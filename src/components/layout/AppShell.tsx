@@ -15,7 +15,7 @@ import {
   SidebarMenuButton,
   SidebarTrigger,
   SidebarInset,
-  useSidebar, 
+  useSidebar,
 } from '@/components/ui/sidebar';
 import { NAV_ITEMS } from '@/lib/constants';
 import { Button } from '@/components/ui/button';
@@ -29,12 +29,12 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
-import { UserCircle, Building } from 'lucide-react';
+import { UserCircle, Building, PanelLeft } from 'lucide-react';
 
 // Inner component that uses the SidebarContext
 const AppShellLayout = ({ children }: { children: React.ReactNode }) => {
   const pathname = usePathname();
-  const { isMobile, setOpenMobile } = useSidebar(); 
+  const { isMobile, setOpenMobile } = useSidebar();
 
   const handleNavigationClick = () => {
     if (isMobile) {
@@ -91,12 +91,12 @@ const AppShellLayout = ({ children }: { children: React.ReactNode }) => {
             <DropdownMenuContent side="top" align="start" className="w-56 mb-2 ml-2 group-data-[collapsible=icon]:ml-0 group-data-[collapsible=icon]:mb-0 group-data-[collapsible=icon]:mt-2">
               <DropdownMenuLabel>Manage Account</DropdownMenuLabel>
               <DropdownMenuSeparator />
-              <Link href="/company-details" asChild>
-                <DropdownMenuItem onClick={handleNavigationClick}> 
+              <DropdownMenuItem asChild onClick={handleNavigationClick}>
+                <Link href="/company-details">
                   <Building className="mr-2 h-4 w-4" />
                   <span>Company Details</span>
-                </DropdownMenuItem>
-              </Link>
+                </Link>
+              </DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>
            <p className="text-xs text-muted-foreground group-data-[collapsible=icon]:hidden">© {new Date().getFullYear()} BizSight</p>
@@ -105,7 +105,7 @@ const AppShellLayout = ({ children }: { children: React.ReactNode }) => {
 
       <SidebarInset>
         <header className="sticky top-0 z-10 flex h-14 items-center gap-4 border-b bg-background/80 px-4 backdrop-blur-sm sm:h-16 sm:px-6 md:hidden">
-            <SidebarTrigger variant="outline" size="icon" /> {/* Removed explicit h-10 w-10 as size="icon" should handle it */}
+            <SidebarTrigger variant="outline" size="icon" />
             <Link href="/" onClick={handleNavigationClick}>
               <div className="flex items-center gap-2 md:hidden">
                  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-6 w-6 text-primary">
