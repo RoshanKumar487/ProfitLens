@@ -2,19 +2,42 @@
 
 import * as React from "react"
 import { ChevronLeft, ChevronRight } from "lucide-react"
-import { DayPicker } from "react-day-picker"
+import { DayPicker, type DayProps } from "react-day-picker"
 
 import { cn } from "@/lib/utils"
 import { buttonVariants } from "@/components/ui/button"
 
-export type CalendarProps = React.ComponentProps<typeof DayPicker>
+export type CalendarProps = React.ComponentProps<typeof DayPicker> & {
+  components?: {
+    DayContent?: React.ComponentType<{ date: Date; activeModifiers: object; displayMonth: Date }>;
+  }
+}
+
 
 function Calendar({
   className,
   classNames,
   showOutsideDays = true,
+  components,
   ...props
 }: CalendarProps) {
+
+  const DayContentWrapper = (dayProps: DayProps) => {
+    const { date, activeModifiers, displayMonth } = dayProps;
+    if (components?.DayContent) {
+      return <components.DayContent date={date} activeModifiers={activeModifiers} displayMonth={displayMonth} />;
+    }
+    return <>{formatDate(date)}</>;
+  };
+  
+  const formatDate = (date: Date): string => {
+    // Default formatting if no custom DayContent is provided
+    // This ensures the day number is displayed.
+    // You might want to customize this further if needed.
+    return date.getDate().toString();
+  };
+
+
   return (
     <DayPicker
       showOutsideDays={showOutsideDays}
@@ -54,12 +77,9 @@ function Calendar({
         ...classNames,
       }}
       components={{
-        IconLeft: ({ className, ...props }) => (
-          <ChevronLeft className={cn("h-4 w-4", className)} {...props} />
-        ),
-        IconRight: ({ className, ...props }) => (
-          <ChevronRight className={cn("h-4 w-4", className)} {...props} />
-        ),
+        IconLeft: ({ ...props }) => <ChevronLeft className="h-4 w-4" />,
+        IconRight: ({ ...props }) => <ChevronRight className="h-4 w-4" />,
+        DayContent: components?.DayContent ? DayContentWrapper : undefined,
       }}
       {...props}
     />
