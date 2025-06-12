@@ -12,14 +12,12 @@ import {
   SidebarMenu,
   SidebarMenuItem,
   SidebarMenuButton,
-  SidebarTrigger, // This is from '@/components/ui/sidebar'
+  SidebarTrigger, 
   SidebarInset,
-  useSidebar,
 } from '@/components/ui/sidebar';
 import { NAV_ITEMS } from '@/lib/constants';
 import { Button } from '@/components/ui/button';
 import { Separator } from '@/components/ui/separator';
-// Removed: import { SheetTrigger } from '@/components/ui/sheet'; 
 
 const AppShell = ({ children }: { children: React.ReactNode }) => {
   const pathname = usePathname();
@@ -42,7 +40,7 @@ const AppShell = ({ children }: { children: React.ReactNode }) => {
           <SidebarMenu>
             {NAV_ITEMS.map((item) => (
               <SidebarMenuItem key={item.label}>
-                <Link href={item.href} legacyBehavior passHref>
+                <Link href={item.href}>
                   <SidebarMenuButton
                     isActive={pathname === item.href || (item.href !== '/' && pathname.startsWith(item.href))}
                     tooltip={{ children: item.label, side: 'right', className: 'bg-card text-card-foreground' }}
@@ -63,7 +61,6 @@ const AppShell = ({ children }: { children: React.ReactNode }) => {
 
       <SidebarInset>
         <header className="sticky top-0 z-10 flex h-14 items-center gap-4 border-b bg-background/80 px-4 backdrop-blur-sm sm:h-16 sm:px-6 md:hidden">
-            {/* Use the custom SidebarTrigger directly, styled as needed */}
             <SidebarTrigger variant="outline" size="icon" className="md:hidden" />
             <Link href="/" className="flex items-center gap-2 md:hidden">
                  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-6 w-6 text-primary">
