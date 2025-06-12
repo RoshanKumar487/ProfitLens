@@ -15,6 +15,7 @@ import {
   SidebarMenuButton,
   SidebarTrigger,
   SidebarInset,
+  useSidebar, 
 } from '@/components/ui/sidebar';
 import { NAV_ITEMS } from '@/lib/constants';
 import { Button } from '@/components/ui/button';
@@ -30,20 +31,30 @@ import {
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { UserCircle, Building } from 'lucide-react';
 
-const AppShell = ({ children }: { children: React.ReactNode }) => {
+// Inner component that uses the SidebarContext
+const AppShellLayout = ({ children }: { children: React.ReactNode }) => {
   const pathname = usePathname();
+  const { isMobile, setOpenMobile } = useSidebar(); 
+
+  const handleNavigationClick = () => {
+    if (isMobile) {
+      setOpenMobile(false);
+    }
+  };
 
   return (
-    <SidebarProvider defaultOpen={true}>
+    <>
       <Sidebar collapsible="icon" variant="sidebar" className="border-r">
         <SidebarHeader className="p-4">
-          <Link href="/" className="flex items-center gap-2">
-            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-8 w-8 text-primary">
-              <path d="M12 2L2 7l10 5 10-5-10-5z"></path>
-              <path d="M2 17l10 5 10-5"></path>
-              <path d="M2 12l10 5 10-5"></path>
-            </svg>
-            <h1 className="text-2xl font-headline font-semibold text-primary group-data-[collapsible=icon]:hidden">BizSight</h1>
+          <Link href="/" onClick={handleNavigationClick}>
+            <div className="flex items-center gap-2">
+              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-8 w-8 text-primary">
+                <path d="M12 2L2 7l10 5 10-5-10-5z"></path>
+                <path d="M2 17l10 5 10-5"></path>
+                <path d="M2 12l10 5 10-5"></path>
+              </svg>
+              <h1 className="text-2xl font-headline font-semibold text-primary group-data-[collapsible=icon]:hidden">BizSight</h1>
+            </div>
           </Link>
         </SidebarHeader>
         <Separator />
@@ -51,7 +62,7 @@ const AppShell = ({ children }: { children: React.ReactNode }) => {
           <SidebarMenu>
             {NAV_ITEMS.map((item) => (
               <SidebarMenuItem key={item.label}>
-                <Link href={item.href}>
+                <Link href={item.href} onClick={handleNavigationClick}>
                   <SidebarMenuButton
                     isActive={pathname === item.href || (item.href !== '/' && pathname.startsWith(item.href))}
                     tooltip={{ children: item.label, side: 'right', className: 'bg-card text-card-foreground' }}
@@ -80,23 +91,12 @@ const AppShell = ({ children }: { children: React.ReactNode }) => {
             <DropdownMenuContent side="top" align="start" className="w-56 mb-2 ml-2 group-data-[collapsible=icon]:ml-0 group-data-[collapsible=icon]:mb-0 group-data-[collapsible=icon]:mt-2">
               <DropdownMenuLabel>Manage Account</DropdownMenuLabel>
               <DropdownMenuSeparator />
-              <Link href="/company-details" passHref>
-                <DropdownMenuItem>
+              <Link href="/company-details" asChild>
+                <DropdownMenuItem onClick={handleNavigationClick}> 
                   <Building className="mr-2 h-4 w-4" />
                   <span>Company Details</span>
                 </DropdownMenuItem>
               </Link>
-              {/* Future items:
-              <DropdownMenuItem>
-                <UserCircle className="mr-2 h-4 w-4" />
-                <span>Profile</span>
-              </DropdownMenuItem>
-              <DropdownMenuSeparator />
-              <DropdownMenuItem>
-                <LogOut className="mr-2 h-4 w-4" />
-                <span>Log Out</span>
-              </DropdownMenuItem>
-              */}
             </DropdownMenuContent>
           </DropdownMenu>
            <p className="text-xs text-muted-foreground group-data-[collapsible=icon]:hidden">© {new Date().getFullYear()} BizSight</p>
@@ -105,20 +105,31 @@ const AppShell = ({ children }: { children: React.ReactNode }) => {
 
       <SidebarInset>
         <header className="sticky top-0 z-10 flex h-14 items-center gap-4 border-b bg-background/80 px-4 backdrop-blur-sm sm:h-16 sm:px-6 md:hidden">
-            <SidebarTrigger variant="outline" size="icon" className="h-10 w-10" />
-            <Link href="/" className="flex items-center gap-2 md:hidden">
+            <SidebarTrigger variant="outline" size="icon" /> {/* Removed explicit h-10 w-10 as size="icon" should handle it */}
+            <Link href="/" onClick={handleNavigationClick}>
+              <div className="flex items-center gap-2 md:hidden">
                  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-6 w-6 text-primary">
                     <path d="M12 2L2 7l10 5 10-5-10-5z"></path>
                     <path d="M2 17l10 5 10-5"></path>
                     <path d="M2 12l10 5 10-5"></path>
                  </svg>
                 <span className="font-headline text-lg font-semibold text-primary">BizSight</span>
+              </div>
             </Link>
         </header>
         <main className="flex-1 p-4 sm:p-6 md:p-8">
           {children}
         </main>
       </SidebarInset>
+    </>
+  );
+};
+
+// AppShell now only sets up the provider
+const AppShell = ({ children }: { children: React.ReactNode }) => {
+  return (
+    <SidebarProvider defaultOpen={true}>
+      <AppShellLayout>{children}</AppShellLayout>
     </SidebarProvider>
   );
 };
