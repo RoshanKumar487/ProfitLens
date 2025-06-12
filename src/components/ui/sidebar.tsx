@@ -5,13 +5,14 @@ import * as React from "react"
 import { Slot } from "@radix-ui/react-slot"
 import { VariantProps, cva } from "class-variance-authority"
 import { PanelLeft } from "lucide-react"
+import { VisuallyHidden } from "@radix-ui/react-visually-hidden"
 
 import { useIsMobile } from "@/hooks/use-mobile"
 import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Separator } from "@/components/ui/separator"
-import { Sheet, SheetContent } from "@/components/ui/sheet"
+import { Sheet, SheetContent, SheetTitle } from "@/components/ui/sheet"
 import { Skeleton } from "@/components/ui/skeleton"
 import {
   Tooltip,
@@ -207,6 +208,9 @@ const Sidebar = React.forwardRef<
             }
             side={side}
           >
+            <VisuallyHidden>
+              <SheetTitle>Main Navigation</SheetTitle>
+            </VisuallyHidden>
             <div className="flex h-full w-full flex-col">{children}</div>
           </SheetContent>
         </Sheet>
@@ -265,9 +269,8 @@ const SidebarTrigger = React.forwardRef<
   React.ComponentProps<typeof Button>
 >(({ className, onClick, variant = "ghost", size = "icon", ...props }, ref) => {
   const { toggleSidebar } = useSidebar();
-  // If size is "icon", let the Button component's default styling for size="icon" (h-10 w-10) apply.
-  // Otherwise, or if a specific h/w is not in className for icon size, apply h-7 w-7.
-  const sizeSpecificClass = size === "icon" ? "" : "h-7 w-7";
+  // Apply h-10 w-10 if size is "icon", otherwise h-7 w-7.
+  const sizeSpecificClass = size === "icon" ? "h-10 w-10" : "h-7 w-7";
 
 
   return (
@@ -275,8 +278,8 @@ const SidebarTrigger = React.forwardRef<
       ref={ref}
       data-sidebar="trigger"
       variant={variant}
-      size={size}
-      className={cn(sizeSpecificClass, className)}
+      size={size} // Pass size to Button, it will handle its own logic for 'icon' size
+      className={cn(sizeSpecificClass, className)} // Explicitly set h-10 w-10 for icon if needed, or rely on Button's 'icon' size.
       onClick={(event) => {
         onClick?.(event);
         toggleSidebar();
