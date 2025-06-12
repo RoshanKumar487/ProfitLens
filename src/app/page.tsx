@@ -1,3 +1,5 @@
+'use client';
+
 import PageTitle from '@/components/PageTitle';
 import DataCard from '@/components/DataCard';
 import { DollarSign, TrendingUp, TrendingDown, Users, Activity, BarChartBig, FileText, Lightbulb } from 'lucide-react';

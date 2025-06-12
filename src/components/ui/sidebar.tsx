@@ -1,3 +1,4 @@
+
 "use client"
 
 import * as React from "react"
@@ -262,27 +263,31 @@ Sidebar.displayName = "Sidebar"
 const SidebarTrigger = React.forwardRef<
   React.ElementRef<typeof Button>,
   React.ComponentProps<typeof Button>
->(({ className, onClick, ...props }, ref) => {
-  const { toggleSidebar } = useSidebar()
+>(({ className, onClick, variant = "ghost", size = "icon", ...props }, ref) => {
+  const { toggleSidebar } = useSidebar();
+  // If size is "icon", let the Button component's default styling for size="icon" (h-10 w-10) apply.
+  // Otherwise, or if a specific h/w is not in className for icon size, apply h-7 w-7.
+  const sizeSpecificClass = size === "icon" ? "" : "h-7 w-7";
+
 
   return (
     <Button
       ref={ref}
       data-sidebar="trigger"
-      variant="ghost"
-      size="icon"
-      className={cn("h-7 w-7", className)}
+      variant={variant}
+      size={size}
+      className={cn(sizeSpecificClass, className)}
       onClick={(event) => {
-        onClick?.(event)
-        toggleSidebar()
+        onClick?.(event);
+        toggleSidebar();
       }}
       {...props}
     >
       <PanelLeft />
       <span className="sr-only">Toggle Sidebar</span>
     </Button>
-  )
-})
+  );
+});
 SidebarTrigger.displayName = "SidebarTrigger"
 
 const SidebarRail = React.forwardRef<
