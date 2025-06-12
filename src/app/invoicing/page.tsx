@@ -43,6 +43,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { Calendar } from '@/components/ui/calendar'; // ShadCN Calendar
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 
 
 interface InvoiceItem {
@@ -439,3 +440,4 @@ export default function InvoicingPage() {
     </div>
   );
 }
+
