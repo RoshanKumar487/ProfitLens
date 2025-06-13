@@ -26,18 +26,4 @@ export async function GET() {
   }
 }
 
-// Create or Update company details
-export async function POST(request: NextRequest) {
-  try {
-    const details = await request.json();
-    const { db } = await connectToDatabase();
-
-    await db.collection(COLLECTION_NAME).updateOne({}, { $set: details }, { upsert: true });
-    return NextResponse.json({ message: 'Company details saved successfully' }, { status: 200 });
-  } catch (error) {
-    console.error('API Error - Failed to save company details:', error);
-    const errorMessage = error instanceof Error ? error.message : 'An unknown error occurred during the save operation.';
-    return NextResponse.json({ message: `Server Error: ${errorMessage}` }, { status: 500 });
-  }
-}
-
+// POST function removed as per user request to disable saving.
