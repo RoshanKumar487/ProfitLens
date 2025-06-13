@@ -12,8 +12,8 @@ export async function GET() {
     const { db } = await connectToDatabase();
     const details = await db.collection(COLLECTION_NAME).findOne({});
     if (!details) {
-      return NextResponse.json({ 
-        name: '', address: '', gstin: '', phone: '', email: '', website: '' 
+      return NextResponse.json({
+        name: '', address: '', gstin: '', phone: '', email: '', website: ''
       }, { status: 200 });
     }
     // Ensure _id is not sent to the client or convert it to string if needed
@@ -32,11 +32,7 @@ export async function POST(request: NextRequest) {
     const details = await request.json();
     const { db } = await connectToDatabase();
 
-    await db.collection(COLLECTION_NAME).updateOne(
-      {}, 
-      { $set: details },
-      { upsert: true }
-    );
+    await db.collection(COLLECTION_NAME).updateOne({}, { $set: details }, { upsert: true });
     return NextResponse.json({ message: 'Company details saved successfully' }, { status: 200 });
   } catch (error) {
     console.error('API Error - Failed to save company details:', error);
@@ -44,3 +40,4 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ message: `Server Error: ${errorMessage}` }, { status: 500 });
   }
 }
+
