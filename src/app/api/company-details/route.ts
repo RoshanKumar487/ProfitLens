@@ -19,18 +19,21 @@ const COLLECTION_NAME = 'company_details';
 
 // Helper function to get the collection
 async function getCompanyDetailsCollection(): Promise<Collection<CompanyDetails>> {
+  console.log('[API COMPANY_DETAILS] Connecting to database for collection:', COLLECTION_NAME);
   const { db } = await connectToDatabase();
   return db.collection<CompanyDetails>(COLLECTION_NAME);
 }
 
 // Handles GET requests to /api/company-details
 export async function GET() {
+  console.log('[API COMPANY_DETAILS GET] Received request.');
   try {
     const collection = await getCompanyDetailsCollection();
+    console.log('[API COMPANY_DETAILS GET] Fetching company details from database.');
     const details = await collection.findOne({});
 
     if (!details) {
-      // Return a default structure if no details are found
+      console.log('[API COMPANY_DETAILS GET] No company details found in database. Returning default structure.');
       return NextResponse.json({
         name: '',
         address: '',
@@ -41,8 +44,7 @@ export async function GET() {
       });
     }
 
-    // Prepare the data for the response, excluding _id
-    // Ensure all fields are present, defaulting to empty strings if null/undefined from DB
+    console.log('[API COMPANY_DETAILS GET] Company details found. Preparing response.');
     const responseData = {
       name: details.name || '',
       address: details.address || '',
@@ -54,42 +56,51 @@ export async function GET() {
     return NextResponse.json(responseData);
 
   } catch (error: any) {
-    console.error('[API COMPANY_DETAILS GET] Error:', error);
-    let errorMessage = 'Failed to fetch company details.';
+    console.error('[API COMPANY_DETAILS GET] Critical error:', error);
+    let errorMessage = 'Failed to fetch company details due to a server error.';
     
     if (typeof error.message === 'string') {
       if (error.message.includes('Invalid scheme') || error.message.includes('mongodb+srv') || error.message.includes('mongodb://')) {
           errorMessage = `Server Error: ${error.message}. Please ensure your MONGODB_URI environment variable is correctly configured.`;
+          console.error('[API COMPANY_DETAILS GET] MONGODB_URI configuration error:', error.message);
       } else if (error.message.includes('ECONNREFUSED') || error.message.includes('failed to connect') || error.message.includes('ENOTFOUND')) {
           errorMessage = `Server Error: Could not connect to the database. ${error.message}`;
+          console.error('[API COMPANY_DETAILS GET] Database connection error:', error.message);
       } else {
-        errorMessage = error.message;
+        errorMessage = `Server Error: ${error.message}`;
       }
     }
+    // This response might not be seen if the error is too early (e.g., module load),
+    // but it's good practice to try and return JSON.
     return NextResponse.json({ message: errorMessage }, { status: 500 });
   }
 }
 
 // Handles POST requests to /api/company-details to update or create
 export async function POST(request: NextRequest) {
+  console.log('[API COMPANY_DETAILS POST] Received request.');
   try {
-    const detailsToSave: Omit<CompanyDetails, '_id'> = await request.json(); // Data from client won't have _id
+    const detailsToSave: Omit<CompanyDetails, '_id'> = await request.json();
+    console.log('[API COMPANY_DETAILS POST] Request body (detailsToSave):', detailsToSave);
 
-    // Basic validation (optional, can be more extensive)
     if (!detailsToSave.name || !detailsToSave.address || !detailsToSave.gstin) {
+        console.warn('[API COMPANY_DETAILS POST] Validation failed: Company Name, Address, and GSTIN are required.');
         return NextResponse.json({ message: 'Company Name, Address, and GSTIN are required.' }, { status: 400 });
     }
 
     const collection = await getCompanyDetailsCollection();
+    console.log('[API COMPANY_DETAILS POST] Attempting to update/insert company details into database.');
 
     const result = await collection.updateOne(
-      {}, // An empty filter means update the first document found or insert if no documents exist
+      {}, 
       { $set: detailsToSave },
       { upsert: true }
     );
 
+    console.log('[API COMPANY_DETAILS POST] Database operation result:', result);
+
     if (result.modifiedCount > 0 || result.upsertedId) {
-       // Fetch the (potentially upserted) document to return it, ensuring consistency
+       console.log(`[API COMPANY_DETAILS POST] Details ${result.upsertedId ? 'upserted with ID: ' + result.upsertedId : 'modified'}. Fetching updated record.`);
        const savedDetails = await collection.findOne({});
        if (savedDetails) {
          const responseData = {
@@ -100,12 +111,13 @@ export async function POST(request: NextRequest) {
             email: savedDetails.email || '',
             website: savedDetails.website || '',
           };
+         console.log('[API COMPANY_DETAILS POST] Successfully saved and retrieved details. Sending response:', responseData);
          return NextResponse.json(responseData, { status: 200 });
        }
-       // Fallback if findOne fails after upsert/update (should ideally not happen)
+       console.warn('[API COMPANY_DETAILS POST] Details saved, but failed to retrieve updated record for response.');
        return NextResponse.json({ message: 'Details saved, but failed to retrieve updated record.' }, { status: 200 });
     } else if (result.matchedCount > 0) {
-        // Data was same as existing, nothing modified, but considered success
+        console.log('[API COMPANY_DETAILS POST] Data already up to date. No modifications needed.');
         const existingDetails = await collection.findOne({});
          if (existingDetails) {
             const responseData = {
@@ -120,25 +132,28 @@ export async function POST(request: NextRequest) {
         }
         return NextResponse.json({ message: 'Data already up to date.' }, { status: 200 });
     } else {
-      // This case should ideally not be reached with upsert:true and empty filter
-      // if the operation somehow failed without throwing an error.
+      console.error('[API COMPANY_DETAILS POST] Failed to save company details. No changes were made, and no document matched for update (upsert should have created one). Result:', result);
       return NextResponse.json({ message: 'Failed to save company details. No changes were made.' }, { status: 500 });
     }
 
   } catch (error: any) {
-    console.error('[API COMPANY_DETAILS POST] Error:', error);
-    let errorMessage = 'Failed to save company details.';
+    console.error('[API COMPANY_DETAILS POST] Critical error:', error);
+    let errorMessage = 'Failed to save company details due to a server error.';
      if (typeof error.message === 'string') {
       if (error.message.includes('Invalid scheme') || error.message.includes('mongodb+srv') || error.message.includes('mongodb://')) {
           errorMessage = `Server Error: ${error.message}. Please ensure your MONGODB_URI environment variable is correctly configured.`;
+          console.error('[API COMPANY_DETAILS POST] MONGODB_URI configuration error:', error.message);
       } else if (error.message.includes('ECONNREFUSED') || error.message.includes('failed to connect') || error.message.includes('ENOTFOUND')) {
           errorMessage = `Server Error: Could not connect to the database. ${error.message}`;
-      } else if (error.name === 'SyntaxError' && error.message.includes('JSON')) { // Check if body was valid JSON
+          console.error('[API COMPANY_DETAILS POST] Database connection error:', error.message);
+      } else if (error.name === 'SyntaxError' && error.message.includes('JSON')) { 
           errorMessage = 'Server Error: Invalid JSON data received in the request body.';
+          console.error('[API COMPANY_DETAILS POST] Invalid JSON in request body:', error.message);
       } else {
-        errorMessage = error.message;
+        errorMessage = `Server Error: ${error.message}`;
       }
     }
     return NextResponse.json({ message: errorMessage }, { status: 500 });
   }
 }
+
