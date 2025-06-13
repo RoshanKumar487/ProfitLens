@@ -49,7 +49,7 @@ export default function CompanyDetailsPage() {
              }
            } catch (jsonError) {
              console.error('Failed to parse API error response as JSON (fetch):', jsonError);
-             errorMessage = `Request failed: ${response.statusText} (Status: ${response.status})`;
+             errorMessage = `The server returned an unexpected response (not valid JSON). Status: ${response.status} (${response.statusText}). This often means the API route encountered an error and sent HTML instead. Please check server logs.`;
            }
           throw new Error(errorMessage);
         }
@@ -106,7 +106,7 @@ export default function CompanyDetailsPage() {
           }
         } catch (jsonError) {
           console.error('Failed to parse API error response as JSON (save):', jsonError);
-          errorMessageFromServer = `Request failed: ${response.statusText} (Status: ${response.status})`;
+          errorMessageFromServer = `The server returned an unexpected response (not valid JSON) while saving. Status: ${response.status} (${response.statusText}). This often means the API route encountered an error and sent HTML instead. Please check server logs.`;
         }
         throw new Error(errorMessageFromServer);
       }
