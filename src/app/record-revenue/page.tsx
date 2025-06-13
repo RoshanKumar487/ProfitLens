@@ -38,16 +38,35 @@ export default function RecordRevenuePage() {
       try {
         const response = await fetch('/api/revenue-entries');
         if (!response.ok) {
-          throw new Error('Failed to fetch entries');
+          let errorMessage = 'Failed to fetch revenue entries.';
+          try {
+            const errorData = await response.json();
+            if (errorData && errorData.message) {
+              errorMessage = errorData.message;
+            } else {
+              errorMessage = `Request failed: ${response.statusText} (Status: ${response.status})`;
+            }
+          } catch (jsonError) {
+            console.error('Failed to parse API error response as JSON (fetch revenue):', jsonError);
+            errorMessage = `The server returned an unexpected response (not valid JSON) while fetching entries. Status: ${response.status} (${response.statusText}). Check server logs.`;
+          }
+          throw new Error(errorMessage);
         }
         const data = await response.json();
-        // Ensure date is parsed into Date object
         setRecentEntries(data.map((entry: any) => ({...entry, date: parseISO(entry.date)})));
-      } catch (error) {
+      } catch (error: any) {
         console.error('Error fetching revenue entries:', error);
+        let description = error.message || 'Could not load recent revenue entries. Please try again later.';
+        if (typeof error.message === 'string') {
+          if (error.message.includes('Invalid scheme') || error.message.includes('mongodb://') || error.message.includes('mongodb+srv://')) {
+            description = 'The server reported an issue with the database connection string (MONGODB_URI). Please ensure it\'s correctly configured in your .env file and starts with "mongodb://" or "mongodb+srv://".';
+          } else if (error.message.includes('Failed to connect') || error.message.includes('ECONNREFUSED')) {
+            description = 'The server could not connect to the database. Please check your MONGODB_URI, network settings, and ensure your database server is running and accessible.';
+          }
+        }
         toast({
           title: 'Error Loading Entries',
-          description: 'Could not load recent revenue entries.',
+          description: description,
           variant: 'destructive',
         });
       } finally {
@@ -79,7 +98,6 @@ export default function RecordRevenuePage() {
         return;
     }
 
-
     setIsSaving(true);
     const newEntryPayload = {
       date: date.toISOString(), // Send as ISO string
@@ -98,13 +116,23 @@ export default function RecordRevenuePage() {
       });
 
       if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.message || 'Failed to save entry');
+        let errorMessageFromServer = 'Failed to save revenue entry.';
+        try {
+          const errorData = await response.json();
+          if (errorData && errorData.message) {
+            errorMessageFromServer = errorData.message; 
+          } else {
+             errorMessageFromServer = `Request failed: ${response.statusText} (Status: ${response.status})`;
+          }
+        } catch (jsonError) {
+           console.error('Failed to parse API error response as JSON (save revenue):', jsonError);
+           errorMessageFromServer = `The server returned an unexpected response (not valid JSON) while saving. Status: ${response.status} (${response.statusText}). This likely means the API route encountered an error. Check server logs.`;
+        }
+        throw new Error(errorMessageFromServer);
       }
       
       const savedEntry = await response.json();
 
-      // Add new entry to the top and keep list to 5
       setRecentEntries(prevEntries => 
         [{ ...savedEntry, date: parseISO(savedEntry.date) }, ...prevEntries].slice(0, 5)
       );
@@ -114,16 +142,23 @@ export default function RecordRevenuePage() {
         description: `Successfully recorded $${amountNum.toFixed(2)} from ${source}.`,
       });
 
-      // Reset form
       setDate(new Date());
       setAmount('');
       setSource('');
       setDescription('');
     } catch (error: any) {
       console.error('Error saving revenue entry:', error);
+      let description = error.message || 'Could not save revenue entry. Please try again.';
+      if (typeof error.message === 'string') {
+         if (error.message.includes('Invalid scheme') || error.message.includes('mongodb://') || error.message.includes('mongodb+srv://')) {
+            description = 'The server reported an issue with the database connection string (MONGODB_URI) while saving. Please ensure it\'s correctly configured in your .env file and starts with "mongodb://" or "mongodb+srv://".';
+          } else if (error.message.includes('Failed to connect') || error.message.includes('ECONNREFUSED')) {
+            description = 'The server could not connect to the database while saving. Please check your MONGODB_URI, network settings, and ensure your database server is running and accessible.';
+          }
+      }
       toast({
         title: 'Save Failed',
-        description: error.message || 'Could not save revenue entry.',
+        description: description,
         variant: 'destructive',
       });
     } finally {
