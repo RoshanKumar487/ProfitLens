@@ -64,7 +64,17 @@ export default function CompanyDetailsPage() {
       } catch (error: any) {
         console.error('Error fetching company details:', error);
         let description = error.message || 'Could not load company details. Please try again later.';
-        // The more specific error message is now constructed above, so we directly use error.message here.
+        
+        if (error.name === 'SyntaxError') {
+          description = `Failed to parse server response as JSON. The server may have returned HTML (e.g., an error page) instead of the expected data. Please check server logs. (Details: ${error.message})`;
+        } else if (typeof error.message === 'string') {
+          if (error.message.includes('Invalid scheme') || error.message.includes('mongodb+srv') || error.message.includes('mongodb://')) {
+            description = `Server Error: ${error.message}. Please ensure your MONGODB_URI environment variable is correctly configured in your .env file.`;
+          } else if (error.message.includes('ECONNREFUSED') || error.message.includes('failed to connect') || error.message.includes('ENOTFOUND')) {
+            description = `Server Error: Could not connect to the database. ${error.message}. Check MONGODB_URI and database server status.`;
+          }
+        }
+        
         toast({
           title: 'Error Loading Details',
           description: description,
@@ -110,20 +120,28 @@ export default function CompanyDetailsPage() {
              errorMessage = `API route /api/company-details (POST) not found (404). Please verify the route exists and the server is correctly configured.`;
           } else if (response.status === 500) {
               errorMessage = `Server Error (500) when saving: Received an HTML error page instead of JSON. This points to a critical server-side issue (e.g., database configuration error like MONGODB_URI, or an unhandled error in the API POST route). Please check your server logs for details.`;
-           } else if (response.status === 400 && typeof response.bodyUsed && !response.bodyUsed) {
-             // If it's a 400 and body hasn't been read, try to read it.
+           } else if (response.status === 400) {
+             // Attempt to read body for more info on 400, if it's not already JSON
              try {
-                const errorBody = await response.text(); // Or response.json() if you expect JSON for 400
-                if (errorBody.toLowerCase().includes("invalid json")) {
-                    errorMessage = 'Server Error: Invalid JSON data sent in the request body when saving.';
-                } else {
-                    errorMessage = `Bad Request (400): ${errorBody || response.statusText}`;
+                const errorBodyText = await response.text(); // Read as text first
+                try {
+                    const errorBodyJson = JSON.parse(errorBodyText); // Try to parse
+                    if (errorBodyJson && errorBodyJson.message) {
+                        errorMessage = `Bad Request (400): ${errorBodyJson.message}`;
+                    } else {
+                        errorMessage = `Bad Request (400): ${errorBodyText || response.statusText}`;
+                    }
+                } catch (parseError) { // If text itself is not JSON
+                     if (errorBodyText.toLowerCase().includes("invalid json")) { // Check if the text indicates invalid JSON payload from client
+                        errorMessage = 'Server Error: Invalid JSON data sent in the request body when saving.';
+                    } else {
+                        errorMessage = `Bad Request (400): ${errorBodyText || response.statusText}`;
+                    }
                 }
              } catch (bodyReadError) {
                 errorMessage = `Bad Request (400), and failed to read error body. Status: ${response.statusText}`;
              }
-           }
-            else {
+           } else {
              errorMessage = `Received an unexpected non-JSON response from the server when saving (Status: ${response.status} - ${response.statusText}). Check server logs.`;
           }
         }
@@ -140,6 +158,15 @@ export default function CompanyDetailsPage() {
     } catch (error: any) {
       console.error('Error saving company details:', error);
       let description = error.message || 'Could not save company details. Please try again later.';
+      if (error.name === 'SyntaxError') {
+        description = `Failed to parse server response as JSON after saving. The server might have returned HTML (e.g., an error page) instead of the expected data. Please check server logs. (Details: ${error.message})`;
+      } else if (typeof error.message === 'string') {
+         if (error.message.includes('Invalid scheme') || error.message.includes('mongodb+srv') || error.message.includes('mongodb://')) {
+            description = `Server Error: ${error.message}. Please ensure your MONGODB_URI environment variable is correctly configured.`;
+        } else if (error.message.includes('ECONNREFUSED') || error.message.includes('failed to connect') || error.message.includes('ENOTFOUND')) {
+            description = `Server Error: Could not connect to the database. ${error.message}. Check MONGODB_URI and database server status.`;
+        }
+      }
       toast({
         title: 'Save Failed',
         description: description,
