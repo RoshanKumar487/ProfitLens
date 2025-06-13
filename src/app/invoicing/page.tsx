@@ -227,7 +227,7 @@ export default function InvoicingPage() {
         `Amount: $${invoice.amount.toFixed(2)}`,
         `Due Date: ${format(invoice.dueDate, 'PPP')}`,
         ``,
-        `You can view the full invoice details by logging into your portal (if applicable) or find it attached if this were a real email system.`,
+        `A PDF of Invoice ${invoice.invoiceNumber} would be attached to this email in a fully integrated system.`,
         ``,
         `Thank you for your business!`,
         ``,
