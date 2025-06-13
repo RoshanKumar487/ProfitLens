@@ -39,15 +39,27 @@ export default function CompanyDetailsPage() {
       try {
         const response = await fetch('/api/company-details');
         if (!response.ok) {
-          throw new Error('Failed to fetch details');
+           let errorMessage = 'Failed to fetch details.';
+           try {
+             const errorData = await response.json();
+             if (errorData && errorData.message) {
+               errorMessage = errorData.message;
+             } else {
+                errorMessage = `Request failed: ${response.statusText} (Status: ${response.status})`;
+             }
+           } catch (jsonError) {
+             console.error('Failed to parse API error response as JSON (fetch):', jsonError);
+             errorMessage = `Request failed: ${response.statusText} (Status: ${response.status})`;
+           }
+          throw new Error(errorMessage);
         }
         const data = await response.json();
         setCompanyDetails(data);
-      } catch (error) {
+      } catch (error: any) {
         console.error('Error fetching company details:', error);
         toast({
-          title: 'Error',
-          description: 'Could not load company details. Please try again later.',
+          title: 'Error Loading Details',
+          description: error.message || 'Could not load company details. Please try again later.',
           variant: 'destructive',
         });
       } finally {
@@ -76,8 +88,19 @@ export default function CompanyDetailsPage() {
       });
 
       if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.message || 'Failed to save details');
+        let errorMessageFromServer = 'Failed to save details.'; // Default
+        try {
+          const errorData = await response.json();
+          if (errorData && errorData.message) {
+            errorMessageFromServer = errorData.message; // Use message from server if available
+          } else {
+            errorMessageFromServer = `Request failed: ${response.statusText} (Status: ${response.status})`;
+          }
+        } catch (jsonError) {
+          console.error('Failed to parse API error response as JSON (save):', jsonError);
+          errorMessageFromServer = `Request failed: ${response.statusText} (Status: ${response.status})`;
+        }
+        throw new Error(errorMessageFromServer);
       }
 
       toast({

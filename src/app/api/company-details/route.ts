@@ -1,3 +1,4 @@
+
 // src/app/api/company-details/route.ts
 import type { NextRequest } from 'next/server';
 import { NextResponse } from 'next/server';
@@ -19,8 +20,9 @@ export async function GET() {
     const { _id, ...rest } = details;
     return NextResponse.json(rest, { status: 200 });
   } catch (error) {
-    console.error('Failed to fetch company details:', error);
-    return NextResponse.json({ message: 'Failed to fetch company details' }, { status: 500 });
+    console.error('API Error - Failed to fetch company details:', error);
+    const errorMessage = error instanceof Error ? error.message : 'An unknown error occurred while fetching details.';
+    return NextResponse.json({ message: `Server Error: ${errorMessage}` }, { status: 500 });
   }
 }
 
@@ -30,18 +32,15 @@ export async function POST(request: NextRequest) {
     const details = await request.json();
     const { db } = await connectToDatabase();
 
-    // Use updateOne with upsert: true to either update existing or insert new
-    // Assuming there's only one document for company details, we can use a fixed filter or update any doc.
-    // For simplicity, we'll update (or insert if not exists) the first document found or a new one.
-    // A more robust way might be to have a specific identifier if multiple company profiles were possible.
     await db.collection(COLLECTION_NAME).updateOne(
-      {}, // An empty filter will match the first document if using for a single profile
+      {}, 
       { $set: details },
       { upsert: true }
     );
     return NextResponse.json({ message: 'Company details saved successfully' }, { status: 200 });
   } catch (error) {
-    console.error('Failed to save company details:', error);
-    return NextResponse.json({ message: 'Failed to save company details' }, { status: 500 });
+    console.error('API Error - Failed to save company details:', error);
+    const errorMessage = error instanceof Error ? error.message : 'An unknown error occurred during the save operation.';
+    return NextResponse.json({ message: `Server Error: ${errorMessage}` }, { status: 500 });
   }
 }
