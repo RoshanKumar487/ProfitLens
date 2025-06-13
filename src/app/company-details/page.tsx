@@ -49,7 +49,11 @@ export default function CompanyDetailsPage() {
              }
            } catch (jsonError) {
              console.error('Failed to parse API error response as JSON (fetch):', jsonError);
-             errorMessage = `The server returned an unexpected response (not valid JSON). Status: ${response.status} (${response.statusText}). This often means the API route encountered an error and sent HTML instead. Please check server logs.`;
+             if (response.status === 404) {
+                errorMessage = `API route /api/company-details not found (404). Please verify the route exists and the server is correctly configured. Server logs may provide more details.`;
+             } else {
+                errorMessage = `Received an unexpected non-JSON response from the server (Status: ${response.status} - ${response.statusText}). This often indicates a server-side error. Please check server logs.`;
+             }
            }
           throw new Error(errorMessage);
         }
