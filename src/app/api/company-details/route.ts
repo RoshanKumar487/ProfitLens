@@ -40,14 +40,14 @@ export async function GET() {
     }
 
     // Prepare the data for the response, excluding _id
-    const { _id, ...detailsWithoutId } = details;
+    // Ensure all fields are present, defaulting to empty strings if null/undefined from DB
     const responseData = {
-      name: detailsWithoutId.name || '',
-      address: detailsWithoutId.address || '',
-      gstin: detailsWithoutId.gstin || '',
-      phone: detailsWithoutId.phone || '',
-      email: detailsWithoutId.email || '',
-      website: detailsWithoutId.website || '',
+      name: details.name || '',
+      address: details.address || '',
+      gstin: details.gstin || '',
+      phone: details.phone || '',
+      email: details.email || '',
+      website: details.website || '',
     };
     return NextResponse.json(responseData);
 
@@ -55,13 +55,14 @@ export async function GET() {
     console.error('[API COMPANY_DETAILS GET] Error:', error);
     let errorMessage = 'Failed to fetch company details.';
     
+    // Check if the error message indicates a MONGODB_URI or connection issue
     if (typeof error.message === 'string') {
       if (error.message.includes('Invalid scheme') || error.message.includes('mongodb+srv') || error.message.includes('mongodb://')) {
           errorMessage = `Server Error: ${error.message}. Please ensure your MONGODB_URI environment variable is correctly configured.`;
       } else if (error.message.includes('ECONNREFUSED') || error.message.includes('failed to connect') || error.message.includes('ENOTFOUND')) {
           errorMessage = `Server Error: Could not connect to the database. ${error.message}`;
       } else {
-        errorMessage = error.message;
+        errorMessage = error.message; // Use the original error message if it's not a known connection issue
       }
     }
     return NextResponse.json({ message: errorMessage }, { status: 500 });
@@ -69,4 +70,4 @@ export async function GET() {
 }
 
 // NO OTHER EXPORTS OR FUNCTIONS NAMED GET SHOULD BE IN THIS FILE
-// NO POST function as it was removed by user request.
+// The POST function was previously removed as per user request.
