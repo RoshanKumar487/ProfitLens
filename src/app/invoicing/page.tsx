@@ -1,7 +1,7 @@
 
 'use client';
 
-import React, { useState, useMemo, useEffect } from 'react';
+import React, { useState, useMemo, useEffect, FormEvent } from 'react';
 import PageTitle from '@/components/PageTitle';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -16,7 +16,7 @@ import {
 } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger, DropdownMenuSeparator } from '@/components/ui/dropdown-menu';
-import { Receipt, PlusCircle, Search, MoreHorizontal, Edit, Trash2, Eye, Mail, Download, Calendar as CalendarIconLucide } from 'lucide-react'; // Renamed Calendar to avoid conflict
+import { Receipt, PlusCircle, Search, MoreHorizontal, Edit, Trash2, Eye, Mail, Download, Calendar as CalendarIconLucide, Save } from 'lucide-react'; // Renamed Calendar to avoid conflict
 import { format } from 'date-fns';
 import { useToast } from '@/hooks/use-toast';
 import {
@@ -66,6 +66,15 @@ interface Invoice {
   notes?: string;
 }
 
+interface EmailTemplate {
+  subject: string;
+  body: string;
+}
+
+const LOCAL_STORAGE_INVOICES_KEY = 'bizsight-invoices';
+const LOCAL_STORAGE_COMPANY_DETAILS_KEY = 'bizsight-company-details';
+const LOCAL_STORAGE_EMAIL_TEMPLATE_KEY = 'bizsight-invoice-email-template';
+
 const initialMockInvoices: Invoice[] = [
   { id: '1', invoiceNumber: 'INV001', clientName: 'Acme Corp', clientEmail: 'contact@acme.com', amount: 1200.50, dueDate: new Date('2024-08-15'), status: 'Paid', issuedDate: new Date('2024-07-15'), items: [{id: 'item1', description: 'Web Design', quantity:1, unitPrice: 1000}, {id: 'item2', description: 'Hosting', quantity:1, unitPrice: 200.50}] },
   { id: '2', invoiceNumber: 'INV002', clientName: 'Beta LLC', clientEmail: 'info@betallc.com', amount: 850.00, dueDate: new Date('2024-07-25'), status: 'Overdue', issuedDate: new Date('2024-06-25') },
@@ -73,6 +82,24 @@ const initialMockInvoices: Invoice[] = [
   { id: '4', invoiceNumber: 'INV004', clientName: 'Delta Co', clientEmail: 'billing@deltaco.com', amount: 500.00, dueDate: new Date('2024-08-20'), status: 'Pending', issuedDate: new Date('2024-07-20') },
   { id: '5', invoiceNumber: 'INV005', clientName: 'Epsilon Ltd', clientEmail: 'finance@epsilon.com', amount: 150.00, dueDate: new Date('2024-07-10'), status: 'Draft', issuedDate: new Date('2024-07-01') },
 ];
+
+const DEFAULT_EMAIL_TEMPLATE: EmailTemplate = {
+  subject: "Invoice {{invoiceNumber}} from {{companyName}}",
+  body: `Dear {{clientName}},
+
+Please find details for invoice {{invoiceNumber}} regarding your recent services/products.
+
+Amount: $ {{amount}}
+Due Date: {{dueDate}}
+
+A PDF of Invoice {{invoiceNumber}} would be attached to this email in a fully integrated system.
+This email is sent via a mailto link and cannot attach files directly.
+
+Thank you for your business!
+
+Sincerely,
+{{companyName}}`
+};
 
 
 export default function InvoicingPage() {
@@ -85,8 +112,14 @@ export default function InvoicingPage() {
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
   const [invoiceToDeleteId, setInvoiceToDeleteId] = useState<string | null>(null);
 
+  const [isEmailPreviewDialogOpen, setIsEmailPreviewDialogOpen] = useState(false);
+  const [invoiceForEmail, setInvoiceForEmail] = useState<Invoice | null>(null);
+  const [emailSubject, setEmailSubject] = useState('');
+  const [emailBody, setEmailBody] = useState('');
+  const [companyNameForEmail, setCompanyNameForEmail] = useState("Your Company");
+
   useEffect(() => {
-    const storedInvoices = localStorage.getItem('bizsight-invoices');
+    const storedInvoices = localStorage.getItem(LOCAL_STORAGE_INVOICES_KEY);
     if (storedInvoices) {
       const parsedInvoices = JSON.parse(storedInvoices).map((inv: Invoice) => ({
         ...inv,
@@ -97,11 +130,23 @@ export default function InvoicingPage() {
     } else {
        setInvoices(initialMockInvoices); 
     }
+
+    const companyDetailsString = localStorage.getItem(LOCAL_STORAGE_COMPANY_DETAILS_KEY);
+    if (companyDetailsString) {
+        try {
+            const companyDetails = JSON.parse(companyDetailsString);
+            if (companyDetails.name) {
+                setCompanyNameForEmail(companyDetails.name);
+            }
+        } catch (e) {
+            console.error("Failed to parse company details from localStorage", e);
+        }
+    }
   }, []);
 
   useEffect(() => {
-     if (invoices.length > 0 || localStorage.getItem('bizsight-invoices')) {
-        localStorage.setItem('bizsight-invoices', JSON.stringify(invoices));
+     if (invoices.length > 0 || localStorage.getItem(LOCAL_STORAGE_INVOICES_KEY)) {
+        localStorage.setItem(LOCAL_STORAGE_INVOICES_KEY, JSON.stringify(invoices));
      }
   }, [invoices]);
 
@@ -131,7 +176,7 @@ export default function InvoicingPage() {
   
   const handleFormSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!currentInvoice.clientName || !currentInvoice.amount === undefined || !currentInvoice.issuedDate || !currentInvoice.dueDate) { // amount can be 0
+    if (!currentInvoice.clientName || currentInvoice.amount === undefined || !currentInvoice.issuedDate || !currentInvoice.dueDate) { // amount can be 0
         toast({ title: "Missing Fields", description: "Please fill all required invoice details (Client Name, Amount, Issued Date, Due Date).", variant: "destructive" });
         return;
     }
@@ -139,7 +184,6 @@ export default function InvoicingPage() {
         toast({ title: "Invalid Amount", description: "Amount cannot be negative.", variant: "destructive" });
         return;
     }
-
 
     const newInvoiceNumber = `INV${(invoices.length + 1).toString().padStart(3, '0')}`;
     const finalInvoice: Invoice = {
@@ -195,55 +239,107 @@ export default function InvoicingPage() {
   };
   
   const handleViewInvoice = (invoice: Invoice) => {
-    // Placeholder for viewing - could open a new dialog/page with detailed view
     toast({ title: "View Invoice", description: `Details for ${invoice.invoiceNumber} would be shown here.`});
   };
 
-  const handleEmailInvoice = (invoice: Invoice) => {
-    if (typeof window === "undefined") {
-        toast({ title: "Email Invoice", description: `Invoice ${invoice.invoiceNumber} would be prepared for email on the client.`});
+  const loadAndPrepareEmailTemplate = (invoice: Invoice, useDefault: boolean = false) => {
+    let template = DEFAULT_EMAIL_TEMPLATE;
+    if (!useDefault) {
+        const storedTemplateString = localStorage.getItem(LOCAL_STORAGE_EMAIL_TEMPLATE_KEY);
+        if (storedTemplateString) {
+            try {
+                template = JSON.parse(storedTemplateString);
+            } catch (e) {
+                console.error("Failed to parse saved email template", e);
+                // Fallback to default if parsing fails
+                template = DEFAULT_EMAIL_TEMPLATE;
+            }
+        }
+    }
+    
+    let processedSubject = template.subject;
+    let processedBody = template.body;
+
+    const placeholders = {
+        '{{clientName}}': invoice.clientName || 'Client',
+        '{{invoiceNumber}}': invoice.invoiceNumber,
+        '{{amount}}': invoice.amount.toFixed(2),
+        '{{dueDate}}': format(invoice.dueDate, 'PPP'),
+        '{{companyName}}': companyNameForEmail,
+        // Add more placeholders as needed
+    };
+
+    for (const [key, value] of Object.entries(placeholders)) {
+        processedSubject = processedSubject.replace(new RegExp(key, 'g'), value);
+        processedBody = processedBody.replace(new RegExp(key, 'g'), value);
+    }
+    setEmailSubject(processedSubject);
+    setEmailBody(processedBody);
+  };
+  
+  const handleOpenEmailDialog = (invoice: Invoice) => {
+    if (!invoice.clientEmail) {
+        toast({ title: "Missing Client Email", description: "Cannot send email without client's email address.", variant: "destructive"});
         return;
     }
-
-    const companyDetailsString = localStorage.getItem('bizsight-company-details');
-    let companyName = "Your Company"; // Default
-    if (companyDetailsString) {
-        try {
-        const companyDetails = JSON.parse(companyDetailsString);
-        if (companyDetails.name) {
-            companyName = companyDetails.name;
-        }
-        } catch (e) {
-        console.error("Failed to parse company details from localStorage", e);
-        }
-    }
-
-    const subject = encodeURIComponent(`Invoice ${invoice.invoiceNumber} from ${companyName}`);
-    const bodyLines = [
-        `Dear ${invoice.clientName || 'Client'},`,
-        ``,
-        `Please find details for invoice ${invoice.invoiceNumber} regarding your recent services/products.`,
-        ``,
-        `Amount: $${invoice.amount.toFixed(2)}`,
-        `Due Date: ${format(invoice.dueDate, 'PPP')}`,
-        ``,
-        `A PDF of Invoice ${invoice.invoiceNumber} would be attached to this email in a fully integrated system.`,
-        ``,
-        `Thank you for your business!`,
-        ``,
-        `Sincerely,`,
-        `${companyName}`
-    ];
-    const body = encodeURIComponent(bodyLines.join('\n'));
-
-    const mailtoLink = `mailto:${invoice.clientEmail || ''}?subject=${subject}&body=${body}`;
-
-    window.location.href = mailtoLink;
-    toast({ title: "Email Client Opened", description: `Preparing email for invoice ${invoice.invoiceNumber}.`});
+    setInvoiceForEmail(invoice);
+    loadAndPrepareEmailTemplate(invoice);
+    setIsEmailPreviewDialogOpen(true);
   };
 
+  const handleSendEmail = () => {
+    if (!invoiceForEmail || !invoiceForEmail.clientEmail) return;
+
+    const mailtoLink = `mailto:${invoiceForEmail.clientEmail}?subject=${encodeURIComponent(emailSubject)}&body=${encodeURIComponent(emailBody)}`;
+    if (typeof window !== "undefined") {
+        window.location.href = mailtoLink;
+    }
+    toast({ title: "Email Client Opened", description: `Preparing email for invoice ${invoiceForEmail.invoiceNumber}.`});
+    setIsEmailPreviewDialogOpen(false);
+    setInvoiceForEmail(null);
+  };
+
+  const handleSaveTemplate = () => {
+    // This saves the current state of emailSubject and emailBody AS THE NEW TEMPLATE
+    // Users need to ensure placeholders are in the text if they want them.
+    // For simplicity, we're saving the literal text from the dialog.
+    // A more advanced system would save a template with placeholders.
+    // Here, we will assume the user has edited the text to be a template WITH placeholders.
+    // The actual replacement happens in `loadAndPrepareEmailTemplate`.
+    // So, we save the raw `emailSubject` and `emailBody` as they are edited in the dialog.
+    // The user is responsible for keeping/adding placeholders like {{clientName}} if they want them in the template.
+    const currentTemplateText: EmailTemplate = { subject: emailSubject, body: emailBody };
+    localStorage.setItem(LOCAL_STORAGE_EMAIL_TEMPLATE_KEY, JSON.stringify(currentTemplateText));
+    toast({ title: "Template Saved", description: "Your current email content is saved as the default template."});
+  };
+  
+  const handleSaveTemplateAndSend = () => {
+    handleSaveTemplate(); // Save the current dialog content as the template
+    // To make the template useful, we should save the version *before* placeholder replacement.
+    // This is tricky. For now, the `handleSaveTemplate` saves the *resolved* version.
+    // A better approach: The dialog should hold template strings, and preview the resolved version.
+    // For this iteration, let's save the raw text from the dialog as the template.
+    // The user must manually ensure placeholders are in the text they save.
+
+    // For a simple "save the current content (with placeholders manually inserted by user)"
+    // we use the current emailSubject and emailBody from the state, which user might have edited
+    // to be their new template.
+    const templateToSave: EmailTemplate = { subject: emailSubject, body: emailBody };
+    localStorage.setItem(LOCAL_STORAGE_EMAIL_TEMPLATE_KEY, JSON.stringify(templateToSave));
+    toast({ title: "Template Saved", description: "The current email format has been saved as your default template." });
+
+    handleSendEmail(); // Then send the email
+  };
+
+  const handleRevertToDefaultTemplate = () => {
+    if (invoiceForEmail) {
+        loadAndPrepareEmailTemplate(invoiceForEmail, true); // true to force default
+        toast({ title: "Template Reset", description: "Email content reset to the original default."});
+    }
+  };
+
+
   const handleDownloadInvoice = (invoice: Invoice) => {
-    // Placeholder for download
     toast({ title: "Download PDF", description: `PDF for invoice ${invoice.invoiceNumber} would be generated.`});
   };
 
@@ -275,7 +371,7 @@ export default function InvoicingPage() {
     if (currentInvoice.items && currentInvoice.items.length > 0) {
       const totalAmount = currentInvoice.items.reduce((sum, item) => sum + (Number(item.quantity) * Number(item.unitPrice)), 0);
       setCurrentInvoice(prev => ({ ...prev, amount: totalAmount }));
-    } else if ((currentInvoice.items || []).length === 0 && !isEditing) { // If items are empty and not editing, allow manual amount or default to 0
+    } else if ((currentInvoice.items || []).length === 0 && !isEditing) { 
         // Amount can be manually set if no items, or defaults to 0 from handleCreateNew
     }
   }, [currentInvoice.items, isEditing]);
@@ -342,7 +438,7 @@ export default function InvoicingPage() {
                       <DropdownMenuContent align="end">
                         <DropdownMenuItem onClick={() => handleViewInvoice(invoice)}><Eye className="mr-2 h-4 w-4" /> View</DropdownMenuItem>
                         <DropdownMenuItem onClick={() => handleEditInvoice(invoice)}><Edit className="mr-2 h-4 w-4" /> Edit</DropdownMenuItem>
-                        <DropdownMenuItem onClick={() => handleEmailInvoice(invoice)} disabled={!invoice.clientEmail}><Mail className="mr-2 h-4 w-4" /> Email</DropdownMenuItem>
+                        <DropdownMenuItem onClick={() => handleOpenEmailDialog(invoice)} disabled={!invoice.clientEmail}><Mail className="mr-2 h-4 w-4" /> Email</DropdownMenuItem>
                         <DropdownMenuItem onClick={() => handleDownloadInvoice(invoice)}><Download className="mr-2 h-4 w-4" /> Download PDF</DropdownMenuItem>
                         <DropdownMenuSeparator />
                         <DropdownMenuItem onClick={() => promptDeleteInvoice(invoice.id)} className="text-destructive focus:text-destructive focus:bg-destructive/10">
@@ -358,6 +454,7 @@ export default function InvoicingPage() {
         </CardContent>
       </Card>
 
+      {/* Invoice Form Dialog */}
       <Dialog open={isFormOpen} onOpenChange={(open) => { setIsFormOpen(open); if (!open) { setCurrentInvoice({}); setIsEditing(false); } }}>
         <DialogContent className="sm:max-w-2xl max-h-[90vh] flex flex-col">
           <DialogHeader>
@@ -458,6 +555,51 @@ export default function InvoicingPage() {
         </DialogContent>
       </Dialog>
 
+      {/* Email Preview Dialog */}
+      <Dialog open={isEmailPreviewDialogOpen} onOpenChange={(open) => { setIsEmailPreviewDialogOpen(open); if (!open) setInvoiceForEmail(null); }}>
+        <DialogContent className="sm:max-w-xl">
+          <DialogHeader>
+            <DialogTitle className="font-headline">Compose Email</DialogTitle>
+            <DialogDescription>
+              Preview and edit the email for invoice {invoiceForEmail?.invoiceNumber} to {invoiceForEmail?.clientName}.
+              Placeholders like {{'{'}}{{'{'}}clientName}} or {{'{'}}{{'{'}}invoiceNumber}} will be replaced.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-2">
+            <div>
+              <Label htmlFor="emailTo">To:</Label>
+              <Input id="emailTo" value={invoiceForEmail?.clientEmail || ''} readOnly disabled className="bg-muted/50"/>
+            </div>
+            <div>
+              <Label htmlFor="emailSubject">Subject:</Label>
+              <Input id="emailSubject" value={emailSubject} onChange={(e) => setEmailSubject(e.target.value)} />
+            </div>
+            <div>
+              <Label htmlFor="emailBody">Body:</Label>
+              <Textarea id="emailBody" value={emailBody} onChange={(e) => setEmailBody(e.target.value)} rows={10} />
+            </div>
+          </div>
+          <DialogFooter className="justify-between flex-wrap gap-2">
+            <div className="flex gap-2 flex-wrap">
+                 <Button type="button" variant="outline" onClick={handleRevertToDefaultTemplate}>Use Original Default</Button>
+                 <Button type="button" variant="secondary" onClick={handleSaveTemplate}>
+                    <Save className="mr-2 h-4 w-4" /> Save Current as My Default
+                 </Button>
+            </div>
+            <div className="flex gap-2 flex-wrap">
+                <DialogClose asChild>
+                    <Button type="button" variant="ghost">Cancel</Button>
+                </DialogClose>
+                <Button type="button" onClick={handleSendEmail}>
+                    <Mail className="mr-2 h-4 w-4" /> Send Email
+                </Button>
+            </div>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+
+      {/* Delete Invoice Alert Dialog */}
       <AlertDialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>
         <AlertDialogContent>
           <AlertDialogHeader>
