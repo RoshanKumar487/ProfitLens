@@ -57,9 +57,17 @@ export default function CompanyDetailsPage() {
         setCompanyDetails(data);
       } catch (error: any) {
         console.error('Error fetching company details:', error);
+        let description = error.message || 'Could not load company details. Please try again later.';
+        if (typeof error.message === 'string') {
+          if (error.message.includes('Invalid scheme') || error.message.includes('mongodb://') || error.message.includes('mongodb+srv://')) {
+            description = 'The server reported an issue with the database connection string (MONGODB_URI). Please ensure it\'s correctly configured in your .env file and starts with "mongodb://" or "mongodb+srv://".';
+          } else if (error.message.includes('Failed to connect') || error.message.includes('ECONNREFUSED')) {
+            description = 'The server could not connect to the database. Please check your MONGODB_URI, network settings, and ensure your database server is running and accessible.';
+          }
+        }
         toast({
           title: 'Error Loading Details',
-          description: error.message || 'Could not load company details. Please try again later.',
+          description: description,
           variant: 'destructive',
         });
       } finally {
@@ -88,11 +96,11 @@ export default function CompanyDetailsPage() {
       });
 
       if (!response.ok) {
-        let errorMessageFromServer = 'Failed to save details.'; // Default
+        let errorMessageFromServer = 'Failed to save details.'; 
         try {
           const errorData = await response.json();
           if (errorData && errorData.message) {
-            errorMessageFromServer = errorData.message; // Use message from server if available
+            errorMessageFromServer = errorData.message; 
           } else {
             errorMessageFromServer = `Request failed: ${response.statusText} (Status: ${response.status})`;
           }
@@ -109,9 +117,17 @@ export default function CompanyDetailsPage() {
       });
     } catch (error: any) {
       console.error('Error saving company details:', error);
+      let description = error.message || 'Could not save company details. Please try again.';
+      if (typeof error.message === 'string') {
+         if (error.message.includes('Invalid scheme') || error.message.includes('mongodb://') || error.message.includes('mongodb+srv://')) {
+            description = 'The server reported an issue with the database connection string (MONGODB_URI) while saving. Please ensure it\'s correctly configured in your .env file and starts with "mongodb://" or "mongodb+srv://".';
+          } else if (error.message.includes('Failed to connect') || error.message.includes('ECONNREFUSED')) {
+            description = 'The server could not connect to the database while saving. Please check your MONGODB_URI, network settings, and ensure your database server is running and accessible.';
+          }
+      }
       toast({
         title: 'Save Failed',
-        description: error.message || 'Could not save company details. Please try again.',
+        description: description,
         variant: 'destructive',
       });
     } finally {
