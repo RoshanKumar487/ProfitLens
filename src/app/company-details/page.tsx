@@ -51,6 +51,8 @@ export default function CompanyDetailsPage() {
              console.error('Failed to parse API error response as JSON (fetch):', jsonError);
              if (response.status === 404) {
                 errorMessage = `API route /api/company-details not found (404). Please verify the route exists and the server is correctly configured. Server logs may provide more details.`;
+             } else if (response.status === 500) {
+                errorMessage = `Server Error (500): Received an HTML error page instead of JSON. This usually means a critical server-side issue, often related to database configuration (e.g., missing or incorrect MONGODB_URI in .env) or an unhandled error in the API route. Please check your server logs for the specific error.`;
              } else {
                 errorMessage = `Received an unexpected non-JSON response from the server (Status: ${response.status} - ${response.statusText}). This often indicates a server-side error. Please check server logs.`;
              }
@@ -62,13 +64,7 @@ export default function CompanyDetailsPage() {
       } catch (error: any) {
         console.error('Error fetching company details:', error);
         let description = error.message || 'Could not load company details. Please try again later.';
-        if (typeof error.message === 'string') {
-          if (error.message.includes('Invalid scheme') || error.message.includes('mongodb://') || error.message.includes('mongodb+srv://')) {
-            description = 'The server reported an issue with the database connection string (MONGODB_URI). Please ensure it\'s correctly configured in your .env file and starts with "mongodb://" or "mongodb+srv://".';
-          } else if (error.message.includes('Failed to connect') || error.message.includes('ECONNREFUSED')) {
-            description = 'The server could not connect to the database. Please check your MONGODB_URI, network settings, and ensure your database server is running and accessible.';
-          }
-        }
+        // The more specific error message is now constructed above, so we directly use error.message here.
         toast({
           title: 'Error Loading Details',
           description: description,
@@ -112,7 +108,22 @@ export default function CompanyDetailsPage() {
           console.error('Failed to parse API error response as JSON (save):', jsonError);
            if (response.status === 404) {
              errorMessage = `API route /api/company-details (POST) not found (404). Please verify the route exists and the server is correctly configured.`;
-          } else {
+          } else if (response.status === 500) {
+              errorMessage = `Server Error (500) when saving: Received an HTML error page instead of JSON. This points to a critical server-side issue (e.g., database configuration error like MONGODB_URI, or an unhandled error in the API POST route). Please check your server logs for details.`;
+           } else if (response.status === 400 && typeof response.bodyUsed && !response.bodyUsed) {
+             // If it's a 400 and body hasn't been read, try to read it.
+             try {
+                const errorBody = await response.text(); // Or response.json() if you expect JSON for 400
+                if (errorBody.toLowerCase().includes("invalid json")) {
+                    errorMessage = 'Server Error: Invalid JSON data sent in the request body when saving.';
+                } else {
+                    errorMessage = `Bad Request (400): ${errorBody || response.statusText}`;
+                }
+             } catch (bodyReadError) {
+                errorMessage = `Bad Request (400), and failed to read error body. Status: ${response.statusText}`;
+             }
+           }
+            else {
              errorMessage = `Received an unexpected non-JSON response from the server when saving (Status: ${response.status} - ${response.statusText}). Check server logs.`;
           }
         }
@@ -120,7 +131,7 @@ export default function CompanyDetailsPage() {
       }
 
       const savedData = await response.json();
-      setCompanyDetails(savedData); // Update state with potentially processed/confirmed data
+      setCompanyDetails(savedData);
       toast({
         title: 'Details Saved',
         description: 'Company information updated successfully.',
@@ -129,13 +140,6 @@ export default function CompanyDetailsPage() {
     } catch (error: any) {
       console.error('Error saving company details:', error);
       let description = error.message || 'Could not save company details. Please try again later.';
-       if (typeof error.message === 'string') {
-          if (error.message.includes('Invalid scheme') || error.message.includes('mongodb://') || error.message.includes('mongodb+srv://')) {
-            description = 'The server reported an issue with the database connection string (MONGODB_URI) while saving. Please ensure it\'s correctly configured.';
-          } else if (error.message.includes('Failed to connect') || error.message.includes('ECONNREFUSED')) {
-            description = 'The server could not connect to the database while saving. Please check your MONGODB_URI and network settings.';
-          }
-        }
       toast({
         title: 'Save Failed',
         description: description,
