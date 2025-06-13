@@ -200,8 +200,46 @@ export default function InvoicingPage() {
   };
 
   const handleEmailInvoice = (invoice: Invoice) => {
-    // Placeholder for emailing
-    toast({ title: "Email Invoice", description: `Invoice ${invoice.invoiceNumber} would be prepared for email.`});
+    if (typeof window === "undefined") {
+        toast({ title: "Email Invoice", description: `Invoice ${invoice.invoiceNumber} would be prepared for email on the client.`});
+        return;
+    }
+
+    const companyDetailsString = localStorage.getItem('bizsight-company-details');
+    let companyName = "Your Company"; // Default
+    if (companyDetailsString) {
+        try {
+        const companyDetails = JSON.parse(companyDetailsString);
+        if (companyDetails.name) {
+            companyName = companyDetails.name;
+        }
+        } catch (e) {
+        console.error("Failed to parse company details from localStorage", e);
+        }
+    }
+
+    const subject = encodeURIComponent(`Invoice ${invoice.invoiceNumber} from ${companyName}`);
+    const bodyLines = [
+        `Dear ${invoice.clientName || 'Client'},`,
+        ``,
+        `Please find details for invoice ${invoice.invoiceNumber} regarding your recent services/products.`,
+        ``,
+        `Amount: $${invoice.amount.toFixed(2)}`,
+        `Due Date: ${format(invoice.dueDate, 'PPP')}`,
+        ``,
+        `You can view the full invoice details by logging into your portal (if applicable) or find it attached if this were a real email system.`,
+        ``,
+        `Thank you for your business!`,
+        ``,
+        `Sincerely,`,
+        `${companyName}`
+    ];
+    const body = encodeURIComponent(bodyLines.join('\n'));
+
+    const mailtoLink = `mailto:${invoice.clientEmail || ''}?subject=${subject}&body=${body}`;
+
+    window.location.href = mailtoLink;
+    toast({ title: "Email Client Opened", description: `Preparing email for invoice ${invoice.invoiceNumber}.`});
   };
 
   const handleDownloadInvoice = (invoice: Invoice) => {
@@ -304,7 +342,7 @@ export default function InvoicingPage() {
                       <DropdownMenuContent align="end">
                         <DropdownMenuItem onClick={() => handleViewInvoice(invoice)}><Eye className="mr-2 h-4 w-4" /> View</DropdownMenuItem>
                         <DropdownMenuItem onClick={() => handleEditInvoice(invoice)}><Edit className="mr-2 h-4 w-4" /> Edit</DropdownMenuItem>
-                        <DropdownMenuItem onClick={() => handleEmailInvoice(invoice)}><Mail className="mr-2 h-4 w-4" /> Email</DropdownMenuItem>
+                        <DropdownMenuItem onClick={() => handleEmailInvoice(invoice)} disabled={!invoice.clientEmail}><Mail className="mr-2 h-4 w-4" /> Email</DropdownMenuItem>
                         <DropdownMenuItem onClick={() => handleDownloadInvoice(invoice)}><Download className="mr-2 h-4 w-4" /> Download PDF</DropdownMenuItem>
                         <DropdownMenuSeparator />
                         <DropdownMenuItem onClick={() => promptDeleteInvoice(invoice.id)} className="text-destructive focus:text-destructive focus:bg-destructive/10">
