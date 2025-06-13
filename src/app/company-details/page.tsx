@@ -7,9 +7,9 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/com
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
-// import { Button } from '@/components/ui/button'; // Save button removed
+import { Button } from '@/components/ui/button';
 import { useToast } from '@/hooks/use-toast';
-import { Building, Loader2 } from 'lucide-react'; // Save icon removed
+import { Building, Loader2, Save } from 'lucide-react';
 
 interface CompanyDetails {
   name: string;
@@ -30,7 +30,7 @@ export default function CompanyDetailsPage() {
     website: '',
   });
   const [isLoading, setIsLoading] = useState(true);
-  // isSaving state and handleSave function removed
+  const [isSaving, setIsSaving] = useState(false);
   const { toast } = useToast();
 
   useEffect(() => {
@@ -87,7 +87,65 @@ export default function CompanyDetailsPage() {
     setCompanyDetails(prev => ({ ...prev, [name]: value }));
   };
 
-  // handleSave function removed
+  const handleSave = async (e?: React.FormEvent) => {
+    if (e) e.preventDefault();
+    setIsSaving(true);
+    try {
+      const response = await fetch('/api/company-details', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(companyDetails),
+      });
+
+      if (!response.ok) {
+        let errorMessage = 'Failed to save details.';
+        try {
+          const errorData = await response.json();
+          if (errorData && errorData.message) {
+            errorMessage = errorData.message;
+          } else {
+            errorMessage = `Request failed: ${response.statusText} (Status: ${response.status})`;
+          }
+        } catch (jsonError) {
+          console.error('Failed to parse API error response as JSON (save):', jsonError);
+           if (response.status === 404) {
+             errorMessage = `API route /api/company-details (POST) not found (404). Please verify the route exists and the server is correctly configured.`;
+          } else {
+             errorMessage = `Received an unexpected non-JSON response from the server when saving (Status: ${response.status} - ${response.statusText}). Check server logs.`;
+          }
+        }
+        throw new Error(errorMessage);
+      }
+
+      const savedData = await response.json();
+      setCompanyDetails(savedData); // Update state with potentially processed/confirmed data
+      toast({
+        title: 'Details Saved',
+        description: 'Company information updated successfully.',
+      });
+
+    } catch (error: any) {
+      console.error('Error saving company details:', error);
+      let description = error.message || 'Could not save company details. Please try again later.';
+       if (typeof error.message === 'string') {
+          if (error.message.includes('Invalid scheme') || error.message.includes('mongodb://') || error.message.includes('mongodb+srv://')) {
+            description = 'The server reported an issue with the database connection string (MONGODB_URI) while saving. Please ensure it\'s correctly configured.';
+          } else if (error.message.includes('Failed to connect') || error.message.includes('ECONNREFUSED')) {
+            description = 'The server could not connect to the database while saving. Please check your MONGODB_URI and network settings.';
+          }
+        }
+      toast({
+        title: 'Save Failed',
+        description: description,
+        variant: 'destructive',
+      });
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
 
   if (isLoading) {
     return (
@@ -105,7 +163,7 @@ export default function CompanyDetailsPage() {
                 <div className="h-10 bg-muted rounded w-full animate-pulse"></div>
               </div>
             ))}
-            {/* Placeholder for save button removed */}
+             <div className="h-10 bg-muted rounded w-full sm:w-auto animate-pulse mt-4"></div>
           </CardContent>
         </Card>
       </div>
@@ -114,16 +172,15 @@ export default function CompanyDetailsPage() {
 
   return (
     <div className="space-y-6">
-      <PageTitle title="Company Details" subtitle="View your business information." icon={Building} />
+      <PageTitle title="Company Details" subtitle="Manage your business information." icon={Building} />
 
       <Card className="shadow-lg max-w-2xl mx-auto">
         <CardHeader>
           <CardTitle className="font-headline">Business Information</CardTitle>
-          <CardDescription>View your company's official details. This information may be used in invoices or other documents.</CardDescription>
+          <CardDescription>Update your company's official details. This information may be used in invoices or other documents.</CardDescription>
         </CardHeader>
         <CardContent>
-          {/* Form no longer submits */}
-          <form className="space-y-4">
+          <form onSubmit={handleSave} className="space-y-4">
             <div>
               <Label htmlFor="name">Company Name</Label>
               <Input
@@ -133,7 +190,7 @@ export default function CompanyDetailsPage() {
                 onChange={handleChange}
                 placeholder="e.g., Acme Corp Ltd."
                 required
-                // disabled prop related to saving removed
+                disabled={isSaving}
               />
             </div>
             <div>
@@ -146,7 +203,7 @@ export default function CompanyDetailsPage() {
                 placeholder="e.g., 123 Main Street, Anytown, ST 12345"
                 rows={3}
                 required
-                // disabled prop related to saving removed
+                disabled={isSaving}
               />
             </div>
             <div>
@@ -158,7 +215,7 @@ export default function CompanyDetailsPage() {
                 onChange={handleChange}
                 placeholder="e.g., 22AAAAA0000A1Z5"
                 required
-                // disabled prop related to saving removed
+                disabled={isSaving}
               />
             </div>
             <div>
@@ -170,7 +227,7 @@ export default function CompanyDetailsPage() {
                 value={companyDetails.phone}
                 onChange={handleChange}
                 placeholder="e.g., +1-555-123-4567"
-                // disabled prop related to saving removed
+                disabled={isSaving}
               />
             </div>
             <div>
@@ -182,7 +239,7 @@ export default function CompanyDetailsPage() {
                 value={companyDetails.email}
                 onChange={handleChange}
                 placeholder="e.g., contact@example.com"
-                // disabled prop related to saving removed
+                disabled={isSaving}
               />
             </div>
             <div>
@@ -194,10 +251,17 @@ export default function CompanyDetailsPage() {
                 value={companyDetails.website}
                 onChange={handleChange}
                 placeholder="e.g., https://www.example.com"
-                // disabled prop related to saving removed
+                disabled={isSaving}
               />
             </div>
-            {/* Save Button removed */}
+            <Button type="submit" disabled={isSaving || isLoading} className="w-full sm:w-auto">
+              {isSaving ? (
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+              ) : (
+                <Save className="mr-2 h-4 w-4" />
+              )}
+              Save Details
+            </Button>
           </form>
         </CardContent>
       </Card>
