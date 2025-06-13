@@ -1,6 +1,7 @@
+
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, FormEvent } from 'react';
 import PageTitle from '@/components/PageTitle';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -9,13 +10,13 @@ import { Textarea } from '@/components/ui/textarea';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Calendar } from '@/components/ui/calendar';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
-import { CalendarIcon, TrendingUp, Save } from 'lucide-react';
-import { format } from 'date-fns';
+import { CalendarIcon, TrendingUp, Save, Loader2 } from 'lucide-react';
+import { format, parseISO } from 'date-fns';
 import { useToast } from '@/hooks/use-toast';
 
 interface RevenueEntry {
-  id: string;
-  date: Date;
+  id: string; // MongoDB _id as string
+  date: Date; // Will be Date object in state, string from/to API
   amount: number;
   source: string;
   description?: string;
@@ -27,23 +28,37 @@ export default function RecordRevenuePage() {
   const [source, setSource] = useState<string>('');
   const [description, setDescription] = useState<string>('');
   const [recentEntries, setRecentEntries] = useState<RevenueEntry[]>([]);
+  const [isLoadingEntries, setIsLoadingEntries] = useState(true);
+  const [isSaving, setIsSaving] = useState(false);
   const { toast } = useToast();
 
   useEffect(() => {
-    const storedRevenue = localStorage.getItem('bizsight-revenue');
-    if (storedRevenue) {
-      setRecentEntries(JSON.parse(storedRevenue).map((entry: RevenueEntry) => ({...entry, date: new Date(entry.date)})));
-    }
-  }, []);
-  
-  useEffect(() => {
-    if (recentEntries.length > 0 || localStorage.getItem('bizsight-revenue')) {
-        localStorage.setItem('bizsight-revenue', JSON.stringify(recentEntries));
-    }
-  }, [recentEntries]);
+    const fetchRevenueEntries = async () => {
+      setIsLoadingEntries(true);
+      try {
+        const response = await fetch('/api/revenue-entries');
+        if (!response.ok) {
+          throw new Error('Failed to fetch entries');
+        }
+        const data = await response.json();
+        // Ensure date is parsed into Date object
+        setRecentEntries(data.map((entry: any) => ({...entry, date: parseISO(entry.date)})));
+      } catch (error) {
+        console.error('Error fetching revenue entries:', error);
+        toast({
+          title: 'Error Loading Entries',
+          description: 'Could not load recent revenue entries.',
+          variant: 'destructive',
+        });
+      } finally {
+        setIsLoadingEntries(false);
+      }
+    };
 
+    fetchRevenueEntries();
+  }, [toast]);
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
     if (!date || !amount || !source) {
       toast({
@@ -53,28 +68,67 @@ export default function RecordRevenuePage() {
       });
       return;
     }
+    
+    const amountNum = parseFloat(amount);
+    if (isNaN(amountNum) || amountNum <= 0) {
+        toast({
+            title: 'Invalid Amount',
+            description: 'Amount must be a positive number.',
+            variant: 'destructive',
+        });
+        return;
+    }
 
-    const newEntry: RevenueEntry = {
-      id: crypto.randomUUID(),
-      date,
-      amount: parseFloat(amount),
+
+    setIsSaving(true);
+    const newEntryPayload = {
+      date: date.toISOString(), // Send as ISO string
+      amount: amountNum,
       source,
       description,
     };
-    
-    const updatedEntries = [newEntry, ...recentEntries].slice(0, 5); // Keep last 5
-    setRecentEntries(updatedEntries);
-    
-    toast({
-      title: 'Revenue Recorded',
-      description: `Successfully recorded $${amount} from ${source}.`,
-    });
 
-    // Reset form
-    setDate(new Date());
-    setAmount('');
-    setSource('');
-    setDescription('');
+    try {
+      const response = await fetch('/api/revenue-entries', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(newEntryPayload),
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.message || 'Failed to save entry');
+      }
+      
+      const savedEntry = await response.json();
+
+      // Add new entry to the top and keep list to 5
+      setRecentEntries(prevEntries => 
+        [{ ...savedEntry, date: parseISO(savedEntry.date) }, ...prevEntries].slice(0, 5)
+      );
+      
+      toast({
+        title: 'Revenue Recorded',
+        description: `Successfully recorded $${amountNum.toFixed(2)} from ${source}.`,
+      });
+
+      // Reset form
+      setDate(new Date());
+      setAmount('');
+      setSource('');
+      setDescription('');
+    } catch (error: any) {
+      console.error('Error saving revenue entry:', error);
+      toast({
+        title: 'Save Failed',
+        description: error.message || 'Could not save revenue entry.',
+        variant: 'destructive',
+      });
+    } finally {
+      setIsSaving(false);
+    }
   };
 
   return (
@@ -96,6 +150,7 @@ export default function RecordRevenuePage() {
                     <Button
                       variant="outline"
                       className="w-full justify-start text-left font-normal"
+                      disabled={isSaving}
                     >
                       <CalendarIcon className="mr-2 h-4 w-4" />
                       {date ? format(date, 'PPP') : <span>Pick a date</span>}
@@ -107,6 +162,7 @@ export default function RecordRevenuePage() {
                       selected={date}
                       onSelect={setDate}
                       initialFocus
+                      disabled={isSaving}
                     />
                   </PopoverContent>
                 </Popover>
@@ -123,6 +179,7 @@ export default function RecordRevenuePage() {
                   required
                   min="0.01"
                   step="0.01"
+                  disabled={isSaving}
                 />
               </div>
 
@@ -134,6 +191,7 @@ export default function RecordRevenuePage() {
                   onChange={(e) => setSource(e.target.value)}
                   placeholder="e.g., Client A Payment, Product Sale"
                   required
+                  disabled={isSaving}
                 />
               </div>
 
@@ -144,11 +202,17 @@ export default function RecordRevenuePage() {
                   value={description}
                   onChange={(e) => setDescription(e.target.value)}
                   placeholder="e.g., Payment for project X, Sale of 10 units of Y"
+                  disabled={isSaving}
                 />
               </div>
 
-              <Button type="submit" className="w-full">
-                <Save className="mr-2 h-4 w-4" /> Record Revenue
+              <Button type="submit" className="w-full" disabled={isSaving || isLoadingEntries}>
+                {isSaving ? (
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                ) : (
+                  <Save className="mr-2 h-4 w-4" />
+                )}
+                {isSaving ? 'Saving...' : 'Record Revenue'}
               </Button>
             </form>
           </CardContent>
@@ -160,12 +224,24 @@ export default function RecordRevenuePage() {
             <CardDescription>Last 5 recorded revenue entries.</CardDescription>
           </CardHeader>
           <CardContent className="space-y-3">
-            {recentEntries.length > 0 ? (
+            {isLoadingEntries ? (
+              [...Array(3)].map((_, i) => (
+                <div key={i} className="p-3 bg-muted/50 rounded-lg border border-border animate-pulse">
+                  <div className="flex justify-between items-center">
+                    <div className="h-5 bg-muted rounded w-1/4"></div>
+                    <div className="h-4 bg-muted rounded w-1/5"></div>
+                  </div>
+                  <div className="h-4 bg-muted rounded w-1/2 mt-1"></div>
+                  <div className="h-3 bg-muted rounded w-3/4 mt-1"></div>
+                </div>
+              ))
+            ) : recentEntries.length > 0 ? (
               recentEntries.map(entry => (
                 <div key={entry.id} className="p-3 bg-muted/50 rounded-lg border border-border">
                   <div className="flex justify-between items-center">
                     <span className="font-semibold text-foreground">${entry.amount.toFixed(2)}</span>
-                    <span className="text-xs text-muted-foreground">{format(new Date(entry.date), 'PP')}</span>
+                    {/* Ensure entry.date is a Date object before formatting */}
+                    <span className="text-xs text-muted-foreground">{entry.date instanceof Date ? format(entry.date, 'PP') : format(parseISO(entry.date as unknown as string), 'PP')}</span>
                   </div>
                   <p className="text-sm text-muted-foreground">{entry.source}</p>
                   {entry.description && <p className="text-xs text-muted-foreground mt-1">{entry.description}</p>}
