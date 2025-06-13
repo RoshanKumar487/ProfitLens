@@ -562,7 +562,7 @@ export default function InvoicingPage() {
             <DialogTitle className="font-headline">Compose Email</DialogTitle>
             <DialogDescription>
               Preview and edit the email for invoice {invoiceForEmail?.invoiceNumber} to {invoiceForEmail?.clientName}.
-              Placeholders like {{'{'}}{{'{'}}clientName}} or {{'{'}}{{'{'}}invoiceNumber}} will be replaced.
+{/* Placeholders like {{'{'}}{{'{'}}clientName}} or {{'{'}}{{'{'}}invoiceNumber}} will be replaced. */}
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-4 py-2">
