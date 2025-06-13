@@ -1,4 +1,5 @@
 
+// src/app/api/company-details/route.ts
 import { NextResponse } from 'next/server';
 import { connectToDatabase } from '@/lib/mongodb';
 import type { Collection, ObjectId } from 'mongodb';
@@ -69,5 +70,5 @@ export async function GET() {
   }
 }
 
-// NO OTHER EXPORTS OR FUNCTIONS NAMED GET SHOULD BE IN THIS FILE
+// NO OTHER EXPORTS OR FUNCTIONS NAMED GET, POST, PUT, DELETE etc. SHOULD BE IN THIS FILE
 // The POST function was previously removed as per user request.
