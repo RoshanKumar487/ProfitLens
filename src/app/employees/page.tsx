@@ -38,13 +38,18 @@ import {
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger, DropdownMenuSeparator } from '@/components/ui/dropdown-menu';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
-import { Users2, PlusCircle, MoreHorizontal, Edit, Trash2, Loader2, Save, Camera, UploadCloud, FileText, XCircle } from 'lucide-react';
+import { Users2, PlusCircle, MoreHorizontal, Edit, Trash2, Loader2, Save, Camera, UploadCloud, FileText, XCircle, CalendarIcon } from 'lucide-react'; // Added CalendarIcon
 import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/contexts/AuthContext';
 import { db } from '@/lib/firebaseConfig';
 import { collection, addDoc, getDocs, doc, updateDoc, deleteDoc, query, where, orderBy, Timestamp, serverTimestamp, setDoc } from 'firebase/firestore';
 import { uploadFileToStorage, deleteFileFromStorage } from '@/lib/firebaseStorageUtils';
 import { Skeleton } from '@/components/ui/skeleton';
+import { Popover, PopoverTrigger, PopoverContent } from '@/components/ui/popover';
+import { Calendar } from '@/components/ui/calendar';
+import { format } from 'date-fns';
+import type { DateRange } from 'react-day-picker';
+import { downloadCsv } from '@/lib/utils';
 
 interface EmployeeFirestore {
   id?: string;
@@ -96,6 +101,9 @@ export default function EmployeesPage() {
   const [profilePictureFile, setProfilePictureFile] = useState<File | null>(null);
   const [profilePicturePreview, setProfilePicturePreview] = useState<string | null>(null);
   const [associatedFile, setAssociatedFile] = useState<File | null>(null);
+
+  const [exportDateRange, setExportDateRange] = useState<DateRange | undefined>();
+  const [isExporting, setIsExporting] = useState(false);
 
   const cleanupWebcam = useCallback(() => {
     if (videoRef.current && videoRef.current.srcObject) {
@@ -398,6 +406,66 @@ export default function EmployeesPage() {
     }
   };
 
+  const handleExportEmployees = async () => {
+    if (!user || !user.companyId) {
+      toast({ title: 'Authentication Error', description: 'User not authenticated.', variant: 'destructive' });
+      return;
+    }
+    if (!exportDateRange || !exportDateRange.from || !exportDateRange.to) {
+      toast({ title: 'Date Range Required', description: 'Please select a date range for export (based on creation date).', variant: 'destructive' });
+      return;
+    }
+
+    setIsExporting(true);
+    try {
+      const employeesRef = collection(db, 'employees');
+      const q = query(
+        employeesRef,
+        where('companyId', '==', user.companyId),
+        where('createdAt', '>=', Timestamp.fromDate(exportDateRange.from)),
+        // Adjust 'to' date to be end of day for 'createdAt' <= query
+        where('createdAt', '<=', Timestamp.fromDate(new Date(exportDateRange.to.setHours(23,59,59,999)))),
+        orderBy('createdAt', 'asc')
+      );
+      const querySnapshot = await getDocs(q);
+      const employeesToExport = querySnapshot.docs.map(docSnap => {
+        const data = docSnap.data() as EmployeeFirestore;
+        return {
+          Name: data.name,
+          Position: data.position,
+          Salary: data.salary,
+          Description: data.description || '',
+          'Profile Picture URL': data.profilePictureUrl || '',
+          'Associated File Name': data.associatedFileName || '',
+          'Created At': format(data.createdAt.toDate(), 'yyyy-MM-dd HH:mm:ss'),
+        };
+      });
+
+      if (employeesToExport.length === 0) {
+        toast({ title: 'No Data', description: 'No employees found for the selected creation date range.', variant: 'default' });
+        setIsExporting(false);
+        return;
+      }
+
+      const headers = ['Name', 'Position', 'Salary', 'Description', 'Profile Picture URL', 'Associated File Name', 'Created At'];
+      const csvRows = [
+        headers.join(','),
+        ...employeesToExport.map(row => headers.map(header => `"${String(row[header as keyof typeof row]).replace(/"/g, '""')}"`).join(','))
+      ];
+      const csvString = csvRows.join('\n');
+      const filename = `BizSight_Employees_${format(exportDateRange.from, 'yyyyMMdd')}_to_${format(exportDateRange.to, 'yyyyMMdd')}.csv`;
+      downloadCsv(csvString, filename);
+      toast({ title: 'Export Successful', description: `${employeesToExport.length} employees exported.` });
+
+    } catch (error: any) {
+      console.error('Error exporting employees:', error);
+      toast({ title: 'Export Failed', description: error.message, variant: 'destructive' });
+    } finally {
+      setIsExporting(false);
+    }
+  };
+
+
   if (authIsLoading) {
     return ( <div className="flex items-center justify-center h-[calc(100vh-200px)]"><Loader2 className="h-12 w-12 animate-spin text-primary" /> <p className="ml-2">Loading authentication...</p></div> );
   }
@@ -418,9 +486,49 @@ export default function EmployeesPage() {
   return (
     <div className="space-y-6">
       <PageTitle title="Employees" subtitle="Manage your team members." icon={Users2}>
-        <Button onClick={handleCreateNew} disabled={isSaving || isLoadingEmployees}>
-          <PlusCircle className="mr-2 h-4 w-4" /> Add Employee
-        </Button>
+        <div className="flex flex-col sm:flex-row gap-2 items-center">
+          <Button onClick={handleCreateNew} disabled={isSaving || isLoadingEmployees || isExporting}>
+            <PlusCircle className="mr-2 h-4 w-4" /> Add Employee
+          </Button>
+          <Popover>
+            <PopoverTrigger asChild>
+              <Button
+                id="date-range-employees"
+                variant={"outline"}
+                className="w-full sm:w-[260px] justify-start text-left font-normal"
+                disabled={isExporting}
+              >
+                <CalendarIcon className="mr-2 h-4 w-4" />
+                {exportDateRange?.from ? (
+                  exportDateRange.to ? (
+                    <>
+                      {format(exportDateRange.from, "LLL dd, y")} - {" "}
+                      {format(exportDateRange.to, "LLL dd, y")}
+                    </>
+                  ) : (
+                    format(exportDateRange.from, "LLL dd, y")
+                  )
+                ) : (
+                  <span>Pick creation date range</span>
+                )}
+              </Button>
+            </PopoverTrigger>
+            <PopoverContent className="w-auto p-0" align="end">
+              <Calendar
+                initialFocus
+                mode="range"
+                defaultMonth={exportDateRange?.from}
+                selected={exportDateRange}
+                onSelect={setExportDateRange}
+                numberOfMonths={2}
+              />
+            </PopoverContent>
+          </Popover>
+          <Button onClick={handleExportEmployees} disabled={isExporting || !exportDateRange?.from || !exportDateRange?.to} className="w-full sm:w-auto">
+            {isExporting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <FileText className="mr-2 h-4 w-4" />}
+            Export CSV
+          </Button>
+        </div>
       </PageTitle>
 
       <Table>
@@ -586,6 +694,3 @@ export default function EmployeesPage() {
     </div>
   );
 }
-
-
-    

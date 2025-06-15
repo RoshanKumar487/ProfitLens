@@ -16,8 +16,9 @@ import {
 } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger, DropdownMenuSeparator } from '@/components/ui/dropdown-menu';
-import { Receipt, PlusCircle, Search, MoreHorizontal, Edit, Trash2, Eye, Mail, FileDown, Calendar as CalendarIconLucide, Save, Loader2, UserPlus, Printer } from 'lucide-react';
+import { Receipt, PlusCircle, Search, MoreHorizontal, Edit, Trash2, Eye, Mail, FileDown, Calendar as CalendarIconLucide, Save, Loader2, UserPlus, Printer, FileText, CalendarIcon } from 'lucide-react'; // Added FileText, CalendarIcon
 import { format } from 'date-fns';
+import type { DateRange } from 'react-day-picker'; // Added DateRange
 import { useToast } from '@/hooks/use-toast';
 import {
   Dialog,
@@ -48,7 +49,7 @@ import { ScrollArea } from '@/components/ui/scroll-area';
 import { useAuth } from '@/contexts/AuthContext';
 import { collection, addDoc, getDocs, doc, updateDoc, deleteDoc, query, where, orderBy, Timestamp, serverTimestamp, getDoc } from 'firebase/firestore';
 import { db } from '@/lib/firebaseConfig';
-import { cn } from '@/lib/utils';
+import { cn, downloadCsv } from '@/lib/utils'; // Added downloadCsv
 import jsPDF from 'jspdf';
 import html2canvas from 'html2canvas';
 import Image from 'next/image';
@@ -151,6 +152,9 @@ export default function InvoicingPage() {
   const [isViewInvoiceDialogOpen, setIsViewInvoiceDialogOpen] = useState(false);
   const [invoiceToView, setInvoiceToView] = useState<InvoiceDisplay | null>(null);
   const [isDownloadingPDF, setIsDownloadingPDF] = useState(false);
+
+  const [exportDateRange, setExportDateRange] = useState<DateRange | undefined>();
+  const [isExporting, setIsExporting] = useState(false);
 
 
   const fetchCompanyProfile = useCallback(async () => {
@@ -806,6 +810,65 @@ export default function InvoicingPage() {
     return !existingClients.some(c => c.name.toLowerCase() === currentInvoice.clientName!.toLowerCase());
   }, [currentInvoice.clientName, existingClients]);
 
+  const handleExportInvoices = async () => {
+    if (!user || !user.companyId) {
+      toast({ title: 'Authentication Error', description: 'User not authenticated.', variant: 'destructive' });
+      return;
+    }
+    if (!exportDateRange || !exportDateRange.from || !exportDateRange.to) {
+      toast({ title: 'Date Range Required', description: 'Please select a date range for export.', variant: 'destructive' });
+      return;
+    }
+
+    setIsExporting(true);
+    try {
+      const invoicesRef = collection(db, 'invoices');
+      const q = query(
+        invoicesRef,
+        where('companyId', '==', user.companyId),
+        where('issuedDate', '>=', Timestamp.fromDate(exportDateRange.from)),
+        where('issuedDate', '<=', Timestamp.fromDate(exportDateRange.to)),
+        orderBy('issuedDate', 'asc')
+      );
+      const querySnapshot = await getDocs(q);
+      const invoicesToExport = querySnapshot.docs.map(docSnap => {
+        const data = docSnap.data() as InvoiceFirestore;
+        return {
+          'Invoice Number': data.invoiceNumber,
+          'Client Name': data.clientName,
+          'Client Email': data.clientEmail || '',
+          'Amount': data.amount.toFixed(2),
+          'Issued Date': format(data.issuedDate.toDate(), 'yyyy-MM-dd'),
+          'Due Date': format(data.dueDate.toDate(), 'yyyy-MM-dd'),
+          'Status': data.status,
+          'Notes': data.notes || '',
+        };
+      });
+
+      if (invoicesToExport.length === 0) {
+        toast({ title: 'No Data', description: 'No invoices found in the selected date range.', variant: 'default' });
+        setIsExporting(false);
+        return;
+      }
+
+      const headers = ['Invoice Number', 'Client Name', 'Client Email', 'Amount', 'Issued Date', 'Due Date', 'Status', 'Notes'];
+      const csvRows = [
+        headers.join(','),
+        ...invoicesToExport.map(row => headers.map(header => `"${String(row[header as keyof typeof row]).replace(/"/g, '""')}"`).join(','))
+      ];
+      const csvString = csvRows.join('\n');
+      const filename = `BizSight_Invoices_${format(exportDateRange.from, 'yyyyMMdd')}_to_${format(exportDateRange.to, 'yyyyMMdd')}.csv`;
+      downloadCsv(csvString, filename);
+      toast({ title: 'Export Successful', description: `${invoicesToExport.length} invoices exported.` });
+
+    } catch (error: any) {
+      console.error('Error exporting invoices:', error);
+      toast({ title: 'Export Failed', description: error.message, variant: 'destructive' });
+    } finally {
+      setIsExporting(false);
+    }
+  };
+
 
   if (authIsLoading) {
     return (
@@ -832,9 +895,49 @@ export default function InvoicingPage() {
   return (
     <div className="space-y-6">
       <PageTitle title="Invoicing" subtitle="Manage your customer invoices efficiently." icon={Receipt}>
-        <Button onClick={handleCreateNew} disabled={isSaving || isLoading || isFetchingCompanyProfile}>
-          <PlusCircle className="mr-2 h-4 w-4" /> Create New Invoice
-        </Button>
+        <div className="flex flex-col sm:flex-row gap-2 items-center">
+            <Button onClick={handleCreateNew} disabled={isSaving || isLoading || isFetchingCompanyProfile || isExporting}>
+              <PlusCircle className="mr-2 h-4 w-4" /> Create New Invoice
+            </Button>
+             <Popover>
+                <PopoverTrigger asChild>
+                  <Button
+                    id="date-range-invoices"
+                    variant={"outline"}
+                    className="w-full sm:w-[260px] justify-start text-left font-normal"
+                    disabled={isExporting}
+                  >
+                    <CalendarIcon className="mr-2 h-4 w-4" />
+                    {exportDateRange?.from ? (
+                      exportDateRange.to ? (
+                        <>
+                          {format(exportDateRange.from, "LLL dd, y")} - {" "}
+                          {format(exportDateRange.to, "LLL dd, y")}
+                        </>
+                      ) : (
+                        format(exportDateRange.from, "LLL dd, y")
+                      )
+                    ) : (
+                      <span>Pick export date range</span>
+                    )}
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-auto p-0" align="end">
+                  <Calendar
+                    initialFocus
+                    mode="range"
+                    defaultMonth={exportDateRange?.from}
+                    selected={exportDateRange}
+                    onSelect={setExportDateRange}
+                    numberOfMonths={2}
+                  />
+                </PopoverContent>
+              </Popover>
+              <Button onClick={handleExportInvoices} disabled={isExporting || !exportDateRange?.from || !exportDateRange?.to} className="w-full sm:w-auto">
+                {isExporting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <FileText className="mr-2 h-4 w-4" />}
+                Export CSV
+              </Button>
+        </div>
       </PageTitle>
 
       <Card className="shadow-lg">
