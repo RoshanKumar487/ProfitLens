@@ -1,11 +1,13 @@
+
 'use client';
 
 import PageTitle from '@/components/PageTitle';
 import DataCard from '@/components/DataCard';
-import { DollarSign, TrendingUp, TrendingDown, Users, Activity, BarChartBig, FileText, Lightbulb } from 'lucide-react';
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
+import { DollarSign, TrendingUp, TrendingDown, Users, Activity, BarChartBig, FileText } from 'lucide-react'; // Removed Lightbulb as it's now in HelpfulTipsCard
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'; // Added CardDescription
 import { ResponsiveContainer, BarChart, XAxis, YAxis, Tooltip, Legend, Bar, CartesianGrid } from 'recharts';
-import Image from 'next/image';
+import dynamic from 'next/dynamic';
+import { Skeleton } from '@/components/ui/skeleton'; // For loading state
 
 
 const mockChartData = [
@@ -22,6 +24,35 @@ const mockRecentActivity = [
   { id: 2, description: 'New expense "Office Supplies" recorded', time: '5 hours ago', type: 'expense' },
   { id: 3, description: 'Appointment with "Client X" scheduled', time: '1 day ago', type: 'calendar' },
 ];
+
+const HelpfulTipsCardSkeleton = () => (
+  <Card className="shadow-lg">
+    <CardHeader>
+      <Skeleton className="h-6 w-3/4 rounded" /> 
+      <Skeleton className="h-4 w-1/2 rounded mt-1" /> 
+    </CardHeader>
+    <CardContent className="space-y-3">
+      <div className="flex items-start gap-3">
+        <Skeleton className="h-5 w-5 rounded-full" /> 
+        <Skeleton className="h-4 flex-grow rounded" /> 
+      </div>
+      <div className="flex items-start gap-3">
+        <Skeleton className="h-5 w-5 rounded-full" />
+        <Skeleton className="h-4 flex-grow rounded" />
+      </div>
+      <div className="flex items-start gap-3">
+        <Skeleton className="h-5 w-5 rounded-full" />
+        <Skeleton className="h-4 flex-grow rounded" />
+      </div>
+      <Skeleton className="h-[200px] w-full rounded-lg mt-4" /> 
+    </CardContent>
+  </Card>
+);
+
+const HelpfulTipsCard = dynamic(() => import('@/components/dashboard/HelpfulTipsCard'), {
+  loading: () => <HelpfulTipsCardSkeleton />,
+});
+
 
 export default function DashboardPage() {
   // Placeholder data
@@ -116,27 +147,7 @@ export default function DashboardPage() {
             </ul>
           </CardContent>
         </Card>
-        <Card className="shadow-lg">
-          <CardHeader>
-            <CardTitle className="font-headline">Helpful Tips</CardTitle>
-             <CardDescription>Boost your business efficiency.</CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-3">
-            <div className="flex items-start gap-3">
-              <Lightbulb className="h-5 w-5 text-primary mt-1" />
-              <p className="text-sm">Regularly review your Expense Analyzer suggestions to optimize spending.</p>
-            </div>
-            <div className="flex items-start gap-3">
-              <Lightbulb className="h-5 w-5 text-primary mt-1" />
-              <p className="text-sm">Use invoice templates for faster billing and professional look.</p>
-            </div>
-             <div className="flex items-start gap-3">
-              <Lightbulb className="h-5 w-5 text-primary mt-1" />
-              <p className="text-sm">Schedule recurring appointments in the calendar to save time.</p>
-            </div>
-             <Image src="https://placehold.co/600x200.png" alt="Business illustration" width={600} height={200} className="rounded-lg mt-4 object-cover w-full" data-ai-hint="business growth" />
-          </CardContent>
-        </Card>
+        <HelpfulTipsCard />
       </div>
     </div>
   );
