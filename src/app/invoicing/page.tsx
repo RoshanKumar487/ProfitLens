@@ -317,7 +317,7 @@ export default function InvoicingPage() {
         issuedDate: invoice.issuedDate instanceof Timestamp ? invoice.issuedDate.toDate() : invoice.issuedDate,
         dueDate: invoice.dueDate instanceof Timestamp ? invoice.dueDate.toDate() : invoice.dueDate,
     });
-    setClientNameSearch(invoice.clientName || '');
+    setClientNameSearch(invoice.clientName || ''); // Keep clientNameSearch in sync for popover
     setIsEditing(true);
     setIsFormOpen(true);
   };
@@ -617,42 +617,37 @@ export default function InvoicingPage() {
                     <PopoverTrigger asChild>
                       <Input
                         id="clientName"
-                        value={clientNameSearch} 
+                        value={currentInvoice.clientName || ''} 
                         onChange={(e) => {
-                            const newSearchTerm = e.target.value;
-                            setClientNameSearch(newSearchTerm); // Update the visual input's state
+                            const typedName = e.target.value;
+                            let newClientEmail = currentInvoice.clientEmail || '';
 
-                            let emailForNewName = currentInvoice.clientEmail || ''; // Start with current email
+                            const matchedClient = existingClientNames.find(name => name.toLowerCase() === typedName.toLowerCase());
 
-                            const exactMatchExistingClient = existingClientNames.find(name => name.toLowerCase() === newSearchTerm.toLowerCase());
-
-                            if (exactMatchExistingClient) {
-                                // Typed name is an exact match for an existing client
-                                const clientInvoices = invoices.filter(inv => inv.clientName === exactMatchExistingClient);
+                            if (matchedClient) {
+                                const clientInvoices = invoices.filter(inv => inv.clientName === matchedClient);
                                 const latestEmail = clientInvoices.sort((a, b) => {
                                     const dateA = a.issuedDate instanceof Timestamp ? a.issuedDate.toMillis() : new Date(a.issuedDate).getTime();
                                     const dateB = b.issuedDate instanceof Timestamp ? b.issuedDate.toMillis() : new Date(b.issuedDate).getTime();
                                     return dateB - dateA;
                                 })[0]?.clientEmail;
-                                emailForNewName = latestEmail || '';
+                                newClientEmail = latestEmail || '';
                             } else {
-                                // Typed name is NOT an exact match (it's new, or edited from an existing one)
-                                // If the *previous* clientName in currentInvoice was an existing client, and newSearchTerm is different,
-                                // then we should clear the email, as it's effectively a new client entity being typed.
-                                if (currentInvoice.clientName && existingClientNames.includes(currentInvoice.clientName) && newSearchTerm.toLowerCase() !== currentInvoice.clientName.toLowerCase()) {
-                                    emailForNewName = '';
+                                if (currentInvoice.clientName && existingClientNames.includes(currentInvoice.clientName) && currentInvoice.clientName.toLowerCase() !== typedName.toLowerCase()) {
+                                    newClientEmail = ''; // Clear email if changing from a known client to a new one
                                 }
-                                // Otherwise, allow manually typed email to persist or be blank if it was already blank.
+                                // Otherwise, retain current newClientEmail (could be manually entered)
                             }
-
-                            setCurrentInvoice(prev => ({ ...prev, clientName: newSearchTerm, clientEmail: emailForNewName }));
-                            setIsClientPopoverOpen(newSearchTerm.length > 0);
+                            
+                            setCurrentInvoice(prev => ({ ...prev, clientName: typedName, clientEmail: newClientEmail }));
+                            setClientNameSearch(typedName); // For popover filtering
+                            setIsClientPopoverOpen(typedName.length > 0);
                         }}
                         onClick={() => {
-                           if (clientNameSearch.length > 0) setIsClientPopoverOpen(true);
+                           if ((currentInvoice.clientName || '').length > 0) setIsClientPopoverOpen(true);
                         }}
                         onFocus={() => {
-                            if (clientNameSearch.length > 0) setIsClientPopoverOpen(true);
+                            if ((currentInvoice.clientName || '').length > 0) setIsClientPopoverOpen(true);
                         }}
                         onBlur={() => setTimeout(() => setIsClientPopoverOpen(false), 150)} 
                         placeholder="Type or select client"
@@ -678,8 +673,8 @@ export default function InvoicingPage() {
                                       const dateB = b.issuedDate instanceof Timestamp ? b.issuedDate.toMillis() : new Date(b.issuedDate).getTime();
                                       return dateB - dateA;
                                     })[0]?.clientEmail;
-                                    setCurrentInvoice({ ...currentInvoice, clientName: name, clientEmail: latestEmail || '' });
-                                    setClientNameSearch(name);
+                                    setCurrentInvoice(prev => ({ ...prev, clientName: name, clientEmail: latestEmail || '' }));
+                                    setClientNameSearch(name); // Sync search state
                                     setIsClientPopoverOpen(false);
                                   }}
                                 >
