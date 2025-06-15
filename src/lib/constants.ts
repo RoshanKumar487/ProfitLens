@@ -1,6 +1,6 @@
 
 import type { LucideIcon } from 'lucide-react';
-import { LayoutDashboard, CalendarDays, TrendingUp, TrendingDown, Sparkles, Receipt } from 'lucide-react';
+import { LayoutDashboard, CalendarDays, TrendingUp, TrendingDown, Sparkles, Receipt, Users2 } from 'lucide-react';
 
 export interface NavItem {
   label: string;
@@ -39,4 +39,10 @@ export const NAV_ITEMS: NavItem[] = [
     href: '/invoicing',
     icon: Receipt,
   },
+  {
+    label: 'Employees',
+    href: '/employees',
+    icon: Users2,
+  },
 ];
+
