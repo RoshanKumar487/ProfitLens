@@ -16,8 +16,8 @@ import {
 } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger, DropdownMenuSeparator } from '@/components/ui/dropdown-menu';
-import { Receipt, PlusCircle, Search, MoreHorizontal, Edit, Trash2, Eye, Mail, Download, Calendar as CalendarIconLucide, Save } from 'lucide-react'; // Renamed Calendar to avoid conflict
-import { format } from 'date-fns';
+import { Receipt, PlusCircle, Search, MoreHorizontal, Edit, Trash2, Eye, Mail, Download, Calendar as CalendarIconLucide, Save, Loader2, Briefcase } from 'lucide-react';
+import { format, parseISO } from 'date-fns';
 import { useToast } from '@/hooks/use-toast';
 import {
   Dialog,
@@ -40,11 +40,13 @@ import {
 } from "@/components/ui/alert-dialog";
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
-import { Calendar } from '@/components/ui/calendar'; // ShadCN Calendar
+import { Calendar } from '@/components/ui/calendar';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
-
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { useAuth } from '@/contexts/AuthContext';
+import { collection, addDoc, getDocs, doc, updateDoc, deleteDoc, query, where, orderBy, Timestamp, serverTimestamp } from 'firebase/firestore';
+import { db } from '@/lib/firebaseConfig';
 
 interface InvoiceItem {
   id: string;
@@ -54,16 +56,18 @@ interface InvoiceItem {
 }
 
 interface Invoice {
-  id: string;
+  id: string; // Firestore document ID
   invoiceNumber: string;
   clientName: string;
   clientEmail?: string;
   amount: number;
-  dueDate: Date;
+  dueDate: Date | Timestamp;
   status: 'Paid' | 'Pending' | 'Overdue' | 'Draft';
-  issuedDate: Date;
+  issuedDate: Date | Timestamp;
   items?: InvoiceItem[];
   notes?: string;
+  companyId?: string; // For Firestore querying
+  createdAt?: Timestamp; // For Firestore ordering
 }
 
 interface EmailTemplate {
@@ -71,17 +75,8 @@ interface EmailTemplate {
   body: string;
 }
 
-const LOCAL_STORAGE_INVOICES_KEY = 'bizsight-invoices';
-const LOCAL_STORAGE_COMPANY_DETAILS_KEY = 'bizsight-company-details';
 const LOCAL_STORAGE_EMAIL_TEMPLATE_KEY = 'bizsight-invoice-email-template';
 
-const initialMockInvoices: Invoice[] = [
-  { id: '1', invoiceNumber: 'INV001', clientName: 'Acme Corp', clientEmail: 'contact@acme.com', amount: 1200.50, dueDate: new Date('2024-08-15'), status: 'Paid', issuedDate: new Date('2024-07-15'), items: [{id: 'item1', description: 'Web Design', quantity:1, unitPrice: 1000}, {id: 'item2', description: 'Hosting', quantity:1, unitPrice: 200.50}] },
-  { id: '2', invoiceNumber: 'INV002', clientName: 'Beta LLC', clientEmail: 'info@betallc.com', amount: 850.00, dueDate: new Date('2024-07-25'), status: 'Overdue', issuedDate: new Date('2024-06-25') },
-  { id: '3', invoiceNumber: 'INV003', clientName: 'Gamma Inc', clientEmail: 'accounts@gammainc.com', amount: 2500.75, dueDate: new Date('2024-09-01'), status: 'Pending', issuedDate: new Date('2024-08-01') },
-  { id: '4', invoiceNumber: 'INV004', clientName: 'Delta Co', clientEmail: 'billing@deltaco.com', amount: 500.00, dueDate: new Date('2024-08-20'), status: 'Pending', issuedDate: new Date('2024-07-20') },
-  { id: '5', invoiceNumber: 'INV005', clientName: 'Epsilon Ltd', clientEmail: 'finance@epsilon.com', amount: 150.00, dueDate: new Date('2024-07-10'), status: 'Draft', issuedDate: new Date('2024-07-01') },
-];
 
 const DEFAULT_EMAIL_TEMPLATE: EmailTemplate = {
   subject: "Invoice {{invoiceNumber}} from {{companyName}}",
@@ -103,6 +98,7 @@ Sincerely,
 
 
 export default function InvoicingPage() {
+  const { user, isLoading: authIsLoading } = useAuth();
   const [invoices, setInvoices] = useState<Invoice[]>([]);
   const [searchTerm, setSearchTerm] = useState<string>('');
   const [isFormOpen, setIsFormOpen] = useState(false);
@@ -118,37 +114,104 @@ export default function InvoicingPage() {
   const [emailBody, setEmailBody] = useState('');
   const [companyNameForEmail, setCompanyNameForEmail] = useState("Your Company");
 
-  useEffect(() => {
-    const storedInvoices = localStorage.getItem(LOCAL_STORAGE_INVOICES_KEY);
-    if (storedInvoices) {
-      const parsedInvoices = JSON.parse(storedInvoices).map((inv: Invoice) => ({
-        ...inv,
-        dueDate: new Date(inv.dueDate),
-        issuedDate: new Date(inv.issuedDate),
-      }));
-      setInvoices(parsedInvoices);
-    } else {
-       setInvoices(initialMockInvoices); 
-    }
+  const [isLoading, setIsLoading] = useState(true);
+  const [isSaving, setIsSaving] = useState(false);
 
-    const companyDetailsString = localStorage.getItem(LOCAL_STORAGE_COMPANY_DETAILS_KEY);
-    if (companyDetailsString) {
-        try {
-            const companyDetails = JSON.parse(companyDetailsString);
-            if (companyDetails.name) {
-                setCompanyNameForEmail(companyDetails.name);
-            }
-        } catch (e) {
-            console.error("Failed to parse company details from localStorage", e);
-        }
+  const [existingClientNames, setExistingClientNames] = useState<string[]>([]);
+  const [clientNameSearch, setClientNameSearch] = useState(''); // Used for the input field in the popover/combobox
+  const [isClientPopoverOpen, setIsClientPopoverOpen] = useState(false);
+
+
+  const fetchInvoices = React.useCallback(async () => {
+    if (!user || !user.companyId) {
+      console.log('[InvoicingPage fetchInvoices] User or companyId not available. Skipping fetch.');
+      setInvoices([]);
+      setIsLoading(false);
+      return;
     }
+    console.log(`[InvoicingPage fetchInvoices] Called for companyId: ${user.companyId}`);
+    setIsLoading(true);
+    try {
+      const invoicesColRef = collection(db, 'invoices');
+      const q = query(invoicesColRef, where('companyId', '==', user.companyId), orderBy('createdAt', 'desc'));
+      const querySnapshot = await getDocs(q);
+      console.log(`[InvoicingPage fetchInvoices] Firestore query returned ${querySnapshot.docs.length} documents.`);
+      
+      const fetchedInvoices = querySnapshot.docs.map(docSnap => {
+        const data = docSnap.data() as Omit<Invoice, 'id' | 'dueDate' | 'issuedDate' | 'createdAt'> & { dueDate: Timestamp, issuedDate: Timestamp, createdAt: Timestamp };
+        return {
+          id: docSnap.id,
+          ...data,
+          dueDate: data.dueDate.toDate(),
+          issuedDate: data.issuedDate.toDate(),
+          createdAt: data.createdAt, // Keep as Timestamp for potential future use if needed
+        };
+      });
+
+      setInvoices(fetchedInvoices);
+      console.log(`[InvoicingPage fetchInvoices] ${fetchedInvoices.length} invoices set to state.`);
+
+      const uniqueNames = Array.from(new Set(fetchedInvoices.map((inv: Invoice) => inv.clientName).filter(Boolean)));
+      setExistingClientNames(uniqueNames.sort());
+      console.log(`[InvoicingPage fetchInvoices] Existing client names set:`, uniqueNames);
+
+    } catch (error: any) {
+      console.error('[InvoicingPage fetchInvoices] Error fetching invoices:', error);
+      toast({
+        title: 'Error Fetching Invoices',
+        description: `Could not load invoices. ${error.message || ''}`,
+        variant: 'destructive',
+      });
+      setInvoices([]); // Clear invoices on error
+    } finally {
+      setIsLoading(false);
+      console.log('[InvoicingPage fetchInvoices] Finished. isLoading set to false.');
+    }
+  }, [user, toast]);
+
+
+  useEffect(() => {
+    console.log(`[InvoicingPage useEffect for fetch] authIsLoading: ${authIsLoading}, user: ${user ? user.uid : 'null'}, companyId: ${user?.companyId || 'null'}`);
+    if (authIsLoading) {
+      console.log("[InvoicingPage useEffect for fetch] Auth is loading, setting page isLoading to true.");
+      setIsLoading(true); // Show page loading indicator while auth is resolving
+      return;
+    }
+    if (user && user.companyId) {
+      console.log("[InvoicingPage useEffect for fetch] User and companyId available, calling fetchInvoices.");
+      fetchInvoices();
+    } else {
+      console.log("[InvoicingPage useEffect for fetch] No user or no companyId after auth. Clearing invoices and setting isLoading to false.");
+      setInvoices([]); // Clear invoices if no user/companyId
+      setIsLoading(false); // Ensure loading is stopped if no user
+      setExistingClientNames([]);
+    }
+  }, [user, user?.companyId, authIsLoading, fetchInvoices]);
+
+
+  useEffect(() => {
+    // Fetch company name for email template from localStorage (or API in future)
+     const fetchCompanyName = async () => {
+        try {
+            const response = await fetch('/api/company-details');
+            if (response.ok) {
+                const details = await response.json();
+                if (details.name) {
+                    setCompanyNameForEmail(details.name);
+                } else {
+                   setCompanyNameForEmail("Your Company Name"); // Fallback if not set
+                }
+            } else {
+                 setCompanyNameForEmail("Your Company Name"); 
+            }
+        } catch (error) {
+            console.error("Failed to fetch company details for email:", error);
+            setCompanyNameForEmail("Your Company Name");
+        }
+    };
+    fetchCompanyName();
   }, []);
 
-  useEffect(() => {
-     if (invoices.length > 0 || localStorage.getItem(LOCAL_STORAGE_INVOICES_KEY)) {
-        localStorage.setItem(LOCAL_STORAGE_INVOICES_KEY, JSON.stringify(invoices));
-     }
-  }, [invoices]);
 
   const filteredInvoices = useMemo(() => {
     return invoices.filter(
@@ -174,8 +237,12 @@ export default function InvoicingPage() {
     }
   };
   
-  const handleFormSubmit = (e: React.FormEvent) => {
+  const handleFormSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!user || !user.companyId) {
+      toast({ title: "Authentication Error", description: "User not authenticated. Please sign in.", variant: "destructive" });
+      return;
+    }
     if (!currentInvoice.clientName || currentInvoice.amount === undefined || !currentInvoice.issuedDate || !currentInvoice.dueDate) { // amount can be 0
         toast({ title: "Missing Fields", description: "Please fill all required invoice details (Client Name, Amount, Issued Date, Due Date).", variant: "destructive" });
         return;
@@ -185,41 +252,74 @@ export default function InvoicingPage() {
         return;
     }
 
-    const newInvoiceNumber = `INV${(invoices.length + 1).toString().padStart(3, '0')}`;
-    const finalInvoice: Invoice = {
-      id: isEditing && currentInvoice.id ? currentInvoice.id : crypto.randomUUID(),
-      invoiceNumber: isEditing && currentInvoice.invoiceNumber ? currentInvoice.invoiceNumber : newInvoiceNumber,
+    setIsSaving(true);
+
+    const invoiceDataToSave: Omit<Invoice, 'id' | 'createdAt'> & { createdAt?: any } = {
+      invoiceNumber: currentInvoice.invoiceNumber || `INV${(Date.now()).toString().slice(-6)}`, // More unique temp number
       clientName: currentInvoice.clientName!,
       clientEmail: currentInvoice.clientEmail,
       amount: Number(currentInvoice.amount) || 0,
-      issuedDate: currentInvoice.issuedDate!,
-      dueDate: currentInvoice.dueDate!,
+      issuedDate: currentInvoice.issuedDate instanceof Date ? Timestamp.fromDate(currentInvoice.issuedDate) : currentInvoice.issuedDate,
+      dueDate: currentInvoice.dueDate instanceof Date ? Timestamp.fromDate(currentInvoice.dueDate) : currentInvoice.dueDate,
       status: currentInvoice.status || 'Draft',
       items: currentInvoice.items || [],
-      notes: currentInvoice.notes
+      notes: currentInvoice.notes,
+      companyId: user.companyId,
     };
 
-    if (isEditing) {
-      setInvoices(invoices.map(inv => inv.id === finalInvoice.id ? finalInvoice : inv));
-      toast({ title: "Invoice Updated", description: `Invoice ${finalInvoice.invoiceNumber} updated successfully.` });
-    } else {
-      setInvoices([finalInvoice, ...invoices]);
-      toast({ title: "Invoice Created", description: `Invoice ${finalInvoice.invoiceNumber} created successfully.` });
+
+    try {
+      if (isEditing && currentInvoice.id) {
+        invoiceDataToSave.invoiceNumber = currentInvoice.invoiceNumber!; // Keep existing number
+        const invoiceRef = doc(db, 'invoices', currentInvoice.id);
+        await updateDoc(invoiceRef, invoiceDataToSave);
+        toast({ title: "Invoice Updated", description: `Invoice ${invoiceDataToSave.invoiceNumber} updated successfully.` });
+      } else {
+        invoiceDataToSave.createdAt = serverTimestamp(); // Add createdAt for new invoices
+        const invoicesColRef = collection(db, 'invoices');
+        const docRef = await addDoc(invoicesColRef, invoiceDataToSave);
+        // Auto-generate invoice number if not editing (more robustly if needed)
+        if (!invoiceDataToSave.invoiceNumber || invoiceDataToSave.invoiceNumber.startsWith('INV000')) {
+            const newInvNum = `INV${docRef.id.substring(0, 6).toUpperCase()}`;
+            await updateDoc(docRef, { invoiceNumber: newInvNum });
+            invoiceDataToSave.invoiceNumber = newInvNum;
+        }
+        toast({ title: "Invoice Created", description: `Invoice ${invoiceDataToSave.invoiceNumber} created successfully.` });
+      }
+      fetchInvoices(); // Refresh the list
+      setIsFormOpen(false);
+      setCurrentInvoice({});
+      setClientNameSearch('');
+      setIsEditing(false);
+    } catch (error: any) {
+      console.error("Error saving invoice: ", error);
+      toast({ title: "Save Failed", description: `Could not save invoice. ${error.message}`, variant: "destructive" });
+    } finally {
+      setIsSaving(false);
     }
-    
-    setIsFormOpen(false);
-    setCurrentInvoice({});
-    setIsEditing(false);
   };
 
   const handleCreateNew = () => {
-    setCurrentInvoice({ issuedDate: new Date(), dueDate: new Date(new Date().setDate(new Date().getDate() + 30)), status: 'Draft', items: [], amount: 0 }); // Default due date 30 days from now
+    setCurrentInvoice({ 
+        issuedDate: new Date(), 
+        dueDate: new Date(new Date().setDate(new Date().getDate() + 30)), 
+        status: 'Draft', 
+        items: [], 
+        amount: 0,
+        invoiceNumber: `INV${(Date.now()).toString().slice(-6)}` // Placeholder, can be refined upon save
+    });
+    setClientNameSearch('');
     setIsEditing(false);
     setIsFormOpen(true);
   };
 
   const handleEditInvoice = (invoice: Invoice) => {
-    setCurrentInvoice(invoice);
+    setCurrentInvoice({
+        ...invoice,
+        issuedDate: invoice.issuedDate instanceof Timestamp ? invoice.issuedDate.toDate() : invoice.issuedDate,
+        dueDate: invoice.dueDate instanceof Timestamp ? invoice.dueDate.toDate() : invoice.dueDate,
+    });
+    setClientNameSearch(invoice.clientName || '');
     setIsEditing(true);
     setIsFormOpen(true);
   };
@@ -229,17 +329,42 @@ export default function InvoicingPage() {
     setIsDeleteDialogOpen(true);
   };
 
-  const confirmDeleteInvoice = () => {
+  const confirmDeleteInvoice = async () => {
     if (invoiceToDeleteId) {
-        setInvoices(invoices.filter(inv => inv.id !== invoiceToDeleteId));
-        toast({ title: "Invoice Deleted", description: "The invoice has been removed.", variant: "destructive" });
-        setInvoiceToDeleteId(null);
+        try {
+            setIsSaving(true);
+            const invoiceRef = doc(db, 'invoices', invoiceToDeleteId);
+            await deleteDoc(invoiceRef);
+            toast({ title: "Invoice Deleted", description: "The invoice has been removed."});
+            fetchInvoices(); // Refresh list
+            setInvoiceToDeleteId(null);
+        } catch (error: any) {
+            console.error("Error deleting invoice: ", error);
+            toast({ title: "Delete Failed", description: `Could not delete invoice. ${error.message}`, variant: "destructive"});
+        } finally {
+            setIsSaving(false);
+        }
     }
     setIsDeleteDialogOpen(false);
   };
   
   const handleViewInvoice = (invoice: Invoice) => {
-    toast({ title: "View Invoice", description: `Details for ${invoice.invoiceNumber} would be shown here.`});
+    // For now, using an alert. Could open a detailed view modal later.
+    const invoiceDetails = `
+      Invoice #: ${invoice.invoiceNumber}
+      Client: ${invoice.clientName}
+      Amount: $${invoice.amount.toFixed(2)}
+      Status: ${invoice.status}
+      Issued: ${invoice.issuedDate instanceof Date ? format(invoice.issuedDate, 'PP') : format(invoice.issuedDate.toDate(), 'PP')}
+      Due: ${invoice.dueDate instanceof Date ? format(invoice.dueDate, 'PP') : format(invoice.dueDate.toDate(), 'PP')}
+      ${invoice.clientEmail ? `Client Email: ${invoice.clientEmail}` : ''}
+      ${invoice.notes ? `Notes: ${invoice.notes}` : ''}
+      Items:
+      ${(invoice.items || []).map(item => `- ${item.description} (Qty: ${item.quantity}, Price: $${item.unitPrice.toFixed(2)})`).join('\n      ') || '  No items detailed.'}
+    `;
+    // Using alert for simplicity, can be replaced with a modal
+    alert(invoiceDetails); 
+    // toast({ title: "View Invoice", description: `Details for ${invoice.invoiceNumber} shown in alert.`});
   };
 
   const loadAndPrepareEmailTemplate = (invoice: Invoice, useDefault: boolean = false) => {
@@ -251,7 +376,6 @@ export default function InvoicingPage() {
                 template = JSON.parse(storedTemplateString);
             } catch (e) {
                 console.error("Failed to parse saved email template", e);
-                // Fallback to default if parsing fails
                 template = DEFAULT_EMAIL_TEMPLATE;
             }
         }
@@ -264,14 +388,13 @@ export default function InvoicingPage() {
         '{{clientName}}': invoice.clientName || 'Client',
         '{{invoiceNumber}}': invoice.invoiceNumber,
         '{{amount}}': invoice.amount.toFixed(2),
-        '{{dueDate}}': format(invoice.dueDate, 'PPP'),
+        '{{dueDate}}': invoice.dueDate instanceof Date ? format(invoice.dueDate, 'PPP') : format(invoice.dueDate.toDate(), 'PPP'),
         '{{companyName}}': companyNameForEmail,
-        // Add more placeholders as needed
     };
 
     for (const [key, value] of Object.entries(placeholders)) {
-        processedSubject = processedSubject.replace(new RegExp(key, 'g'), value);
-        processedBody = processedBody.replace(new RegExp(key, 'g'), value);
+        processedSubject = processedSubject.replace(new RegExp(key.replace(/[-\/\\^$*+?.()|[\]{}]/g, '\\$&'), 'g'), value);
+        processedBody = processedBody.replace(new RegExp(key.replace(/[-\/\\^$*+?.()|[\]{}]/g, '\\$&'), 'g'), value);
     }
     setEmailSubject(processedSubject);
     setEmailBody(processedBody);
@@ -300,48 +423,56 @@ export default function InvoicingPage() {
   };
 
   const handleSaveTemplate = () => {
-    // This saves the current state of emailSubject and emailBody AS THE NEW TEMPLATE
-    // Users need to ensure placeholders are in the text if they want them.
-    // For simplicity, we're saving the literal text from the dialog.
-    // A more advanced system would save a template with placeholders.
-    // Here, we will assume the user has edited the text to be a template WITH placeholders.
-    // The actual replacement happens in `loadAndPrepareEmailTemplate`.
-    // So, we save the raw `emailSubject` and `emailBody` as they are edited in the dialog.
-    // The user is responsible for keeping/adding placeholders like {{clientName}} if they want them in the template.
     const currentTemplateText: EmailTemplate = { subject: emailSubject, body: emailBody };
     localStorage.setItem(LOCAL_STORAGE_EMAIL_TEMPLATE_KEY, JSON.stringify(currentTemplateText));
     toast({ title: "Template Saved", description: "Your current email content is saved as the default template."});
   };
   
-  const handleSaveTemplateAndSend = () => {
-    handleSaveTemplate(); // Save the current dialog content as the template
-    // To make the template useful, we should save the version *before* placeholder replacement.
-    // This is tricky. For now, the `handleSaveTemplate` saves the *resolved* version.
-    // A better approach: The dialog should hold template strings, and preview the resolved version.
-    // For this iteration, let's save the raw text from the dialog as the template.
-    // The user must manually ensure placeholders are in the text they save.
-
-    // For a simple "save the current content (with placeholders manually inserted by user)"
-    // we use the current emailSubject and emailBody from the state, which user might have edited
-    // to be their new template.
-    const templateToSave: EmailTemplate = { subject: emailSubject, body: emailBody };
-    localStorage.setItem(LOCAL_STORAGE_EMAIL_TEMPLATE_KEY, JSON.stringify(templateToSave));
-    toast({ title: "Template Saved", description: "The current email format has been saved as your default template." });
-
-    handleSendEmail(); // Then send the email
-  };
-
   const handleRevertToDefaultTemplate = () => {
     if (invoiceForEmail) {
-        loadAndPrepareEmailTemplate(invoiceForEmail, true); // true to force default
+        loadAndPrepareEmailTemplate(invoiceForEmail, true); 
         toast({ title: "Template Reset", description: "Email content reset to the original default."});
     }
   };
 
 
   const handleDownloadInvoice = (invoice: Invoice) => {
-    toast({ title: "Download PDF", description: `PDF for invoice ${invoice.invoiceNumber} would be generated.`});
+    // Basic text download for now
+    const issuedDateFormatted = invoice.issuedDate instanceof Date ? format(invoice.issuedDate, 'yyyy-MM-dd') : format(invoice.issuedDate.toDate(), 'yyyy-MM-dd');
+    const dueDateFormatted = invoice.dueDate instanceof Date ? format(invoice.dueDate, 'yyyy-MM-dd') : format(invoice.dueDate.toDate(), 'yyyy-MM-dd');
+
+    let content = `Invoice Number: ${invoice.invoiceNumber}\n`;
+    content += `Client: ${invoice.clientName}\n`;
+    if (invoice.clientEmail) content += `Client Email: ${invoice.clientEmail}\n`;
+    content += `Issued Date: ${issuedDateFormatted}\n`;
+    content += `Due Date: ${dueDateFormatted}\n`;
+    content += `Status: ${invoice.status}\n`;
+    content += `Amount: $${invoice.amount.toFixed(2)}\n\n`;
+
+    if (invoice.items && invoice.items.length > 0) {
+      content += "Items:\n";
+      invoice.items.forEach(item => {
+        content += `- ${item.description} (Qty: ${item.quantity}, Unit Price: $${item.unitPrice.toFixed(2)}, Total: $${(item.quantity * item.unitPrice).toFixed(2)})\n`;
+      });
+      content += "\n";
+    }
+
+    if (invoice.notes) content += `Notes: ${invoice.notes}\n`;
+
+    content += `\nThank you for your business!\n${companyNameForEmail}`;
+
+    const blob = new Blob([content], { type: 'text/plain;charset=utf-8' });
+    const link = document.createElement('a');
+    link.href = URL.createObjectURL(blob);
+    link.download = `Invoice-${invoice.invoiceNumber}.txt`;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(link.href);
+
+    toast({ title: "Download Started", description: `Text file for invoice ${invoice.invoiceNumber} generated.`});
   };
+
 
   const handleAddItem = () => {
     const newItem: InvoiceItem = { id: crypto.randomUUID(), description: '', quantity: 1, unitPrice: 0 };
@@ -371,16 +502,27 @@ export default function InvoicingPage() {
     if (currentInvoice.items && currentInvoice.items.length > 0) {
       const totalAmount = currentInvoice.items.reduce((sum, item) => sum + (Number(item.quantity) * Number(item.unitPrice)), 0);
       setCurrentInvoice(prev => ({ ...prev, amount: totalAmount }));
-    } else if ((currentInvoice.items || []).length === 0 && !isEditing) { 
-        // Amount can be manually set if no items, or defaults to 0 from handleCreateNew
+    } else if ((currentInvoice.items || []).length === 0 && (currentInvoice.amount === undefined || currentInvoice.amount === null)) {
+      // If items are removed and amount becomes undefined/null, set it back to 0
+      // Allows manual override if items array is empty
+      setCurrentInvoice(prev => ({ ...prev, amount: 0}));
     }
-  }, [currentInvoice.items, isEditing]);
+  }, [currentInvoice.items]);
+
+
+  if (isLoading && invoices.length === 0) { // Show full page loader only on initial load and no data
+    return (
+      <div className="flex items-center justify-center h-[calc(100vh-200px)]">
+        <Loader2 className="h-12 w-12 animate-spin text-primary" />
+      </div>
+    );
+  }
 
 
   return (
     <div className="space-y-6">
       <PageTitle title="Invoicing" subtitle="Manage your customer invoices efficiently." icon={Receipt}>
-        <Button onClick={handleCreateNew}>
+        <Button onClick={handleCreateNew} disabled={isSaving || isLoading}>
           <PlusCircle className="mr-2 h-4 w-4" /> Create New Invoice
         </Button>
       </PageTitle>
@@ -397,13 +539,20 @@ export default function InvoicingPage() {
                 className="pl-8 sm:w-[250px] md:w-[300px]"
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
+                disabled={isLoading}
               />
             </div>
           </div>
         </CardHeader>
         <CardContent>
+          {isLoading && invoices.length > 0 && ( // Show subtle loading bar if refreshing data
+            <div className="flex justify-center py-4">
+              <Loader2 className="h-6 w-6 animate-spin text-primary" />
+              <span className="ml-2">Refreshing invoices...</span>
+            </div>
+          )}
           <Table>
-            <TableCaption>{filteredInvoices.length === 0 ? "No invoices found." : `A list of your recent invoices.`}</TableCaption>
+            <TableCaption>{filteredInvoices.length === 0 && !isLoading ? "No invoices found." : filteredInvoices.length > 0 ? "A list of your recent invoices." : isLoading ? "Loading invoices..." : "No invoices match your search."}</TableCaption>
             <TableHeader>
               <TableRow>
                 <TableHead>Number</TableHead>
@@ -421,8 +570,8 @@ export default function InvoicingPage() {
                   <TableCell className="font-medium">{invoice.invoiceNumber}</TableCell>
                   <TableCell>{invoice.clientName}</TableCell>
                   <TableCell className="text-right">${invoice.amount.toFixed(2)}</TableCell>
-                  <TableCell>{format(new Date(invoice.issuedDate), 'PP')}</TableCell>
-                  <TableCell>{format(new Date(invoice.dueDate), 'PP')}</TableCell>
+                  <TableCell>{invoice.issuedDate instanceof Date ? format(invoice.issuedDate, 'PP') : format(invoice.issuedDate.toDate(), 'PP')}</TableCell>
+                  <TableCell>{invoice.dueDate instanceof Date ? format(invoice.dueDate, 'PP') : format(invoice.dueDate.toDate(), 'PP')}</TableCell>
                   <TableCell>
                     <Badge variant={getStatusBadgeVariant(invoice.status)} className={`${invoice.status === 'Paid' ? 'bg-accent text-accent-foreground hover:bg-accent/80' : ''} ${invoice.status === 'Overdue' ? 'bg-destructive text-destructive-foreground hover:bg-destructive/80' : ''}`}>
                       {invoice.status}
@@ -431,7 +580,7 @@ export default function InvoicingPage() {
                   <TableCell className="text-right">
                     <DropdownMenu>
                       <DropdownMenuTrigger asChild>
-                        <Button variant="ghost" size="icon" className="h-8 w-8">
+                        <Button variant="ghost" size="icon" className="h-8 w-8" disabled={isSaving}>
                           <MoreHorizontal className="h-4 w-4" />
                         </Button>
                       </DropdownMenuTrigger>
@@ -439,7 +588,7 @@ export default function InvoicingPage() {
                         <DropdownMenuItem onClick={() => handleViewInvoice(invoice)}><Eye className="mr-2 h-4 w-4" /> View</DropdownMenuItem>
                         <DropdownMenuItem onClick={() => handleEditInvoice(invoice)}><Edit className="mr-2 h-4 w-4" /> Edit</DropdownMenuItem>
                         <DropdownMenuItem onClick={() => handleOpenEmailDialog(invoice)} disabled={!invoice.clientEmail}><Mail className="mr-2 h-4 w-4" /> Email</DropdownMenuItem>
-                        <DropdownMenuItem onClick={() => handleDownloadInvoice(invoice)}><Download className="mr-2 h-4 w-4" /> Download PDF</DropdownMenuItem>
+                        <DropdownMenuItem onClick={() => handleDownloadInvoice(invoice)}><Download className="mr-2 h-4 w-4" /> Download</DropdownMenuItem>
                         <DropdownMenuSeparator />
                         <DropdownMenuItem onClick={() => promptDeleteInvoice(invoice.id)} className="text-destructive focus:text-destructive focus:bg-destructive/10">
                           <Trash2 className="mr-2 h-4 w-4" /> Delete
@@ -455,7 +604,7 @@ export default function InvoicingPage() {
       </Card>
 
       {/* Invoice Form Dialog */}
-      <Dialog open={isFormOpen} onOpenChange={(open) => { setIsFormOpen(open); if (!open) { setCurrentInvoice({}); setIsEditing(false); } }}>
+      <Dialog open={isFormOpen} onOpenChange={(open) => { setIsFormOpen(open); if (!open) { setCurrentInvoice({}); setIsEditing(false); setClientNameSearch(''); } }}>
         <DialogContent className="sm:max-w-2xl max-h-[90vh] flex flex-col">
           <DialogHeader>
             <DialogTitle className="font-headline">{isEditing ? 'Edit Invoice' : 'Create New Invoice'}</DialogTitle>
@@ -465,41 +614,99 @@ export default function InvoicingPage() {
           </DialogHeader>
           <form onSubmit={handleFormSubmit} id="invoice-form-explicit" className="space-y-4 overflow-y-auto flex-grow p-1 pr-3">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                
                 <div>
-                    <Label htmlFor="clientName">Client Name</Label>
-                    <Input id="clientName" value={currentInvoice.clientName || ''} onChange={(e) => setCurrentInvoice({ ...currentInvoice, clientName: e.target.value })} required />
+                  <Label htmlFor="clientName">Client Name</Label>
+                  <Popover open={isClientPopoverOpen} onOpenChange={setIsClientPopoverOpen}>
+                    <PopoverTrigger asChild>
+                      <Input
+                        id="clientName"
+                        value={currentInvoice.clientName || ''}
+                        onChange={(e) => {
+                          setCurrentInvoice({ ...currentInvoice, clientName: e.target.value, clientEmail: existingClientNames.includes(e.target.value) ? currentInvoice.clientEmail : '' }); // Clear email if new client is typed
+                          setClientNameSearch(e.target.value);
+                          if (e.target.value.length > 0) { // Only open if there is text
+                            setIsClientPopoverOpen(true);
+                          } else {
+                            setIsClientPopoverOpen(false);
+                          }
+                        }}
+                        onClick={() => {
+                          if ((currentInvoice.clientName || '').length > 0) setIsClientPopoverOpen(true);
+                        }}
+                        onBlur={() => setTimeout(() => setIsClientPopoverOpen(false), 150)} // Delay to allow click
+                        placeholder="Type or select client"
+                        required
+                        autoComplete="off"
+                        disabled={isSaving}
+                      />
+                    </PopoverTrigger>
+                    {isClientPopoverOpen && clientNameSearch && existingClientNames.filter(name => name.toLowerCase().includes(clientNameSearch.toLowerCase())).length > 0 && (
+                      <PopoverContent className="w-[--radix-popover-trigger-width] p-0" align="start">
+                        <div className="max-h-48 overflow-y-auto rounded-md border bg-popover text-popover-foreground shadow-md">
+                          {existingClientNames
+                            .filter(name => name.toLowerCase().includes(clientNameSearch.toLowerCase()))
+                            .map(name => (
+                              <div
+                                key={name}
+                                className="p-2 hover:bg-accent cursor-pointer text-sm"
+                                onMouseDown={() => {
+                                  const clientInvoices = invoices.filter(inv => inv.clientName === name);
+                                  const latestEmail = clientInvoices.sort((a, b) => {
+                                    const dateA = a.issuedDate instanceof Timestamp ? a.issuedDate.toMillis() : new Date(a.issuedDate).getTime();
+                                    const dateB = b.issuedDate instanceof Timestamp ? b.issuedDate.toMillis() : new Date(b.issuedDate).getTime();
+                                    return dateB - dateA;
+                                  })[0]?.clientEmail;
+                                  setCurrentInvoice({ ...currentInvoice, clientName: name, clientEmail: latestEmail || '' });
+                                  setClientNameSearch(name);
+                                  setIsClientPopoverOpen(false);
+                                }}
+                              >
+                                {name}
+                              </div>
+                            ))}
+                        </div>
+                      </PopoverContent>
+                    )}
+                  </Popover>
+                  {currentInvoice.clientName && !existingClientNames.includes(currentInvoice.clientName) && (
+                    <p className="text-xs text-muted-foreground mt-1">
+                      <Briefcase className="inline h-3 w-3 mr-1" /> New client: "{currentInvoice.clientName}" will be added.
+                    </p>
+                  )}
                 </div>
+
                 <div>
                     <Label htmlFor="clientEmail">Client Email (Optional)</Label>
-                    <Input id="clientEmail" type="email" value={currentInvoice.clientEmail || ''} onChange={(e) => setCurrentInvoice({ ...currentInvoice, clientEmail: e.target.value })} />
+                    <Input id="clientEmail" type="email" value={currentInvoice.clientEmail || ''} onChange={(e) => setCurrentInvoice({ ...currentInvoice, clientEmail: e.target.value })} disabled={isSaving} />
                 </div>
                 <div>
                     <Label htmlFor="issuedDate">Issued Date</Label>
                     <Popover>
                         <PopoverTrigger asChild>
-                        <Button variant="outline" className="w-full justify-start text-left font-normal">
+                        <Button variant="outline" className="w-full justify-start text-left font-normal" disabled={isSaving}>
                             <CalendarIconLucide className="mr-2 h-4 w-4" />
-                            {currentInvoice.issuedDate ? format(currentInvoice.issuedDate, 'PPP') : <span>Pick a date</span>}
+                            {currentInvoice.issuedDate ? format(currentInvoice.issuedDate instanceof Timestamp ? currentInvoice.issuedDate.toDate() : currentInvoice.issuedDate, 'PPP') : <span>Pick a date</span>}
                         </Button>
                         </PopoverTrigger>
-                        <PopoverContent className="w-auto p-0"><Calendar mode="single" selected={currentInvoice.issuedDate} onSelect={(date) => setCurrentInvoice({...currentInvoice, issuedDate: date})} initialFocus /></PopoverContent>
+                        <PopoverContent className="w-auto p-0"><Calendar mode="single" selected={currentInvoice.issuedDate instanceof Timestamp ? currentInvoice.issuedDate.toDate() : currentInvoice.issuedDate} onSelect={(date) => setCurrentInvoice({...currentInvoice, issuedDate: date})} initialFocus /></PopoverContent>
                     </Popover>
                 </div>
                  <div>
                     <Label htmlFor="dueDate">Due Date</Label>
                     <Popover>
                         <PopoverTrigger asChild>
-                        <Button variant="outline" className="w-full justify-start text-left font-normal">
+                        <Button variant="outline" className="w-full justify-start text-left font-normal" disabled={isSaving}>
                             <CalendarIconLucide className="mr-2 h-4 w-4" />
-                            {currentInvoice.dueDate ? format(currentInvoice.dueDate, 'PPP') : <span>Pick a date</span>}
+                            {currentInvoice.dueDate ? format(currentInvoice.dueDate instanceof Timestamp ? currentInvoice.dueDate.toDate() : currentInvoice.dueDate, 'PPP') : <span>Pick a date</span>}
                         </Button>
                         </PopoverTrigger>
-                        <PopoverContent className="w-auto p-0"><Calendar mode="single" selected={currentInvoice.dueDate} onSelect={(date) => setCurrentInvoice({...currentInvoice, dueDate: date})} initialFocus /></PopoverContent>
+                        <PopoverContent className="w-auto p-0"><Calendar mode="single" selected={currentInvoice.dueDate instanceof Timestamp ? currentInvoice.dueDate.toDate() : currentInvoice.dueDate} onSelect={(date) => setCurrentInvoice({...currentInvoice, dueDate: date})} initialFocus /></PopoverContent>
                     </Popover>
                 </div>
                  <div>
                   <Label htmlFor="status">Status</Label>
-                  <Select value={currentInvoice.status || 'Draft'} onValueChange={(value: Invoice['status']) => setCurrentInvoice({ ...currentInvoice, status: value })}>
+                  <Select value={currentInvoice.status || 'Draft'} onValueChange={(value: Invoice['status']) => setCurrentInvoice({ ...currentInvoice, status: value })} disabled={isSaving}>
                     <SelectTrigger id="status"><SelectValue placeholder="Select status" /></SelectTrigger>
                     <SelectContent>
                       <SelectItem value="Draft">Draft</SelectItem>
@@ -511,46 +718,49 @@ export default function InvoicingPage() {
                 </div>
             </div>
             
-            <div className="space-y-2">
+            <div className="space-y-2 pt-2">
               <div className="flex justify-between items-center">
                 <Label>Invoice Items</Label>
-                <Button type="button" variant="outline" size="sm" onClick={handleAddItem}><PlusCircle className="mr-2 h-4 w-4" /> Add Item</Button>
+                <Button type="button" variant="outline" size="sm" onClick={handleAddItem} disabled={isSaving}><PlusCircle className="mr-2 h-4 w-4" /> Add Item</Button>
               </div>
-              {(currentInvoice.items || []).map((item, index) => (
+              {(currentInvoice.items || []).map((item) => (
                 <div key={item.id} className="flex gap-2 items-end p-2 border rounded-md bg-muted/30">
                   <div className="flex-grow space-y-1">
                     <Label htmlFor={`item-desc-${item.id}`} className="text-xs">Description</Label>
-                    <Input id={`item-desc-${item.id}`} value={item.description} onChange={e => handleItemChange(item.id, 'description', e.target.value)} placeholder="Service or Product" />
+                    <Input id={`item-desc-${item.id}`} value={item.description} onChange={e => handleItemChange(item.id, 'description', e.target.value)} placeholder="Service or Product" disabled={isSaving} />
                   </div>
                   <div className="w-20 space-y-1">
                      <Label htmlFor={`item-qty-${item.id}`} className="text-xs">Qty</Label>
-                    <Input id={`item-qty-${item.id}`} type="number" value={item.quantity} onChange={e => handleItemChange(item.id, 'quantity', e.target.value)} min="0" />
+                    <Input id={`item-qty-${item.id}`} type="number" value={item.quantity} onChange={e => handleItemChange(item.id, 'quantity', e.target.value)} min="0" disabled={isSaving} />
                   </div>
                    <div className="w-24 space-y-1">
                     <Label htmlFor={`item-price-${item.id}`} className="text-xs">Unit Price</Label>
-                    <Input id={`item-price-${item.id}`} type="number" value={item.unitPrice} onChange={e => handleItemChange(item.id, 'unitPrice', e.target.value)} min="0" step="0.01" />
+                    <Input id={`item-price-${item.id}`} type="number" value={item.unitPrice} onChange={e => handleItemChange(item.id, 'unitPrice', e.target.value)} min="0" step="0.01" disabled={isSaving} />
                   </div>
-                  <Button type="button" variant="ghost" size="icon" className="text-destructive h-8 w-8" onClick={() => handleRemoveItem(item.id)}><Trash2 className="h-4 w-4" /></Button>
+                  <Button type="button" variant="ghost" size="icon" className="text-destructive h-8 w-8" onClick={() => handleRemoveItem(item.id)} disabled={isSaving}><Trash2 className="h-4 w-4" /></Button>
                 </div>
               ))}
+               { (currentInvoice.items || []).length === 0 && <p className="text-xs text-muted-foreground text-center py-2">No items added. Total amount can be set manually.</p>}
             </div>
 
             <div>
                 <Label htmlFor="amount">Total Amount ($)</Label>
-                <Input id="amount" type="number" value={currentInvoice.amount === undefined ? '' : currentInvoice.amount.toFixed(2)} onChange={(e) => setCurrentInvoice({ ...currentInvoice, amount: parseFloat(e.target.value) || 0 })} placeholder="Calculated automatically if items exist" disabled={(currentInvoice.items || []).length > 0} required min="0" step="0.01" />
+                <Input id="amount" type="number" value={currentInvoice.amount === undefined ? '' : currentInvoice.amount.toFixed(2)} onChange={(e) => setCurrentInvoice({ ...currentInvoice, amount: parseFloat(e.target.value) || 0 })} placeholder="Calculated if items exist, or set manually" disabled={(currentInvoice.items || []).length > 0 || isSaving} required min="0" step="0.01" />
             </div>
 
             <div>
                 <Label htmlFor="notes">Notes (Optional)</Label>
-                <Textarea id="notes" value={currentInvoice.notes || ''} onChange={(e) => setCurrentInvoice({ ...currentInvoice, notes: e.target.value })} placeholder="e.g., Payment terms, thank you message" />
+                <Textarea id="notes" value={currentInvoice.notes || ''} onChange={(e) => setCurrentInvoice({ ...currentInvoice, notes: e.target.value })} placeholder="e.g., Payment terms, thank you message" disabled={isSaving} />
             </div>
 
           </form>
           <DialogFooter className="mt-auto pt-4 border-t">
             <DialogClose asChild>
-              <Button type="button" variant="outline" onClick={() => { setIsFormOpen(false); setCurrentInvoice({}); setIsEditing(false); }}>Cancel</Button>
+              <Button type="button" variant="outline" onClick={() => { setIsFormOpen(false); setCurrentInvoice({}); setIsEditing(false); setClientNameSearch(''); }} disabled={isSaving}>Cancel</Button>
             </DialogClose>
-            <Button type="submit" form="invoice-form-explicit">{isEditing ? 'Save Changes' : 'Create Invoice'}</Button>
+            <Button type="submit" form="invoice-form-explicit" disabled={isSaving}>
+                {isSaving ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : (isEditing ? 'Save Changes' : 'Create Invoice')}
+            </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
@@ -562,7 +772,6 @@ export default function InvoicingPage() {
             <DialogTitle className="font-headline">Compose Email</DialogTitle>
             <DialogDescription>
               Preview and edit the email for invoice {invoiceForEmail?.invoiceNumber} to {invoiceForEmail?.clientName}.
-{/* Placeholders like {{'{'}}{{'{'}}clientName}} or {{'{'}}{{'{'}}invoiceNumber}} will be replaced. */}
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-4 py-2">
@@ -606,13 +815,13 @@ export default function InvoicingPage() {
             <AlertDialogTitle>Are you absolutely sure?</AlertDialogTitle>
             <AlertDialogDescription>
               This action cannot be undone. This will permanently delete the invoice
-              and remove its data.
+              and remove its data from Firestore.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel onClick={() => setInvoiceToDeleteId(null)}>Cancel</AlertDialogCancel>
-            <AlertDialogAction onClick={confirmDeleteInvoice} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
-              Delete
+            <AlertDialogCancel onClick={() => setInvoiceToDeleteId(null)} disabled={isSaving}>Cancel</AlertDialogCancel>
+            <AlertDialogAction onClick={confirmDeleteInvoice} className="bg-destructive text-destructive-foreground hover:bg-destructive/90" disabled={isSaving}>
+              {isSaving ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : 'Delete'}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
@@ -620,3 +829,4 @@ export default function InvoicingPage() {
     </div>
   );
 }
+
