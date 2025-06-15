@@ -9,8 +9,9 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
-import { UserPlus, Loader2, AlertTriangle, Building, MapPin, Home, Map } from 'lucide-react';
+import { UserPlus, Loader2, AlertTriangle, Building } from 'lucide-react'; // Removed MapPin, Home, Map as they are not used
 import { useToast } from '@/hooks/use-toast';
+import { Separator } from '@/components/ui/separator'; // Added import for Separator
 
 export default function SignUpPage() {
   const [displayName, setDisplayName] = useState(''); // User's full name
@@ -43,8 +44,11 @@ export default function SignUpPage() {
     
     await signUp(email, password, displayName, companyName, companyAddress, city, state);
     
-    if (error) { // This error is from the AuthContext, which might be stale if a new submission clears it
-        setPageError(error.message);
+    // Error state from useAuth might be stale immediately after signUp resolves.
+    // It's better to rely on the error returned by signUp or if AuthContext updates its error state reactively.
+    // For now, checking `error` from `useAuth()` which should update if `signUp` sets an error in the context.
+    if (useAuth().error) { 
+        setPageError(useAuth().error!.message); // Ensure useAuth().error is not null before accessing message
     }
     // Navigation is handled by AuthContext on successful sign-up
   };
@@ -198,5 +202,3 @@ export default function SignUpPage() {
     </div>
   );
 }
-
-    
