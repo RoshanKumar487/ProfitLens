@@ -82,7 +82,7 @@ interface InvoiceDisplay extends Omit<InvoiceFirestore, 'dueDate' | 'issuedDate'
 
 interface ExistingClient {
   name: string;
-  email?: string;
+  email?: string; // The latest email found for this client
 }
 
 interface CompanyDetailsFirestore {
@@ -140,6 +140,7 @@ export default function InvoicingPage() {
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
 
+  // This will store unique client names and their latest emails
   const [existingClients, setExistingClients] = useState<ExistingClient[]>([]);
   const [isClientPopoverOpen, setIsClientPopoverOpen] = useState(false);
   const clientNameInputRef = useRef<HTMLInputElement>(null);
@@ -177,19 +178,19 @@ export default function InvoicingPage() {
 
       setInvoices(fetchedInvoices);
 
-      // Derive existing clients
+      // Derive existing clients: Store unique client names and their latest email
       const clientsMap = new Map<string, ExistingClient>();
-      fetchedInvoices.forEach(inv => {
+      // Iterate in reverse (older to newer) so the latest email for a client is preserved
+      for (let i = fetchedInvoices.length - 1; i >= 0; i--) {
+        const inv = fetchedInvoices[i];
         if (inv.clientName) {
-          const existing = clientsMap.get(inv.clientName);
-           // Update if this invoice has an email and the current map entry doesn't, or if this email is different (preferring non-empty emails)
-          if (!existing || (inv.clientEmail && !existing.email) || (inv.clientEmail && inv.clientEmail !== existing.email)) {
-            clientsMap.set(inv.clientName, { name: inv.clientName, email: inv.clientEmail || undefined });
-          } else if (!existing && !inv.clientEmail) { // Ensure client is added even if no email
-             clientsMap.set(inv.clientName, { name: inv.clientName, email: undefined });
-          }
+          // If email exists for this invoice, it's considered more recent for this client
+          clientsMap.set(inv.clientName.toLowerCase(), { 
+            name: inv.clientName, 
+            email: inv.clientEmail || clientsMap.get(inv.clientName.toLowerCase())?.email 
+          });
         }
-      });
+      }
       setExistingClients(Array.from(clientsMap.values()));
 
     } catch (error: any) {
@@ -345,6 +346,7 @@ export default function InvoicingPage() {
     });
     setIsEditing(false);
     setIsFormOpen(true);
+    setTimeout(() => clientNameInputRef.current?.focus(), 0); // Focus on client name when dialog opens
   };
 
   const handleEditInvoice = (invoice: InvoiceDisplay) => {
@@ -640,20 +642,66 @@ export default function InvoicingPage() {
       const totalAmount = currentInvoice.items.reduce((sum, item) => sum + (Number(item.quantity) * Number(item.unitPrice)), 0);
       setCurrentInvoice(prev => ({ ...prev, amount: totalAmount }));
     } else if ((currentInvoice.items || []).length === 0 ) {
+        // If items are cleared, but amount was manually set, don't overwrite unless amount is undefined
         if (currentInvoice.amount === undefined || currentInvoice.amount === null) {
-            setCurrentInvoice(prev => ({ ...prev, amount: 0}));
+             setCurrentInvoice(prev => ({ ...prev, amount: 0}));
         }
     }
   }, [currentInvoice.items]);
 
+  const handleClientNameInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const typedValue = e.target.value;
+    setCurrentInvoice(prev => ({
+      ...prev,
+      clientName: typedValue,
+      // Do NOT update clientEmail here directly from typing
+    }));
+    if (typedValue.trim() !== '' || existingClients.length > 0) {
+      setIsClientPopoverOpen(true);
+    } else {
+      setIsClientPopoverOpen(false);
+    }
+  };
+
+  const handleClientSuggestionClick = (client: ExistingClient) => {
+    setCurrentInvoice(prev => ({
+      ...prev,
+      clientName: client.name,
+      clientEmail: client.email || '', // Populate email when a suggestion is clicked
+    }));
+    setIsClientPopoverOpen(false);
+    clientNameInputRef.current?.focus();
+  };
+
+  const handleClientNameInputFocus = () => {
+    // Open popover if there's text or existing clients to show
+    if (currentInvoice.clientName || existingClients.length > 0) {
+      setIsClientPopoverOpen(true);
+    }
+  };
+  
+  const handleClientNameInputBlur = (e: React.FocusEvent<HTMLInputElement>) => {
+    // setTimeout to allow click on popover item before it closes
+    setTimeout(() => {
+      if (popoverContentRef.current && !popoverContentRef.current.contains(document.activeElement)) {
+        setIsClientPopoverOpen(false);
+      }
+    }, 150);
+  };
+
+
   const filteredClientSuggestions = useMemo(() => {
-    if (!currentInvoice.clientName || currentInvoice.clientName.trim() === '') {
-      return existingClients; // Show all if input is empty
+    const currentName = currentInvoice.clientName?.toLowerCase() || '';
+    if (!currentName && isClientPopoverOpen) { // Show all if input empty and popover is open (e.g. on focus)
+        return existingClients;
+    }
+    if (!currentName) {
+        return [];
     }
     return existingClients.filter(client =>
-      client.name.toLowerCase().includes(currentInvoice.clientName!.toLowerCase())
+      client.name.toLowerCase().includes(currentName)
     );
-  }, [currentInvoice.clientName, existingClients]);
+  }, [currentInvoice.clientName, existingClients, isClientPopoverOpen]);
 
   const isNewClient = useMemo(() => {
     if (!currentInvoice.clientName || currentInvoice.clientName.trim() === '') return false;
@@ -770,32 +818,22 @@ export default function InvoicingPage() {
                   <Label htmlFor="clientName">Client Name</Label>
                   <Popover open={isClientPopoverOpen} onOpenChange={setIsClientPopoverOpen}>
                     <PopoverTrigger asChild>
-                      <Input
-                        id="clientName"
-                        ref={clientNameInputRef}
-                        value={currentInvoice.clientName || ''}
-                        onChange={(e) => {
-                          setCurrentInvoice(prev => ({ ...prev, clientName: e.target.value }));
-                          if (e.target.value.trim() !== '' || existingClients.length > 0) {
-                             setIsClientPopoverOpen(true);
-                          } else {
-                             setIsClientPopoverOpen(false);
-                          }
-                        }}
-                        onFocus={() => (currentInvoice.clientName || existingClients.length > 0) && setIsClientPopoverOpen(true)}
-                        onBlur={() => {
-                           setTimeout(() => {
-                              if (popoverContentRef.current && !popoverContentRef.current.contains(document.activeElement)) {
-                                setIsClientPopoverOpen(false);
-                              }
-                            }, 100);
-                        }}
-                        placeholder="Enter client name"
-                        required
-                        autoComplete="off"
-                        disabled={isSaving}
-                        className="w-full"
-                      />
+                       {/* Ensure PopoverTrigger does not interfere with Input's own focus/blur needed for direct editing */}
+                       <div> {/* Simple div wrapper for PopoverTrigger if needed, or remove asChild if Input handles Popover itself */}
+                        <Input
+                          id="clientName"
+                          ref={clientNameInputRef}
+                          value={currentInvoice.clientName || ''}
+                          onChange={handleClientNameInputChange}
+                          onFocus={handleClientNameInputFocus}
+                          onBlur={handleClientNameInputBlur}
+                          placeholder="Enter client name"
+                          required
+                          autoComplete="off"
+                          disabled={isSaving}
+                          className="w-full"
+                        />
+                      </div>
                     </PopoverTrigger>
                     {isClientPopoverOpen && (
                       <PopoverContent
@@ -803,6 +841,7 @@ export default function InvoicingPage() {
                         className="w-[--radix-popover-trigger-width] p-0 max-h-60 overflow-y-auto"
                         side="bottom"
                         align="start"
+                        onOpenAutoFocus={(e) => e.preventDefault()} // Prevent focus stealing
                       >
                         <ScrollArea className="max-h-56">
                           {filteredClientSuggestions.length > 0 ? (
@@ -810,15 +849,8 @@ export default function InvoicingPage() {
                               <div
                                 key={client.name}
                                 className="px-3 py-2 text-sm hover:bg-accent cursor-pointer"
-                                onMouseDown={() => { // Use onMouseDown to fire before onBlur
-                                  setCurrentInvoice(prev => ({
-                                    ...prev,
-                                    clientName: client.name,
-                                    clientEmail: client.email || '',
-                                  }));
-                                  setIsClientPopoverOpen(false);
-                                  clientNameInputRef.current?.focus();
-                                }}
+                                // Use onMouseDown to ensure click registers before blur closes popover
+                                onMouseDown={() => handleClientSuggestionClick(client)}
                               >
                                 {client.name}
                                 {client.email && <span className="text-xs text-muted-foreground ml-2">({client.email})</span>}
@@ -826,14 +858,14 @@ export default function InvoicingPage() {
                             ))
                           ) : (
                             <div className="px-3 py-2 text-sm text-muted-foreground">
-                              {currentInvoice.clientName && currentInvoice.clientName.trim() !== '' ? 'No matching clients found.' : (existingClients.length > 0 ? 'Type to search clients...' : 'No existing clients. Type to add.')}
+                              {currentInvoice.clientName && currentInvoice.clientName.trim() !== '' ? 'No matching clients found.' : (existingClients.length > 0 ? 'Type to search clients or select from list...' : 'No existing clients. Type to add.')}
                             </div>
                           )}
                         </ScrollArea>
                       </PopoverContent>
                     )}
                   </Popover>
-                   {isNewClient && currentInvoice.clientName && (
+                   {isNewClient && currentInvoice.clientName && currentInvoice.clientName.trim() !== '' && (
                     <p className="text-xs text-muted-foreground mt-1 flex items-center">
                       <UserPlus className="h-3 w-3 mr-1 text-accent" />
                       New client: '{currentInvoice.clientName}' will be added.
