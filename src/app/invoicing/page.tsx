@@ -1,7 +1,7 @@
 
 'use client';
 
-import React, { useState, useMemo, useEffect, FormEvent } from 'react';
+import React, { useState, useMemo, useEffect, type FormEvent } from 'react';
 import PageTitle from '@/components/PageTitle';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -114,11 +114,11 @@ export default function InvoicingPage() {
   const [emailBody, setEmailBody] = useState('');
   const [companyNameForEmail, setCompanyNameForEmail] = useState("Your Company");
 
-  const [isLoading, setIsLoading] = useState(true);
-  const [isSaving, setIsSaving] = useState(false);
+  const [isLoading, setIsLoading] = useState(true); // Page level loading for initial data or auth
+  const [isSaving, setIsSaving] = useState(false); // For save/delete operations
 
   const [existingClientNames, setExistingClientNames] = useState<string[]>([]);
-  const [clientNameSearch, setClientNameSearch] = useState(''); // Used for the input field in the popover/combobox
+  const [clientNameSearch, setClientNameSearch] = useState(''); 
   const [isClientPopoverOpen, setIsClientPopoverOpen] = useState(false);
 
 
@@ -130,7 +130,9 @@ export default function InvoicingPage() {
       return;
     }
     console.log(`[InvoicingPage fetchInvoices] Called for companyId: ${user.companyId}`);
-    setIsLoading(true);
+    // Use a different loading state for fetching invoices if page is already displayed
+    // For now, main isLoading handles this.
+    setIsLoading(true); 
     try {
       const invoicesColRef = collection(db, 'invoices');
       const q = query(invoicesColRef, where('companyId', '==', user.companyId), orderBy('createdAt', 'desc'));
@@ -138,14 +140,15 @@ export default function InvoicingPage() {
       console.log(`[InvoicingPage fetchInvoices] Firestore query returned ${querySnapshot.docs.length} documents.`);
       
       const fetchedInvoices = querySnapshot.docs.map(docSnap => {
-        const data = docSnap.data() as Omit<Invoice, 'id' | 'dueDate' | 'issuedDate' | 'createdAt'> & { dueDate: Timestamp, issuedDate: Timestamp, createdAt: Timestamp };
+        const data = docSnap.data();
         return {
           id: docSnap.id,
           ...data,
-          dueDate: data.dueDate.toDate(),
-          issuedDate: data.issuedDate.toDate(),
-          createdAt: data.createdAt, // Keep as Timestamp for potential future use if needed
-        };
+          // Ensure dueDate and issuedDate are converted to JS Date objects
+          dueDate: data.dueDate instanceof Timestamp ? data.dueDate.toDate() : (typeof data.dueDate === 'string' ? parseISO(data.dueDate) : new Date(data.dueDate)),
+          issuedDate: data.issuedDate instanceof Timestamp ? data.issuedDate.toDate() : (typeof data.issuedDate === 'string' ? parseISO(data.issuedDate) : new Date(data.issuedDate)),
+          createdAt: data.createdAt, 
+        } as Invoice; // Cast to Invoice to ensure type safety
       });
 
       setInvoices(fetchedInvoices);
@@ -159,22 +162,22 @@ export default function InvoicingPage() {
       console.error('[InvoicingPage fetchInvoices] Error fetching invoices:', error);
       toast({
         title: 'Error Fetching Invoices',
-        description: `Could not load invoices. ${error.message || ''}`,
+        description: `Could not load invoices. ${error.message || 'An unknown error occurred.'}`,
         variant: 'destructive',
       });
-      setInvoices([]); // Clear invoices on error
+      setInvoices([]); 
     } finally {
       setIsLoading(false);
       console.log('[InvoicingPage fetchInvoices] Finished. isLoading set to false.');
     }
-  }, [user, toast]);
+  }, [user, toast]); // Removed user.companyId from deps as user object itself is sufficient
 
 
   useEffect(() => {
     console.log(`[InvoicingPage useEffect for fetch] authIsLoading: ${authIsLoading}, user: ${user ? user.uid : 'null'}, companyId: ${user?.companyId || 'null'}`);
     if (authIsLoading) {
       console.log("[InvoicingPage useEffect for fetch] Auth is loading, setting page isLoading to true.");
-      setIsLoading(true); // Show page loading indicator while auth is resolving
+      setIsLoading(true); 
       return;
     }
     if (user && user.companyId) {
@@ -182,15 +185,14 @@ export default function InvoicingPage() {
       fetchInvoices();
     } else {
       console.log("[InvoicingPage useEffect for fetch] No user or no companyId after auth. Clearing invoices and setting isLoading to false.");
-      setInvoices([]); // Clear invoices if no user/companyId
-      setIsLoading(false); // Ensure loading is stopped if no user
+      setInvoices([]); 
       setExistingClientNames([]);
+      setIsLoading(false); 
     }
-  }, [user, user?.companyId, authIsLoading, fetchInvoices]);
+  }, [user, user?.companyId, authIsLoading, fetchInvoices]); // Added user?.companyId for explicit dependency
 
 
   useEffect(() => {
-    // Fetch company name for email template from localStorage (or API in future)
      const fetchCompanyName = async () => {
         try {
             const response = await fetch('/api/company-details');
@@ -199,7 +201,7 @@ export default function InvoicingPage() {
                 if (details.name) {
                     setCompanyNameForEmail(details.name);
                 } else {
-                   setCompanyNameForEmail("Your Company Name"); // Fallback if not set
+                   setCompanyNameForEmail("Your Company Name"); 
                 }
             } else {
                  setCompanyNameForEmail("Your Company Name"); 
@@ -243,7 +245,7 @@ export default function InvoicingPage() {
       toast({ title: "Authentication Error", description: "User not authenticated. Please sign in.", variant: "destructive" });
       return;
     }
-    if (!currentInvoice.clientName || currentInvoice.amount === undefined || !currentInvoice.issuedDate || !currentInvoice.dueDate) { // amount can be 0
+    if (!currentInvoice.clientName || currentInvoice.amount === undefined || !currentInvoice.issuedDate || !currentInvoice.dueDate) { 
         toast({ title: "Missing Fields", description: "Please fill all required invoice details (Client Name, Amount, Issued Date, Due Date).", variant: "destructive" });
         return;
     }
@@ -255,7 +257,7 @@ export default function InvoicingPage() {
     setIsSaving(true);
 
     const invoiceDataToSave: Omit<Invoice, 'id' | 'createdAt'> & { createdAt?: any } = {
-      invoiceNumber: currentInvoice.invoiceNumber || `INV${(Date.now()).toString().slice(-6)}`, // More unique temp number
+      invoiceNumber: currentInvoice.invoiceNumber || `INV${(Date.now()).toString().slice(-6)}`, 
       clientName: currentInvoice.clientName!,
       clientEmail: currentInvoice.clientEmail,
       amount: Number(currentInvoice.amount) || 0,
@@ -270,23 +272,22 @@ export default function InvoicingPage() {
 
     try {
       if (isEditing && currentInvoice.id) {
-        invoiceDataToSave.invoiceNumber = currentInvoice.invoiceNumber!; // Keep existing number
+        invoiceDataToSave.invoiceNumber = currentInvoice.invoiceNumber!; 
         const invoiceRef = doc(db, 'invoices', currentInvoice.id);
         await updateDoc(invoiceRef, invoiceDataToSave);
         toast({ title: "Invoice Updated", description: `Invoice ${invoiceDataToSave.invoiceNumber} updated successfully.` });
       } else {
-        invoiceDataToSave.createdAt = serverTimestamp(); // Add createdAt for new invoices
+        invoiceDataToSave.createdAt = serverTimestamp(); 
         const invoicesColRef = collection(db, 'invoices');
         const docRef = await addDoc(invoicesColRef, invoiceDataToSave);
-        // Auto-generate invoice number if not editing (more robustly if needed)
-        if (!invoiceDataToSave.invoiceNumber || invoiceDataToSave.invoiceNumber.startsWith('INV000')) {
+        if (!invoiceDataToSave.invoiceNumber || invoiceDataToSave.invoiceNumber.startsWith('INV')) { // More generic check for default INV
             const newInvNum = `INV${docRef.id.substring(0, 6).toUpperCase()}`;
             await updateDoc(docRef, { invoiceNumber: newInvNum });
             invoiceDataToSave.invoiceNumber = newInvNum;
         }
         toast({ title: "Invoice Created", description: `Invoice ${invoiceDataToSave.invoiceNumber} created successfully.` });
       }
-      fetchInvoices(); // Refresh the list
+      fetchInvoices(); 
       setIsFormOpen(false);
       setCurrentInvoice({});
       setClientNameSearch('');
@@ -306,7 +307,7 @@ export default function InvoicingPage() {
         status: 'Draft', 
         items: [], 
         amount: 0,
-        invoiceNumber: `INV${(Date.now()).toString().slice(-6)}` // Placeholder, can be refined upon save
+        invoiceNumber: `INV${(Date.now()).toString().slice(-6)}` 
     });
     setClientNameSearch('');
     setIsEditing(false);
@@ -336,7 +337,7 @@ export default function InvoicingPage() {
             const invoiceRef = doc(db, 'invoices', invoiceToDeleteId);
             await deleteDoc(invoiceRef);
             toast({ title: "Invoice Deleted", description: "The invoice has been removed."});
-            fetchInvoices(); // Refresh list
+            fetchInvoices(); 
             setInvoiceToDeleteId(null);
         } catch (error: any) {
             console.error("Error deleting invoice: ", error);
@@ -349,22 +350,22 @@ export default function InvoicingPage() {
   };
   
   const handleViewInvoice = (invoice: Invoice) => {
-    // For now, using an alert. Could open a detailed view modal later.
+    const issuedDateStr = invoice.issuedDate instanceof Date ? format(invoice.issuedDate, 'PP') : (invoice.issuedDate instanceof Timestamp ? format(invoice.issuedDate.toDate(), 'PP') : 'N/A');
+    const dueDateStr = invoice.dueDate instanceof Date ? format(invoice.dueDate, 'PP') : (invoice.dueDate instanceof Timestamp ? format(invoice.dueDate.toDate(), 'PP') : 'N/A');
+
     const invoiceDetails = `
       Invoice #: ${invoice.invoiceNumber}
       Client: ${invoice.clientName}
       Amount: $${invoice.amount.toFixed(2)}
       Status: ${invoice.status}
-      Issued: ${invoice.issuedDate instanceof Date ? format(invoice.issuedDate, 'PP') : format(invoice.issuedDate.toDate(), 'PP')}
-      Due: ${invoice.dueDate instanceof Date ? format(invoice.dueDate, 'PP') : format(invoice.dueDate.toDate(), 'PP')}
+      Issued: ${issuedDateStr}
+      Due: ${dueDateStr}
       ${invoice.clientEmail ? `Client Email: ${invoice.clientEmail}` : ''}
       ${invoice.notes ? `Notes: ${invoice.notes}` : ''}
       Items:
       ${(invoice.items || []).map(item => `- ${item.description} (Qty: ${item.quantity}, Price: $${item.unitPrice.toFixed(2)})`).join('\n      ') || '  No items detailed.'}
     `;
-    // Using alert for simplicity, can be replaced with a modal
     alert(invoiceDetails); 
-    // toast({ title: "View Invoice", description: `Details for ${invoice.invoiceNumber} shown in alert.`});
   };
 
   const loadAndPrepareEmailTemplate = (invoice: Invoice, useDefault: boolean = false) => {
@@ -383,18 +384,19 @@ export default function InvoicingPage() {
     
     let processedSubject = template.subject;
     let processedBody = template.body;
+    const dueDateFormatted = invoice.dueDate instanceof Date ? format(invoice.dueDate, 'PPP') : (invoice.dueDate instanceof Timestamp ? format(invoice.dueDate.toDate(), 'PPP') : 'N/A');
 
     const placeholders = {
         '{{clientName}}': invoice.clientName || 'Client',
         '{{invoiceNumber}}': invoice.invoiceNumber,
         '{{amount}}': invoice.amount.toFixed(2),
-        '{{dueDate}}': invoice.dueDate instanceof Date ? format(invoice.dueDate, 'PPP') : format(invoice.dueDate.toDate(), 'PPP'),
+        '{{dueDate}}': dueDateFormatted,
         '{{companyName}}': companyNameForEmail,
     };
 
     for (const [key, value] of Object.entries(placeholders)) {
-        processedSubject = processedSubject.replace(new RegExp(key.replace(/[-\/\\^$*+?.()|[\]{}]/g, '\\$&'), 'g'), value);
-        processedBody = processedBody.replace(new RegExp(key.replace(/[-\/\\^$*+?.()|[\]{}]/g, '\\$&'), 'g'), value);
+        processedSubject = processedSubject.replace(new RegExp(key.replace(/[-\/\\^$*+?.()|[\]{}]/g, '\\$&'), 'g'), String(value));
+        processedBody = processedBody.replace(new RegExp(key.replace(/[-\/\\^$*+?.()|[\]{}]/g, '\\$&'), 'g'), String(value));
     }
     setEmailSubject(processedSubject);
     setEmailBody(processedBody);
@@ -437,9 +439,8 @@ export default function InvoicingPage() {
 
 
   const handleDownloadInvoice = (invoice: Invoice) => {
-    // Basic text download for now
-    const issuedDateFormatted = invoice.issuedDate instanceof Date ? format(invoice.issuedDate, 'yyyy-MM-dd') : format(invoice.issuedDate.toDate(), 'yyyy-MM-dd');
-    const dueDateFormatted = invoice.dueDate instanceof Date ? format(invoice.dueDate, 'yyyy-MM-dd') : format(invoice.dueDate.toDate(), 'yyyy-MM-dd');
+    const issuedDateFormatted = invoice.issuedDate instanceof Date ? format(invoice.issuedDate, 'yyyy-MM-dd') : (invoice.issuedDate instanceof Timestamp ? format(invoice.issuedDate.toDate(), 'yyyy-MM-dd') : 'N/A');
+    const dueDateFormatted = invoice.dueDate instanceof Date ? format(invoice.dueDate, 'yyyy-MM-dd') : (invoice.dueDate instanceof Timestamp ? format(invoice.dueDate.toDate(), 'yyyy-MM-dd') : 'N/A');
 
     let content = `Invoice Number: ${invoice.invoiceNumber}\n`;
     content += `Client: ${invoice.clientName}\n`;
@@ -503,14 +504,12 @@ export default function InvoicingPage() {
       const totalAmount = currentInvoice.items.reduce((sum, item) => sum + (Number(item.quantity) * Number(item.unitPrice)), 0);
       setCurrentInvoice(prev => ({ ...prev, amount: totalAmount }));
     } else if ((currentInvoice.items || []).length === 0 && (currentInvoice.amount === undefined || currentInvoice.amount === null)) {
-      // If items are removed and amount becomes undefined/null, set it back to 0
-      // Allows manual override if items array is empty
       setCurrentInvoice(prev => ({ ...prev, amount: 0}));
     }
   }, [currentInvoice.items]);
 
 
-  if (isLoading && invoices.length === 0) { // Show full page loader only on initial load and no data
+  if (isLoading && invoices.length === 0) { 
     return (
       <div className="flex items-center justify-center h-[calc(100vh-200px)]">
         <Loader2 className="h-12 w-12 animate-spin text-primary" />
@@ -539,13 +538,13 @@ export default function InvoicingPage() {
                 className="pl-8 sm:w-[250px] md:w-[300px]"
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
-                disabled={isLoading}
+                disabled={isLoading && invoices.length === 0} // Disable only if full page loading
               />
             </div>
           </div>
         </CardHeader>
         <CardContent>
-          {isLoading && invoices.length > 0 && ( // Show subtle loading bar if refreshing data
+          {isLoading && invoices.length > 0 && ( 
             <div className="flex justify-center py-4">
               <Loader2 className="h-6 w-6 animate-spin text-primary" />
               <span className="ml-2">Refreshing invoices...</span>
@@ -570,8 +569,8 @@ export default function InvoicingPage() {
                   <TableCell className="font-medium">{invoice.invoiceNumber}</TableCell>
                   <TableCell>{invoice.clientName}</TableCell>
                   <TableCell className="text-right">${invoice.amount.toFixed(2)}</TableCell>
-                  <TableCell>{invoice.issuedDate instanceof Date ? format(invoice.issuedDate, 'PP') : format(invoice.issuedDate.toDate(), 'PP')}</TableCell>
-                  <TableCell>{invoice.dueDate instanceof Date ? format(invoice.dueDate, 'PP') : format(invoice.dueDate.toDate(), 'PP')}</TableCell>
+                  <TableCell>{invoice.issuedDate instanceof Date ? format(invoice.issuedDate, 'PP') : (invoice.issuedDate instanceof Timestamp ? format(invoice.issuedDate.toDate(), 'PP') : 'N/A')}</TableCell>
+                  <TableCell>{invoice.dueDate instanceof Date ? format(invoice.dueDate, 'PP') : (invoice.dueDate instanceof Timestamp ? format(invoice.dueDate.toDate(), 'PP') : 'N/A')}</TableCell>
                   <TableCell>
                     <Badge variant={getStatusBadgeVariant(invoice.status)} className={`${invoice.status === 'Paid' ? 'bg-accent text-accent-foreground hover:bg-accent/80' : ''} ${invoice.status === 'Overdue' ? 'bg-destructive text-destructive-foreground hover:bg-destructive/80' : ''}`}>
                       {invoice.status}
@@ -621,50 +620,59 @@ export default function InvoicingPage() {
                     <PopoverTrigger asChild>
                       <Input
                         id="clientName"
-                        value={currentInvoice.clientName || ''}
+                        value={clientNameSearch} // Use clientNameSearch for direct input control
                         onChange={(e) => {
-                          setCurrentInvoice({ ...currentInvoice, clientName: e.target.value, clientEmail: existingClientNames.includes(e.target.value) ? currentInvoice.clientEmail : '' }); // Clear email if new client is typed
-                          setClientNameSearch(e.target.value);
-                          if (e.target.value.length > 0) { // Only open if there is text
-                            setIsClientPopoverOpen(true);
-                          } else {
-                            setIsClientPopoverOpen(false);
-                          }
+                          const newSearchTerm = e.target.value;
+                          setClientNameSearch(newSearchTerm);
+                          // Update currentInvoice.clientName directly for new/edited clients
+                          setCurrentInvoice({ ...currentInvoice, clientName: newSearchTerm, clientEmail: existingClientNames.includes(newSearchTerm) ? currentInvoice.clientEmail : '' });
+                          setIsClientPopoverOpen(newSearchTerm.length > 0);
                         }}
                         onClick={() => {
-                          if ((currentInvoice.clientName || '').length > 0) setIsClientPopoverOpen(true);
+                           if (clientNameSearch.length > 0) setIsClientPopoverOpen(true);
                         }}
-                        onBlur={() => setTimeout(() => setIsClientPopoverOpen(false), 150)} // Delay to allow click
+                        onFocus={() => { // Open popover on focus if there's text
+                            if (clientNameSearch.length > 0) setIsClientPopoverOpen(true);
+                        }}
+                        onBlur={() => setTimeout(() => setIsClientPopoverOpen(false), 150)} 
                         placeholder="Type or select client"
                         required
                         autoComplete="off"
                         disabled={isSaving}
                       />
                     </PopoverTrigger>
-                    {isClientPopoverOpen && clientNameSearch && existingClientNames.filter(name => name.toLowerCase().includes(clientNameSearch.toLowerCase())).length > 0 && (
+                    {isClientPopoverOpen && clientNameSearch && (
                       <PopoverContent className="w-[--radix-popover-trigger-width] p-0" align="start">
                         <div className="max-h-48 overflow-y-auto rounded-md border bg-popover text-popover-foreground shadow-md">
-                          {existingClientNames
-                            .filter(name => name.toLowerCase().includes(clientNameSearch.toLowerCase()))
-                            .map(name => (
-                              <div
-                                key={name}
-                                className="p-2 hover:bg-accent cursor-pointer text-sm"
-                                onMouseDown={() => {
-                                  const clientInvoices = invoices.filter(inv => inv.clientName === name);
-                                  const latestEmail = clientInvoices.sort((a, b) => {
-                                    const dateA = a.issuedDate instanceof Timestamp ? a.issuedDate.toMillis() : new Date(a.issuedDate).getTime();
-                                    const dateB = b.issuedDate instanceof Timestamp ? b.issuedDate.toMillis() : new Date(b.issuedDate).getTime();
-                                    return dateB - dateA;
-                                  })[0]?.clientEmail;
-                                  setCurrentInvoice({ ...currentInvoice, clientName: name, clientEmail: latestEmail || '' });
-                                  setClientNameSearch(name);
-                                  setIsClientPopoverOpen(false);
-                                }}
-                              >
-                                {name}
-                              </div>
-                            ))}
+                          {(() => {
+                            const filteredClients = existingClientNames.filter(name => name.toLowerCase().includes(clientNameSearch.toLowerCase()));
+                            if (filteredClients.length > 0) {
+                              return filteredClients.map(name => (
+                                <div
+                                  key={name}
+                                  className="p-2 hover:bg-accent hover:text-accent-foreground cursor-pointer text-sm"
+                                  onMouseDown={() => { // Use onMouseDown to fire before onBlur
+                                    const clientInvoices = invoices.filter(inv => inv.clientName === name);
+                                    const latestEmail = clientInvoices.sort((a, b) => {
+                                      const dateA = a.issuedDate instanceof Timestamp ? a.issuedDate.toMillis() : new Date(a.issuedDate).getTime();
+                                      const dateB = b.issuedDate instanceof Timestamp ? b.issuedDate.toMillis() : new Date(b.issuedDate).getTime();
+                                      return dateB - dateA;
+                                    })[0]?.clientEmail;
+                                    setCurrentInvoice({ ...currentInvoice, clientName: name, clientEmail: latestEmail || '' });
+                                    setClientNameSearch(name);
+                                    setIsClientPopoverOpen(false);
+                                  }}
+                                >
+                                  {name}
+                                </div>
+                              ));
+                            } else if (existingClientNames.length === 0) {
+                                return <div className="p-2 text-sm text-muted-foreground">No existing clients. Type to add.</div>;
+                            }
+                            else {
+                              return <div className="p-2 text-sm text-muted-foreground">No matching clients found. Type to add.</div>;
+                            }
+                          })()}
                         </div>
                       </PopoverContent>
                     )}
@@ -829,4 +837,3 @@ export default function InvoicingPage() {
     </div>
   );
 }
-
