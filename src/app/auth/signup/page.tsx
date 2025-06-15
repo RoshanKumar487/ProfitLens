@@ -9,12 +9,12 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
-import { UserPlus, Loader2, AlertTriangle, Building } from 'lucide-react'; // Removed MapPin, Home, Map as they are not used
+import { UserPlus, Loader2, AlertTriangle, Building } from 'lucide-react'; 
 import { useToast } from '@/hooks/use-toast';
-import { Separator } from '@/components/ui/separator'; // Added import for Separator
+import { Separator } from '@/components/ui/separator';
 
 export default function SignUpPage() {
-  const [displayName, setDisplayName] = useState(''); // User's full name
+  const [displayName, setDisplayName] = useState(''); 
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
@@ -23,14 +23,14 @@ export default function SignUpPage() {
   const [city, setCity] = useState('');
   const [state, setState] = useState('');
 
-  const { signUp, isLoading, error } = useAuth();
+  const { signUp, isLoading, error } = useAuth(); // 'error' from context is used for auth errors
   const { toast } = useToast();
-  const [pageError, setPageError] = useState<string | null>(null);
+  const [pageError, setPageError] = useState<string | null>(null); // 'pageError' is for form validation errors
 
 
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
-    setPageError(null);
+    setPageError(null); // Clear previous form-specific errors
     if (!displayName || !email || !password || !confirmPassword || !companyName || !companyAddress || !city || !state) {
       setPageError("All fields are required.");
       toast({ title: "Missing Fields", description: "Please fill out all fields.", variant: "destructive" });
@@ -42,15 +42,12 @@ export default function SignUpPage() {
       return;
     }
     
+    // Call signUp. If it fails, AuthContext updates its 'error' state, which is displayed via JSX.
+    // AuthContext also shows a toast for the error.
     await signUp(email, password, displayName, companyName, companyAddress, city, state);
     
-    // Error state from useAuth might be stale immediately after signUp resolves.
-    // It's better to rely on the error returned by signUp or if AuthContext updates its error state reactively.
-    // For now, checking `error` from `useAuth()` which should update if `signUp` sets an error in the context.
-    if (useAuth().error) { 
-        setPageError(useAuth().error!.message); // Ensure useAuth().error is not null before accessing message
-    }
-    // Navigation is handled by AuthContext on successful sign-up
+    // Navigation is handled by AuthContext on successful sign-up.
+    // Error display is handled by the reactive 'error' state from useAuth() in the JSX.
   };
 
   return (
@@ -63,12 +60,12 @@ export default function SignUpPage() {
         </CardHeader>
         <CardContent>
           <form onSubmit={handleSubmit} className="space-y-4">
-             {pageError && (
+             {pageError && ( // For form validation errors (e.g., passwords don't match)
               <div className="p-3 rounded-md bg-destructive/10 text-destructive text-sm flex items-center gap-2">
                 <AlertTriangle className="h-4 w-4"/> {pageError}
               </div>
             )}
-            {error && !pageError && ( // Display general auth context error if not already shown by pageError
+            {error && !pageError && ( // For authentication errors from AuthContext (e.g., email already in use)
               <div className="p-3 rounded-md bg-destructive/10 text-destructive text-sm flex items-center gap-2">
                 <AlertTriangle className="h-4 w-4"/> {error.message}
               </div>
