@@ -98,19 +98,25 @@ interface CompanyDetailsFirestore {
   website: string;
 }
 
-const LOCAL_STORAGE_EMAIL_TEMPLATE_KEY = 'bizsight-invoice-email-template';
+const LOCAL_STORAGE_EMAIL_TEMPLATE_KEY = 'bizsight-invoice-email-template-v2'; // Updated key for new structure
 
 const DEFAULT_EMAIL_SUBJECT_TEMPLATE = "Invoice {{invoiceNumber}} from {{companyName}}";
-// Default HTML email body template
-const DEFAULT_EMAIL_BODY_HTML_TEMPLATE = `
-<p>Dear {{clientName}},</p>
-<p>Please find details for invoice <strong>{{invoiceNumber}}</strong> regarding your recent services/products.</p>
-<p><strong>Amount:</strong> $ {{amount}}</p>
-<p><strong>Due Date:</strong> {{dueDate}}</p>
-<p><em>This email was sent from BizSight. If you have any questions, please contact {{companyName}}.</em></p>
-<p>Thank you for your business!</p>
-<p>Sincerely,<br>{{companyName}}</p>
+
+const DEFAULT_EDITABLE_EMAIL_BODY_TEXT = `
+Dear {{clientName}},
+
+Please find invoice {{invoiceNumber}} detailed below.
+Total Amount: $ {{amount}}
+Due Date: {{dueDate}}
+
+If you have any questions, please let us know.
+
+Thank you for your business!
+
+Sincerely,
+{{companyName}}
 `;
+
 
 export default function InvoicingPage() {
   const { user, isLoading: authIsLoading } = useAuth();
@@ -127,7 +133,7 @@ export default function InvoicingPage() {
   const [invoiceForEmail, setInvoiceForEmail] = useState<InvoiceDisplay | null>(null);
   const [emailRecipient, setEmailRecipient] = useState('');
   const [emailSubject, setEmailSubject] = useState('');
-  const [emailBody, setEmailBody] = useState(''); // Will hold HTML
+  const [emailBodyUserText, setEmailBodyUserText] = useState(''); // Stores plain text for user editing
   const [isSendingEmail, setIsSendingEmail] = useState(false);
   
   const [companyProfileDetails, setCompanyProfileDetails] = useState<CompanyDetailsFirestore | null>(null);
@@ -416,11 +422,11 @@ export default function InvoicingPage() {
             .grid { display: grid; } .grid-cols-2 { grid-template-columns: repeat(2, minmax(0, 1fr)); } .gap-8 { gap: 2rem; }
             .items-start { align-items: flex-start; }
             .p-4 { padding: 1rem; } .p-6 { padding: 1.5rem; }
-            .bg-muted-light { background-color: #f8f9fa; } /* Lighter than globals.css muted for print */
+            .bg-muted-light { background-color: #f8f9fa; } 
             .rounded-lg { border-radius: 0.5rem; }
             .uppercase { text-transform: uppercase; }
-            .text-primary-print { color: #007bff; } /* Example primary color for print */
-            .text-muted-foreground-print { color: #6c757d; } /* Example muted color for print */
+            .text-primary-print { color: #007bff; } 
+            .text-muted-foreground-print { color: #6c757d; }
             .whitespace-pre-line { white-space: pre-line; }
             .border { border: 1px solid #dee2e6; }
             .border-t { border-top: 1px solid #dee2e6; }
@@ -459,19 +465,19 @@ export default function InvoicingPage() {
       const canvas = await html2canvas(invoicePrintRef.current, {
         scale: 2, 
         useCORS: true,
-        logging: false, // Reduce console noise
-        onclone: (document) => { // Temporarily apply print-friendly styles for PDF generation
+        logging: false, 
+        onclone: (document) => { 
             const clonedContainer = document.querySelector('.invoice-view-container');
             if(clonedContainer) {
-              clonedContainer.style.border = 'none'; // Remove border for PDF capture
-              clonedContainer.style.boxShadow = 'none'; // Remove shadow for PDF capture
+              (clonedContainer as HTMLElement).style.border = 'none'; 
+              (clonedContainer as HTMLElement).style.boxShadow = 'none'; 
             }
         }
       });
       const imgData = canvas.toDataURL('image/png');
       const pdf = new jsPDF({
         orientation: 'portrait',
-        unit: 'pt', // Points for better scaling with A4
+        unit: 'pt', 
         format: 'a4'
       });
 
@@ -590,43 +596,42 @@ export default function InvoicingPage() {
 
 
   const loadAndPrepareEmailTemplate = (invoice: InvoiceDisplay, useDefault: boolean = false) => {
-    let storedTemplateSubject = DEFAULT_EMAIL_SUBJECT_TEMPLATE;
-    let storedTemplateBodyHTML = DEFAULT_EMAIL_BODY_HTML_TEMPLATE;
+    let templateSubject = DEFAULT_EMAIL_SUBJECT_TEMPLATE;
+    let templateUserText = DEFAULT_EDITABLE_EMAIL_BODY_TEXT;
 
     if (!useDefault) {
         const storedTemplateString = localStorage.getItem(LOCAL_STORAGE_EMAIL_TEMPLATE_KEY);
         if (storedTemplateString) {
             try {
                 const parsed = JSON.parse(storedTemplateString);
-                if(parsed.subject) storedTemplateSubject = parsed.subject;
-                if(parsed.body) storedTemplateBodyHTML = parsed.body; // Assuming body is stored as HTML
+                if(parsed.subject) templateSubject = parsed.subject;
+                if(parsed.bodyUserText) templateUserText = parsed.bodyUserText;
             } catch (e) {
                 console.error("Failed to parse saved email template", e);
             }
         }
     }
 
-    let processedSubject = storedTemplateSubject;
-    let processedBodyHTML = generateInvoiceHTMLForEmail(invoice, companyProfileDetails); // Always use fresh invoice HTML as base
-
-    const dueDateFormatted = format(invoice.dueDate, 'PPP');
     const companyNameForTpl = companyProfileDetails?.name || "Your Company";
-
     const placeholders = {
         '{{clientName}}': invoice.clientName || 'Client',
         '{{invoiceNumber}}': invoice.invoiceNumber,
         '{{amount}}': invoice.amount.toFixed(2),
-        '{{dueDate}}': dueDateFormatted,
+        '{{dueDate}}': format(invoice.dueDate, 'PPP'),
         '{{companyName}}': companyNameForTpl,
     };
 
+    let processedSubject = templateSubject;
+    let processedUserText = templateUserText;
+
     for (const [key, value] of Object.entries(placeholders)) {
         processedSubject = processedSubject.replace(new RegExp(key.replace(/[-\/\\^$*+?.()|[\]{}]/g, '\\$&'), 'g'), String(value));
-        // Body is now generated HTML, so placeholder replacement is less critical here unless the user edits a simpler template
+        processedUserText = processedUserText.replace(new RegExp(key.replace(/[-\/\\^$*+?.()|[\]{}]/g, '\\$&'), 'g'), String(value));
     }
+
     setEmailRecipient(invoice.clientEmail || '');
     setEmailSubject(processedSubject);
-    setEmailBody(processedBodyHTML); // This is now rich HTML
+    setEmailBodyUserText(processedUserText);
   };
 
   const handleOpenEmailDialog = (invoice: InvoiceDisplay) => {
@@ -645,11 +650,39 @@ export default function InvoicingPage() {
       return;
     }
     setIsSendingEmail(true);
+
+    // Convert user's plain text to basic HTML
+    const userTextHtml = `<div style="white-space: pre-wrap; margin-bottom: 20px;">${emailBodyUserText.replace(/\n/g, '<br>')}</div>`;
+    
+    // Get the full HTML representation of the invoice
+    const invoiceDetailsHtml = generateInvoiceHTMLForEmail(invoiceForEmail, companyProfileDetails);
+
+    // Combine them
+    const fullEmailHtmlBody = `
+      <html>
+        <head>
+          <style>
+            body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; }
+            .email-container { max-width: 800px; margin: 0 auto; padding: 20px; }
+            .invoice-section { margin-top: 20px; padding-top: 20px; border-top: 1px solid #eee; }
+          </style>
+        </head>
+        <body>
+          <div class="email-container">
+            ${userTextHtml}
+            <div class="invoice-section">
+              ${invoiceDetailsHtml}
+            </div>
+          </div>
+        </body>
+      </html>
+    `;
+
     try {
       const result = await sendInvoiceEmailAction({
         to: emailRecipient,
         subject: emailSubject,
-        htmlBody: emailBody, // Send the HTML body
+        htmlBody: fullEmailHtmlBody,
         invoiceNumber: invoiceForEmail.invoiceNumber,
       });
 
@@ -668,16 +701,16 @@ export default function InvoicingPage() {
   };
 
   const handleSaveTemplate = () => {
-    // Saving current subject and potentially a simplified body or a flag to use the generated one
-    // For now, just save subject, as body is dynamically generated.
-    // A more advanced template system would be needed for full body customization persistence.
-    localStorage.setItem(LOCAL_STORAGE_EMAIL_TEMPLATE_KEY, JSON.stringify({ subject: emailSubject, body: DEFAULT_EMAIL_BODY_HTML_TEMPLATE /* or a custom one if we add rich editor */ }));
-    toast({ title: "Template Subject Saved", description: "Your current email subject is saved as default."});
+    localStorage.setItem(LOCAL_STORAGE_EMAIL_TEMPLATE_KEY, JSON.stringify({ 
+        subject: emailSubject, 
+        bodyUserText: emailBodyUserText // Save the plain text
+    }));
+    toast({ title: "Template Saved", description: "Your current email subject and plain text body are saved as default."});
   };
 
   const handleRevertToDefaultTemplate = () => {
     if (invoiceForEmail) {
-        loadAndPrepareEmailTemplate(invoiceForEmail, true);
+        loadAndPrepareEmailTemplate(invoiceForEmail, true); // Pass true to use hardcoded defaults
         toast({ title: "Template Reset", description: "Email content reset to the original default."});
     }
   };
@@ -717,13 +750,12 @@ export default function InvoicingPage() {
     }
   }, [currentInvoice.items]);
 
- const handleClientNameInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleClientNameInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const typedValue = e.target.value;
     setCurrentInvoice(prev => ({
       ...prev,
       clientName: typedValue,
-      // Do NOT auto-update email here based on typedValue matching an existing client
-      // Email should only update if a suggestion is EXPLICITLY clicked
+      // Email is NOT updated here
     }));
     if (typedValue.trim() !== '' || existingClients.length > 0) {
       setIsClientPopoverOpen(true);
@@ -749,23 +781,21 @@ export default function InvoicingPage() {
   };
   
   const handleClientNameInputBlur = (e: React.FocusEvent<HTMLInputElement>) => {
-    // Delay closing the popover to allow click on suggestion
     setTimeout(() => {
       if (popoverContentRef.current && !popoverContentRef.current.contains(document.activeElement)) {
         setIsClientPopoverOpen(false);
       }
-    }, 150); // 150ms delay
+    }, 150); 
   };
 
 
   const filteredClientSuggestions = useMemo(() => {
     const currentName = currentInvoice.clientName?.toLowerCase() || '';
     if (!currentName && isClientPopoverOpen) { 
-        // If input is empty but popover is open (e.g. on focus), show all
         return existingClients;
     }
     if (!currentName) {
-        return []; // Don't show suggestions if input is empty and popover isn't explicitly managed to be open
+        return []; 
     }
     return existingClients.filter(client =>
       client.name.toLowerCase().includes(currentName)
@@ -774,7 +804,6 @@ export default function InvoicingPage() {
 
   const isNewClient = useMemo(() => {
     if (!currentInvoice.clientName || currentInvoice.clientName.trim() === '') return false;
-    // Check if the currently typed/set clientName exactly matches any existing client's name
     return !existingClients.some(c => c.name.toLowerCase() === currentInvoice.clientName!.toLowerCase());
   }, [currentInvoice.clientName, existingClients]);
 
@@ -893,7 +922,6 @@ export default function InvoicingPage() {
                   <Label htmlFor="clientName">Client Name</Label>
                   <Popover open={isClientPopoverOpen} onOpenChange={setIsClientPopoverOpen}>
                     <PopoverTrigger asChild>
-                       {/* The Input component itself is the trigger */}
                         <Input
                           id="clientName"
                           ref={clientNameInputRef}
@@ -914,7 +942,7 @@ export default function InvoicingPage() {
                         className="w-[--radix-popover-trigger-width] p-0 max-h-60 overflow-y-auto"
                         side="bottom"
                         align="start"
-                        onOpenAutoFocus={(e) => e.preventDefault()} // Prevent focus stealing
+                        onOpenAutoFocus={(e) => e.preventDefault()} 
                       >
                         <ScrollArea className="max-h-56">
                           {filteredClientSuggestions.length > 0 ? (
@@ -922,7 +950,6 @@ export default function InvoicingPage() {
                               <div
                                 key={client.name}
                                 className="px-3 py-2 text-sm hover:bg-accent cursor-pointer"
-                                // Use onMouseDown to ensure it fires before onBlur of the input
                                 onMouseDown={() => handleClientSuggestionClick(client)}
                               >
                                 {client.name}
@@ -1170,7 +1197,7 @@ export default function InvoicingPage() {
             <DialogTitle className="font-headline">Compose Email</DialogTitle>
             <DialogDescription>
               Preview and edit the email for invoice {invoiceForEmail?.invoiceNumber} to {invoiceForEmail?.clientName}.
-              <br/>The body below is HTML. Advanced users can edit it directly.
+              <br/>The body below is plain text. It will be formatted into an HTML email upon sending.
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-4 py-2 flex-grow overflow-y-auto pr-2">
@@ -1183,8 +1210,15 @@ export default function InvoicingPage() {
               <Input id="emailSubject" value={emailSubject} onChange={(e) => setEmailSubject(e.target.value)} disabled={isSendingEmail}/>
             </div>
             <div>
-              <Label htmlFor="emailBody">Body (HTML):</Label>
-              <Textarea id="emailBody" value={emailBody} onChange={(e) => setEmailBody(e.target.value)} rows={12} disabled={isSendingEmail} placeholder="HTML email body..."/>
+              <Label htmlFor="emailBodyUserText">Body (Plain Text):</Label>
+              <Textarea 
+                id="emailBodyUserText" 
+                value={emailBodyUserText} 
+                onChange={(e) => setEmailBodyUserText(e.target.value)} 
+                rows={10} 
+                disabled={isSendingEmail} 
+                placeholder="Your plain text message here... Newlines will be preserved."
+              />
             </div>
           </div>
           <DialogFooter className="justify-between flex-wrap gap-2 mt-auto pt-4 border-t">
@@ -1198,7 +1232,7 @@ export default function InvoicingPage() {
                 <DialogClose asChild>
                     <Button type="button" variant="ghost" disabled={isSendingEmail}>Cancel</Button>
                 </DialogClose>
-                <Button type="button" onClick={handleSendEmail} disabled={isSendingEmail || !emailRecipient || !emailSubject || !emailBody}>
+                <Button type="button" onClick={handleSendEmail} disabled={isSendingEmail || !emailRecipient || !emailSubject || !emailBodyUserText}>
                     {isSendingEmail ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Mail className="mr-2 h-4 w-4" />}
                     {isSendingEmail ? "Sending..." : "Send Email"}
                 </Button>
@@ -1229,3 +1263,4 @@ export default function InvoicingPage() {
     </div>
   );
 }
+
