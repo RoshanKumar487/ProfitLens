@@ -18,6 +18,7 @@ interface User {
   uid: string;
   email: string | null;
   displayName: string | null;
+  companyId: string; // Added companyId
 }
 
 interface AuthContextType {
@@ -31,6 +32,11 @@ interface AuthContextType {
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
+// Helper to derive companyId
+const getDerivedCompanyId = (uid: string): string => {
+  return `fb-default-company-${uid.substring(0, 5)}`;
+};
+
 export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [user, setUser] = useState<User | null>(null);
   const [isLoading, setIsLoading] = useState(true);
@@ -41,13 +47,15 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, (firebaseUser) => {
       if (firebaseUser) {
+        const companyId = getDerivedCompanyId(firebaseUser.uid);
         const appUser: User = {
           uid: firebaseUser.uid,
           email: firebaseUser.email,
           displayName: firebaseUser.displayName,
+          companyId: companyId, 
         };
         setUser(appUser);
-        console.log(`AuthContext: User authenticated. UID: ${firebaseUser.uid}`);
+        console.log(`AuthContext: User authenticated. UID: ${firebaseUser.uid}, CompanyID: ${companyId}`);
       } else {
         setUser(null);
         console.log('AuthContext: No user signed in.');
@@ -69,14 +77,15 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     setError(null);
     try {
       const userCredential = await createUserWithEmailAndPassword(auth, email, password);
-      if (displayName && userCredential.user) {
-        await updateProfile(userCredential.user, { displayName });
-        setUser(prevUser => prevUser ? {...prevUser, displayName } : { uid: userCredential.user.uid, email: userCredential.user.email, displayName });
+      const firebaseUser = userCredential.user;
+      if (displayName && firebaseUser) {
+        await updateProfile(firebaseUser, { displayName });
       }
-      console.log('AuthContext: User signed up successfully:', userCredential.user.uid);
+      // User state will be updated by onAuthStateChanged listener
+      console.log('AuthContext: User signed up successfully:', firebaseUser.uid);
       toast({ title: "Sign Up Successful", description: "Welcome!" });
-      router.push('/');
-      return userCredential.user;
+      router.push('/'); // Navigate after state update ensures context is ready
+      return firebaseUser;
     } catch (err) {
       const authError = err as AuthError;
       console.error('AuthContext: Sign up error', authError);
@@ -93,9 +102,10 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     setError(null);
     try {
       const userCredential = await signInWithEmailAndPassword(auth, email, password);
+      // User state will be updated by onAuthStateChanged listener
       console.log('AuthContext: User signed in successfully:', userCredential.user.uid);
       toast({ title: "Sign In Successful", description: "Welcome back!"});
-      router.push('/');
+      router.push('/'); // Navigate after state update ensures context is ready
       return userCredential.user;
     } catch (err) {
       const authError = err as AuthError;
@@ -114,7 +124,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     try {
       await firebaseSignOut(auth);
       console.log('AuthContext: User signed out successfully.');
-      setUser(null);
+      // User state (setUser(null)) handled by onAuthStateChanged
       toast({ title: "Signed Out", description: "You have been successfully signed out."});
       // router.push('/signin'); // Or your desired sign-in page
     } catch (err) {

@@ -3,28 +3,46 @@ rules_version = '2';
 
 service cloud.firestore {
   match /databases/{database}/documents {
-    // Allow read/write access to authenticated users for development.
-    // IMPORTANT: Secure these rules properly before deploying to production.
-    // You should restrict access based on user UID and companyId.
-    match /{document=**} {
-      allow read, write: if request.auth != null;
+    // Helper function to get the companyId derived from user's UID
+    function getDerivedCompanyId(userId) {
+      return 'fb-default-company-' + userId.substring(0, 5);
     }
 
-    // Example for more specific rules:
-    // match /companyProfiles/{companyId} {
-    //   allow read, write: if request.auth != null && request.auth.token.companyId == companyId;
-    // }
-    // match /users/{userId} {
-    //  allow read, write: if request.auth != null && request.auth.uid == userId;
-    // }
-    // match /expenses/{expenseId} {
-    //   allow read, write: if request.auth != null && resource.data.companyId == request.auth.token.companyId;
-    // }
-    // match /invoices/{invoiceId} {
-    //   allow read, write: if request.auth != null && resource.data.companyId == request.auth.token.companyId;
-    // }
-    // match /employees/{employeeId} {
-    //   allow read, write: if request.auth != null && resource.data.companyId == request.auth.token.companyId;
-    // }
+    // Company Profiles: User can only access their own company's profile
+    match /companyProfiles/{profileId} {
+      allow read, write: if request.auth != null && profileId == getDerivedCompanyId(request.auth.uid);
+    }
+
+    // Revenue Entries: User can only R/W entries for their own company
+    match /revenueEntries/{entryId} {
+      // Allow create if the new document's companyId matches the user's derived companyId
+      allow create: if request.auth != null && request.resource.data.companyId == getDerivedCompanyId(request.auth.uid);
+      // Allow read, update, delete if the existing document's companyId matches the user's derived companyId
+      allow read, update, delete: if request.auth != null && resource.data.companyId == getDerivedCompanyId(request.auth.uid);
+    }
+
+    // Expenses: User can only R/W entries for their own company
+    match /expenses/{expenseId} {
+      allow create: if request.auth != null && request.resource.data.companyId == getDerivedCompanyId(request.auth.uid);
+      allow read, update, delete: if request.auth != null && resource.data.companyId == getDerivedCompanyId(request.auth.uid);
+    }
+
+    // Appointments: User can only R/W appointments for their own company
+    match /appointments/{appointmentId} {
+      allow create: if request.auth != null && request.resource.data.companyId == getDerivedCompanyId(request.auth.uid);
+      allow read, update, delete: if request.auth != null && resource.data.companyId == getDerivedCompanyId(request.auth.uid);
+    }
+
+    // Invoices: User can only R/W invoices for their own company
+    match /invoices/{invoiceId} {
+      allow create: if request.auth != null && request.resource.data.companyId == getDerivedCompanyId(request.auth.uid);
+      allow read, update, delete: if request.auth != null && resource.data.companyId == getDerivedCompanyId(request.auth.uid);
+    }
+    
+    // Employees: User can only R/W employees for their own company
+    match /employees/{employeeId} {
+      allow create: if request.auth != null && request.resource.data.companyId == getDerivedCompanyId(request.auth.uid);
+      allow read, update, delete: if request.auth != null && resource.data.companyId == getDerivedCompanyId(request.auth.uid);
+    }
   }
 }
