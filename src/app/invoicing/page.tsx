@@ -75,6 +75,7 @@ interface InvoiceDisplay extends Omit<InvoiceFirestore, 'dueDate' | 'issuedDate'
   dueDate: Date;
   issuedDate: Date;
   items: InvoiceItem[];
+  notes?: string; // Keep notes optional here
 }
 
 interface CompanyDetailsFirestore {
@@ -159,7 +160,7 @@ export default function InvoicingPage() {
           status: data.status,
           issuedDate: data.issuedDate.toDate(),
           items: data.items || [],
-          notes: data.notes,
+          notes: data.notes, // notes will be undefined if not present in Firestore
         } as InvoiceDisplay;
       });
 
@@ -263,13 +264,13 @@ export default function InvoicingPage() {
 
     const invoiceDataToSaveCore = {
       clientName: currentInvoice.clientName!,
-      clientEmail: currentInvoice.clientEmail,
+      clientEmail: currentInvoice.clientEmail || '', // Ensure email is a string
       amount: Number(currentInvoice.amount) || 0,
       issuedDate: issuedDateForFirestore,
       dueDate: dueDateForFirestore,
       status: currentInvoice.status || 'Draft',
       items: currentInvoice.items || [],
-      notes: currentInvoice.notes,
+      notes: currentInvoice.notes || '', // Ensure notes is always a string (empty if undefined/null)
       companyId: user.companyId,
     };
 
@@ -278,7 +279,7 @@ export default function InvoicingPage() {
         const invoiceRef = doc(db, 'invoices', currentInvoice.id);
         await updateDoc(invoiceRef, {
             ...invoiceDataToSaveCore,
-            invoiceNumber: currentInvoice.invoiceNumber!,
+            invoiceNumber: currentInvoice.invoiceNumber!, // invoiceNumber should exist when editing
         });
         toast({ title: "Invoice Updated", description: `Invoice ${currentInvoice.invoiceNumber} updated successfully.` });
       } else {
@@ -313,13 +314,17 @@ export default function InvoicingPage() {
         invoiceNumber: `INV${(Date.now()).toString().slice(-6)}`,
         clientName: '',
         clientEmail: '',
+        notes: '', // Initialize notes as an empty string
     });
     setIsEditing(false);
     setIsFormOpen(true);
   };
 
   const handleEditInvoice = (invoice: InvoiceDisplay) => {
-    setCurrentInvoice({ ...invoice });
+    setCurrentInvoice({ 
+      ...invoice,
+      notes: invoice.notes || '' // Ensure notes is at least an empty string when editing
+    });
     setIsEditing(true);
     setIsFormOpen(true);
   };
