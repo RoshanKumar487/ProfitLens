@@ -46,12 +46,15 @@ export default function CompanyDetailsPage() {
       }
       if (!user || !user.companyId) {
         setIsFetching(false);
-        toast({
-          title: 'Authentication Error',
-          description: 'User or company information not available. Please sign in.',
-          variant: 'destructive',
-        });
+        // No need to toast here if we are rendering an access denied message
+        // toast({
+        //   title: 'Authentication Error',
+        //   description: 'User or company information not available. Please sign in.',
+        //   variant: 'destructive',
+        // });
         console.log("CompanyDetails: User or companyId not found for fetching.");
+        // Ensure form is empty if no user
+        setCompanyDetails({ name: '', address: '', gstin: '', phone: '', email: '', website: '' });
         return;
       }
 
@@ -61,11 +64,19 @@ export default function CompanyDetailsPage() {
         const docSnap = await getDoc(docRef);
 
         if (docSnap.exists()) {
-          setCompanyDetails(docSnap.data() as CompanyDetailsFirestore);
+          const data = docSnap.data() as Partial<CompanyDetailsFirestore>; // Treat as partial
+          setCompanyDetails({
+            name: data.name || '',
+            address: data.address || '',
+            gstin: data.gstin || '',
+            phone: data.phone || '',
+            email: data.email || '',
+            website: data.website || '',
+            // updatedAt can remain undefined if not present
+          });
           console.log("CompanyDetails: Fetched details for companyId:", user.companyId);
         } else {
           console.log("CompanyDetails: No details found for companyId:", user.companyId, ". Initializing empty form.");
-          // Initialize with empty strings to ensure controlled components
           setCompanyDetails({ name: '', address: '', gstin: '', phone: '', email: '', website: '' });
         }
       } catch (error: any) {
@@ -75,13 +86,15 @@ export default function CompanyDetailsPage() {
           description: error.message || 'Could not load company details from Firestore.',
           variant: 'destructive',
         });
+        // Fallback to empty strings in case of error
+        setCompanyDetails({ name: '', address: '', gstin: '', phone: '', email: '', website: '' });
       } finally {
         setIsFetching(false);
       }
     };
 
     fetchCompanyDetails();
-  }, [user, user?.companyId, authIsLoading, toast]);
+  }, [user, authIsLoading, toast]); // Removed user.companyId as user object already covers it
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
     const { name, value } = e.target;
@@ -102,7 +115,6 @@ export default function CompanyDetailsPage() {
     setIsSaving(true);
     try {
       const docRef = doc(db, 'companyProfiles', user.companyId);
-      // Ensure all optional fields are at least empty strings if not provided
       const detailsToSave: CompanyDetailsFirestore = {
         name: companyDetails.name || '',
         address: companyDetails.address || '',
@@ -114,7 +126,8 @@ export default function CompanyDetailsPage() {
       };
       await setDoc(docRef, detailsToSave, { merge: true }); 
       
-      setCompanyDetails(detailsToSave); // Update local state with updatedAt and ensured strings
+      // Update local state to include updatedAt and ensure all fields are strings
+      setCompanyDetails(prev => ({...detailsToSave, updatedAt: prev.updatedAt})); 
       toast({
         title: 'Details Saved',
         description: 'Company information updated successfully in Firestore.',
@@ -166,7 +179,6 @@ export default function CompanyDetailsPage() {
           </CardHeader>
           <CardContent>
             <p>Please sign in to manage your company details.</p>
-            {/* Optionally, add a sign-in button/link here */}
           </CardContent>
         </Card>
       </div>
@@ -190,7 +202,7 @@ export default function CompanyDetailsPage() {
               <Input
                 id="name"
                 name="name"
-                value={companyDetails.name}
+                value={companyDetails.name} // Will always be a string
                 onChange={handleChange}
                 placeholder="e.g., Acme Corp Ltd."
                 required
@@ -202,7 +214,7 @@ export default function CompanyDetailsPage() {
               <Textarea
                 id="address"
                 name="address"
-                value={companyDetails.address}
+                value={companyDetails.address} // Will always be a string
                 onChange={handleChange}
                 placeholder="e.g., 123 Main Street, Anytown, ST 12345"
                 rows={3}
@@ -215,7 +227,7 @@ export default function CompanyDetailsPage() {
               <Input
                 id="gstin"
                 name="gstin"
-                value={companyDetails.gstin}
+                value={companyDetails.gstin} // Will always be a string
                 onChange={handleChange}
                 placeholder="e.g., 22AAAAA0000A1Z5"
                 required
@@ -228,7 +240,7 @@ export default function CompanyDetailsPage() {
                 id="phone"
                 name="phone"
                 type="tel"
-                value={companyDetails.phone}
+                value={companyDetails.phone} // Will always be a string
                 onChange={handleChange}
                 placeholder="e.g., +1-555-123-4567"
                 disabled={isSaving}
@@ -240,7 +252,7 @@ export default function CompanyDetailsPage() {
                 id="email"
                 name="email"
                 type="email"
-                value={companyDetails.email}
+                value={companyDetails.email} // Will always be a string
                 onChange={handleChange}
                 placeholder="e.g., contact@example.com"
                 disabled={isSaving}
@@ -252,7 +264,7 @@ export default function CompanyDetailsPage() {
                 id="website"
                 name="website"
                 type="url"
-                value={companyDetails.website}
+                value={companyDetails.website} // Will always be a string
                 onChange={handleChange}
                 placeholder="e.g., https://www.example.com"
                 disabled={isSaving}
