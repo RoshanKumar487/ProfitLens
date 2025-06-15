@@ -13,14 +13,19 @@ import { Building, Loader2, Save } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { db } from '@/lib/firebaseConfig';
 import { doc, getDoc, setDoc, Timestamp } from 'firebase/firestore';
+import { Separator } from '@/components/ui/separator';
+
 
 interface CompanyDetailsFirestore {
   name: string;
-  address: string;
+  address: string; // Street address
+  city: string;
+  state: string; // State or Province
   gstin: string;
   phone: string;
   email: string;
   website: string;
+  createdAt?: Timestamp; // Added for consistency, usually set on creation
   updatedAt?: Timestamp;
 }
 
@@ -29,6 +34,8 @@ export default function CompanyDetailsPage() {
   const [companyDetails, setCompanyDetails] = useState<CompanyDetailsFirestore>({
     name: '',
     address: '',
+    city: '',
+    state: '',
     gstin: '',
     phone: '',
     email: '',
@@ -46,15 +53,8 @@ export default function CompanyDetailsPage() {
       }
       if (!user || !user.companyId) {
         setIsFetching(false);
-        // No need to toast here if we are rendering an access denied message
-        // toast({
-        //   title: 'Authentication Error',
-        //   description: 'User or company information not available. Please sign in.',
-        //   variant: 'destructive',
-        // });
         console.log("CompanyDetails: User or companyId not found for fetching.");
-        // Ensure form is empty if no user
-        setCompanyDetails({ name: '', address: '', gstin: '', phone: '', email: '', website: '' });
+        setCompanyDetails({ name: '', address: '', city: '', state: '', gstin: '', phone: '', email: '', website: '' });
         return;
       }
 
@@ -64,20 +64,24 @@ export default function CompanyDetailsPage() {
         const docSnap = await getDoc(docRef);
 
         if (docSnap.exists()) {
-          const data = docSnap.data() as Partial<CompanyDetailsFirestore>; // Treat as partial
+          const data = docSnap.data() as Partial<CompanyDetailsFirestore>;
           setCompanyDetails({
             name: data.name || '',
             address: data.address || '',
+            city: data.city || '',
+            state: data.state || '',
             gstin: data.gstin || '',
             phone: data.phone || '',
             email: data.email || '',
             website: data.website || '',
-            // updatedAt can remain undefined if not present
+            createdAt: data.createdAt, // Persist if exists
+            updatedAt: data.updatedAt,
           });
           console.log("CompanyDetails: Fetched details for companyId:", user.companyId);
         } else {
           console.log("CompanyDetails: No details found for companyId:", user.companyId, ". Initializing empty form.");
-          setCompanyDetails({ name: '', address: '', gstin: '', phone: '', email: '', website: '' });
+          // This case should be less common now as profile is created on signup
+          setCompanyDetails({ name: user.displayName || '', address: '', city: '', state: '', gstin: '', phone: '', email: user.email || '', website: '' });
         }
       } catch (error: any) {
         console.error('Error fetching company details from Firestore:', error);
@@ -86,15 +90,14 @@ export default function CompanyDetailsPage() {
           description: error.message || 'Could not load company details from Firestore.',
           variant: 'destructive',
         });
-        // Fallback to empty strings in case of error
-        setCompanyDetails({ name: '', address: '', gstin: '', phone: '', email: '', website: '' });
+        setCompanyDetails({ name: '', address: '', city: '', state: '', gstin: '', phone: '', email: '', website: '' });
       } finally {
         setIsFetching(false);
       }
     };
 
     fetchCompanyDetails();
-  }, [user, authIsLoading, toast]); // Removed user.companyId as user object already covers it
+  }, [user, authIsLoading, toast]);
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
     const { name, value } = e.target;
@@ -107,8 +110,8 @@ export default function CompanyDetailsPage() {
       toast({ title: "Save Failed", description: "User not authenticated.", variant: "destructive" });
       return;
     }
-    if (!companyDetails.name || !companyDetails.address || !companyDetails.gstin) {
-        toast({ title: "Missing Information", description: "Company Name, Address, and GSTIN are required.", variant: "destructive" });
+    if (!companyDetails.name || !companyDetails.address || !companyDetails.city || !companyDetails.state || !companyDetails.gstin) {
+        toast({ title: "Missing Information", description: "Company Name, Address, City, State, and GSTIN/Tax ID are required.", variant: "destructive" });
         return;
     }
 
@@ -116,18 +119,20 @@ export default function CompanyDetailsPage() {
     try {
       const docRef = doc(db, 'companyProfiles', user.companyId);
       const detailsToSave: CompanyDetailsFirestore = {
-        name: companyDetails.name || '',
-        address: companyDetails.address || '',
-        gstin: companyDetails.gstin || '',
+        name: companyDetails.name,
+        address: companyDetails.address,
+        city: companyDetails.city,
+        state: companyDetails.state,
+        gstin: companyDetails.gstin,
         phone: companyDetails.phone || '',
         email: companyDetails.email || '',
         website: companyDetails.website || '',
+        createdAt: companyDetails.createdAt || Timestamp.now(), // Preserve or set if new
         updatedAt: Timestamp.now(),
       };
       await setDoc(docRef, detailsToSave, { merge: true }); 
       
-      // Update local state to include updatedAt and ensure all fields are strings
-      setCompanyDetails(prev => ({...detailsToSave, updatedAt: prev.updatedAt})); 
+      setCompanyDetails(detailsToSave); 
       toast({
         title: 'Details Saved',
         description: 'Company information updated successfully in Firestore.',
@@ -156,7 +161,7 @@ export default function CompanyDetailsPage() {
             <CardDescription>Loading company details...</CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
-            {[...Array(6)].map((_, i) => (
+            {[...Array(8)].map((_, i) => ( // Increased skeleton count
               <div key={i} className="space-y-2">
                 <div className="h-4 bg-muted rounded w-1/4 animate-pulse"></div>
                 <div className="h-10 bg-muted rounded w-full animate-pulse"></div>
@@ -202,7 +207,7 @@ export default function CompanyDetailsPage() {
               <Input
                 id="name"
                 name="name"
-                value={companyDetails.name} // Will always be a string
+                value={companyDetails.name}
                 onChange={handleChange}
                 placeholder="e.g., Acme Corp Ltd."
                 required
@@ -210,24 +215,51 @@ export default function CompanyDetailsPage() {
               />
             </div>
             <div>
-              <Label htmlFor="address">Full Address</Label>
+              <Label htmlFor="address">Street Address</Label>
               <Textarea
                 id="address"
                 name="address"
-                value={companyDetails.address} // Will always be a string
+                value={companyDetails.address}
                 onChange={handleChange}
-                placeholder="e.g., 123 Main Street, Anytown, ST 12345"
-                rows={3}
+                placeholder="e.g., 123 Main Street"
+                rows={2}
                 required
                 disabled={isSaving}
               />
             </div>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div>
+                <Label htmlFor="city">City</Label>
+                <Input
+                  id="city"
+                  name="city"
+                  value={companyDetails.city}
+                  onChange={handleChange}
+                  placeholder="e.g., Anytown"
+                  required
+                  disabled={isSaving}
+                />
+              </div>
+              <div>
+                <Label htmlFor="state">State / Province</Label>
+                <Input
+                  id="state"
+                  name="state"
+                  value={companyDetails.state}
+                  onChange={handleChange}
+                  placeholder="e.g., CA or Ontario"
+                  required
+                  disabled={isSaving}
+                />
+              </div>
+            </div>
+             <Separator className="my-4" />
             <div>
               <Label htmlFor="gstin">GSTIN / Tax ID</Label>
               <Input
                 id="gstin"
                 name="gstin"
-                value={companyDetails.gstin} // Will always be a string
+                value={companyDetails.gstin}
                 onChange={handleChange}
                 placeholder="e.g., 22AAAAA0000A1Z5"
                 required
@@ -240,19 +272,19 @@ export default function CompanyDetailsPage() {
                 id="phone"
                 name="phone"
                 type="tel"
-                value={companyDetails.phone} // Will always be a string
+                value={companyDetails.phone}
                 onChange={handleChange}
                 placeholder="e.g., +1-555-123-4567"
                 disabled={isSaving}
               />
             </div>
             <div>
-              <Label htmlFor="email">Email Address (Optional)</Label>
+              <Label htmlFor="email">Contact Email (Optional)</Label>
               <Input
                 id="email"
                 name="email"
                 type="email"
-                value={companyDetails.email} // Will always be a string
+                value={companyDetails.email}
                 onChange={handleChange}
                 placeholder="e.g., contact@example.com"
                 disabled={isSaving}
@@ -264,7 +296,7 @@ export default function CompanyDetailsPage() {
                 id="website"
                 name="website"
                 type="url"
-                value={companyDetails.website} // Will always be a string
+                value={companyDetails.website}
                 onChange={handleChange}
                 placeholder="e.g., https://www.example.com"
                 disabled={isSaving}
@@ -284,3 +316,5 @@ export default function CompanyDetailsPage() {
     </div>
   );
 }
+
+    
