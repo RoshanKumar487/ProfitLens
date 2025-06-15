@@ -1,7 +1,7 @@
 
 'use client';
 
-import React, { useState, useMemo, useEffect, type FormEvent, useCallback } from 'react';
+import React, { useState, useMemo, useEffect, type FormEvent, useCallback, useRef } from 'react';
 import PageTitle from '@/components/PageTitle';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -137,6 +137,8 @@ export default function InvoicingPage() {
   const [existingClientNames, setExistingClientNames] = useState<string[]>([]);
   const [clientNameSearch, setClientNameSearch] = useState(''); 
   const [isClientPopoverOpen, setIsClientPopoverOpen] = useState(false);
+  const popoverContentRef = useRef<HTMLDivElement>(null);
+
 
   const fetchInvoices = useCallback(async () => {
     if (!user || !user.companyId) {
@@ -319,8 +321,8 @@ export default function InvoicingPage() {
         items: [], 
         amount: 0,
         invoiceNumber: `INV${(Date.now()).toString().slice(-6)}`,
-        clientName: '', // Initialize clientName
-        clientEmail: '', // Initialize clientEmail
+        clientName: '', 
+        clientEmail: '', 
     });
     setClientNameSearch('');
     setIsEditing(false);
@@ -558,7 +560,7 @@ export default function InvoicingPage() {
         <div class="invoice-container">
           <div class="header-section">
             <div class="company-logo">
-              <!-- <img src="https://placehold.co/150x70.png?text=Your+Logo" alt="Company Logo" /> -->
+              <!-- <img src="https://placehold.co/150x70.png?text=Your+Logo" alt="Company Logo" data-ai-hint="logo placeholder" /> -->
               <h2 style="color: #333; margin:0;">${companyNameForEmail}</h2>
             </div>
             ${companyDetailsHtml}
@@ -737,31 +739,38 @@ export default function InvoicingPage() {
                       <Input
                         id="clientName"
                         value={currentInvoice.clientName || ''} 
-                        onChange={(e) => {
-                            const typedName = e.target.value;
-                            // Directly update clientName in currentInvoice
-                            setCurrentInvoice(prev => ({ ...prev, clientName: typedName }));
-                            // Update search term for popover
-                            setClientNameSearch(typedName);
-                            // Open popover for suggestions
-                            if (!isClientPopoverOpen) setIsClientPopoverOpen(true);
+                        onChange={(e: React.ChangeEvent<HTMLInputElement>) => {
+                            const typedValue = e.target.value;
+                            setCurrentInvoice(prev => ({
+                                ...prev,
+                                clientName: typedValue,
+                            }));
+                            setClientNameSearch(typedValue);
+                            if (typedValue && !isClientPopoverOpen) {
+                                setIsClientPopoverOpen(true);
+                            }
+                            // Removed automatic closing on empty to allow seeing all suggestions
                         }}
                         onFocus={() => {
-                            setClientNameSearch(currentInvoice.clientName || ''); // Sync search with current name on focus
+                            setClientNameSearch(currentInvoice.clientName || '');
                             setIsClientPopoverOpen(true);
                         }}
                         onBlur={() => {
-                            // Delay closing to allow click on popover item
-                            setTimeout(() => setIsClientPopoverOpen(false), 150);
+                            setTimeout(() => {
+                                if (popoverContentRef.current && document.activeElement && popoverContentRef.current.contains(document.activeElement)) {
+                                    return; 
+                                }
+                                setIsClientPopoverOpen(false);
+                            }, 150);
                         }}
-                        placeholder="Type client name"
+                        placeholder="Type or select client"
                         required
                         autoComplete="off"
                         disabled={isSaving}
                       />
                     </PopoverTrigger>
                     {isClientPopoverOpen && (
-                      <PopoverContent className="w-[--radix-popover-trigger-width] p-0" align="start">
+                      <PopoverContent ref={popoverContentRef} className="w-[--radix-popover-trigger-width] p-0" align="start">
                         <div className="max-h-48 overflow-y-auto rounded-md border bg-popover text-popover-foreground shadow-md">
                           {(() => {
                             const filteredClients = clientNameSearch ? existingClientNames.filter(name => name.toLowerCase().includes(clientNameSearch.toLowerCase())) : existingClientNames;
@@ -770,7 +779,7 @@ export default function InvoicingPage() {
                                 <div
                                   key={name}
                                   className="p-2 hover:bg-accent hover:text-accent-foreground cursor-pointer text-sm"
-                                  onMouseDown={() => { 
+                                  onMouseDown={() => { // Explicit selection
                                     const clientInvoices = invoices.filter(inv => inv.clientName === name);
                                     const latestEmail = clientInvoices.sort((a, b) => b.issuedDate.getTime() - a.issuedDate.getTime())[0]?.clientEmail;
                                     setCurrentInvoice(prev => ({ ...prev, clientName: name, clientEmail: latestEmail || '' }));
@@ -785,8 +794,24 @@ export default function InvoicingPage() {
                                  return <div className="p-2 text-sm text-muted-foreground">No matching clients. Type to add new.</div>;
                             } else if (existingClientNames.length === 0 && clientNameSearch) {
                                 return <div className="p-2 text-sm text-muted-foreground">No existing clients. Type to add new.</div>;
-                            } else if (existingClientNames.length === 0 && !clientNameSearch) {
+                            } else if (existingClientNames.length === 0 && !clientNameSearch) { // Show if input is empty and no clients
                                 return <div className="p-2 text-sm text-muted-foreground">Type to add a new client.</div>;
+                            } else if (!clientNameSearch && existingClientNames.length > 0) { // Show all clients if input is empty
+                                 return existingClientNames.map(name => (
+                                <div
+                                  key={name}
+                                  className="p-2 hover:bg-accent hover:text-accent-foreground cursor-pointer text-sm"
+                                  onMouseDown={() => {
+                                    const clientInvoices = invoices.filter(inv => inv.clientName === name);
+                                    const latestEmail = clientInvoices.sort((a, b) => b.issuedDate.getTime() - a.issuedDate.getTime())[0]?.clientEmail;
+                                    setCurrentInvoice(prev => ({ ...prev, clientName: name, clientEmail: latestEmail || '' }));
+                                    setClientNameSearch(name);
+                                    setIsClientPopoverOpen(false);
+                                  }}
+                                >
+                                  {name}
+                                </div>
+                              ));
                             }
                              return <div className="p-2 text-sm text-muted-foreground">Keep typing or select suggestion.</div>;
                           })()}
@@ -958,7 +983,3 @@ export default function InvoicingPage() {
     </div>
   );
 }
-
-    
-
-    
