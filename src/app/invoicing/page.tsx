@@ -16,7 +16,7 @@ import {
 } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger, DropdownMenuSeparator } from '@/components/ui/dropdown-menu';
-import { Receipt, PlusCircle, Search, MoreHorizontal, Edit, Trash2, Eye, Mail, Download, Calendar as CalendarIconLucide, Save, Loader2, UserPlus } from 'lucide-react';
+import { Receipt, PlusCircle, Search, MoreHorizontal, Edit, Trash2, Eye, Mail, Download, Calendar as CalendarIconLucide, Save, Loader2, UserPlus, Printer, FileDown } from 'lucide-react';
 import { format } from 'date-fns';
 import { useToast } from '@/hooks/use-toast';
 import {
@@ -49,6 +49,9 @@ import { useAuth } from '@/contexts/AuthContext';
 import { collection, addDoc, getDocs, doc, updateDoc, deleteDoc, query, where, orderBy, Timestamp, serverTimestamp, getDoc } from 'firebase/firestore';
 import { db } from '@/lib/firebaseConfig';
 import { cn } from '@/lib/utils';
+import jsPDF from 'jspdf';
+import html2canvas from 'html2canvas';
+import Image from 'next/image';
 
 interface InvoiceItem {
   id: string;
@@ -135,16 +138,54 @@ export default function InvoicingPage() {
   const [invoiceForEmail, setInvoiceForEmail] = useState<InvoiceDisplay | null>(null);
   const [emailSubject, setEmailSubject] = useState('');
   const [emailBody, setEmailBody] = useState('');
-  const [companyNameForEmail, setCompanyNameForEmail] = useState("Your Company");
+  
+  const [companyProfileDetails, setCompanyProfileDetails] = useState<CompanyDetailsFirestore | null>(null);
+  const [isFetchingCompanyProfile, setIsFetchingCompanyProfile] = useState(true);
 
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
 
-  // This will store unique client names and their latest emails
   const [existingClients, setExistingClients] = useState<ExistingClient[]>([]);
   const [isClientPopoverOpen, setIsClientPopoverOpen] = useState(false);
   const clientNameInputRef = useRef<HTMLInputElement>(null);
   const popoverContentRef = useRef<HTMLDivElement>(null);
+  const invoicePrintRef = useRef<HTMLDivElement>(null);
+
+  const [isViewInvoiceDialogOpen, setIsViewInvoiceDialogOpen] = useState(false);
+  const [invoiceToView, setInvoiceToView] = useState<InvoiceDisplay | null>(null);
+  const [isDownloadingPDF, setIsDownloadingPDF] = useState(false);
+
+
+  const fetchCompanyProfile = useCallback(async () => {
+    if (user && user.companyId) {
+      setIsFetchingCompanyProfile(true);
+      try {
+        const docRef = doc(db, 'companyProfiles', user.companyId);
+        const docSnap = await getDoc(docRef);
+        if (docSnap.exists()) {
+          setCompanyProfileDetails(docSnap.data() as CompanyDetailsFirestore);
+        } else {
+          setCompanyProfileDetails({ name: 'Your Company Name', address: 'Your Address', gstin: 'Your GSTIN', phone: '', email: '', website: '' });
+          console.log("[InvoicingPage fetchCompanyProfile] No company profile found, using defaults.");
+        }
+      } catch (error) {
+        console.error("[InvoicingPage fetchCompanyProfile] Failed to fetch company details from Firestore:", error);
+        setCompanyProfileDetails({ name: 'Your Company Name', address: 'Your Address', gstin: 'Your GSTIN', phone: '', email: '', website: '' });
+        toast({ title: "Error Fetching Company Info", description: "Could not load company details for invoices.", variant: "destructive" });
+      } finally {
+        setIsFetchingCompanyProfile(false);
+      }
+    } else {
+      setCompanyProfileDetails(null);
+      setIsFetchingCompanyProfile(false);
+    }
+  }, [user, toast]);
+
+  useEffect(() => {
+    if (!authIsLoading) {
+      fetchCompanyProfile();
+    }
+  }, [user, authIsLoading, fetchCompanyProfile]);
 
 
   const fetchInvoices = useCallback(async () => {
@@ -178,13 +219,10 @@ export default function InvoicingPage() {
 
       setInvoices(fetchedInvoices);
 
-      // Derive existing clients: Store unique client names and their latest email
       const clientsMap = new Map<string, ExistingClient>();
-      // Iterate in reverse (older to newer) so the latest email for a client is preserved
       for (let i = fetchedInvoices.length - 1; i >= 0; i--) {
         const inv = fetchedInvoices[i];
         if (inv.clientName) {
-          // If email exists for this invoice, it's considered more recent for this client
           clientsMap.set(inv.clientName.toLowerCase(), { 
             name: inv.clientName, 
             email: inv.clientEmail || clientsMap.get(inv.clientName.toLowerCase())?.email 
@@ -222,29 +260,6 @@ export default function InvoicingPage() {
     fetchInvoices();
   }, [user, user?.companyId, authIsLoading, fetchInvoices]);
 
-  useEffect(() => {
-     const fetchCompanyDetailsForEmail = async () => {
-        if (user && user.companyId) {
-            try {
-                const docRef = doc(db, 'companyProfiles', user.companyId);
-                const docSnap = await getDoc(docRef);
-                if (docSnap.exists() && docSnap.data().name) {
-                    setCompanyNameForEmail(docSnap.data().name);
-                } else {
-                    setCompanyNameForEmail("Your Company Name");
-                }
-            } catch (error) {
-                console.error("[InvoicingPage fetchCompanyDetailsForEmail] Failed to fetch company details from Firestore for email:", error);
-                setCompanyNameForEmail("Your Company Name");
-            }
-        } else {
-             setCompanyNameForEmail("Your Company Name");
-        }
-    };
-    if (!authIsLoading) {
-        fetchCompanyDetailsForEmail();
-    }
-  }, [user, user?.companyId, authIsLoading]);
 
   const filteredInvoices = useMemo(() => {
     return invoices.filter(
@@ -346,7 +361,7 @@ export default function InvoicingPage() {
     });
     setIsEditing(false);
     setIsFormOpen(true);
-    setTimeout(() => clientNameInputRef.current?.focus(), 0); // Focus on client name when dialog opens
+    setTimeout(() => clientNameInputRef.current?.focus(), 0);
   };
 
   const handleEditInvoice = (invoice: InvoiceDisplay) => {
@@ -381,25 +396,115 @@ export default function InvoicingPage() {
     }
     setIsDeleteDialogOpen(false);
   };
-
-  const handleViewInvoice = (invoice: InvoiceDisplay) => {
-    const issuedDateStr = format(invoice.issuedDate, 'PP');
-    const dueDateStr = format(invoice.dueDate, 'PP');
-
-    const invoiceDetails = `
-      Invoice #: ${invoice.invoiceNumber}
-      Client: ${invoice.clientName}
-      Amount: $${invoice.amount.toFixed(2)}
-      Status: ${invoice.status}
-      Issued: ${issuedDateStr}
-      Due: ${dueDateStr}
-      ${invoice.clientEmail ? `Client Email: ${invoice.clientEmail}` : ''}
-      ${invoice.notes ? `Notes: ${invoice.notes}` : ''}
-      Items:
-      ${(invoice.items || []).map(item => `- ${item.description} (Qty: ${item.quantity}, Price: $${item.unitPrice.toFixed(2)})`).join('\n      ') || '  No items detailed.'}
-    `;
-    alert(invoiceDetails);
+  
+  const handleOpenViewInvoiceDialog = (invoice: InvoiceDisplay) => {
+    setInvoiceToView(invoice);
+    setIsViewInvoiceDialogOpen(true);
   };
+
+  const handlePrintInvoice = () => {
+    const printContents = invoicePrintRef.current?.innerHTML;
+    if (printContents && typeof window !== 'undefined') {
+      const printWindow = window.open('', '_blank', 'height=800,width=800');
+      if (printWindow) {
+        printWindow.document.write('<html><head><title>Print Invoice</title>');
+        // Basic print styling - can be expanded
+        printWindow.document.write(`
+          <style>
+            body { font-family: 'PT Sans', sans-serif; margin: 20px; color: #333; }
+            .invoice-view-container { max-width: 750px; margin: auto; }
+            table { width: 100%; border-collapse: collapse; margin-bottom: 1rem; }
+            th, td { border: 1px solid #ddd; padding: 8px; text-align: left; }
+            th { background-color: #f2f2f2; }
+            .text-right { text-align: right; }
+            .font-bold { font-weight: bold; }
+            .text-lg { font-size: 1.125rem; }
+            .text-2xl { font-size: 1.5rem; }
+            .mb-4 { margin-bottom: 1rem; }
+            .mt-4 { margin-top: 1rem; }
+            .mt-8 { margin-top: 2rem; }
+            .grid { display: grid; }
+            .grid-cols-2 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+            .gap-8 { gap: 2rem; }
+            .p-6 { padding: 1.5rem; }
+            .bg-muted { background-color: #f1f5f9; } /* Example from globals.css, adjust if needed */
+            .rounded-lg { border-radius: 0.5rem; }
+            h1,h2,h3,h4 { margin-top:0; margin-bottom: 0.5rem; }
+            /* Hide buttons in print view */
+            @media print {
+              body * { visibility: hidden; }
+              .printable-area, .printable-area * { visibility: visible; }
+              .printable-area { position: absolute; left: 0; top: 0; width: 100%; }
+              .no-print { display: none !important; }
+            }
+          </style>
+        `);
+        printWindow.document.write('</head><body>');
+        printWindow.document.write(`<div class="printable-area">${printContents}</div>`);
+        printWindow.document.write('</body></html>');
+        printWindow.document.close();
+        printWindow.focus();
+        
+        // Delay print and close to allow content to render
+        setTimeout(() => {
+            printWindow.print();
+            printWindow.close();
+        }, 250);
+
+      } else {
+        toast({ title: "Print Error", description: "Could not open print window. Please check pop-up blocker settings.", variant: "destructive"});
+      }
+    }
+  };
+
+  const handleDownloadPDF = async () => {
+    if (!invoicePrintRef.current || !invoiceToView) return;
+    setIsDownloadingPDF(true);
+    try {
+      const canvas = await html2canvas(invoicePrintRef.current, {
+        scale: 2, // Increase scale for better quality
+        useCORS: true, // If you have external images
+        logging: true,
+      });
+      const imgData = canvas.toDataURL('image/png');
+      const pdf = new jsPDF({
+        orientation: 'portrait',
+        unit: 'px', // Use pixels for unit to match canvas dimensions
+        format: [canvas.width, canvas.height] // Set PDF size to canvas size
+      });
+
+      // If canvas width is greater than a typical A4 portrait width (approx 595px), scale it down.
+      // A4: 210mm x 297mm. At 72 DPI, 595px x 842px. At 96 DPI, 794px x 1123px.
+      // We'll use a reference width, e.g., 750px for a reasonably sized PDF.
+      const pdfWidth = pdf.internal.pageSize.getWidth();
+      const pdfHeight = pdf.internal.pageSize.getHeight();
+      
+      const imgProps = pdf.getImageProperties(imgData);
+      const aspectRatio = imgProps.width / imgProps.height;
+
+      let newImgWidth = pdfWidth;
+      let newImgHeight = newImgWidth / aspectRatio;
+
+      if (newImgHeight > pdfHeight) {
+        newImgHeight = pdfHeight;
+        newImgWidth = newImgHeight * aspectRatio;
+      }
+      
+      // Center the image if it's smaller than the page
+      const xOffset = (pdfWidth - newImgWidth) / 2;
+      const yOffset = (pdfHeight - newImgHeight) / 2;
+
+      pdf.addImage(imgData, 'PNG', xOffset, yOffset, newImgWidth, newImgHeight);
+      pdf.save(`Invoice-${invoiceToView.invoiceNumber}.pdf`);
+      toast({ title: "PDF Downloaded", description: `Invoice ${invoiceToView.invoiceNumber}.pdf downloaded.`});
+    } catch (error) {
+      console.error("Error generating PDF:", error);
+      toast({ title: "PDF Generation Failed", description: "Could not generate PDF.", variant: "destructive"});
+    } finally {
+      setIsDownloadingPDF(false);
+    }
+  };
+
 
   const loadAndPrepareEmailTemplate = (invoice: InvoiceDisplay, useDefault: boolean = false) => {
     let template = DEFAULT_EMAIL_TEMPLATE;
@@ -418,13 +523,14 @@ export default function InvoicingPage() {
     let processedSubject = template.subject;
     let processedBody = template.body;
     const dueDateFormatted = format(invoice.dueDate, 'PPP');
+    const companyNameForTpl = companyProfileDetails?.name || "Your Company";
 
     const placeholders = {
         '{{clientName}}': invoice.clientName || 'Client',
         '{{invoiceNumber}}': invoice.invoiceNumber,
         '{{amount}}': invoice.amount.toFixed(2),
         '{{dueDate}}': dueDateFormatted,
-        '{{companyName}}': companyNameForEmail,
+        '{{companyName}}': companyNameForTpl,
     };
 
     for (const [key, value] of Object.entries(placeholders)) {
@@ -470,149 +576,6 @@ export default function InvoicingPage() {
     }
   };
 
-
-  const handleDownloadInvoice = async (invoice: InvoiceDisplay) => {
-    const issuedDateFormatted = format(invoice.issuedDate, 'yyyy-MM-dd');
-    const dueDateFormatted = format(invoice.dueDate, 'yyyy-MM-dd');
-
-    let companyDetailsHtmlSection = `
-      <div style="text-align: right; margin-bottom: 20px;">
-        <h1 style="color: #333; margin:0; font-size: 28px;">INVOICE</h1>
-        <p style="margin: 2px 0;"><strong>Invoice #:</strong> ${invoice.invoiceNumber}</p>
-        <p style="margin: 2px 0;"><strong>Date Issued:</strong> ${issuedDateFormatted}</p>
-        <p style="margin: 2px 0;"><strong>Date Due:</strong> ${dueDateFormatted}</p>
-        <p style="margin: 2px 0;"><strong>Status:</strong> ${invoice.status}</p>
-      </div>
-    `;
-
-    let fromCompanyHtml = `<p><strong>From:</strong><br>${companyNameForEmail}</p>`;
-    if (user && user.companyId) {
-        try {
-            const companyDocRef = doc(db, 'companyProfiles', user.companyId);
-            const companyDocSnap = await getDoc(companyDocRef);
-            if (companyDocSnap.exists()) {
-                const coData = companyDocSnap.data() as CompanyDetailsFirestore;
-                fromCompanyHtml = `
-                    <p style="margin:0;"><strong>From:</strong></p>
-                    <p style="margin:2px 0;">${coData.name}</p>
-                    <p style="margin:2px 0;">${coData.address ? coData.address.replace(/\n/g, '<br>') : ''}</p>
-                    ${coData.email ? `<p style="margin:2px 0;">Email: ${coData.email}</p>` : ''}
-                    ${coData.phone ? `<p style="margin:2px 0;">Phone: ${coData.phone}</p>` : ''}
-                    ${coData.gstin ? `<p style="margin:2px 0;">GSTIN: ${coData.gstin}</p>` : ''}
-                    ${coData.website ? `<p style="margin:2px 0;">Website: <a href="${coData.website}" target="_blank">${coData.website}</a></p>` : ''}
-                `;
-            }
-        } catch (e) {
-            console.error("Failed to fetch company details for invoice download:", e);
-        }
-    }
-
-    const clientDetailsHtml = `
-      <p style="margin:0;"><strong>To:</strong></p>
-      <p style="margin:2px 0;">${invoice.clientName}</p>
-      ${invoice.clientEmail ? `<p style="margin:2px 0;">Email: ${invoice.clientEmail}</p>` : ''}
-    `;
-
-    let itemsHtml = `
-      <table style="width: 100%; border-collapse: collapse; margin-top: 20px;">
-        <thead>
-          <tr style="background-color: #f2f2f2;">
-            <th style="border: 1px solid #ddd; padding: 8px; text-align: left;">Description</th>
-            <th style="border: 1px solid #ddd; padding: 8px; text-align: right;">Quantity</th>
-            <th style="border: 1px solid #ddd; padding: 8px; text-align: right;">Unit Price</th>
-            <th style="border: 1px solid #ddd; padding: 8px; text-align: right;">Amount</th>
-          </tr>
-        </thead>
-        <tbody>
-    `;
-    (invoice.items || []).forEach(item => {
-      itemsHtml += `
-          <tr>
-            <td style="border: 1px solid #ddd; padding: 8px;">${item.description}</td>
-            <td style="border: 1px solid #ddd; padding: 8px; text-align: right;">${item.quantity}</td>
-            <td style="border: 1px solid #ddd; padding: 8px; text-align: right;">$${item.unitPrice.toFixed(2)}</td>
-            <td style="border: 1px solid #ddd; padding: 8px; text-align: right;">$${(item.quantity * item.unitPrice).toFixed(2)}</td>
-          </tr>
-      `;
-    });
-    itemsHtml += `
-        </tbody>
-      </table>
-    `;
-
-    const totalAmountHtml = `
-      <div style="text-align: right; margin-top: 20px;">
-        <h3 style="margin: 5px 0;">Total Amount: $${invoice.amount.toFixed(2)}</h3>
-      </div>
-    `;
-
-    const notesHtml = invoice.notes ? `
-      <div style="margin-top: 20px;">
-        <h4>Notes:</h4>
-        <p style="white-space: pre-wrap; font-size: 0.9em; color: #555;">${invoice.notes}</p>
-      </div>
-    ` : '';
-
-    const footerHtml = `
-        <div style="text-align: center; margin-top: 30px; padding-top: 15px; border-top: 1px solid #eee; font-size: 0.9em; color: #777;">
-            <p>Thank you for your business!</p>
-            <p>${companyNameForEmail}</p>
-        </div>
-    `;
-
-    const htmlContent = `
-      <!DOCTYPE html>
-      <html lang="en">
-      <head>
-        <meta charset="UTF-8">
-        <meta name="viewport" content="width=device-width, initial-scale=1.0">
-        <title>Invoice ${invoice.invoiceNumber}</title>
-        <style>
-          body { font-family: 'PT Sans', Arial, sans-serif; margin: 0; padding: 0; background-color: #f9f9f9; color: #333; }
-          .invoice-container { max-width: 800px; margin: 20px auto; padding: 20px; background-color: #fff; border: 1px solid #ddd; box-shadow: 0 0 10px rgba(0,0,0,0.05); }
-          .header-section { display: flex; justify-content: space-between; align-items: flex-start; padding-bottom: 20px; border-bottom: 1px solid #eee; }
-          .company-logo img { max-width: 150px; max-height: 70px; }
-          .details-section { display: flex; justify-content: space-between; margin-top: 20px; }
-          .details-section > div { width: 48%; }
-          p { line-height: 1.6; }
-          table th, table td { vertical-align: top; }
-        </style>
-      </head>
-      <body>
-        <div class="invoice-container">
-          <div class="header-section">
-            <div class="company-logo">
-              <!-- <img src="https://placehold.co/150x70.png?text=Your+Logo" alt="Company Logo" data-ai-hint="logo placeholder" /> -->
-              <h2 style="color: #333; margin:0;">${companyNameForEmail}</h2>
-            </div>
-            ${companyDetailsHtmlSection}
-          </div>
-          <div class="details-section">
-            <div>${fromCompanyHtml}</div>
-            <div>${clientDetailsHtml}</div>
-          </div>
-          ${itemsHtml}
-          ${totalAmountHtml}
-          ${notesHtml}
-          ${footerHtml}
-        </div>
-      </body>
-      </html>
-    `;
-
-    const blob = new Blob([htmlContent], { type: 'text/html;charset=utf-8' });
-    const link = document.createElement('a');
-    link.href = URL.createObjectURL(blob);
-    link.download = `Invoice-${invoice.invoiceNumber}.html`;
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-    URL.revokeObjectURL(link.href);
-
-    toast({ title: "Download Started", description: `HTML file for invoice ${invoice.invoiceNumber} generated.`});
-  };
-
-
   const handleAddItem = () => {
     const newItem: InvoiceItem = { id: crypto.randomUUID(), description: '', quantity: 1, unitPrice: 0 };
     setCurrentInvoice(prev => ({
@@ -642,7 +605,6 @@ export default function InvoicingPage() {
       const totalAmount = currentInvoice.items.reduce((sum, item) => sum + (Number(item.quantity) * Number(item.unitPrice)), 0);
       setCurrentInvoice(prev => ({ ...prev, amount: totalAmount }));
     } else if ((currentInvoice.items || []).length === 0 ) {
-        // If items are cleared, but amount was manually set, don't overwrite unless amount is undefined
         if (currentInvoice.amount === undefined || currentInvoice.amount === null) {
              setCurrentInvoice(prev => ({ ...prev, amount: 0}));
         }
@@ -654,7 +616,6 @@ export default function InvoicingPage() {
     setCurrentInvoice(prev => ({
       ...prev,
       clientName: typedValue,
-      // Do NOT update clientEmail here directly from typing
     }));
     if (typedValue.trim() !== '' || existingClients.length > 0) {
       setIsClientPopoverOpen(true);
@@ -667,21 +628,19 @@ export default function InvoicingPage() {
     setCurrentInvoice(prev => ({
       ...prev,
       clientName: client.name,
-      clientEmail: client.email || '', // Populate email when a suggestion is clicked
+      clientEmail: client.email || prev.clientEmail || '', 
     }));
     setIsClientPopoverOpen(false);
     clientNameInputRef.current?.focus();
   };
 
   const handleClientNameInputFocus = () => {
-    // Open popover if there's text or existing clients to show
     if (currentInvoice.clientName || existingClients.length > 0) {
       setIsClientPopoverOpen(true);
     }
   };
   
   const handleClientNameInputBlur = (e: React.FocusEvent<HTMLInputElement>) => {
-    // setTimeout to allow click on popover item before it closes
     setTimeout(() => {
       if (popoverContentRef.current && !popoverContentRef.current.contains(document.activeElement)) {
         setIsClientPopoverOpen(false);
@@ -692,7 +651,7 @@ export default function InvoicingPage() {
 
   const filteredClientSuggestions = useMemo(() => {
     const currentName = currentInvoice.clientName?.toLowerCase() || '';
-    if (!currentName && isClientPopoverOpen) { // Show all if input empty and popover is open (e.g. on focus)
+    if (!currentName && isClientPopoverOpen) { 
         return existingClients;
     }
     if (!currentName) {
@@ -721,7 +680,7 @@ export default function InvoicingPage() {
   return (
     <div className="space-y-6">
       <PageTitle title="Invoicing" subtitle="Manage your customer invoices efficiently." icon={Receipt}>
-        <Button onClick={handleCreateNew} disabled={isSaving || isLoading}>
+        <Button onClick={handleCreateNew} disabled={isSaving || isLoading || isFetchingCompanyProfile}>
           <PlusCircle className="mr-2 h-4 w-4" /> Create New Invoice
         </Button>
       </PageTitle>
@@ -738,12 +697,18 @@ export default function InvoicingPage() {
                 className="pl-8 sm:w-[250px] md:w-[300px]"
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
-                disabled={isLoading && invoices.length === 0}
+                disabled={(isLoading && invoices.length === 0) || isFetchingCompanyProfile}
               />
             </div>
           </div>
         </CardHeader>
         <CardContent>
+          {(isLoading || isFetchingCompanyProfile) && invoices.length === 0 && (
+             <div className="flex items-center justify-center py-10">
+                <Loader2 className="h-8 w-8 animate-spin text-primary" />
+                <span className="ml-2">Loading data...</span>
+            </div>
+          )}
           {isLoading && invoices.length > 0 && (
             <div className="flex justify-center py-4">
               <Loader2 className="h-6 w-6 animate-spin text-primary" />
@@ -784,10 +749,10 @@ export default function InvoicingPage() {
                         </Button>
                       </DropdownMenuTrigger>
                       <DropdownMenuContent align="end">
-                        <DropdownMenuItem onClick={() => handleViewInvoice(invoice)}><Eye className="mr-2 h-4 w-4" /> View</DropdownMenuItem>
+                        <DropdownMenuItem onClick={() => handleOpenViewInvoiceDialog(invoice)}><Eye className="mr-2 h-4 w-4" /> View / Print / Download</DropdownMenuItem>
                         <DropdownMenuItem onClick={() => handleEditInvoice(invoice)}><Edit className="mr-2 h-4 w-4" /> Edit</DropdownMenuItem>
                         <DropdownMenuItem onClick={() => handleOpenEmailDialog(invoice)} disabled={!invoice.clientEmail}><Mail className="mr-2 h-4 w-4" /> Email</DropdownMenuItem>
-                        <DropdownMenuItem onClick={() => handleDownloadInvoice(invoice)}><Download className="mr-2 h-4 w-4" /> Download</DropdownMenuItem>
+                        {/* Removed standalone Download, now part of View dialog */}
                         <DropdownMenuSeparator />
                         <DropdownMenuItem onClick={() => promptDeleteInvoice(invoice.id)} className="text-destructive focus:text-destructive focus:bg-destructive/10">
                           <Trash2 className="mr-2 h-4 w-4" /> Delete
@@ -818,8 +783,7 @@ export default function InvoicingPage() {
                   <Label htmlFor="clientName">Client Name</Label>
                   <Popover open={isClientPopoverOpen} onOpenChange={setIsClientPopoverOpen}>
                     <PopoverTrigger asChild>
-                       {/* Ensure PopoverTrigger does not interfere with Input's own focus/blur needed for direct editing */}
-                       <div> {/* Simple div wrapper for PopoverTrigger if needed, or remove asChild if Input handles Popover itself */}
+                       <div> 
                         <Input
                           id="clientName"
                           ref={clientNameInputRef}
@@ -841,7 +805,7 @@ export default function InvoicingPage() {
                         className="w-[--radix-popover-trigger-width] p-0 max-h-60 overflow-y-auto"
                         side="bottom"
                         align="start"
-                        onOpenAutoFocus={(e) => e.preventDefault()} // Prevent focus stealing
+                        onOpenAutoFocus={(e) => e.preventDefault()} 
                       >
                         <ScrollArea className="max-h-56">
                           {filteredClientSuggestions.length > 0 ? (
@@ -849,7 +813,6 @@ export default function InvoicingPage() {
                               <div
                                 key={client.name}
                                 className="px-3 py-2 text-sm hover:bg-accent cursor-pointer"
-                                // Use onMouseDown to ensure click registers before blur closes popover
                                 onMouseDown={() => handleClientSuggestionClick(client)}
                               >
                                 {client.name}
@@ -974,6 +937,127 @@ export default function InvoicingPage() {
         </DialogContent>
       </Dialog>
 
+      {/* View Invoice Dialog */}
+      <Dialog open={isViewInvoiceDialogOpen} onOpenChange={(open) => { setIsViewInvoiceDialogOpen(open); if (!open) setInvoiceToView(null); }}>
+        <DialogContent className="sm:max-w-4xl max-h-[90vh] flex flex-col p-0">
+          <DialogHeader className="p-6 pb-0">
+            <DialogTitle className="font-headline text-2xl">Invoice Details</DialogTitle>
+            <DialogDescription>
+              Viewing Invoice {invoiceToView?.invoiceNumber}. Use actions below to print or download.
+            </DialogDescription>
+          </DialogHeader>
+          
+          <ScrollArea className="flex-grow overflow-y-auto">
+            <div ref={invoicePrintRef} className="invoice-view-container p-6 bg-card text-card-foreground">
+              {isFetchingCompanyProfile && <div className="text-center p-10"><Loader2 className="h-8 w-8 animate-spin text-primary mx-auto" /> <p>Loading company details...</p></div>}
+              {!isFetchingCompanyProfile && invoiceToView && companyProfileDetails && (
+                <>
+                  {/* Invoice Header */}
+                  <header className="mb-8">
+                    <div className="grid grid-cols-2 gap-8 items-start">
+                      <div>
+                         <Image src="https://placehold.co/200x80.png?text=Your+Logo" alt="Company Logo" width={150} height={60} className="mb-4" data-ai-hint="company logo" />
+                        <h2 className="text-2xl font-bold text-primary">{companyProfileDetails.name}</h2>
+                        <p className="text-sm text-muted-foreground whitespace-pre-line">{companyProfileDetails.address}</p>
+                        {companyProfileDetails.email && <p className="text-sm text-muted-foreground">Email: {companyProfileDetails.email}</p>}
+                        {companyProfileDetails.phone && <p className="text-sm text-muted-foreground">Phone: {companyProfileDetails.phone}</p>}
+                        {companyProfileDetails.website && <p className="text-sm text-muted-foreground">Website: <a href={companyProfileDetails.website} target="_blank" rel="noopener noreferrer" className="text-primary hover:underline">{companyProfileDetails.website}</a></p>}
+                        {companyProfileDetails.gstin && <p className="text-sm text-muted-foreground">GSTIN/Tax ID: {companyProfileDetails.gstin}</p>}
+                      </div>
+                      <div className="text-right">
+                        <h1 className="text-4xl font-bold uppercase text-foreground mb-2">Invoice</h1>
+                        <p className="text-md"><span className="font-semibold">Invoice #:</span> {invoiceToView.invoiceNumber}</p>
+                        <p className="text-md"><span className="font-semibold">Date Issued:</span> {format(invoiceToView.issuedDate, 'PPP')}</p>
+                        <p className="text-md"><span className="font-semibold">Date Due:</span> {format(invoiceToView.dueDate, 'PPP')}</p>
+                        <Badge variant={getStatusBadgeVariant(invoiceToView.status)} className={`mt-2 text-sm px-3 py-1 ${invoiceToView.status === 'Paid' ? 'bg-accent text-accent-foreground' : invoiceToView.status === 'Overdue' ? 'bg-destructive text-destructive-foreground' : ''}`}>
+                          {invoiceToView.status}
+                        </Badge>
+                      </div>
+                    </div>
+                  </header>
+
+                  {/* Client Details */}
+                  <section className="mb-8 p-4 bg-muted/30 rounded-lg">
+                    <h3 className="text-lg font-semibold text-foreground mb-2">Bill To:</h3>
+                    <p className="font-medium text-foreground">{invoiceToView.clientName}</p>
+                    {invoiceToView.clientEmail && <p className="text-sm text-muted-foreground">{invoiceToView.clientEmail}</p>}
+                    {/* Placeholder for client address - add if available in future */}
+                  </section>
+
+                  {/* Items Table */}
+                  <section className="mb-8">
+                    <Table className="border">
+                      <TableHeader className="bg-muted/50">
+                        <TableRow>
+                          <TableHead className="w-[50px]">#</TableHead>
+                          <TableHead>Description</TableHead>
+                          <TableHead className="text-right">Quantity</TableHead>
+                          <TableHead className="text-right">Unit Price</TableHead>
+                          <TableHead className="text-right">Amount</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {(invoiceToView.items || []).map((item, index) => (
+                          <TableRow key={item.id}>
+                            <TableCell>{index + 1}</TableCell>
+                            <TableCell>{item.description}</TableCell>
+                            <TableCell className="text-right">{item.quantity}</TableCell>
+                            <TableCell className="text-right">${item.unitPrice.toFixed(2)}</TableCell>
+                            <TableCell className="text-right font-medium">${(item.quantity * item.unitPrice).toFixed(2)}</TableCell>
+                          </TableRow>
+                        ))}
+                        {(!invoiceToView.items || invoiceToView.items.length === 0) && (
+                           <TableRow><TableCell colSpan={5} className="text-center text-muted-foreground py-4">No line items for this invoice.</TableCell></TableRow>
+                        )}
+                      </TableBody>
+                    </Table>
+                  </section>
+                  
+                  {/* Totals Section */}
+                  <section className="flex justify-end mb-8">
+                    <div className="w-full max-w-xs space-y-2">
+                       {/* Placeholder for Subtotal, Tax if needed in future */}
+                       <div className="flex justify-between items-center border-t pt-2">
+                         <p className="text-lg font-semibold text-foreground">Grand Total:</p>
+                         <p className="text-lg font-bold text-primary">${invoiceToView.amount.toFixed(2)}</p>
+                       </div>
+                    </div>
+                  </section>
+
+                  {/* Notes */}
+                  {invoiceToView.notes && (
+                    <section className="mb-8 p-4 bg-muted/30 rounded-lg">
+                      <h4 className="font-semibold text-foreground mb-1">Notes:</h4>
+                      <p className="text-sm text-muted-foreground whitespace-pre-wrap">{invoiceToView.notes}</p>
+                    </section>
+                  )}
+
+                  {/* Footer */}
+                  <footer className="text-center text-sm text-muted-foreground pt-8 border-t">
+                    <p>Thank you for your business!</p>
+                    <p>{companyProfileDetails.name} - Payment is due by {format(invoiceToView.dueDate, 'PPP')}.</p>
+                  </footer>
+                </>
+              )}
+            </div>
+          </ScrollArea>
+          
+          <DialogFooter className="p-6 border-t bg-background no-print">
+             <Button type="button" variant="outline" onClick={handlePrintInvoice} disabled={isDownloadingPDF}>
+                <Printer className="mr-2 h-4 w-4" /> Print Invoice
+             </Button>
+             <Button type="button" onClick={handleDownloadPDF} disabled={isDownloadingPDF}>
+                {isDownloadingPDF ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <FileDown className="mr-2 h-4 w-4" />}
+                {isDownloadingPDF ? "Downloading..." : "Download PDF"}
+             </Button>
+            <DialogClose asChild>
+              <Button type="button" variant="ghost" disabled={isDownloadingPDF}>Close</Button>
+            </DialogClose>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+
       {/* Email Preview Dialog */}
       <Dialog open={isEmailPreviewDialogOpen} onOpenChange={(open) => { setIsEmailPreviewDialogOpen(open); if (!open) setInvoiceForEmail(null); }}>
         <DialogContent className="sm:max-w-xl">
@@ -1038,3 +1122,4 @@ export default function InvoicingPage() {
     </div>
   );
 }
+
