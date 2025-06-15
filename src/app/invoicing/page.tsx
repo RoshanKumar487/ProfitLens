@@ -180,6 +180,7 @@ export default function InvoicingPage() {
         variant: 'destructive',
       });
       setInvoices([]); 
+      setExistingClientNames([]);
     } finally {
       setIsLoading(false);
     }
@@ -750,9 +751,10 @@ export default function InvoicingPage() {
                           }
                         }}
                         onFocus={() => {
-                          if (currentInvoice.clientName || existingClientNames.length > 0) {
-                              setIsClientPopoverOpen(true);
-                          }
+                            // Open popover on focus if there's text or existing clients to show
+                            if (currentInvoice.clientName || existingClientNames.length > 0) {
+                                setIsClientPopoverOpen(true);
+                            }
                         }}
                         onBlur={() => {
                           setTimeout(() => {
@@ -776,23 +778,25 @@ export default function InvoicingPage() {
                         ref={popoverContentRef} 
                         className="w-[--radix-popover-trigger-width] p-0" 
                         align="start"
-                        onOpenAutoFocus={(e) => e.preventDefault()} 
+                        onOpenAutoFocus={(e) => e.preventDefault()} // Prevent auto-focus on first item
                       >
                         <div className="max-h-48 overflow-y-auto rounded-md border bg-popover text-popover-foreground shadow-md">
                           {(() => {
-                            const searchTerm = (currentInvoice.clientName || '').toLowerCase();
-                            const filteredClients = searchTerm
-                              ? existingClientNames.filter(name => name.toLowerCase().includes(searchTerm))
-                              : existingClientNames;
+                            const currentSearchTerm = (currentInvoice.clientName || '').toLowerCase();
+                            const filteredClients = currentSearchTerm
+                              ? existingClientNames.filter(name => name.toLowerCase().includes(currentSearchTerm))
+                              : existingClientNames; // Show all if search term is empty
 
                             if (filteredClients.length > 0) {
                               return filteredClients.map(name => (
                                 <div
                                   key={name}
                                   className="p-2 hover:bg-accent hover:text-accent-foreground cursor-pointer text-sm"
-                                  onMouseDown={() => { 
+                                  onMouseDown={() => { // Use onMouseDown to fire before blur
                                     const clientInvoices = invoices.filter(inv => inv.clientName === name);
-                                    const latestEmail = clientInvoices.sort((a, b) => b.issuedDate.getTime() - a.issuedDate.getTime())[0]?.clientEmail;
+                                    const latestEmail = clientInvoices.length > 0 
+                                        ? clientInvoices.sort((a,b) => b.issuedDate.getTime() - a.issuedDate.getTime())[0]?.clientEmail 
+                                        : '';
                                     
                                     setCurrentInvoice(prev => ({ 
                                         ...prev, 
@@ -800,19 +804,17 @@ export default function InvoicingPage() {
                                         clientEmail: latestEmail || '' 
                                     }));
                                     setIsClientPopoverOpen(false);
-                                    // No need to manually focus input, it should retain focus or Popover handles it.
+                                    clientNameInputRef.current?.focus(); // Refocus input
                                   }}
                                 >
                                   {name}
                                 </div>
                               ));
-                            } else if (searchTerm) {
-                                 return <div className="p-2 text-sm text-muted-foreground">No matching clients. Type to add new.</div>;
-                            } else if (existingClientNames.length === 0) { // No search term, no existing clients
+                            } else if (currentSearchTerm && existingClientNames.length > 0) {
+                                 return <div className="p-2 text-sm text-muted-foreground">No matching clients.</div>;
+                            } else if (existingClientNames.length === 0) {
                                 return <div className="p-2 text-sm text-muted-foreground">No existing clients. Type to add new.</div>;
                             }
-                            // No search term, but existing clients (already handled by filteredClients showing all)
-                            // Or any other unhandled case
                             return <div className="p-2 text-sm text-muted-foreground">Type to search or add a new client.</div>;
                           })()}
                         </div>
@@ -989,4 +991,3 @@ export default function InvoicingPage() {
     </div>
   );
 }
-
