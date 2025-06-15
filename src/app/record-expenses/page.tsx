@@ -32,7 +32,7 @@ const EXPENSE_CATEGORIES = [
 ];
 
 interface ExpenseEntryFirestore {
-  id: string; // Firestore document ID
+  id?: string; 
   date: Timestamp;
   amount: number;
   category: string;
@@ -44,7 +44,7 @@ interface ExpenseEntryFirestore {
 
 interface ExpenseEntryDisplay {
   id: string;
-  date: Date; // For display
+  date: Date; 
   amount: number;
   category: string;
   description?: string;
@@ -71,7 +71,6 @@ export default function RecordExpensesPage() {
     if (!user || !user.companyId) {
       setIsLoadingEntries(false);
       setRecentEntries([]);
-      console.log("RecordExpenses: User or companyId not found for fetching entries.");
       return;
     }
 
@@ -93,19 +92,18 @@ export default function RecordExpensesPage() {
         };
       });
       setRecentEntries(fetchedEntries);
-      console.log("RecordExpenses: Fetched", fetchedEntries.length, "entries for companyId:", user.companyId);
     } catch (error: any) {
-      console.error('Error fetching expense entries from Firestore:', error);
+      console.error('Error fetching expense entries:', error);
       toast({
         title: 'Error Loading Entries',
-        description: error.message || 'Could not load recent expense entries from Firestore.',
+        description: error.message,
         variant: 'destructive',
       });
       setRecentEntries([]);
     } finally {
       setIsLoadingEntries(false);
     }
-  }, [user, user?.companyId, authIsLoading, toast]);
+  }, [user, authIsLoading, toast]);
 
   useEffect(() => {
     fetchExpenseEntries();
@@ -133,39 +131,57 @@ export default function RecordExpensesPage() {
       date: Timestamp.fromDate(date),
       amount: amountNum,
       category,
-      description,
-      vendor,
+      description: description || '',
+      vendor: vendor || '',
       companyId: user.companyId,
       createdAt: serverTimestamp(),
     };
 
     try {
-      const docRef = await addDoc(collection(db, 'expenses'), newEntryPayload);
-      
-      fetchExpenseEntries(); // Refetch to show the new entry
-      
+      await addDoc(collection(db, 'expenses'), newEntryPayload);
+      fetchExpenseEntries();
       toast({
         title: 'Expense Recorded',
         description: `Successfully recorded $${amountNum.toFixed(2)} for ${category}.`,
       });
-      console.log("RecordExpenses: Saved new entry with ID:", docRef.id);
-
       setDate(new Date());
       setAmount('');
       setCategory('');
       setDescription('');
       setVendor('');
     } catch (error: any) {
-      console.error('Error saving expense entry to Firestore:', error);
+      console.error('Error saving expense entry:', error);
       toast({
         title: 'Save Failed',
-        description: error.message || 'Could not save expense entry to Firestore.',
+        description: error.message,
         variant: 'destructive',
       });
     } finally {
       setIsSaving(false);
     }
   };
+  
+  if (authIsLoading) {
+    return (
+      <div className="flex justify-center items-center h-64">
+        <Loader2 className="h-12 w-12 animate-spin text-primary" />
+         <p className="ml-2">Loading authentication...</p>
+      </div>
+    );
+  }
+
+  if (!user && !authIsLoading) {
+     return (
+      <div className="space-y-6">
+        <PageTitle title="Record Expenses" subtitle="Log your business expenditures." icon={TrendingDown} />
+        <Card className="shadow-lg">
+          <CardHeader><CardTitle>Access Denied</CardTitle></CardHeader>
+          <CardContent><p>Please sign in to record expenses.</p></CardContent>
+        </Card>
+      </div>
+    )
+  }
+
 
   return (
     <div className="space-y-6">
@@ -272,7 +288,7 @@ export default function RecordExpensesPage() {
         <Card className="shadow-lg">
           <CardHeader>
             <CardTitle className="font-headline">Recent Expense Entries</CardTitle>
-            <CardDescription>Last 5 recorded expense entries from Firestore.</CardDescription>
+            <CardDescription>Last 5 recorded expense entries.</CardDescription>
           </CardHeader>
           <CardContent className="space-y-3">
             {isLoadingEntries ? (
@@ -298,7 +314,7 @@ export default function RecordExpensesPage() {
                 </div>
               ))
             ) : (
-              <p className="text-sm text-muted-foreground text-center py-4">No expenses recorded in Firestore yet for this company.</p>
+              <p className="text-sm text-muted-foreground text-center py-4">No expenses recorded yet.</p>
             )}
           </CardContent>
         </Card>

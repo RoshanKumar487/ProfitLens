@@ -18,7 +18,7 @@ import { db } from '@/lib/firebaseConfig';
 import { collection, addDoc, getDocs, query, where, orderBy, limit, Timestamp, serverTimestamp } from 'firebase/firestore';
 
 interface RevenueEntryFirestore {
-  id: string; // Firestore document ID
+  id?: string; 
   date: Timestamp; 
   amount: number;
   source: string;
@@ -29,7 +29,7 @@ interface RevenueEntryFirestore {
 
 interface RevenueEntryDisplay {
   id: string;
-  date: Date; // For display
+  date: Date; 
   amount: number;
   source: string;
   description?: string;
@@ -54,7 +54,6 @@ export default function RecordRevenuePage() {
     if (!user || !user.companyId) {
       setIsLoadingEntries(false);
       setRecentEntries([]);
-      console.log("RecordRevenue: User or companyId not found for fetching entries.");
       return;
     }
 
@@ -68,26 +67,25 @@ export default function RecordRevenuePage() {
         const data = docSnap.data() as Omit<RevenueEntryFirestore, 'id'>;
         return {
           id: docSnap.id,
-          date: data.date.toDate(), // Convert Timestamp to Date for display
+          date: data.date.toDate(),
           amount: data.amount,
           source: data.source,
           description: data.description,
         };
       });
       setRecentEntries(fetchedEntries);
-      console.log("RecordRevenue: Fetched", fetchedEntries.length, "entries for companyId:", user.companyId);
     } catch (error: any) {
-      console.error('Error fetching revenue entries from Firestore:', error);
+      console.error('Error fetching revenue entries:', error);
       toast({
         title: 'Error Loading Entries',
-        description: error.message || 'Could not load recent revenue entries from Firestore.',
+        description: error.message,
         variant: 'destructive',
       });
       setRecentEntries([]);
     } finally {
       setIsLoadingEntries(false);
     }
-  }, [user, user?.companyId, authIsLoading, toast]);
+  }, [user, authIsLoading, toast]);
 
   useEffect(() => {
     fetchRevenueEntries();
@@ -115,38 +113,54 @@ export default function RecordRevenuePage() {
       date: Timestamp.fromDate(date), 
       amount: amountNum,
       source,
-      description,
+      description: description || '',
       companyId: user.companyId,
       createdAt: serverTimestamp(),
     };
 
     try {
-      const docRef = await addDoc(collection(db, 'revenueEntries'), newEntryPayload);
-      
-      // Optimistically update UI or refetch
-      fetchRevenueEntries(); // Refetch to get the latest list including the new one
-      
+      await addDoc(collection(db, 'revenueEntries'), newEntryPayload);
+      fetchRevenueEntries(); 
       toast({
         title: 'Revenue Recorded',
         description: `Successfully recorded $${amountNum.toFixed(2)} from ${source}.`,
       });
-      console.log("RecordRevenue: Saved new entry with ID:", docRef.id);
-
       setDate(new Date());
       setAmount('');
       setSource('');
       setDescription('');
     } catch (error: any) {
-      console.error('Error saving revenue entry to Firestore:', error);
+      console.error('Error saving revenue entry:', error);
       toast({
         title: 'Save Failed',
-        description: error.message || 'Could not save revenue entry to Firestore.',
+        description: error.message,
         variant: 'destructive',
       });
     } finally {
       setIsSaving(false);
     }
   };
+
+  if (authIsLoading) {
+    return (
+      <div className="flex justify-center items-center h-64">
+        <Loader2 className="h-12 w-12 animate-spin text-primary" />
+         <p className="ml-2">Loading authentication...</p>
+      </div>
+    );
+  }
+
+  if (!user && !authIsLoading) {
+     return (
+      <div className="space-y-6">
+        <PageTitle title="Record Revenue" subtitle="Log your daily or transaction-based income." icon={TrendingUp} />
+        <Card className="shadow-lg">
+          <CardHeader><CardTitle>Access Denied</CardTitle></CardHeader>
+          <CardContent><p>Please sign in to record revenue.</p></CardContent>
+        </Card>
+      </div>
+    )
+  }
 
   return (
     <div className="space-y-6">
@@ -238,7 +252,7 @@ export default function RecordRevenuePage() {
         <Card className="shadow-lg">
           <CardHeader>
             <CardTitle className="font-headline">Recent Revenue Entries</CardTitle>
-            <CardDescription>Last 5 recorded revenue entries from Firestore.</CardDescription>
+            <CardDescription>Last 5 recorded revenue entries.</CardDescription>
           </CardHeader>
           <CardContent className="space-y-3">
             {isLoadingEntries ? (
@@ -264,7 +278,7 @@ export default function RecordRevenuePage() {
                 </div>
               ))
             ) : (
-              <p className="text-sm text-muted-foreground text-center py-4">No revenue recorded in Firestore yet for this company.</p>
+              <p className="text-sm text-muted-foreground text-center py-4">No revenue recorded yet.</p>
             )}
           </CardContent>
         </Card>

@@ -11,14 +11,14 @@ import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { CalendarDays, PlusCircle, Clock, MapPin, Edit3, Trash2, Loader2 } from 'lucide-react';
-import { format, parseISO } from 'date-fns';
+import { format } from 'date-fns';
 import { useToast } from '@/hooks/use-toast';
 import {
   Dialog,
   DialogContent,
   DialogHeader,
   DialogTitle,
-  DialogDescription,
+  DialogDescription as DialogDesc, // Renamed to avoid conflict with CardDescription
   DialogFooter,
   DialogClose,
 } from "@/components/ui/dialog";
@@ -99,7 +99,7 @@ export default function CalendarPage() {
     } finally {
       setIsLoadingAppointments(false);
     }
-  }, [user, user?.companyId, authIsLoading, toast]);
+  }, [user, authIsLoading, toast]); // Removed user.companyId from deps as user itself covers it
 
   useEffect(() => {
     fetchAppointments();
@@ -117,7 +117,7 @@ export default function CalendarPage() {
   const handleFormSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!user || !user.companyId) {
-      toast({ title: "Authentication Error", description: "User not authenticated.", variant: "destructive" });
+      toast({ title: "Authentication Error", description: "User not authenticated. Please sign in.", variant: "destructive" });
       return;
     }
     if (!currentAppointment.title || !currentAppointment.date) {
@@ -129,9 +129,9 @@ export default function CalendarPage() {
     const appointmentDataToSave = {
       title: currentAppointment.title,
       date: Timestamp.fromDate(currentAppointment.date),
-      time: currentAppointment.time,
-      location: currentAppointment.location,
-      notes: currentAppointment.notes,
+      time: currentAppointment.time || '',
+      location: currentAppointment.location || '',
+      notes: currentAppointment.notes || '',
       companyId: user.companyId,
     };
 
@@ -164,6 +164,10 @@ export default function CalendarPage() {
   };
   
   const handleDeleteAppointment = async (id: string) => {
+    if (!user || !user.companyId) {
+      toast({ title: "Authentication Error", description: "User not authenticated.", variant: "destructive" });
+      return;
+    }
     setIsSaving(true); // Use general saving indicator
     try {
       const appointmentRef = doc(db, 'appointments', id);
@@ -201,6 +205,27 @@ export default function CalendarPage() {
     return format(date, 'd');
   };
 
+  if (authIsLoading) {
+    return (
+      <div className="flex justify-center items-center h-64">
+        <Loader2 className="h-12 w-12 animate-spin text-primary" />
+        <p className="ml-2">Loading authentication...</p>
+      </div>
+    );
+  }
+
+  if (!user && !authIsLoading) {
+     return (
+      <div className="space-y-6">
+        <PageTitle title="Calendar" subtitle="Manage your schedule and appointments." icon={CalendarDays} />
+        <Card className="shadow-lg">
+          <CardHeader><CardTitle>Access Denied</CardTitle></CardHeader>
+          <CardContent><p>Please sign in to manage your calendar.</p></CardContent>
+        </Card>
+      </div>
+    )
+  }
+
   return (
     <div className="space-y-6">
       <PageTitle title="Calendar" subtitle="Manage your schedule and appointments." icon={CalendarDays}>
@@ -218,6 +243,7 @@ export default function CalendarPage() {
       {isLoadingAppointments && (
         <div className="flex justify-center items-center h-64">
           <Loader2 className="h-12 w-12 animate-spin text-primary" />
+           <p className="ml-2">Loading appointments...</p>
         </div>
       )}
 
@@ -281,10 +307,10 @@ export default function CalendarPage() {
         <DialogContent className="sm:max-w-[425px]">
           <DialogHeader>
             <DialogTitle className="font-headline">{isEditing ? 'Edit Appointment' : 'Add New Appointment'}</DialogTitle>
-            <DialogDescription>
+            <DialogDesc>
               {isEditing ? 'Update the details for your appointment.' : 'Fill in the details for your new appointment.'}
               {currentAppointment.date && ` For ${format(currentAppointment.date, 'MMMM d, yyyy')}.`}
-            </DialogDescription>
+            </DialogDesc>
           </DialogHeader>
           <form onSubmit={handleFormSubmit} className="space-y-4 py-2">
             <div>

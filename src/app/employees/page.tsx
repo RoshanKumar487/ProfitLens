@@ -42,7 +42,7 @@ import { Users2, PlusCircle, MoreHorizontal, Edit, Trash2, Loader2, Save, Camera
 import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/contexts/AuthContext';
 import { db } from '@/lib/firebaseConfig';
-import { collection, addDoc, getDocs, doc, updateDoc, deleteDoc, query, where, orderBy, Timestamp, serverTimestamp, writeBatch } from 'firebase/firestore';
+import { collection, addDoc, getDocs, doc, updateDoc, deleteDoc, query, where, orderBy, Timestamp, serverTimestamp } from 'firebase/firestore';
 import { uploadFileToStorage, deleteFileFromStorage } from '@/lib/firebaseStorageUtils';
 import { Skeleton } from '@/components/ui/skeleton';
 
@@ -53,10 +53,10 @@ interface EmployeeFirestore {
   salary: number;
   description?: string;
   profilePictureUrl?: string;
-  profilePictureStoragePath?: string; // To store the actual path for easier deletion
+  profilePictureStoragePath?: string;
   associatedFileUrl?: string;
   associatedFileName?: string;
-  associatedFileStoragePath?: string; // To store the actual path
+  associatedFileStoragePath?: string;
   companyId: string;
   createdAt: Timestamp;
   updatedAt?: Timestamp;
@@ -103,7 +103,6 @@ export default function EmployeesPage() {
       stream.getTracks().forEach(track => track.stop());
       videoRef.current.srcObject = null;
     }
-    // Don't hide webcam here, let the button do it
   }, []);
 
   useEffect(() => {
@@ -130,7 +129,6 @@ export default function EmployeesPage() {
     } else {
       cleanupWebcam();
     }
-    // Only cleanup on unmount if webcam was shown
     return () => { if (showWebcam) cleanupWebcam();};
   }, [showWebcam, toast, cleanupWebcam]);
 
@@ -175,7 +173,7 @@ export default function EmployeesPage() {
     } finally {
       setIsLoadingEmployees(false);
     }
-  }, [user, user?.companyId, authIsLoading, toast]);
+  }, [user, authIsLoading, toast]);
 
   useEffect(() => {
     fetchEmployees();
@@ -194,9 +192,9 @@ export default function EmployeesPage() {
   }, [cleanupWebcam]);
 
   const handleFormSubmit = async (e: React.FormEvent) => {
-    e.preventDefault(); // Important if button is type="submit"
+    e.preventDefault();
     if (!user || !user.companyId) {
-      toast({ title: "Authentication Error", variant: "destructive" });
+      toast({ title: "Authentication Error", description: "User not authenticated.", variant: "destructive" });
       return;
     }
     if (!currentEmployee.name || !currentEmployee.position || currentEmployee.salary === undefined) {
@@ -206,7 +204,7 @@ export default function EmployeesPage() {
 
     const salaryNum = Number(currentEmployee.salary);
     if (isNaN(salaryNum) || salaryNum < 0) {
-        toast({ title: "Invalid Salary", variant: "destructive"});
+        toast({ title: "Invalid Salary", description: "Salary must be a non-negative number.", variant: "destructive"});
         return;
     }
 
@@ -217,21 +215,18 @@ export default function EmployeesPage() {
     let newAssociatedFileName = currentEmployee.associatedFileName || '';
     let newAssociatedFileStoragePath = currentEmployee.associatedFileStoragePath || '';
 
-    // Use existing ID if editing, otherwise generate a new one for path construction
     const employeeDocId = currentEmployee.id || doc(collection(db, 'employees')).id;
 
     try {
       if (profilePictureFile) {
-        // Delete old file if it exists and a new one is being uploaded
         if (isEditing && currentEmployee.profilePictureStoragePath) {
-          await deleteFileFromStorage(currentEmployee.profilePictureStoragePath).catch(err => console.warn("Old profile pic deletion failed (might not exist):", err));
+          await deleteFileFromStorage(currentEmployee.profilePictureStoragePath).catch(err => console.warn("Old profile pic deletion failed:", err));
         }
         const fileExtension = profilePictureFile.name.split('.').pop() || 'png';
         newProfilePicStoragePath = `employees/${user.companyId}/${employeeDocId}/profileImage.${fileExtension}`;
         newProfilePicUrl = await uploadFileToStorage(profilePictureFile, newProfilePicStoragePath);
       } else if (isEditing && currentEmployee.profilePictureUrl === undefined && currentEmployee.profilePictureStoragePath) {
-        // This means "Remove" was clicked and there was an existing image
-        await deleteFileFromStorage(currentEmployee.profilePictureStoragePath).catch(err => console.warn("Profile pic deletion failed (might not exist):", err));
+        await deleteFileFromStorage(currentEmployee.profilePictureStoragePath).catch(err => console.warn("Profile pic deletion failed:", err));
         newProfilePicUrl = '';
         newProfilePicStoragePath = '';
       }
@@ -251,7 +246,7 @@ export default function EmployeesPage() {
         newAssociatedFileStoragePath = '';
       }
 
-      const employeeDataToSave: Omit<EmployeeFirestore, 'id' | 'createdAt' | 'updatedAt'> = {
+      const employeeDataToSave: Omit<EmployeeFirestore, 'id' | 'createdAt' | 'updatedAt'> & {companyId: string} = {
         name: currentEmployee.name!,
         position: currentEmployee.position!,
         salary: salaryNum,
@@ -269,18 +264,8 @@ export default function EmployeesPage() {
         await updateDoc(employeeRef, { ...employeeDataToSave, updatedAt: serverTimestamp() });
         toast({ title: "Employee Updated" });
       } else {
-        // For new employee, use the pre-generated employeeDocId
         const newEmployeeRef = doc(db, 'employees', employeeDocId);
-        // Use setDoc with the new ref, or addDoc and then update if ID is needed before file paths.
-        // Simpler: use addDoc and let Firestore generate ID, then update with storage paths if needed,
-        // but paths depend on ID. So pre-generating ID or two-step save is better.
-        // For now, assume employeeDocId is what we'll use.
-        // If addDoc is preferred, upload logic needs to handle docRef.id after initial save.
-        // Let's stick to addDoc for simplicity and potentially update storage paths later if needed (more complex).
-        // For now, using employeeDocId might lead to empty docs if file upload fails.
-        // A safer way: save basic data, get ID, upload files, then update doc with URLs.
-        // Simplified: save all at once.
-        await addDoc(collection(db, 'employees'), { ...employeeDataToSave, createdAt: serverTimestamp() });
+        await setDoc(newEmployeeRef, { ...employeeDataToSave, createdAt: serverTimestamp() });
         toast({ title: "Employee Added" });
       }
       
@@ -320,7 +305,7 @@ export default function EmployeesPage() {
   };
 
   const confirmDeleteEmployee = async () => {
-    if (!employeeToDeleteId) return;
+    if (!employeeToDeleteId || !user || !user.companyId) return;
     setIsSaving(true);
     try {
       const employeeToDelete = employees.find(emp => emp.id === employeeToDeleteId);
@@ -354,7 +339,7 @@ export default function EmployeesPage() {
       const file = e.target.files[0];
       if (file.size > 5 * 1024 * 1024) { // 5MB limit
         toast({ title: "File Too Large", description: "Profile picture must be less than 5MB.", variant: "destructive"});
-        e.target.value = ""; // Reset file input
+        e.target.value = ""; 
         return;
       }
       setProfilePictureFile(file);
@@ -368,9 +353,9 @@ export default function EmployeesPage() {
   const handleAssociatedFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files[0]) {
       const file = e.target.files[0];
-       if (file.size > 10 * 1024 * 1024) { // 10MB limit for associated files
+       if (file.size > 10 * 1024 * 1024) { // 10MB limit
         toast({ title: "File Too Large", description: "Associated file must be less than 10MB.", variant: "destructive"});
-        e.target.value = ""; // Reset file input
+        e.target.value = "";
         return;
       }
       setAssociatedFile(file);
@@ -404,7 +389,6 @@ export default function EmployeesPage() {
     if (isEditing) {
         setCurrentEmployee(prev => ({...prev, profilePictureUrl: undefined, profilePictureStoragePath: prev.profilePictureStoragePath ? prev.profilePictureStoragePath : undefined }));
     }
-    toast({ title: "Profile picture selection cleared."});
   };
 
   const handleRemoveAssociatedFile = () => {
@@ -412,11 +396,22 @@ export default function EmployeesPage() {
      if (isEditing) {
         setCurrentEmployee(prev => ({...prev, associatedFileUrl: undefined, associatedFileName: undefined, associatedFileStoragePath: prev.associatedFileStoragePath ? prev.associatedFileStoragePath : undefined }));
     }
-    toast({ title: "Associated file selection cleared."});
   };
 
-  if (isLoadingEmployees && employees.length === 0 && authIsLoading) {
-    return ( <div className="flex items-center justify-center h-[calc(100vh-200px)]"><Loader2 className="h-12 w-12 animate-spin text-primary" /></div> );
+  if (authIsLoading) {
+    return ( <div className="flex items-center justify-center h-[calc(100vh-200px)]"><Loader2 className="h-12 w-12 animate-spin text-primary" /> <p className="ml-2">Loading authentication...</p></div> );
+  }
+
+  if (!user && !authIsLoading) {
+     return (
+      <div className="space-y-6">
+        <PageTitle title="Employees" subtitle="Manage your team members." icon={Users2} />
+        <Card className="shadow-lg">
+          <CardHeader><CardTitle>Access Denied</CardTitle></CardHeader>
+          <CardContent><p>Please sign in to manage employees.</p></CardContent>
+        </Card>
+      </div>
+    )
   }
 
 
@@ -534,7 +529,7 @@ export default function EmployeesPage() {
                 <div className="mt-1.5 space-y-1.5 p-2 border rounded-md bg-muted/30">
                   <video ref={videoRef} className="w-full aspect-[4/3] rounded-md bg-black" autoPlay muted playsInline />
                   {hasCameraPermission === false && (
-                    <Alert variant="destructive" className="p-2 text-xs"><Camera className="h-3.5 w-3.5"/><AlertTitle className="text-xs">Cam Access Denied</AlertTitle><AlertDescription className="text-xs">Enable in browser.</AlertDescription></Alert>
+                    <Alert variant="destructive" className="p-2 text-xs"><Camera className="h-3.5 w-3.5"/><AlertTitle className="text-xs">Cam Access Denied</AlertTitle><DialogDescription className="text-xs">Enable in browser.</DialogDescription></Alert>
                   )}
                   {hasCameraPermission === true && (
                     <Button type="button" onClick={handleCapturePhoto} className="w-full h-9 text-xs" disabled={isSaving}><Camera className="mr-1.5 h-3.5 w-3.5" /> Capture</Button>

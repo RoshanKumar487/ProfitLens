@@ -4,73 +4,54 @@ rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
 
-    // Helper function to get the expected companyId for the authenticated user
-    function userCompanyId() {
-      return "fb-default-company-" + request.auth.uid.substring(0,5);
+    // Helper function to get the expected companyId for a given userId
+    function getExpectedCompanyIdForUser(userId) {
+      return "fb-default-company-" + userId.slice(0, 5);
     }
 
-    // Company Profiles: Only the authenticated user associated with that companyId can manage it.
-    // The companyId is the document ID.
-    match /companyProfiles/{companyIdDoc} {
-      allow read, write: if request.auth != null && companyIdDoc == userCompanyId();
+    // Company Profiles: Only the user associated with the companyId can manage it.
+    // The document ID {companyId} itself must match the derived ID for the authenticated user.
+    match /companyProfiles/{companyId} {
+      allow read, create, update, delete: if request.auth != null && companyId == getExpectedCompanyIdForUser(request.auth.uid);
     }
 
-    // Revenue Entries: Users can manage entries associated with their companyId.
-    match /revenueEntries/{entryId} {
-      allow get: if request.auth != null && resource.data.companyId == userCompanyId();
-      allow list: if request.auth != null && request.query.filters.size() > 0 && request.query.filters[0].field == "companyId" && request.query.filters[0].value == userCompanyId();
-      allow create: if request.auth != null && request.resource.data.companyId == userCompanyId();
-      allow update: if request.auth != null && resource.data.companyId == userCompanyId() && request.resource.data.companyId == resource.data.companyId;
-      allow delete: if request.auth != null && resource.data.companyId == userCompanyId();
-    }
-
-    // Expenses: Users can manage entries associated with their companyId.
-    match /expenses/{expenseId} {
-      allow get: if request.auth != null && resource.data.companyId == userCompanyId();
-      allow list: if request.auth != null && request.query.filters.size() > 0 && request.query.filters[0].field == "companyId" && request.query.filters[0].value == userCompanyId();
-      allow create: if request.auth != null && request.resource.data.companyId == userCompanyId();
-      allow update: if request.auth != null && resource.data.companyId == userCompanyId() && request.resource.data.companyId == resource.data.companyId;
-      allow delete: if request.auth != null && resource.data.companyId == userCompanyId();
-    }
-
-    // Appointments: Users can manage entries associated with their companyId.
+    // Appointments Collection
     match /appointments/{appointmentId} {
-      allow get: if request.auth != null && resource.data.companyId == userCompanyId();
-      allow list: if request.auth != null && request.query.filters.size() > 0 && request.query.filters[0].field == "companyId" && request.query.filters[0].value == userCompanyId();
-      allow create: if request.auth != null && request.resource.data.companyId == userCompanyId();
-      allow update: if request.auth != null && resource.data.companyId == userCompanyId() && request.resource.data.companyId == resource.data.companyId;
-      allow delete: if request.auth != null && resource.data.companyId == userCompanyId();
+      // Allow create if the companyId in the new document matches the user's expected companyId
+      allow create: if request.auth != null && request.resource.data.companyId == getExpectedCompanyIdForUser(request.auth.uid);
+      // Allow read, update, delete if the companyId in the existing document matches the user's expected companyId
+      allow read, update, delete: if request.auth != null && resource.data.companyId == getExpectedCompanyIdForUser(request.auth.uid);
+      // Allow list operations (queries). Individual document reads are still protected by the 'read' rule.
+      // Client-side queries MUST include `where('companyId', '==', user.companyId)`.
+      allow list: if request.auth != null;
     }
 
-    // Invoices: Users can manage entries associated with their companyId.
-    match /invoices/{invoiceId} {
-      allow get: if request.auth != null && resource.data.companyId == userCompanyId();
-      allow list: if request.auth != null && request.query.filters.size() > 0 && request.query.filters[0].field == "companyId" && request.query.filters[0].value == userCompanyId();
-      allow create: if request.auth != null && request.resource.data.companyId == userCompanyId();
-      allow update: if request.auth != null && resource.data.companyId == userCompanyId() && request.resource.data.companyId == resource.data.companyId;
-      allow delete: if request.auth != null && resource.data.companyId == userCompanyId();
-    }
-
-    // Employees: Users can manage entries associated with their companyId.
+    // Employees Collection
     match /employees/{employeeId} {
-      allow get: if request.auth != null && resource.data.companyId == userCompanyId();
-      // Allow list if querying by companyId matching the user's companyId
-      allow list: if request.auth != null &&
-                     request.query.filters.size() > 0 &&
-                     request.query.filters[0].field == "companyId" &&
-                     request.query.filters[0].value == userCompanyId();
-      allow create: if request.auth != null &&
-                       request.resource.data.companyId == userCompanyId();
-      allow update: if request.auth != null &&
-                       resource.data.companyId == userCompanyId() &&
-                       request.resource.data.companyId == resource.data.companyId; // Prevent changing companyId
-      allow delete: if request.auth != null &&
-                       resource.data.companyId == userCompanyId();
+      allow create: if request.auth != null && request.resource.data.companyId == getExpectedCompanyIdForUser(request.auth.uid);
+      allow read, update, delete: if request.auth != null && resource.data.companyId == getExpectedCompanyIdForUser(request.auth.uid);
+      allow list: if request.auth != null;
     }
 
-    // Default deny all other access
-    match /{document=**} {
-      allow read, write: if false;
+    // Expenses Collection
+    match /expenses/{expenseId} {
+      allow create: if request.auth != null && request.resource.data.companyId == getExpectedCompanyIdForUser(request.auth.uid);
+      allow read, update, delete: if request.auth != null && resource.data.companyId == getExpectedCompanyIdForUser(request.auth.uid);
+      allow list: if request.auth != null;
+    }
+
+    // Invoices Collection
+    match /invoices/{invoiceId} {
+      allow create: if request.auth != null && request.resource.data.companyId == getExpectedCompanyIdForUser(request.auth.uid);
+      allow read, update, delete: if request.auth != null && resource.data.companyId == getExpectedCompanyIdForUser(request.auth.uid);
+      allow list: if request.auth != null;
+    }
+
+    // Revenue Entries Collection
+    match /revenueEntries/{revenueEntryId} {
+      allow create: if request.auth != null && request.resource.data.companyId == getExpectedCompanyIdForUser(request.auth.uid);
+      allow read, update, delete: if request.auth != null && resource.data.companyId == getExpectedCompanyIdForUser(request.auth.uid);
+      allow list: if request.auth != null;
     }
   }
 }

@@ -65,6 +65,7 @@ export default function CompanyDetailsPage() {
           console.log("CompanyDetails: Fetched details for companyId:", user.companyId);
         } else {
           console.log("CompanyDetails: No details found for companyId:", user.companyId, ". Initializing empty form.");
+          // Initialize with empty strings to ensure controlled components
           setCompanyDetails({ name: '', address: '', gstin: '', phone: '', email: '', website: '' });
         }
       } catch (error: any) {
@@ -101,13 +102,19 @@ export default function CompanyDetailsPage() {
     setIsSaving(true);
     try {
       const docRef = doc(db, 'companyProfiles', user.companyId);
+      // Ensure all optional fields are at least empty strings if not provided
       const detailsToSave: CompanyDetailsFirestore = {
-        ...companyDetails,
+        name: companyDetails.name || '',
+        address: companyDetails.address || '',
+        gstin: companyDetails.gstin || '',
+        phone: companyDetails.phone || '',
+        email: companyDetails.email || '',
+        website: companyDetails.website || '',
         updatedAt: Timestamp.now(),
       };
       await setDoc(docRef, detailsToSave, { merge: true }); 
       
-      setCompanyDetails(detailsToSave); // Update local state with updatedAt
+      setCompanyDetails(detailsToSave); // Update local state with updatedAt and ensured strings
       toast({
         title: 'Details Saved',
         description: 'Company information updated successfully in Firestore.',
@@ -148,6 +155,24 @@ export default function CompanyDetailsPage() {
       </div>
     );
   }
+
+  if (!user && !authIsLoading) {
+    return (
+       <div className="space-y-6">
+        <PageTitle title="Company Details" subtitle="Manage your business information." icon={Building} />
+        <Card className="shadow-lg max-w-2xl mx-auto">
+          <CardHeader>
+            <CardTitle className="font-headline">Access Denied</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <p>Please sign in to manage your company details.</p>
+            {/* Optionally, add a sign-in button/link here */}
+          </CardContent>
+        </Card>
+      </div>
+    )
+  }
+
 
   return (
     <div className="space-y-6">

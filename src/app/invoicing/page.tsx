@@ -43,7 +43,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { Calendar } from '@/components/ui/calendar';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent, CardHeader, CardTitle, CardDescription as CardDesc } from '@/components/ui/card'; // Renamed CardDescription
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { useAuth } from '@/contexts/AuthContext';
 import { collection, addDoc, getDocs, doc, updateDoc, deleteDoc, query, where, orderBy, Timestamp, serverTimestamp, getDoc } from 'firebase/firestore';
@@ -52,7 +52,7 @@ import { cn } from '@/lib/utils';
 import jsPDF from 'jspdf';
 import html2canvas from 'html2canvas';
 import Image from 'next/image';
-import { sendInvoiceEmailAction } from './actions'; // Import the Server Action
+import { sendInvoiceEmailAction } from './actions'; 
 
 interface InvoiceItem {
   id: string;
@@ -98,7 +98,7 @@ interface CompanyDetailsFirestore {
   website: string;
 }
 
-const LOCAL_STORAGE_EMAIL_TEMPLATE_KEY = 'bizsight-invoice-email-template-v2'; // Updated key for new structure
+const LOCAL_STORAGE_EMAIL_TEMPLATE_KEY = 'bizsight-invoice-email-template-v2';
 
 const DEFAULT_EMAIL_SUBJECT_TEMPLATE = "Invoice {{invoiceNumber}} from {{companyName}}";
 
@@ -133,7 +133,7 @@ export default function InvoicingPage() {
   const [invoiceForEmail, setInvoiceForEmail] = useState<InvoiceDisplay | null>(null);
   const [emailRecipient, setEmailRecipient] = useState('');
   const [emailSubject, setEmailSubject] = useState('');
-  const [emailBodyUserText, setEmailBodyUserText] = useState(''); // Stores plain text for user editing
+  const [emailBodyUserText, setEmailBodyUserText] = useState('');
   const [isSendingEmail, setIsSendingEmail] = useState(false);
   
   const [companyProfileDetails, setCompanyProfileDetails] = useState<CompanyDetailsFirestore | null>(null);
@@ -178,8 +178,11 @@ export default function InvoicingPage() {
   }, [user, toast]);
 
   useEffect(() => {
-    if (!authIsLoading) {
+    if (!authIsLoading && user) {
       fetchCompanyProfile();
+    } else if (!authIsLoading && !user) {
+        setIsFetchingCompanyProfile(false);
+        setCompanyProfileDetails(null);
     }
   }, [user, authIsLoading, fetchCompanyProfile]);
 
@@ -216,15 +219,15 @@ export default function InvoicingPage() {
       setInvoices(fetchedInvoices);
 
       const clientsMap = new Map<string, ExistingClient>();
-      for (let i = fetchedInvoices.length - 1; i >= 0; i--) {
-        const inv = fetchedInvoices[i];
+      fetchedInvoices.forEach(inv => {
         if (inv.clientName) {
-          clientsMap.set(inv.clientName.toLowerCase(), { 
-            name: inv.clientName, 
-            email: inv.clientEmail || clientsMap.get(inv.clientName.toLowerCase())?.email 
-          });
+            const existingEntry = clientsMap.get(inv.clientName.toLowerCase());
+            clientsMap.set(inv.clientName.toLowerCase(), { 
+                name: inv.clientName, 
+                email: inv.clientEmail || existingEntry?.email || '' 
+            });
         }
-      }
+      });
       setExistingClients(Array.from(clientsMap.values()));
 
     } catch (error: any) {
@@ -254,7 +257,7 @@ export default function InvoicingPage() {
       return;
     }
     fetchInvoices();
-  }, [user, user?.companyId, authIsLoading, fetchInvoices]);
+  }, [user, authIsLoading, fetchInvoices]);
 
 
   const filteredInvoices = useMemo(() => {
@@ -309,7 +312,7 @@ export default function InvoicingPage() {
       dueDate: dueDateForFirestore,
       status: currentInvoice.status || 'Draft',
       items: currentInvoice.items || [],
-      notes: currentInvoice.notes || '',
+      notes: currentInvoice.notes || '', // Ensure notes is a string
       companyId: user.companyId,
     };
 
@@ -375,7 +378,7 @@ export default function InvoicingPage() {
   };
 
   const confirmDeleteInvoice = async () => {
-    if (invoiceToDeleteId) {
+    if (invoiceToDeleteId && user && user.companyId) {
         setIsSaving(true);
         try {
             const invoiceRef = doc(db, 'invoices', invoiceToDeleteId);
@@ -651,13 +654,9 @@ export default function InvoicingPage() {
     }
     setIsSendingEmail(true);
 
-    // Convert user's plain text to basic HTML
     const userTextHtml = `<div style="white-space: pre-wrap; margin-bottom: 20px;">${emailBodyUserText.replace(/\n/g, '<br>')}</div>`;
-    
-    // Get the full HTML representation of the invoice
     const invoiceDetailsHtml = generateInvoiceHTMLForEmail(invoiceForEmail, companyProfileDetails);
 
-    // Combine them
     const fullEmailHtmlBody = `
       <html>
         <head>
@@ -703,14 +702,14 @@ export default function InvoicingPage() {
   const handleSaveTemplate = () => {
     localStorage.setItem(LOCAL_STORAGE_EMAIL_TEMPLATE_KEY, JSON.stringify({ 
         subject: emailSubject, 
-        bodyUserText: emailBodyUserText // Save the plain text
+        bodyUserText: emailBodyUserText
     }));
     toast({ title: "Template Saved", description: "Your current email subject and plain text body are saved as default."});
   };
 
   const handleRevertToDefaultTemplate = () => {
     if (invoiceForEmail) {
-        loadAndPrepareEmailTemplate(invoiceForEmail, true); // Pass true to use hardcoded defaults
+        loadAndPrepareEmailTemplate(invoiceForEmail, true);
         toast({ title: "Template Reset", description: "Email content reset to the original default."});
     }
   };
@@ -750,14 +749,14 @@ export default function InvoicingPage() {
     }
   }, [currentInvoice.items]);
 
+
   const handleClientNameInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const typedValue = e.target.value;
     setCurrentInvoice(prev => ({
       ...prev,
       clientName: typedValue,
-      // Email is NOT updated here
     }));
-    if (typedValue.trim() !== '' || existingClients.length > 0) {
+    if (typedValue || existingClients.length > 0) {
       setIsClientPopoverOpen(true);
     } else {
       setIsClientPopoverOpen(false);
@@ -768,12 +767,12 @@ export default function InvoicingPage() {
     setCurrentInvoice(prev => ({
       ...prev,
       clientName: client.name,
-      clientEmail: client.email || '', // Populate email when suggestion is clicked
+      clientEmail: client.email || '',
     }));
     setIsClientPopoverOpen(false);
-    clientNameInputRef.current?.focus(); // Or next field
+    clientNameInputRef.current?.focus();
   };
-
+  
   const handleClientNameInputFocus = () => {
     if (currentInvoice.clientName || existingClients.length > 0) {
       setIsClientPopoverOpen(true);
@@ -808,12 +807,25 @@ export default function InvoicingPage() {
   }, [currentInvoice.clientName, existingClients]);
 
 
-  if (isLoading && invoices.length === 0 && !authIsLoading) {
+  if (authIsLoading) {
     return (
       <div className="flex items-center justify-center h-[calc(100vh-200px)]">
         <Loader2 className="h-12 w-12 animate-spin text-primary" />
+        <p className="ml-2">Loading authentication...</p>
       </div>
     );
+  }
+
+  if (!user && !authIsLoading) {
+     return (
+      <div className="space-y-6">
+        <PageTitle title="Invoicing" subtitle="Manage your customer invoices efficiently." icon={Receipt} />
+        <Card className="shadow-lg">
+          <CardHeader><CardTitle>Access Denied</CardTitle></CardHeader>
+          <CardContent><p>Please sign in to manage invoices.</p></CardContent>
+        </Card>
+      </div>
+    )
   }
 
 
@@ -906,7 +918,6 @@ export default function InvoicingPage() {
         </CardContent>
       </Card>
 
-      {/* Invoice Form Dialog */}
       <Dialog open={isFormOpen} onOpenChange={(open) => { setIsFormOpen(open); if (!open) { setCurrentInvoice({}); setIsEditing(false); setIsClientPopoverOpen(false); } }}>
         <DialogContent className="sm:max-w-2xl max-h-[90vh] flex flex-col">
           <DialogHeader>
@@ -917,7 +928,6 @@ export default function InvoicingPage() {
           </DialogHeader>
           <form onSubmit={handleFormSubmit} id="invoice-form-explicit" className="space-y-4 overflow-y-auto flex-grow p-1 pr-3">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                
                 <div className="relative">
                   <Label htmlFor="clientName">Client Name</Label>
                   <Popover open={isClientPopoverOpen} onOpenChange={setIsClientPopoverOpen}>
@@ -1074,7 +1084,6 @@ export default function InvoicingPage() {
         </DialogContent>
       </Dialog>
 
-      {/* View Invoice Dialog */}
       <Dialog open={isViewInvoiceDialogOpen} onOpenChange={(open) => { setIsViewInvoiceDialogOpen(open); if (!open) setInvoiceToView(null); }}>
         <DialogContent className="sm:max-w-4xl max-h-[90vh] flex flex-col p-0">
           <DialogHeader className="p-6 pb-0">
@@ -1089,7 +1098,6 @@ export default function InvoicingPage() {
               {isFetchingCompanyProfile && <div className="text-center p-10"><Loader2 className="h-8 w-8 animate-spin text-primary mx-auto" /> <p>Loading company details...</p></div>}
               {!isFetchingCompanyProfile && invoiceToView && companyProfileDetails && (
                 <>
-                  {/* Invoice Header */}
                   <header className="mb-8">
                     <div className="grid grid-cols-2 gap-8 items-start">
                       <div>
@@ -1113,14 +1121,12 @@ export default function InvoicingPage() {
                     </div>
                   </header>
 
-                  {/* Client Details */}
                   <section className="mb-8 p-4 bg-muted/30 rounded-lg">
                     <h3 className="text-lg font-semibold text-foreground mb-2">Bill To:</h3>
                     <p className="font-medium text-foreground">{invoiceToView.clientName}</p>
                     {invoiceToView.clientEmail && <p className="text-sm text-muted-foreground">{invoiceToView.clientEmail}</p>}
                   </section>
 
-                  {/* Items Table */}
                   <section className="mb-8">
                     <Table className="border">
                       <TableHeader className="bg-muted/50">
@@ -1189,8 +1195,6 @@ export default function InvoicingPage() {
         </DialogContent>
       </Dialog>
 
-
-      {/* Email Preview Dialog */}
       <Dialog open={isEmailPreviewDialogOpen} onOpenChange={(open) => { setIsEmailPreviewDialogOpen(open); if (!open) setInvoiceForEmail(null); }}>
         <DialogContent className="sm:max-w-2xl max-h-[90vh] flex flex-col">
           <DialogHeader>
@@ -1241,8 +1245,6 @@ export default function InvoicingPage() {
         </DialogContent>
       </Dialog>
 
-
-      {/* Delete Invoice Alert Dialog */}
       <AlertDialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>
         <AlertDialogContent>
           <AlertDialogHeader>
@@ -1263,4 +1265,3 @@ export default function InvoicingPage() {
     </div>
   );
 }
-
