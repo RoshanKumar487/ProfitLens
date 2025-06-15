@@ -66,8 +66,8 @@ interface InvoiceFirestore {
   issuedDate: Timestamp;
   items?: InvoiceItem[];
   notes?: string;
-  companyId: string; 
-  createdAt: Timestamp; 
+  companyId: string;
+  createdAt: Timestamp;
 }
 
 interface InvoiceDisplay extends Omit<InvoiceFirestore, 'dueDate' | 'issuedDate' | 'createdAt' | 'companyId' | 'items'> {
@@ -132,7 +132,7 @@ export default function InvoicingPage() {
   const [companyNameForEmail, setCompanyNameForEmail] = useState("Your Company");
 
   const [isLoading, setIsLoading] = useState(true);
-  const [isSaving, setIsSaving] = useState(false); 
+  const [isSaving, setIsSaving] = useState(false);
 
   const [existingClientNames, setExistingClientNames] = useState<string[]>([]);
   const [isClientPopoverOpen, setIsClientPopoverOpen] = useState(false);
@@ -147,12 +147,12 @@ export default function InvoicingPage() {
       setIsLoading(false);
       return;
     }
-    setIsLoading(true); 
+    setIsLoading(true);
     try {
       const invoicesColRef = collection(db, 'invoices');
       const q = query(invoicesColRef, where('companyId', '==', user.companyId), orderBy('createdAt', 'desc'));
       const querySnapshot = await getDocs(q);
-      
+
       const fetchedInvoices = querySnapshot.docs.map(docSnap => {
         const data = docSnap.data() as Omit<InvoiceFirestore, 'id'>;
         return {
@@ -179,12 +179,12 @@ export default function InvoicingPage() {
         description: `Could not load invoices. ${error.message || 'An unknown error occurred.'}`,
         variant: 'destructive',
       });
-      setInvoices([]); 
+      setInvoices([]);
       setExistingClientNames([]);
     } finally {
       setIsLoading(false);
     }
-  }, [user, toast]); 
+  }, [user, toast]);
 
 
   useEffect(() => {
@@ -239,7 +239,7 @@ export default function InvoicingPage() {
   const getStatusBadgeVariant = (status: InvoiceDisplay['status']) => {
     switch (status) {
       case 'Paid':
-        return 'default'; 
+        return 'default';
       case 'Pending':
         return 'secondary';
       case 'Overdue':
@@ -250,14 +250,14 @@ export default function InvoicingPage() {
         return 'outline';
     }
   };
-  
+
   const handleFormSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!user || !user.companyId) {
       toast({ title: "Authentication Error", description: "User not authenticated. Please sign in.", variant: "destructive" });
       return;
     }
-    if (!currentInvoice.clientName || currentInvoice.amount === undefined || !currentInvoice.issuedDate || !currentInvoice.dueDate) { 
+    if (!currentInvoice.clientName || currentInvoice.amount === undefined || !currentInvoice.issuedDate || !currentInvoice.dueDate) {
         toast({ title: "Missing Fields", description: "Please fill all required invoice details (Client Name, Amount, Issued Date, Due Date).", variant: "destructive" });
         return;
     }
@@ -288,7 +288,7 @@ export default function InvoicingPage() {
         const invoiceRef = doc(db, 'invoices', currentInvoice.id);
         await updateDoc(invoiceRef, {
             ...invoiceDataToSaveCore,
-            invoiceNumber: currentInvoice.invoiceNumber!, 
+            invoiceNumber: currentInvoice.invoiceNumber!,
         });
         toast({ title: "Invoice Updated", description: `Invoice ${currentInvoice.invoiceNumber} updated successfully.` });
       } else {
@@ -301,7 +301,7 @@ export default function InvoicingPage() {
         });
         toast({ title: "Invoice Created", description: `Invoice ${newInvoiceNumber} created successfully.` });
       }
-      fetchInvoices(); 
+      fetchInvoices();
       setIsFormOpen(false);
       setCurrentInvoice({});
       setIsEditing(false);
@@ -314,15 +314,15 @@ export default function InvoicingPage() {
   };
 
   const handleCreateNew = () => {
-    setCurrentInvoice({ 
-        issuedDate: new Date(), 
-        dueDate: new Date(new Date().setDate(new Date().getDate() + 30)), 
-        status: 'Draft', 
-        items: [], 
+    setCurrentInvoice({
+        issuedDate: new Date(),
+        dueDate: new Date(new Date().setDate(new Date().getDate() + 30)),
+        status: 'Draft',
+        items: [],
         amount: 0,
         invoiceNumber: `INV${(Date.now()).toString().slice(-6)}`,
-        clientName: '', 
-        clientEmail: '', 
+        clientName: '',
+        clientEmail: '',
     });
     setIsEditing(false);
     setIsFormOpen(true);
@@ -346,7 +346,7 @@ export default function InvoicingPage() {
             const invoiceRef = doc(db, 'invoices', invoiceToDeleteId);
             await deleteDoc(invoiceRef);
             toast({ title: "Invoice Deleted", description: "The invoice has been removed."});
-            fetchInvoices(); 
+            fetchInvoices();
             setInvoiceToDeleteId(null);
         } catch (error: any) {
             console.error("Error deleting invoice: ", error);
@@ -357,7 +357,7 @@ export default function InvoicingPage() {
     }
     setIsDeleteDialogOpen(false);
   };
-  
+
   const handleViewInvoice = (invoice: InvoiceDisplay) => {
     const issuedDateStr = format(invoice.issuedDate, 'PP');
     const dueDateStr = format(invoice.dueDate, 'PP');
@@ -374,7 +374,7 @@ export default function InvoicingPage() {
       Items:
       ${(invoice.items || []).map(item => `- ${item.description} (Qty: ${item.quantity}, Price: $${item.unitPrice.toFixed(2)})`).join('\n      ') || '  No items detailed.'}
     `;
-    alert(invoiceDetails); 
+    alert(invoiceDetails);
   };
 
   const loadAndPrepareEmailTemplate = (invoice: InvoiceDisplay, useDefault: boolean = false) => {
@@ -390,7 +390,7 @@ export default function InvoicingPage() {
             }
         }
     }
-    
+
     let processedSubject = template.subject;
     let processedBody = template.body;
     const dueDateFormatted = format(invoice.dueDate, 'PPP');
@@ -410,7 +410,7 @@ export default function InvoicingPage() {
     setEmailSubject(processedSubject);
     setEmailBody(processedBody);
   };
-  
+
   const handleOpenEmailDialog = (invoice: InvoiceDisplay) => {
     if (!invoice.clientEmail) {
         toast({ title: "Missing Client Email", description: "Cannot send email without client's email address.", variant: "destructive"});
@@ -438,10 +438,10 @@ export default function InvoicingPage() {
     localStorage.setItem(LOCAL_STORAGE_EMAIL_TEMPLATE_KEY, JSON.stringify(currentTemplateText));
     toast({ title: "Template Saved", description: "Your current email content is saved as the default template."});
   };
-  
+
   const handleRevertToDefaultTemplate = () => {
     if (invoiceForEmail) {
-        loadAndPrepareEmailTemplate(invoiceForEmail, true); 
+        loadAndPrepareEmailTemplate(invoiceForEmail, true);
         toast({ title: "Template Reset", description: "Email content reset to the original default."});
     }
   };
@@ -451,7 +451,7 @@ export default function InvoicingPage() {
     const issuedDateFormatted = format(invoice.issuedDate, 'yyyy-MM-dd');
     const dueDateFormatted = format(invoice.dueDate, 'yyyy-MM-dd');
 
-    let companyDetailsHtml = `
+    let companyDetailsHtmlSection = `
       <div style="text-align: right; margin-bottom: 20px;">
         <h1 style="color: #333; margin:0; font-size: 28px;">INVOICE</h1>
         <p style="margin: 2px 0;"><strong>Invoice #:</strong> ${invoice.invoiceNumber}</p>
@@ -460,7 +460,7 @@ export default function InvoicingPage() {
         <p style="margin: 2px 0;"><strong>Status:</strong> ${invoice.status}</p>
       </div>
     `;
-    
+
     let fromCompanyHtml = `<p><strong>From:</strong><br>${companyNameForEmail}</p>`;
     if (user && user.companyId) {
         try {
@@ -528,7 +528,7 @@ export default function InvoicingPage() {
         <p style="white-space: pre-wrap; font-size: 0.9em; color: #555;">${invoice.notes}</p>
       </div>
     ` : '';
-    
+
     const footerHtml = `
         <div style="text-align: center; margin-top: 30px; padding-top: 15px; border-top: 1px solid #eee; font-size: 0.9em; color: #777;">
             <p>Thank you for your business!</p>
@@ -547,7 +547,7 @@ export default function InvoicingPage() {
           body { font-family: 'PT Sans', Arial, sans-serif; margin: 0; padding: 0; background-color: #f9f9f9; color: #333; }
           .invoice-container { max-width: 800px; margin: 20px auto; padding: 20px; background-color: #fff; border: 1px solid #ddd; box-shadow: 0 0 10px rgba(0,0,0,0.05); }
           .header-section { display: flex; justify-content: space-between; align-items: flex-start; padding-bottom: 20px; border-bottom: 1px solid #eee; }
-          .company-logo img { max-width: 150px; max-height: 70px; } /* Placeholder for logo */
+          .company-logo img { max-width: 150px; max-height: 70px; }
           .details-section { display: flex; justify-content: space-between; margin-top: 20px; }
           .details-section > div { width: 48%; }
           p { line-height: 1.6; }
@@ -561,7 +561,7 @@ export default function InvoicingPage() {
               <!-- <img src="https://placehold.co/150x70.png?text=Your+Logo" alt="Company Logo" data-ai-hint="logo placeholder" /> -->
               <h2 style="color: #333; margin:0;">${companyNameForEmail}</h2>
             </div>
-            ${companyDetailsHtml}
+            ${companyDetailsHtmlSection}
           </div>
           <div class="details-section">
             <div>${fromCompanyHtml}</div>
@@ -605,7 +605,7 @@ export default function InvoicingPage() {
         return { ...prev, items: updatedItems };
     });
   };
-  
+
   const handleRemoveItem = (itemId: string) => {
      setCurrentInvoice(prev => ({
       ...prev,
@@ -625,7 +625,7 @@ export default function InvoicingPage() {
   }, [currentInvoice.items]);
 
 
-  if (isLoading && invoices.length === 0 && !authIsLoading) { 
+  if (isLoading && invoices.length === 0 && !authIsLoading) {
     return (
       <div className="flex items-center justify-center h-[calc(100vh-200px)]">
         <Loader2 className="h-12 w-12 animate-spin text-primary" />
@@ -654,13 +654,13 @@ export default function InvoicingPage() {
                 className="pl-8 sm:w-[250px] md:w-[300px]"
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
-                disabled={isLoading && invoices.length === 0} 
+                disabled={isLoading && invoices.length === 0}
               />
             </div>
           </div>
         </CardHeader>
         <CardContent>
-          {isLoading && invoices.length > 0 && ( 
+          {isLoading && invoices.length > 0 && (
             <div className="flex justify-center py-4">
               <Loader2 className="h-6 w-6 animate-spin text-primary" />
               <span className="ml-2">Refreshing invoices...</span>
@@ -729,7 +729,7 @@ export default function InvoicingPage() {
           </DialogHeader>
           <form onSubmit={handleFormSubmit} id="invoice-form-explicit" className="space-y-4 overflow-y-auto flex-grow p-1 pr-3">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                
+
                 <div>
                   <Label htmlFor="clientName">Client Name</Label>
                   <Popover open={isClientPopoverOpen} onOpenChange={setIsClientPopoverOpen}>
@@ -747,19 +747,18 @@ export default function InvoicingPage() {
                           if (typedValue || existingClientNames.length > 0) {
                             setIsClientPopoverOpen(true);
                           } else {
-                            setIsClientPopoverOpen(false); 
+                            setIsClientPopoverOpen(false);
                           }
                         }}
                         onFocus={() => {
-                            // Open popover on focus if there's text or existing clients to show
-                            if (currentInvoice.clientName || existingClientNames.length > 0) {
+                            if (existingClientNames.length > 0 || currentInvoice.clientName) {
                                 setIsClientPopoverOpen(true);
                             }
                         }}
                         onBlur={() => {
                           setTimeout(() => {
                             if (popoverContentRef.current && popoverContentRef.current.contains(document.activeElement)) {
-                              return; 
+                              return;
                             }
                             if (clientNameInputRef.current && clientNameInputRef.current === document.activeElement) {
                                 return;
@@ -774,37 +773,37 @@ export default function InvoicingPage() {
                       />
                     </PopoverTrigger>
                     {isClientPopoverOpen && (
-                      <PopoverContent 
-                        ref={popoverContentRef} 
-                        className="w-[--radix-popover-trigger-width] p-0" 
+                      <PopoverContent
+                        ref={popoverContentRef}
+                        className="w-[--radix-popover-trigger-width] p-0"
                         align="start"
-                        onOpenAutoFocus={(e) => e.preventDefault()} // Prevent auto-focus on first item
+                        onOpenAutoFocus={(e) => e.preventDefault()}
                       >
                         <div className="max-h-48 overflow-y-auto rounded-md border bg-popover text-popover-foreground shadow-md">
                           {(() => {
                             const currentSearchTerm = (currentInvoice.clientName || '').toLowerCase();
                             const filteredClients = currentSearchTerm
                               ? existingClientNames.filter(name => name.toLowerCase().includes(currentSearchTerm))
-                              : existingClientNames; // Show all if search term is empty
+                              : existingClientNames;
 
                             if (filteredClients.length > 0) {
                               return filteredClients.map(name => (
                                 <div
                                   key={name}
                                   className="p-2 hover:bg-accent hover:text-accent-foreground cursor-pointer text-sm"
-                                  onMouseDown={() => { // Use onMouseDown to fire before blur
+                                  onMouseDown={() => {
                                     const clientInvoices = invoices.filter(inv => inv.clientName === name);
-                                    const latestEmail = clientInvoices.length > 0 
-                                        ? clientInvoices.sort((a,b) => b.issuedDate.getTime() - a.issuedDate.getTime())[0]?.clientEmail 
+                                    const latestEmail = clientInvoices.length > 0
+                                        ? clientInvoices.sort((a,b) => b.issuedDate.getTime() - a.issuedDate.getTime())[0]?.clientEmail
                                         : '';
-                                    
-                                    setCurrentInvoice(prev => ({ 
-                                        ...prev, 
-                                        clientName: name, 
-                                        clientEmail: latestEmail || '' 
+
+                                    setCurrentInvoice(prev => ({
+                                        ...prev,
+                                        clientName: name,
+                                        clientEmail: latestEmail || ''
                                     }));
                                     setIsClientPopoverOpen(false);
-                                    clientNameInputRef.current?.focus(); // Refocus input
+                                    clientNameInputRef.current?.focus();
                                   }}
                                 >
                                   {name}
@@ -821,7 +820,7 @@ export default function InvoicingPage() {
                       </PopoverContent>
                     )}
                   </Popover>
-                  {currentInvoice.clientName && !existingClientNames.includes(currentInvoice.clientName) && !isLoading && (
+                  {currentInvoice.clientName && !isLoading && !existingClientNames.includes(currentInvoice.clientName) && (
                     <p className="text-xs text-muted-foreground mt-1">
                       <Briefcase className="inline h-3 w-3 mr-1" /> New client: "{currentInvoice.clientName}" will be added.
                     </p>
@@ -830,12 +829,12 @@ export default function InvoicingPage() {
 
                 <div>
                     <Label htmlFor="clientEmail">Client Email (Optional)</Label>
-                    <Input 
-                        id="clientEmail" 
-                        type="email" 
-                        value={currentInvoice.clientEmail || ''} 
-                        onChange={(e) => setCurrentInvoice({ ...currentInvoice, clientEmail: e.target.value })} 
-                        disabled={isSaving} 
+                    <Input
+                        id="clientEmail"
+                        type="email"
+                        value={currentInvoice.clientEmail || ''}
+                        onChange={(e) => setCurrentInvoice({ ...currentInvoice, clientEmail: e.target.value })}
+                        disabled={isSaving}
                     />
                 </div>
                  <div>
@@ -879,7 +878,7 @@ export default function InvoicingPage() {
                   </Select>
                 </div>
             </div>
-            
+
             <div className="space-y-2 pt-2">
               <div className="flex justify-between items-center">
                 <Label>Invoice Items</Label>
