@@ -1,3 +1,4 @@
+
 import type { LucideIcon } from 'lucide-react';
 import { LayoutDashboard, CalendarDays, TrendingUp, TrendingDown, Sparkles, Receipt } from 'lucide-react';
 

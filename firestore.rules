@@ -1,0 +1,30 @@
+
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // Allow read/write access to authenticated users for development.
+    // IMPORTANT: Secure these rules properly before deploying to production.
+    // You should restrict access based on user UID and companyId.
+    match /{document=**} {
+      allow read, write: if request.auth != null;
+    }
+
+    // Example for more specific rules:
+    // match /companyProfiles/{companyId} {
+    //   allow read, write: if request.auth != null && request.auth.token.companyId == companyId;
+    // }
+    // match /users/{userId} {
+    //  allow read, write: if request.auth != null && request.auth.uid == userId;
+    // }
+    // match /expenses/{expenseId} {
+    //   allow read, write: if request.auth != null && resource.data.companyId == request.auth.token.companyId;
+    // }
+    // match /invoices/{invoiceId} {
+    //   allow read, write: if request.auth != null && resource.data.companyId == request.auth.token.companyId;
+    // }
+    // match /employees/{employeeId} {
+    //   allow read, write: if request.auth != null && resource.data.companyId == request.auth.token.companyId;
+    // }
+  }
+}

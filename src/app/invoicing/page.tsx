@@ -620,4 +620,3 @@ export default function InvoicingPage() {
     </div>
   );
 }
-
