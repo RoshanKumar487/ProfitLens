@@ -16,7 +16,7 @@ import {
 } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger, DropdownMenuSeparator } from '@/components/ui/dropdown-menu';
-import { Receipt, PlusCircle, Search, MoreHorizontal, Edit, Trash2, Eye, Mail, Download, Calendar as CalendarIconLucide, Save, Loader2, UserPlus, Printer, FileDown } from 'lucide-react';
+import { Receipt, PlusCircle, Search, MoreHorizontal, Edit, Trash2, Eye, Mail, FileDown, Calendar as CalendarIconLucide, Save, Loader2, UserPlus, Printer } from 'lucide-react';
 import { format } from 'date-fns';
 import { useToast } from '@/hooks/use-toast';
 import {
@@ -52,6 +52,7 @@ import { cn } from '@/lib/utils';
 import jsPDF from 'jspdf';
 import html2canvas from 'html2canvas';
 import Image from 'next/image';
+import { sendInvoiceEmailAction } from './actions'; // Import the Server Action
 
 interface InvoiceItem {
   id: string;
@@ -85,7 +86,7 @@ interface InvoiceDisplay extends Omit<InvoiceFirestore, 'dueDate' | 'issuedDate'
 
 interface ExistingClient {
   name: string;
-  email?: string; // The latest email found for this client
+  email?: string; 
 }
 
 interface CompanyDetailsFirestore {
@@ -97,31 +98,19 @@ interface CompanyDetailsFirestore {
   website: string;
 }
 
-interface EmailTemplate {
-  subject: string;
-  body: string;
-}
-
 const LOCAL_STORAGE_EMAIL_TEMPLATE_KEY = 'bizsight-invoice-email-template';
 
-const DEFAULT_EMAIL_TEMPLATE: EmailTemplate = {
-  subject: "Invoice {{invoiceNumber}} from {{companyName}}",
-  body: `Dear {{clientName}},
-
-Please find details for invoice {{invoiceNumber}} regarding your recent services/products.
-
-Amount: $ {{amount}}
-Due Date: {{dueDate}}
-
-A PDF of Invoice {{invoiceNumber}} would be attached to this email in a fully integrated system.
-This email is sent via a mailto link and cannot attach files directly.
-
-Thank you for your business!
-
-Sincerely,
-{{companyName}}`
-};
-
+const DEFAULT_EMAIL_SUBJECT_TEMPLATE = "Invoice {{invoiceNumber}} from {{companyName}}";
+// Default HTML email body template
+const DEFAULT_EMAIL_BODY_HTML_TEMPLATE = `
+<p>Dear {{clientName}},</p>
+<p>Please find details for invoice <strong>{{invoiceNumber}}</strong> regarding your recent services/products.</p>
+<p><strong>Amount:</strong> $ {{amount}}</p>
+<p><strong>Due Date:</strong> {{dueDate}}</p>
+<p><em>This email was sent from BizSight. If you have any questions, please contact {{companyName}}.</em></p>
+<p>Thank you for your business!</p>
+<p>Sincerely,<br>{{companyName}}</p>
+`;
 
 export default function InvoicingPage() {
   const { user, isLoading: authIsLoading } = useAuth();
@@ -136,8 +125,10 @@ export default function InvoicingPage() {
 
   const [isEmailPreviewDialogOpen, setIsEmailPreviewDialogOpen] = useState(false);
   const [invoiceForEmail, setInvoiceForEmail] = useState<InvoiceDisplay | null>(null);
+  const [emailRecipient, setEmailRecipient] = useState('');
   const [emailSubject, setEmailSubject] = useState('');
-  const [emailBody, setEmailBody] = useState('');
+  const [emailBody, setEmailBody] = useState(''); // Will hold HTML
+  const [isSendingEmail, setIsSendingEmail] = useState(false);
   
   const [companyProfileDetails, setCompanyProfileDetails] = useState<CompanyDetailsFirestore | null>(null);
   const [isFetchingCompanyProfile, setIsFetchingCompanyProfile] = useState(true);
@@ -166,7 +157,6 @@ export default function InvoicingPage() {
           setCompanyProfileDetails(docSnap.data() as CompanyDetailsFirestore);
         } else {
           setCompanyProfileDetails({ name: 'Your Company Name', address: 'Your Address', gstin: 'Your GSTIN', phone: '', email: '', website: '' });
-          console.log("[InvoicingPage fetchCompanyProfile] No company profile found, using defaults.");
         }
       } catch (error) {
         console.error("[InvoicingPage fetchCompanyProfile] Failed to fetch company details from Firestore:", error);
@@ -408,34 +398,40 @@ export default function InvoicingPage() {
       const printWindow = window.open('', '_blank', 'height=800,width=800');
       if (printWindow) {
         printWindow.document.write('<html><head><title>Print Invoice</title>');
-        // Basic print styling - can be expanded
         printWindow.document.write(`
           <style>
             body { font-family: 'PT Sans', sans-serif; margin: 20px; color: #333; }
-            .invoice-view-container { max-width: 750px; margin: auto; }
+            .invoice-view-container { max-width: 750px; margin: auto; padding: 20px; border: 1px solid #eee; box-shadow: 0 0 10px rgba(0,0,0,0.1); }
+            img { max-width: 150px; margin-bottom: 20px; }
             table { width: 100%; border-collapse: collapse; margin-bottom: 1rem; }
-            th, td { border: 1px solid #ddd; padding: 8px; text-align: left; }
-            th { background-color: #f2f2f2; }
+            th, td { border: 1px solid #ddd; padding: 8px; text-align: left; font-size: 0.9em; }
+            th { background-color: #f9f9f9; }
             .text-right { text-align: right; }
             .font-bold { font-weight: bold; }
             .text-lg { font-size: 1.125rem; }
             .text-2xl { font-size: 1.5rem; }
-            .mb-4 { margin-bottom: 1rem; }
-            .mt-4 { margin-top: 1rem; }
-            .mt-8 { margin-top: 2rem; }
-            .grid { display: grid; }
-            .grid-cols-2 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-            .gap-8 { gap: 2rem; }
-            .p-6 { padding: 1.5rem; }
-            .bg-muted { background-color: #f1f5f9; } /* Example from globals.css, adjust if needed */
+            .text-4xl { font-size: 2.25rem; }
+            .mb-2 { margin-bottom: 0.5rem; } .mb-4 { margin-bottom: 1rem; } .mb-8 { margin-bottom: 2rem; }
+            .mt-2 { margin-top: 0.5rem; } .mt-4 { margin-top: 1rem; } .mt-8 { margin-top: 2rem; }
+            .grid { display: grid; } .grid-cols-2 { grid-template-columns: repeat(2, minmax(0, 1fr)); } .gap-8 { gap: 2rem; }
+            .items-start { align-items: flex-start; }
+            .p-4 { padding: 1rem; } .p-6 { padding: 1.5rem; }
+            .bg-muted-light { background-color: #f8f9fa; } /* Lighter than globals.css muted for print */
             .rounded-lg { border-radius: 0.5rem; }
-            h1,h2,h3,h4 { margin-top:0; margin-bottom: 0.5rem; }
-            /* Hide buttons in print view */
+            .uppercase { text-transform: uppercase; }
+            .text-primary-print { color: #007bff; } /* Example primary color for print */
+            .text-muted-foreground-print { color: #6c757d; } /* Example muted color for print */
+            .whitespace-pre-line { white-space: pre-line; }
+            .border { border: 1px solid #dee2e6; }
+            .border-t { border-top: 1px solid #dee2e6; }
+            .pt-2 { padding-top: 0.5rem; } .pt-8 { padding-top: 2rem; }
+            h1,h2,h3,h4 { margin-top:0; margin-bottom: 0.5rem; font-weight: 600; }
             @media print {
               body * { visibility: hidden; }
               .printable-area, .printable-area * { visibility: visible; }
-              .printable-area { position: absolute; left: 0; top: 0; width: 100%; }
+              .printable-area { position: absolute; left: 0; top: 0; width: 100%; margin: 0; padding:0; border: none; box-shadow: none;}
               .no-print { display: none !important; }
+              @page { margin: 20mm; size: auto; }
             }
           </style>
         `);
@@ -445,7 +441,6 @@ export default function InvoicingPage() {
         printWindow.document.close();
         printWindow.focus();
         
-        // Delay print and close to allow content to render
         setTimeout(() => {
             printWindow.print();
             printWindow.close();
@@ -462,35 +457,34 @@ export default function InvoicingPage() {
     setIsDownloadingPDF(true);
     try {
       const canvas = await html2canvas(invoicePrintRef.current, {
-        scale: 2, // Increase scale for better quality
-        useCORS: true, // If you have external images
-        logging: true,
+        scale: 2, 
+        useCORS: true,
+        logging: false, // Reduce console noise
+        onclone: (document) => { // Temporarily apply print-friendly styles for PDF generation
+            const clonedContainer = document.querySelector('.invoice-view-container');
+            if(clonedContainer) {
+              clonedContainer.style.border = 'none'; // Remove border for PDF capture
+              clonedContainer.style.boxShadow = 'none'; // Remove shadow for PDF capture
+            }
+        }
       });
       const imgData = canvas.toDataURL('image/png');
       const pdf = new jsPDF({
         orientation: 'portrait',
-        unit: 'px', // Use pixels for unit to match canvas dimensions
-        format: [canvas.width, canvas.height] // Set PDF size to canvas size
+        unit: 'pt', // Points for better scaling with A4
+        format: 'a4'
       });
 
-      // If canvas width is greater than a typical A4 portrait width (approx 595px), scale it down.
-      // A4: 210mm x 297mm. At 72 DPI, 595px x 842px. At 96 DPI, 794px x 1123px.
-      // We'll use a reference width, e.g., 750px for a reasonably sized PDF.
       const pdfWidth = pdf.internal.pageSize.getWidth();
       const pdfHeight = pdf.internal.pageSize.getHeight();
-      
       const imgProps = pdf.getImageProperties(imgData);
-      const aspectRatio = imgProps.width / imgProps.height;
-
-      let newImgWidth = pdfWidth;
-      let newImgHeight = newImgWidth / aspectRatio;
-
-      if (newImgHeight > pdfHeight) {
-        newImgHeight = pdfHeight;
-        newImgWidth = newImgHeight * aspectRatio;
-      }
+      const imgWidth = imgProps.width;
+      const imgHeight = imgProps.height;
+      const ratio = Math.min(pdfWidth / imgWidth, pdfHeight / imgHeight);
       
-      // Center the image if it's smaller than the page
+      const newImgWidth = imgWidth * ratio;
+      const newImgHeight = imgHeight * ratio;
+      
       const xOffset = (pdfWidth - newImgWidth) / 2;
       const yOffset = (pdfHeight - newImgHeight) / 2;
 
@@ -505,23 +499,116 @@ export default function InvoicingPage() {
     }
   };
 
+  const generateInvoiceHTMLForEmail = (invoice: InvoiceDisplay, company: CompanyDetailsFirestore | null): string => {
+    let itemsHtml = '';
+    if (invoice.items && invoice.items.length > 0) {
+      invoice.items.forEach((item, index) => {
+        itemsHtml += `
+          <tr>
+            <td style="border: 1px solid #ddd; padding: 8px;">${index + 1}</td>
+            <td style="border: 1px solid #ddd; padding: 8px;">${item.description}</td>
+            <td style="border: 1px solid #ddd; padding: 8px; text-align: right;">${item.quantity}</td>
+            <td style="border: 1px solid #ddd; padding: 8px; text-align: right;">$${item.unitPrice.toFixed(2)}</td>
+            <td style="border: 1px solid #ddd; padding: 8px; text-align: right;">$${(item.quantity * item.unitPrice).toFixed(2)}</td>
+          </tr>
+        `;
+      });
+    } else {
+      itemsHtml = '<tr><td colspan="5" style="border: 1px solid #ddd; padding: 8px; text-align: center;">No line items.</td></tr>';
+    }
+  
+    const companyName = company?.name || 'Your Company';
+    const companyAddress = company?.address?.replace(/\n/g, '<br>') || 'Your Address';
+    const companyEmail = company?.email || '';
+    const companyPhone = company?.phone || '';
+    const companyWebsite = company?.website || '';
+    const companyGstin = company?.gstin || '';
+
+    const statusBadgeStyle = `display: inline-block; padding: 4px 8px; font-size: 0.8em; border-radius: 4px; color: white; background-color: ${invoice.status === 'Paid' ? '#28a745' : invoice.status === 'Overdue' ? '#dc3545' : '#6c757d'};`;
+  
+    return `
+      <div style="font-family: Arial, sans-serif; color: #333; max-width: 800px; margin: auto; padding: 20px; border: 1px solid #eee;">
+        <table style="width: 100%; margin-bottom: 20px;">
+          <tr>
+            <td style="vertical-align: top;">
+              ${company?.name ? `<h1 style="color: #007bff; margin:0 0 10px 0;">${company.name}</h1>` : ''}
+              <p style="margin:0; font-size: 0.9em;">${companyAddress}</p>
+              ${companyEmail ? `<p style="margin:2px 0; font-size: 0.9em;">Email: ${companyEmail}</p>` : ''}
+              ${companyPhone ? `<p style="margin:2px 0; font-size: 0.9em;">Phone: ${companyPhone}</p>` : ''}
+              ${companyWebsite ? `<p style="margin:2px 0; font-size: 0.9em;">Website: <a href="${companyWebsite}" target="_blank">${companyWebsite}</a></p>` : ''}
+              ${companyGstin ? `<p style="margin:2px 0; font-size: 0.9em;">GSTIN/Tax ID: ${companyGstin}</p>` : ''}
+            </td>
+            <td style="text-align: right; vertical-align: top;">
+              <h2 style="text-transform: uppercase; margin:0 0 10px 0; font-size: 1.8em;">Invoice</h2>
+              <p style="margin:2px 0;"><strong>Invoice #:</strong> ${invoice.invoiceNumber}</p>
+              <p style="margin:2px 0;"><strong>Date Issued:</strong> ${format(invoice.issuedDate, 'PPP')}</p>
+              <p style="margin:2px 0;"><strong>Date Due:</strong> ${format(invoice.dueDate, 'PPP')}</p>
+              <p style="margin-top: 5px;"><span style="${statusBadgeStyle}">${invoice.status}</span></p>
+            </td>
+          </tr>
+        </table>
+  
+        <div style="margin-bottom: 20px; padding: 10px; background-color: #f8f9fa; border-radius: 5px;">
+          <h3 style="margin:0 0 5px 0; font-size: 1.1em;">Bill To:</h3>
+          <p style="margin:0; font-weight: bold;">${invoice.clientName}</p>
+          ${invoice.clientEmail ? `<p style="margin:2px 0; font-size: 0.9em;">${invoice.clientEmail}</p>` : ''}
+        </div>
+  
+        <table style="width: 100%; border-collapse: collapse; margin-bottom: 20px;">
+          <thead style="background-color: #f0f0f0;">
+            <tr>
+              <th style="border: 1px solid #ddd; padding: 8px; text-align: left;">#</th>
+              <th style="border: 1px solid #ddd; padding: 8px; text-align: left;">Description</th>
+              <th style="border: 1px solid #ddd; padding: 8px; text-align: right;">Quantity</th>
+              <th style="border: 1px solid #ddd; padding: 8px; text-align: right;">Unit Price</th>
+              <th style="border: 1px solid #ddd; padding: 8px; text-align: right;">Amount</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${itemsHtml}
+          </tbody>
+        </table>
+  
+        <div style="text-align: right; margin-bottom: 20px;">
+          <p style="font-size: 1.2em; font-weight: bold; margin:0;">Grand Total: $${invoice.amount.toFixed(2)}</p>
+        </div>
+  
+        ${invoice.notes ? `
+          <div style="margin-bottom: 20px; padding: 10px; background-color: #f8f9fa; border-radius: 5px;">
+            <h4 style="margin:0 0 5px 0; font-size: 1em;">Notes:</h4>
+            <p style="margin:0; font-size: 0.9em; white-space: pre-wrap;">${invoice.notes}</p>
+          </div>
+        ` : ''}
+  
+        <div style="text-align: center; font-size: 0.8em; color: #777; margin-top: 30px; border-top: 1px solid #eee; padding-top: 10px;">
+          <p>Thank you for your business!</p>
+          <p>${companyName} - Payment is due by ${format(invoice.dueDate, 'PPP')}.</p>
+        </div>
+      </div>
+    `;
+  };
+
 
   const loadAndPrepareEmailTemplate = (invoice: InvoiceDisplay, useDefault: boolean = false) => {
-    let template = DEFAULT_EMAIL_TEMPLATE;
+    let storedTemplateSubject = DEFAULT_EMAIL_SUBJECT_TEMPLATE;
+    let storedTemplateBodyHTML = DEFAULT_EMAIL_BODY_HTML_TEMPLATE;
+
     if (!useDefault) {
         const storedTemplateString = localStorage.getItem(LOCAL_STORAGE_EMAIL_TEMPLATE_KEY);
         if (storedTemplateString) {
             try {
-                template = JSON.parse(storedTemplateString);
+                const parsed = JSON.parse(storedTemplateString);
+                if(parsed.subject) storedTemplateSubject = parsed.subject;
+                if(parsed.body) storedTemplateBodyHTML = parsed.body; // Assuming body is stored as HTML
             } catch (e) {
                 console.error("Failed to parse saved email template", e);
-                template = DEFAULT_EMAIL_TEMPLATE;
             }
         }
     }
 
-    let processedSubject = template.subject;
-    let processedBody = template.body;
+    let processedSubject = storedTemplateSubject;
+    let processedBodyHTML = generateInvoiceHTMLForEmail(invoice, companyProfileDetails); // Always use fresh invoice HTML as base
+
     const dueDateFormatted = format(invoice.dueDate, 'PPP');
     const companyNameForTpl = companyProfileDetails?.name || "Your Company";
 
@@ -535,15 +622,16 @@ export default function InvoicingPage() {
 
     for (const [key, value] of Object.entries(placeholders)) {
         processedSubject = processedSubject.replace(new RegExp(key.replace(/[-\/\\^$*+?.()|[\]{}]/g, '\\$&'), 'g'), String(value));
-        processedBody = processedBody.replace(new RegExp(key.replace(/[-\/\\^$*+?.()|[\]{}]/g, '\\$&'), 'g'), String(value));
+        // Body is now generated HTML, so placeholder replacement is less critical here unless the user edits a simpler template
     }
+    setEmailRecipient(invoice.clientEmail || '');
     setEmailSubject(processedSubject);
-    setEmailBody(processedBody);
+    setEmailBody(processedBodyHTML); // This is now rich HTML
   };
 
   const handleOpenEmailDialog = (invoice: InvoiceDisplay) => {
     if (!invoice.clientEmail) {
-        toast({ title: "Missing Client Email", description: "Cannot send email without client's email address.", variant: "destructive"});
+        toast({ title: "Missing Client Email", description: "Cannot send email without client's email address. Please edit the invoice to add an email.", variant: "destructive"});
         return;
     }
     setInvoiceForEmail(invoice);
@@ -551,22 +639,40 @@ export default function InvoicingPage() {
     setIsEmailPreviewDialogOpen(true);
   };
 
-  const handleSendEmail = () => {
-    if (!invoiceForEmail || !invoiceForEmail.clientEmail) return;
-
-    const mailtoLink = `mailto:${invoiceForEmail.clientEmail}?subject=${encodeURIComponent(emailSubject)}&body=${encodeURIComponent(emailBody)}`;
-    if (typeof window !== "undefined") {
-        window.location.href = mailtoLink;
+  const handleSendEmail = async () => {
+    if (!invoiceForEmail || !emailRecipient) {
+      toast({ title: "Missing Information", description: "Recipient email is required.", variant: "destructive" });
+      return;
     }
-    toast({ title: "Email Client Opened", description: `Preparing email for invoice ${invoiceForEmail.invoiceNumber}.`});
-    setIsEmailPreviewDialogOpen(false);
-    setInvoiceForEmail(null);
+    setIsSendingEmail(true);
+    try {
+      const result = await sendInvoiceEmailAction({
+        to: emailRecipient,
+        subject: emailSubject,
+        htmlBody: emailBody, // Send the HTML body
+        invoiceNumber: invoiceForEmail.invoiceNumber,
+      });
+
+      if (result.success) {
+        toast({ title: "Email Sent", description: result.message });
+        setIsEmailPreviewDialogOpen(false);
+        setInvoiceForEmail(null);
+      } else {
+        toast({ title: "Email Failed", description: result.message, variant: "destructive" });
+      }
+    } catch (error: any) {
+      toast({ title: "Email Error", description: `An unexpected error occurred: ${error.message}`, variant: "destructive" });
+    } finally {
+      setIsSendingEmail(false);
+    }
   };
 
   const handleSaveTemplate = () => {
-    const currentTemplateText: EmailTemplate = { subject: emailSubject, body: emailBody };
-    localStorage.setItem(LOCAL_STORAGE_EMAIL_TEMPLATE_KEY, JSON.stringify(currentTemplateText));
-    toast({ title: "Template Saved", description: "Your current email content is saved as the default template."});
+    // Saving current subject and potentially a simplified body or a flag to use the generated one
+    // For now, just save subject, as body is dynamically generated.
+    // A more advanced template system would be needed for full body customization persistence.
+    localStorage.setItem(LOCAL_STORAGE_EMAIL_TEMPLATE_KEY, JSON.stringify({ subject: emailSubject, body: DEFAULT_EMAIL_BODY_HTML_TEMPLATE /* or a custom one if we add rich editor */ }));
+    toast({ title: "Template Subject Saved", description: "Your current email subject is saved as default."});
   };
 
   const handleRevertToDefaultTemplate = () => {
@@ -611,11 +717,13 @@ export default function InvoicingPage() {
     }
   }, [currentInvoice.items]);
 
-  const handleClientNameInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+ const handleClientNameInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const typedValue = e.target.value;
     setCurrentInvoice(prev => ({
       ...prev,
       clientName: typedValue,
+      // Do NOT auto-update email here based on typedValue matching an existing client
+      // Email should only update if a suggestion is EXPLICITLY clicked
     }));
     if (typedValue.trim() !== '' || existingClients.length > 0) {
       setIsClientPopoverOpen(true);
@@ -628,10 +736,10 @@ export default function InvoicingPage() {
     setCurrentInvoice(prev => ({
       ...prev,
       clientName: client.name,
-      clientEmail: client.email || prev.clientEmail || '', 
+      clientEmail: client.email || '', // Populate email when suggestion is clicked
     }));
     setIsClientPopoverOpen(false);
-    clientNameInputRef.current?.focus();
+    clientNameInputRef.current?.focus(); // Or next field
   };
 
   const handleClientNameInputFocus = () => {
@@ -641,21 +749,23 @@ export default function InvoicingPage() {
   };
   
   const handleClientNameInputBlur = (e: React.FocusEvent<HTMLInputElement>) => {
+    // Delay closing the popover to allow click on suggestion
     setTimeout(() => {
       if (popoverContentRef.current && !popoverContentRef.current.contains(document.activeElement)) {
         setIsClientPopoverOpen(false);
       }
-    }, 150);
+    }, 150); // 150ms delay
   };
 
 
   const filteredClientSuggestions = useMemo(() => {
     const currentName = currentInvoice.clientName?.toLowerCase() || '';
     if (!currentName && isClientPopoverOpen) { 
+        // If input is empty but popover is open (e.g. on focus), show all
         return existingClients;
     }
     if (!currentName) {
-        return [];
+        return []; // Don't show suggestions if input is empty and popover isn't explicitly managed to be open
     }
     return existingClients.filter(client =>
       client.name.toLowerCase().includes(currentName)
@@ -664,6 +774,7 @@ export default function InvoicingPage() {
 
   const isNewClient = useMemo(() => {
     if (!currentInvoice.clientName || currentInvoice.clientName.trim() === '') return false;
+    // Check if the currently typed/set clientName exactly matches any existing client's name
     return !existingClients.some(c => c.name.toLowerCase() === currentInvoice.clientName!.toLowerCase());
   }, [currentInvoice.clientName, existingClients]);
 
@@ -751,8 +862,7 @@ export default function InvoicingPage() {
                       <DropdownMenuContent align="end">
                         <DropdownMenuItem onClick={() => handleOpenViewInvoiceDialog(invoice)}><Eye className="mr-2 h-4 w-4" /> View / Print / Download</DropdownMenuItem>
                         <DropdownMenuItem onClick={() => handleEditInvoice(invoice)}><Edit className="mr-2 h-4 w-4" /> Edit</DropdownMenuItem>
-                        <DropdownMenuItem onClick={() => handleOpenEmailDialog(invoice)} disabled={!invoice.clientEmail}><Mail className="mr-2 h-4 w-4" /> Email</DropdownMenuItem>
-                        {/* Removed standalone Download, now part of View dialog */}
+                        <DropdownMenuItem onClick={() => handleOpenEmailDialog(invoice)} disabled={!invoice.clientEmail || isSendingEmail}><Mail className="mr-2 h-4 w-4" /> Email</DropdownMenuItem>
                         <DropdownMenuSeparator />
                         <DropdownMenuItem onClick={() => promptDeleteInvoice(invoice.id)} className="text-destructive focus:text-destructive focus:bg-destructive/10">
                           <Trash2 className="mr-2 h-4 w-4" /> Delete
@@ -783,7 +893,7 @@ export default function InvoicingPage() {
                   <Label htmlFor="clientName">Client Name</Label>
                   <Popover open={isClientPopoverOpen} onOpenChange={setIsClientPopoverOpen}>
                     <PopoverTrigger asChild>
-                       <div> 
+                       {/* The Input component itself is the trigger */}
                         <Input
                           id="clientName"
                           ref={clientNameInputRef}
@@ -797,7 +907,6 @@ export default function InvoicingPage() {
                           disabled={isSaving}
                           className="w-full"
                         />
-                      </div>
                     </PopoverTrigger>
                     {isClientPopoverOpen && (
                       <PopoverContent
@@ -805,7 +914,7 @@ export default function InvoicingPage() {
                         className="w-[--radix-popover-trigger-width] p-0 max-h-60 overflow-y-auto"
                         side="bottom"
                         align="start"
-                        onOpenAutoFocus={(e) => e.preventDefault()} 
+                        onOpenAutoFocus={(e) => e.preventDefault()} // Prevent focus stealing
                       >
                         <ScrollArea className="max-h-56">
                           {filteredClientSuggestions.length > 0 ? (
@@ -813,6 +922,7 @@ export default function InvoicingPage() {
                               <div
                                 key={client.name}
                                 className="px-3 py-2 text-sm hover:bg-accent cursor-pointer"
+                                // Use onMouseDown to ensure it fires before onBlur of the input
                                 onMouseDown={() => handleClientSuggestionClick(client)}
                               >
                                 {client.name}
@@ -821,7 +931,7 @@ export default function InvoicingPage() {
                             ))
                           ) : (
                             <div className="px-3 py-2 text-sm text-muted-foreground">
-                              {currentInvoice.clientName && currentInvoice.clientName.trim() !== '' ? 'No matching clients found.' : (existingClients.length > 0 ? 'Type to search clients or select from list...' : 'No existing clients. Type to add.')}
+                              {currentInvoice.clientName && currentInvoice.clientName.trim() !== '' ? 'No matching clients found.' : (existingClients.length > 0 ? 'Type to search or select...' : 'No existing clients. Type to add new.')}
                             </div>
                           )}
                         </ScrollArea>
@@ -838,7 +948,7 @@ export default function InvoicingPage() {
 
 
                 <div>
-                    <Label htmlFor="clientEmail">Client Email (Optional)</Label>
+                    <Label htmlFor="clientEmail">Client Email</Label>
                     <Input
                         id="clientEmail"
                         type="email"
@@ -981,7 +1091,6 @@ export default function InvoicingPage() {
                     <h3 className="text-lg font-semibold text-foreground mb-2">Bill To:</h3>
                     <p className="font-medium text-foreground">{invoiceToView.clientName}</p>
                     {invoiceToView.clientEmail && <p className="text-sm text-muted-foreground">{invoiceToView.clientEmail}</p>}
-                    {/* Placeholder for client address - add if available in future */}
                   </section>
 
                   {/* Items Table */}
@@ -1013,10 +1122,8 @@ export default function InvoicingPage() {
                     </Table>
                   </section>
                   
-                  {/* Totals Section */}
                   <section className="flex justify-end mb-8">
                     <div className="w-full max-w-xs space-y-2">
-                       {/* Placeholder for Subtotal, Tax if needed in future */}
                        <div className="flex justify-between items-center border-t pt-2">
                          <p className="text-lg font-semibold text-foreground">Grand Total:</p>
                          <p className="text-lg font-bold text-primary">${invoiceToView.amount.toFixed(2)}</p>
@@ -1024,7 +1131,6 @@ export default function InvoicingPage() {
                     </div>
                   </section>
 
-                  {/* Notes */}
                   {invoiceToView.notes && (
                     <section className="mb-8 p-4 bg-muted/30 rounded-lg">
                       <h4 className="font-semibold text-foreground mb-1">Notes:</h4>
@@ -1032,7 +1138,6 @@ export default function InvoicingPage() {
                     </section>
                   )}
 
-                  {/* Footer */}
                   <footer className="text-center text-sm text-muted-foreground pt-8 border-t">
                     <p>Thank you for your business!</p>
                     <p>{companyProfileDetails.name} - Payment is due by {format(invoiceToView.dueDate, 'PPP')}.</p>
@@ -1060,40 +1165,42 @@ export default function InvoicingPage() {
 
       {/* Email Preview Dialog */}
       <Dialog open={isEmailPreviewDialogOpen} onOpenChange={(open) => { setIsEmailPreviewDialogOpen(open); if (!open) setInvoiceForEmail(null); }}>
-        <DialogContent className="sm:max-w-xl">
+        <DialogContent className="sm:max-w-2xl max-h-[90vh] flex flex-col">
           <DialogHeader>
             <DialogTitle className="font-headline">Compose Email</DialogTitle>
             <DialogDescription>
               Preview and edit the email for invoice {invoiceForEmail?.invoiceNumber} to {invoiceForEmail?.clientName}.
+              <br/>The body below is HTML. Advanced users can edit it directly.
             </DialogDescription>
           </DialogHeader>
-          <div className="space-y-4 py-2">
+          <div className="space-y-4 py-2 flex-grow overflow-y-auto pr-2">
             <div>
               <Label htmlFor="emailTo">To:</Label>
-              <Input id="emailTo" value={invoiceForEmail?.clientEmail || ''} readOnly disabled className="bg-muted/50"/>
+              <Input id="emailTo" value={emailRecipient} onChange={(e) => setEmailRecipient(e.target.value)} placeholder="recipient@example.com" required disabled={isSendingEmail}/>
             </div>
             <div>
               <Label htmlFor="emailSubject">Subject:</Label>
-              <Input id="emailSubject" value={emailSubject} onChange={(e) => setEmailSubject(e.target.value)} />
+              <Input id="emailSubject" value={emailSubject} onChange={(e) => setEmailSubject(e.target.value)} disabled={isSendingEmail}/>
             </div>
             <div>
-              <Label htmlFor="emailBody">Body:</Label>
-              <Textarea id="emailBody" value={emailBody} onChange={(e) => setEmailBody(e.target.value)} rows={10} />
+              <Label htmlFor="emailBody">Body (HTML):</Label>
+              <Textarea id="emailBody" value={emailBody} onChange={(e) => setEmailBody(e.target.value)} rows={12} disabled={isSendingEmail} placeholder="HTML email body..."/>
             </div>
           </div>
-          <DialogFooter className="justify-between flex-wrap gap-2">
+          <DialogFooter className="justify-between flex-wrap gap-2 mt-auto pt-4 border-t">
             <div className="flex gap-2 flex-wrap">
-                 <Button type="button" variant="outline" onClick={handleRevertToDefaultTemplate}>Use Original Default</Button>
-                 <Button type="button" variant="secondary" onClick={handleSaveTemplate}>
+                 <Button type="button" variant="outline" onClick={handleRevertToDefaultTemplate} disabled={isSendingEmail}>Use Original Default</Button>
+                 <Button type="button" variant="secondary" onClick={handleSaveTemplate} disabled={isSendingEmail}>
                     <Save className="mr-2 h-4 w-4" /> Save Current as My Default
                  </Button>
             </div>
             <div className="flex gap-2 flex-wrap">
                 <DialogClose asChild>
-                    <Button type="button" variant="ghost">Cancel</Button>
+                    <Button type="button" variant="ghost" disabled={isSendingEmail}>Cancel</Button>
                 </DialogClose>
-                <Button type="button" onClick={handleSendEmail}>
-                    <Mail className="mr-2 h-4 w-4" /> Send Email
+                <Button type="button" onClick={handleSendEmail} disabled={isSendingEmail || !emailRecipient || !emailSubject || !emailBody}>
+                    {isSendingEmail ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Mail className="mr-2 h-4 w-4" />}
+                    {isSendingEmail ? "Sending..." : "Send Email"}
                 </Button>
             </div>
           </DialogFooter>
@@ -1122,4 +1229,3 @@ export default function InvoicingPage() {
     </div>
   );
 }
-
