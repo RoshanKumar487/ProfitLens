@@ -114,8 +114,8 @@ export default function InvoicingPage() {
   const [emailBody, setEmailBody] = useState('');
   const [companyNameForEmail, setCompanyNameForEmail] = useState("Your Company");
 
-  const [isLoading, setIsLoading] = useState(true); // Page level loading for initial data or auth
-  const [isSaving, setIsSaving] = useState(false); // For save/delete operations
+  const [isLoading, setIsLoading] = useState(true);
+  const [isSaving, setIsSaving] = useState(false); 
 
   const [existingClientNames, setExistingClientNames] = useState<string[]>([]);
   const [clientNameSearch, setClientNameSearch] = useState(''); 
@@ -130,8 +130,6 @@ export default function InvoicingPage() {
       return;
     }
     console.log(`[InvoicingPage fetchInvoices] Called for companyId: ${user.companyId}`);
-    // Use a different loading state for fetching invoices if page is already displayed
-    // For now, main isLoading handles this.
     setIsLoading(true); 
     try {
       const invoicesColRef = collection(db, 'invoices');
@@ -144,11 +142,10 @@ export default function InvoicingPage() {
         return {
           id: docSnap.id,
           ...data,
-          // Ensure dueDate and issuedDate are converted to JS Date objects
           dueDate: data.dueDate instanceof Timestamp ? data.dueDate.toDate() : (typeof data.dueDate === 'string' ? parseISO(data.dueDate) : new Date(data.dueDate)),
           issuedDate: data.issuedDate instanceof Timestamp ? data.issuedDate.toDate() : (typeof data.issuedDate === 'string' ? parseISO(data.issuedDate) : new Date(data.issuedDate)),
           createdAt: data.createdAt, 
-        } as Invoice; // Cast to Invoice to ensure type safety
+        } as Invoice;
       });
 
       setInvoices(fetchedInvoices);
@@ -170,7 +167,7 @@ export default function InvoicingPage() {
       setIsLoading(false);
       console.log('[InvoicingPage fetchInvoices] Finished. isLoading set to false.');
     }
-  }, [user, toast]); // Removed user.companyId from deps as user object itself is sufficient
+  }, [user, toast]); 
 
 
   useEffect(() => {
@@ -189,7 +186,7 @@ export default function InvoicingPage() {
       setExistingClientNames([]);
       setIsLoading(false); 
     }
-  }, [user, user?.companyId, authIsLoading, fetchInvoices]); // Added user?.companyId for explicit dependency
+  }, [user, user?.companyId, authIsLoading, fetchInvoices]); 
 
 
   useEffect(() => {
@@ -280,7 +277,7 @@ export default function InvoicingPage() {
         invoiceDataToSave.createdAt = serverTimestamp(); 
         const invoicesColRef = collection(db, 'invoices');
         const docRef = await addDoc(invoicesColRef, invoiceDataToSave);
-        if (!invoiceDataToSave.invoiceNumber || invoiceDataToSave.invoiceNumber.startsWith('INV')) { // More generic check for default INV
+        if (!invoiceDataToSave.invoiceNumber || invoiceDataToSave.invoiceNumber.startsWith('INV')) { 
             const newInvNum = `INV${docRef.id.substring(0, 6).toUpperCase()}`;
             await updateDoc(docRef, { invoiceNumber: newInvNum });
             invoiceDataToSave.invoiceNumber = newInvNum;
@@ -538,7 +535,7 @@ export default function InvoicingPage() {
                 className="pl-8 sm:w-[250px] md:w-[300px]"
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
-                disabled={isLoading && invoices.length === 0} // Disable only if full page loading
+                disabled={isLoading && invoices.length === 0} 
               />
             </div>
           </div>
@@ -620,18 +617,41 @@ export default function InvoicingPage() {
                     <PopoverTrigger asChild>
                       <Input
                         id="clientName"
-                        value={clientNameSearch} // Use clientNameSearch for direct input control
+                        value={clientNameSearch} 
                         onChange={(e) => {
-                          const newSearchTerm = e.target.value;
-                          setClientNameSearch(newSearchTerm);
-                          // Update currentInvoice.clientName directly for new/edited clients
-                          setCurrentInvoice({ ...currentInvoice, clientName: newSearchTerm, clientEmail: existingClientNames.includes(newSearchTerm) ? currentInvoice.clientEmail : '' });
-                          setIsClientPopoverOpen(newSearchTerm.length > 0);
+                            const newSearchTerm = e.target.value;
+                            setClientNameSearch(newSearchTerm); // Update the visual input's state
+
+                            let emailForNewName = currentInvoice.clientEmail || ''; // Start with current email
+
+                            const exactMatchExistingClient = existingClientNames.find(name => name.toLowerCase() === newSearchTerm.toLowerCase());
+
+                            if (exactMatchExistingClient) {
+                                // Typed name is an exact match for an existing client
+                                const clientInvoices = invoices.filter(inv => inv.clientName === exactMatchExistingClient);
+                                const latestEmail = clientInvoices.sort((a, b) => {
+                                    const dateA = a.issuedDate instanceof Timestamp ? a.issuedDate.toMillis() : new Date(a.issuedDate).getTime();
+                                    const dateB = b.issuedDate instanceof Timestamp ? b.issuedDate.toMillis() : new Date(b.issuedDate).getTime();
+                                    return dateB - dateA;
+                                })[0]?.clientEmail;
+                                emailForNewName = latestEmail || '';
+                            } else {
+                                // Typed name is NOT an exact match (it's new, or edited from an existing one)
+                                // If the *previous* clientName in currentInvoice was an existing client, and newSearchTerm is different,
+                                // then we should clear the email, as it's effectively a new client entity being typed.
+                                if (currentInvoice.clientName && existingClientNames.includes(currentInvoice.clientName) && newSearchTerm.toLowerCase() !== currentInvoice.clientName.toLowerCase()) {
+                                    emailForNewName = '';
+                                }
+                                // Otherwise, allow manually typed email to persist or be blank if it was already blank.
+                            }
+
+                            setCurrentInvoice(prev => ({ ...prev, clientName: newSearchTerm, clientEmail: emailForNewName }));
+                            setIsClientPopoverOpen(newSearchTerm.length > 0);
                         }}
                         onClick={() => {
                            if (clientNameSearch.length > 0) setIsClientPopoverOpen(true);
                         }}
-                        onFocus={() => { // Open popover on focus if there's text
+                        onFocus={() => {
                             if (clientNameSearch.length > 0) setIsClientPopoverOpen(true);
                         }}
                         onBlur={() => setTimeout(() => setIsClientPopoverOpen(false), 150)} 
@@ -641,7 +661,7 @@ export default function InvoicingPage() {
                         disabled={isSaving}
                       />
                     </PopoverTrigger>
-                    {isClientPopoverOpen && clientNameSearch && (
+                    {isClientPopoverOpen && (
                       <PopoverContent className="w-[--radix-popover-trigger-width] p-0" align="start">
                         <div className="max-h-48 overflow-y-auto rounded-md border bg-popover text-popover-foreground shadow-md">
                           {(() => {
@@ -651,7 +671,7 @@ export default function InvoicingPage() {
                                 <div
                                   key={name}
                                   className="p-2 hover:bg-accent hover:text-accent-foreground cursor-pointer text-sm"
-                                  onMouseDown={() => { // Use onMouseDown to fire before onBlur
+                                  onMouseDown={() => { 
                                     const clientInvoices = invoices.filter(inv => inv.clientName === name);
                                     const latestEmail = clientInvoices.sort((a, b) => {
                                       const dateA = a.issuedDate instanceof Timestamp ? a.issuedDate.toMillis() : new Date(a.issuedDate).getTime();
@@ -666,12 +686,12 @@ export default function InvoicingPage() {
                                   {name}
                                 </div>
                               ));
-                            } else if (existingClientNames.length === 0) {
+                            } else if (clientNameSearch.length > 0 && existingClientNames.length === 0) {
                                 return <div className="p-2 text-sm text-muted-foreground">No existing clients. Type to add.</div>;
-                            }
-                            else {
+                            } else if (clientNameSearch.length > 0) {
                               return <div className="p-2 text-sm text-muted-foreground">No matching clients found. Type to add.</div>;
                             }
+                            return null; 
                           })()}
                         </div>
                       </PopoverContent>
