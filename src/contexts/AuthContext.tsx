@@ -1,4 +1,3 @@
-
 'use client';
 
 import type { User as FirebaseUser, AuthError } from 'firebase/auth';
@@ -10,16 +9,16 @@ import {
   signInWithEmailAndPassword,
   signOut as firebaseSignOut,
   updateProfile,
-  sendPasswordResetEmail, // Added for potential future use
+  sendPasswordResetEmail,
 } from 'firebase/auth';
-import { useRouter } from 'next/navigation';
+import { useRouter, usePathname } from 'next/navigation'; // Import usePathname
 import { useToast } from '@/hooks/use-toast';
 
 interface User {
   uid: string;
   email: string | null;
   displayName: string | null;
-  companyId: string; // Added companyId
+  companyId: string;
 }
 
 interface AuthContextType {
@@ -29,14 +28,12 @@ interface AuthContextType {
   signUp: (email: string, password: string, displayName?: string) => Promise<FirebaseUser | null>;
   signIn: (email: string, password: string) => Promise<FirebaseUser | null>;
   signOut: () => Promise<void>;
-  sendPasswordReset: (email: string) => Promise<void>; // Added
+  sendPasswordReset: (email: string) => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
-// Helper to derive companyId
 const getDerivedCompanyId = (uid: string): string => {
-  // Consistent with Firestore rules: "fb-default-company-" + uid.slice(0, 5)
   return `fb-default-company-${uid.slice(0, 5)}`;
 };
 
@@ -45,6 +42,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<AuthError | null>(null);
   const router = useRouter();
+  const pathname = usePathname(); // Get current pathname
   const { toast } = useToast();
 
   useEffect(() => {
@@ -59,6 +57,11 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         };
         setUser(appUser);
         console.log(`AuthContext: User authenticated. UID: ${firebaseUser.uid}, CompanyID: ${companyId}`);
+        // If user is on an auth page after successful login/signup, redirect to dashboard
+        const authPages = ['/auth/signin', '/auth/signup'];
+        if (authPages.includes(pathname)) {
+          router.push('/');
+        }
       } else {
         setUser(null);
         console.log('AuthContext: No user signed in.');
@@ -73,7 +76,23 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     });
 
     return () => unsubscribe();
-  }, [toast]);
+  }, [toast, router, pathname]); // pathname is included to re-evaluate if user lands on auth page while already logged in
+
+  // This useEffect handles redirection for unauthenticated users
+  useEffect(() => {
+    const publicPaths = ['/auth/signin', '/auth/signup']; // Define public paths
+    const isAuthPage = publicPaths.includes(pathname);
+
+    // Only redirect if:
+    // 1. Auth state is determined (isLoading is false)
+    // 2. There is no user
+    // 3. The current page is NOT one of the public authentication pages
+    if (!isLoading && !user && !isAuthPage) {
+      console.log(`AuthContext: Redirecting to /auth/signin from ${pathname}`);
+      router.push('/auth/signin');
+    }
+  }, [user, isLoading, pathname, router]);
+
 
   const signUp = async (email: string, password: string, displayName?: string): Promise<FirebaseUser | null> => {
     setIsLoading(true);
@@ -84,29 +103,21 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       if (displayName && firebaseUser) {
         await updateProfile(firebaseUser, { displayName });
       }
-      // User state will be updated by onAuthStateChanged listener
-      // This ensures companyId is derived correctly after signup.
+      // User state will be updated by onAuthStateChanged, which also handles initial redirect.
       const companyId = getDerivedCompanyId(firebaseUser.uid);
-      const appUser: User = {
-        uid: firebaseUser.uid,
-        email: firebaseUser.email,
-        displayName: displayName || firebaseUser.displayName,
-        companyId: companyId,
-      };
-      setUser(appUser); // Manually set user here to ensure immediate availability
       console.log('AuthContext: User signed up successfully:', firebaseUser.uid, 'CompanyId:', companyId);
       toast({ title: "Sign Up Successful", description: "Welcome!" });
-      router.push('/');
+      // router.push('/'); // Let onAuthStateChanged handle redirect from auth pages
       return firebaseUser;
     } catch (err) {
       const authError = err as AuthError;
       console.error('AuthContext: Sign up error', authError);
-      setError(authError);
+      setError(authError); // Set error state
       toast({ title: "Sign Up Failed", description: authError.message, variant: "destructive"});
+      setIsLoading(false); // Ensure loading is false on error
       return null;
-    } finally {
-      setIsLoading(false);
-    }
+    } 
+    // setIsLoading(false) is handled by onAuthStateChanged after state update
   };
 
   const signIn = async (email: string, password: string): Promise<FirebaseUser | null> => {
@@ -114,48 +125,38 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     setError(null);
     try {
       const userCredential = await signInWithEmailAndPassword(auth, email, password);
-      // User state will be updated by onAuthStateChanged listener
-      // Setting user manually here too for robustness
-      const firebaseUser = userCredential.user;
-      const companyId = getDerivedCompanyId(firebaseUser.uid);
-      const appUser: User = {
-          uid: firebaseUser.uid,
-          email: firebaseUser.email,
-          displayName: firebaseUser.displayName,
-          companyId: companyId,
-      };
-      setUser(appUser);
+      // User state will be updated by onAuthStateChanged.
+      const companyId = getDerivedCompanyId(userCredential.user.uid);
       console.log('AuthContext: User signed in successfully:', userCredential.user.uid, 'CompanyId:', companyId);
       toast({ title: "Sign In Successful", description: "Welcome back!"});
-      router.push('/');
+      // router.push('/'); // Let onAuthStateChanged handle redirect from auth pages
       return userCredential.user;
     } catch (err) {
       const authError = err as AuthError;
       console.error('AuthContext: Sign in error', authError);
-      setError(authError);
+      setError(authError); // Set error state
       toast({ title: "Sign In Failed", description: authError.message, variant: "destructive"});
+      setIsLoading(false); // Ensure loading is false on error
       return null;
-    } finally {
-      setIsLoading(false);
     }
+    // setIsLoading(false) is handled by onAuthStateChanged
   };
 
   const signOut = async (): Promise<void> => {
-    setIsLoading(true);
+    // setIsLoading(true); // Not strictly necessary to set loading true here, as onAuthStateChanged will fire
     setError(null);
     try {
       await firebaseSignOut(auth);
-      // User state (setUser(null)) handled by onAuthStateChanged
+      // User state (setUser(null)) and isLoading(false) handled by onAuthStateChanged
       console.log('AuthContext: User signed out successfully.');
       toast({ title: "Signed Out", description: "You have been successfully signed out."});
-      // router.push('/signin'); // Or your desired sign-in page. For now, let pages handle no user.
+      // router.push('/auth/signin'); // Redirect is handled by the second useEffect
     } catch (err) {
       const authError = err as AuthError;
       console.error('AuthContext: Sign out error', authError);
       setError(authError);
       toast({ title: "Sign Out Failed", description: authError.message, variant: "destructive"});
-    } finally {
-      setIsLoading(false);
+      // setIsLoading(false); // Handled by onAuthStateChanged if it fires, or ensure it's set
     }
   };
 
