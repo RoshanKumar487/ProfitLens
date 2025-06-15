@@ -16,7 +16,7 @@ import {
 } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger, DropdownMenuSeparator } from '@/components/ui/dropdown-menu';
-import { Receipt, PlusCircle, Search, MoreHorizontal, Edit, Trash2, Eye, Mail, Download, Calendar as CalendarIconLucide, Save, Loader2, Briefcase } from 'lucide-react';
+import { Receipt, PlusCircle, Search, MoreHorizontal, Edit, Trash2, Eye, Mail, Download, Calendar as CalendarIconLucide, Save, Loader2 } from 'lucide-react';
 import { format } from 'date-fns';
 import { useToast } from '@/hooks/use-toast';
 import {
@@ -134,16 +134,10 @@ export default function InvoicingPage() {
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
 
-  const [existingClientNames, setExistingClientNames] = useState<string[]>([]);
-  const [isClientPopoverOpen, setIsClientPopoverOpen] = useState(false);
-  const clientNameInputRef = useRef<HTMLInputElement>(null);
-  const popoverContentRef = useRef<HTMLDivElement>(null);
-
 
   const fetchInvoices = useCallback(async () => {
     if (!user || !user.companyId) {
       setInvoices([]);
-      setExistingClientNames([]);
       setIsLoading(false);
       return;
     }
@@ -170,8 +164,6 @@ export default function InvoicingPage() {
       });
 
       setInvoices(fetchedInvoices);
-      const uniqueNames = Array.from(new Set(fetchedInvoices.map(inv => inv.clientName).filter(Boolean)));
-      setExistingClientNames(uniqueNames.sort());
     } catch (error: any) {
       console.error('[InvoicingPage fetchInvoices] Error fetching invoices:', error);
       toast({
@@ -180,7 +172,6 @@ export default function InvoicingPage() {
         variant: 'destructive',
       });
       setInvoices([]);
-      setExistingClientNames([]);
     } finally {
       setIsLoading(false);
     }
@@ -195,7 +186,6 @@ export default function InvoicingPage() {
     if (!user || !user.companyId) {
       setIsLoading(false);
       setInvoices([]);
-      setExistingClientNames([]);
       return;
     }
     fetchInvoices();
@@ -732,99 +722,15 @@ export default function InvoicingPage() {
 
                 <div>
                   <Label htmlFor="clientName">Client Name</Label>
-                  <Popover open={isClientPopoverOpen} onOpenChange={setIsClientPopoverOpen}>
-                    <PopoverTrigger asChild>
-                      <Input
-                        id="clientName"
-                        ref={clientNameInputRef}
-                        value={currentInvoice.clientName || ''}
-                        onChange={(e: React.ChangeEvent<HTMLInputElement>) => {
-                          const typedValue = e.target.value;
-                          setCurrentInvoice(prev => ({
-                            ...prev,
-                            clientName: typedValue,
-                          }));
-                          if (typedValue || existingClientNames.length > 0) {
-                            setIsClientPopoverOpen(true);
-                          } else {
-                            setIsClientPopoverOpen(false);
-                          }
-                        }}
-                        onFocus={() => {
-                            if (existingClientNames.length > 0 || currentInvoice.clientName) {
-                                setIsClientPopoverOpen(true);
-                            }
-                        }}
-                        onBlur={() => {
-                          setTimeout(() => {
-                            if (popoverContentRef.current && popoverContentRef.current.contains(document.activeElement)) {
-                              return;
-                            }
-                            if (clientNameInputRef.current && clientNameInputRef.current === document.activeElement) {
-                                return;
-                            }
-                            setIsClientPopoverOpen(false);
-                          }, 150);
-                        }}
-                        placeholder="Type or select client"
-                        required
-                        autoComplete="off"
-                        disabled={isSaving}
-                      />
-                    </PopoverTrigger>
-                    {isClientPopoverOpen && (
-                      <PopoverContent
-                        ref={popoverContentRef}
-                        className="w-[--radix-popover-trigger-width] p-0"
-                        align="start"
-                        onOpenAutoFocus={(e) => e.preventDefault()}
-                      >
-                        <div className="max-h-48 overflow-y-auto rounded-md border bg-popover text-popover-foreground shadow-md">
-                          {(() => {
-                            const currentSearchTerm = (currentInvoice.clientName || '').toLowerCase();
-                            const filteredClients = currentSearchTerm
-                              ? existingClientNames.filter(name => name.toLowerCase().includes(currentSearchTerm))
-                              : existingClientNames;
-
-                            if (filteredClients.length > 0) {
-                              return filteredClients.map(name => (
-                                <div
-                                  key={name}
-                                  className="p-2 hover:bg-accent hover:text-accent-foreground cursor-pointer text-sm"
-                                  onMouseDown={() => {
-                                    const clientInvoices = invoices.filter(inv => inv.clientName === name);
-                                    const latestEmail = clientInvoices.length > 0
-                                        ? clientInvoices.sort((a,b) => b.issuedDate.getTime() - a.issuedDate.getTime())[0]?.clientEmail
-                                        : '';
-
-                                    setCurrentInvoice(prev => ({
-                                        ...prev,
-                                        clientName: name,
-                                        clientEmail: latestEmail || ''
-                                    }));
-                                    setIsClientPopoverOpen(false);
-                                    clientNameInputRef.current?.focus();
-                                  }}
-                                >
-                                  {name}
-                                </div>
-                              ));
-                            } else if (currentSearchTerm && existingClientNames.length > 0) {
-                                 return <div className="p-2 text-sm text-muted-foreground">No matching clients.</div>;
-                            } else if (existingClientNames.length === 0) {
-                                return <div className="p-2 text-sm text-muted-foreground">No existing clients. Type to add new.</div>;
-                            }
-                            return <div className="p-2 text-sm text-muted-foreground">Type to search or add a new client.</div>;
-                          })()}
-                        </div>
-                      </PopoverContent>
-                    )}
-                  </Popover>
-                  {currentInvoice.clientName && !isLoading && !existingClientNames.includes(currentInvoice.clientName) && (
-                    <p className="text-xs text-muted-foreground mt-1">
-                      <Briefcase className="inline h-3 w-3 mr-1" /> New client: "{currentInvoice.clientName}" will be added.
-                    </p>
-                  )}
+                  <Input
+                    id="clientName"
+                    value={currentInvoice.clientName || ''}
+                    onChange={(e) => setCurrentInvoice(prev => ({ ...prev, clientName: e.target.value }))}
+                    placeholder="Enter client name"
+                    required
+                    autoComplete="off"
+                    disabled={isSaving}
+                  />
                 </div>
 
                 <div>
@@ -834,6 +740,7 @@ export default function InvoicingPage() {
                         type="email"
                         value={currentInvoice.clientEmail || ''}
                         onChange={(e) => setCurrentInvoice({ ...currentInvoice, clientEmail: e.target.value })}
+                        placeholder="Enter client email"
                         disabled={isSaving}
                     />
                 </div>
