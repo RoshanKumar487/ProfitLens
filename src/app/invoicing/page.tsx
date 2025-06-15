@@ -45,7 +45,7 @@ import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { useAuth } from '@/contexts/AuthContext';
-import { collection, addDoc, getDocs, doc, updateDoc, deleteDoc, query, where, orderBy, Timestamp, serverTimestamp } from 'firebase/firestore';
+import { collection, addDoc, getDocs, doc, updateDoc, deleteDoc, query, where, orderBy, Timestamp, serverTimestamp, getDoc } from 'firebase/firestore'; // Added getDoc here
 import { db } from '@/lib/firebaseConfig';
 
 interface InvoiceItem {
@@ -123,7 +123,7 @@ export default function InvoicingPage() {
   const [emailBody, setEmailBody] = useState('');
   const [companyNameForEmail, setCompanyNameForEmail] = useState("Your Company");
 
-  const [isLoadingPage, setIsLoadingPage] = useState(true); // Unified loading state for the page
+  const [isLoading, setIsLoading] = useState(true); // Unified loading state for the page
   const [isSaving, setIsSaving] = useState(false); 
 
   const [existingClientNames, setExistingClientNames] = useState<string[]>([]);
@@ -131,20 +131,15 @@ export default function InvoicingPage() {
   const [isClientPopoverOpen, setIsClientPopoverOpen] = useState(false);
 
   const fetchInvoices = useCallback(async () => {
-    if (authIsLoading) {
-      console.log('[InvoicingPage fetchInvoices] Auth is loading. Aborting fetch.');
-      setIsLoadingPage(true);
-      return;
-    }
     if (!user || !user.companyId) {
       console.log('[InvoicingPage fetchInvoices] User or companyId not available. Clearing invoices.');
       setInvoices([]);
       setExistingClientNames([]);
-      setIsLoadingPage(false);
+      setIsLoading(false);
       return;
     }
     console.log(`[InvoicingPage fetchInvoices] Called for companyId: ${user.companyId}`);
-    setIsLoadingPage(true); 
+    setIsLoading(true); 
     try {
       const invoicesColRef = collection(db, 'invoices');
       const q = query(invoicesColRef, where('companyId', '==', user.companyId), orderBy('createdAt', 'desc'));
@@ -183,35 +178,52 @@ export default function InvoicingPage() {
       });
       setInvoices([]); 
     } finally {
-      setIsLoadingPage(false);
-      console.log('[InvoicingPage fetchInvoices] Finished. isLoadingPage set to false.');
+      setIsLoading(false);
+      console.log('[InvoicingPage fetchInvoices] Finished. isLoading set to false.');
     }
-  }, [user, user?.companyId, authIsLoading, toast]); 
+  }, [user, user?.companyId, toast]); 
 
 
   useEffect(() => {
+    if (authIsLoading) {
+      console.log('[InvoicingPage Main useEffect] Auth is loading. Setting page isLoading to true.');
+      setIsLoading(true);
+      return;
+    }
+    if (!user || !user.companyId) {
+      console.log('[InvoicingPage Main useEffect] Auth loaded, but no user or companyId. Setting page isLoading to false and clearing invoices.');
+      setIsLoading(false);
+      setInvoices([]);
+      setExistingClientNames([]);
+      return;
+    }
+    console.log('[InvoicingPage Main useEffect] Auth loaded, user and companyId available. Calling fetchInvoices.');
     fetchInvoices();
-  }, [fetchInvoices]);
+  }, [user, user?.companyId, authIsLoading, fetchInvoices]);
 
 
   useEffect(() => {
      // Fetch company name for email template, from Firestore if possible
      const fetchCompanyDetailsForEmail = async () => {
         if (user && user.companyId) {
+            console.log('[InvoicingPage fetchCompanyDetailsForEmail] Fetching company details for email. CompanyId:', user.companyId);
             try {
                 const docRef = doc(db, 'companyProfiles', user.companyId);
                 const docSnap = await getDoc(docRef);
                 if (docSnap.exists() && docSnap.data().name) {
                     setCompanyNameForEmail(docSnap.data().name);
+                    console.log('[InvoicingPage fetchCompanyDetailsForEmail] Company name set to:', docSnap.data().name);
                 } else {
                     setCompanyNameForEmail("Your Company Name");
+                     console.log('[InvoicingPage fetchCompanyDetailsForEmail] No company name found or doc does not exist. Using default.');
                 }
             } catch (error) {
-                console.error("Failed to fetch company details from Firestore for email:", error);
+                console.error("[InvoicingPage fetchCompanyDetailsForEmail] Failed to fetch company details from Firestore for email:", error);
                 setCompanyNameForEmail("Your Company Name");
             }
         } else {
              setCompanyNameForEmail("Your Company Name");
+             console.log('[InvoicingPage fetchCompanyDetailsForEmail] No user or companyId available for fetching company details. Using default.');
         }
     };
     if (!authIsLoading) { // Fetch only after auth state is resolved
@@ -295,11 +307,6 @@ export default function InvoicingPage() {
             invoiceNumber: newInvoiceNumber,
             createdAt: serverTimestamp(),
         });
-        // If default INV number was generated and we want ID based one.
-        // if (newInvoiceNumber.startsWith('INV') && newInvoiceNumber.length > 9) { // Heuristic for generated
-        //     const finalInvNum = `INV${docRef.id.substring(0, 6).toUpperCase()}`;
-        //     await updateDoc(docRef, { invoiceNumber: finalInvNum });
-        // }
         toast({ title: "Invoice Created", description: `Invoice ${newInvoiceNumber} created successfully.` });
       }
       fetchInvoices(); 
@@ -526,7 +533,9 @@ export default function InvoicingPage() {
   }, [currentInvoice.items, currentInvoice.amount]);
 
 
-  if (isLoadingPage && invoices.length === 0) { 
+  if (isLoading && invoices.length === 0 && !authIsLoading) { 
+    // Show loader only if not authIsLoading (which has its own page-wide implications)
+    // and if no invoices are loaded yet.
     return (
       <div className="flex items-center justify-center h-[calc(100vh-200px)]">
         <Loader2 className="h-12 w-12 animate-spin text-primary" />
@@ -538,7 +547,7 @@ export default function InvoicingPage() {
   return (
     <div className="space-y-6">
       <PageTitle title="Invoicing" subtitle="Manage your customer invoices efficiently." icon={Receipt}>
-        <Button onClick={handleCreateNew} disabled={isSaving || isLoadingPage}>
+        <Button onClick={handleCreateNew} disabled={isSaving || isLoading}>
           <PlusCircle className="mr-2 h-4 w-4" /> Create New Invoice
         </Button>
       </PageTitle>
@@ -555,20 +564,20 @@ export default function InvoicingPage() {
                 className="pl-8 sm:w-[250px] md:w-[300px]"
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
-                disabled={isLoadingPage && invoices.length === 0} 
+                disabled={isLoading && invoices.length === 0} 
               />
             </div>
           </div>
         </CardHeader>
         <CardContent>
-          {isLoadingPage && invoices.length > 0 && ( 
+          {isLoading && invoices.length > 0 && ( 
             <div className="flex justify-center py-4">
               <Loader2 className="h-6 w-6 animate-spin text-primary" />
               <span className="ml-2">Refreshing invoices...</span>
             </div>
           )}
           <Table>
-            <TableCaption>{filteredInvoices.length === 0 && !isLoadingPage ? "No invoices found." : filteredInvoices.length > 0 ? "A list of your recent invoices." : isLoadingPage ? "Loading invoices..." : "No invoices match your search."}</TableCaption>
+            <TableCaption>{filteredInvoices.length === 0 && !isLoading ? "No invoices found." : filteredInvoices.length > 0 ? "A list of your recent invoices." : isLoading ? "Loading invoices..." : "No invoices match your search."}</TableCaption>
             <TableHeader>
               <TableRow>
                 <TableHead>Number</TableHead>
@@ -641,26 +650,33 @@ export default function InvoicingPage() {
                         onChange={(e) => {
                             const typedName = e.target.value;
                             let newClientEmail = currentInvoice.clientEmail || '';
-                            const matchedClient = existingClientNames.find(name => name.toLowerCase() === typedName.toLowerCase());
+                            // Directly update clientName, this makes the field editable
+                            setCurrentInvoice(prev => ({ ...prev, clientName: typedName }));
+                            setClientNameSearch(typedName); // Update search term for popover filtering
 
-                            if (matchedClient) { // If typed name matches an existing client
+                            // Check if typed name matches an existing client to potentially autofill email
+                            const matchedClient = existingClientNames.find(name => name.toLowerCase() === typedName.toLowerCase());
+                            if (matchedClient) {
                                 const clientInvoices = invoices.filter(inv => inv.clientName === matchedClient);
                                 const latestEmail = clientInvoices.sort((a, b) => b.issuedDate.getTime() - a.issuedDate.getTime())[0]?.clientEmail;
                                 newClientEmail = latestEmail || '';
-                            } else { // If typed name does NOT match any existing client or is a partial new name
-                                // If currentInvoice.clientName was an existing client and now it's different (not matching another existing client)
-                                if (currentInvoice.clientName && existingClientNames.includes(currentInvoice.clientName) && !matchedClient) {
+                                setCurrentInvoice(prev => ({ ...prev, clientEmail: newClientEmail }));
+                            } else {
+                                // If currentInvoice.clientName was previously an existing client and now it's different (and not matching another existing one)
+                                // or if it's simply not matching any existing client, clear the email.
+                                if (currentInvoice.clientName && existingClientNames.includes(currentInvoice.clientName!) && !matchedClient) {
                                     newClientEmail = ''; // Clear email if changing from a known client to a new one
+                                     setCurrentInvoice(prev => ({ ...prev, clientEmail: newClientEmail }));
+                                } else if (!matchedClient) { // If not matching any, also clear
+                                    newClientEmail = '';
+                                     setCurrentInvoice(prev => ({ ...prev, clientEmail: newClientEmail }));
                                 }
-                                // else, retain current newClientEmail (could be manually entered or from a previous match)
+                                // else, newClientEmail is retained (could be manually entered or empty)
                             }
-                            
-                            setCurrentInvoice(prev => ({ ...prev, clientName: typedName, clientEmail: newClientEmail }));
-                            setClientNameSearch(typedName); // For popover filtering
                             setIsClientPopoverOpen(typedName.length > 0 || existingClientNames.length > 0);
                         }}
                         onFocus={() => {
-                            setIsClientPopoverOpen((currentInvoice.clientName || '').length > 0 || existingClientNames.length > 0);
+                            setIsClientPopoverOpen((currentInvoice.clientName || clientNameSearch || '').length > 0 || existingClientNames.length > 0);
                         }}
                         onBlur={() => setTimeout(() => setIsClientPopoverOpen(false), 150)} 
                         placeholder="Type or select client"
@@ -673,7 +689,7 @@ export default function InvoicingPage() {
                       <PopoverContent className="w-[--radix-popover-trigger-width] p-0" align="start">
                         <div className="max-h-48 overflow-y-auto rounded-md border bg-popover text-popover-foreground shadow-md">
                           {(() => {
-                            const filteredClients = existingClientNames.filter(name => name.toLowerCase().includes(clientNameSearch.toLowerCase()));
+                            const filteredClients = existingClientNames.filter(name => name.toLowerCase().includes((clientNameSearch || '').toLowerCase()));
                             if (filteredClients.length > 0) {
                               return filteredClients.map(name => (
                                 <div
@@ -690,9 +706,9 @@ export default function InvoicingPage() {
                                   {name}
                                 </div>
                               ));
-                            } else if (clientNameSearch.length > 0 && existingClientNames.length === 0) {
+                            } else if ((clientNameSearch || '').length > 0 && existingClientNames.length === 0) {
                                 return <div className="p-2 text-sm text-muted-foreground">No existing clients. Type to add.</div>;
-                            } else if (clientNameSearch.length > 0) {
+                            } else if ((clientNameSearch || '').length > 0) {
                               return <div className="p-2 text-sm text-muted-foreground">No matching clients. Type to add.</div>;
                             } else if (existingClientNames.length > 0) { // Show all if search is empty but clients exist
                                return existingClientNames.map(name => (
@@ -881,3 +897,5 @@ export default function InvoicingPage() {
     </div>
   );
 }
+
+    
