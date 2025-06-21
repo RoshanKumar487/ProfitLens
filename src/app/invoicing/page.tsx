@@ -16,7 +16,7 @@ import {
 } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger, DropdownMenuSeparator } from '@/components/ui/dropdown-menu';
-import { Receipt, PlusCircle, Search, MoreHorizontal, Edit, Trash2, Eye, Mail, FileDown, Calendar as CalendarIconLucide, Save, Loader2, UserPlus, Printer, Percent, BookOpen } from 'lucide-react';
+import { Receipt, PlusCircle, Search, MoreHorizontal, Edit, Trash2, Eye, Mail, FileDown, Calendar as CalendarIconLucide, Save, Loader2, UserPlus, Printer, Percent } from 'lucide-react';
 import { format } from 'date-fns';
 import { useToast } from '@/hooks/use-toast';
 import {
@@ -54,7 +54,6 @@ import Image from 'next/image';
 import { sendInvoiceEmailAction } from './actions'; 
 import { cn } from '@/lib/utils';
 import { Separator } from '@/components/ui/separator';
-import { Checkbox } from '@/components/ui/checkbox';
 
 interface InvoiceItem {
   id: string;
@@ -114,14 +113,6 @@ interface CompanyDetailsFirestore {
   accountNumber?: string;
   ifscCode?: string;
 }
-
-interface Product {
-    id: string;
-    name: string;
-    description: string;
-    price: number;
-}
-
 
 const LOCAL_STORAGE_EMAIL_TEMPLATE_KEY = 'profitlens-invoice-email-template-v2';
 const LOCAL_STORAGE_NOTES_TEMPLATE_KEY = 'profitlens-invoice-notes-template-v1';
@@ -199,12 +190,6 @@ export default function InvoicingPage() {
   const [invoiceToView, setInvoiceToView] = useState<InvoiceDisplay | null>(null);
   const [isDownloadingPDF, setIsDownloadingPDF] = useState(false);
 
-  // Product Catalog States
-  const [productCatalog, setProductCatalog] = useState<Product[]>([]);
-  const [isCatalogDialogOpen, setIsCatalogDialogOpen] = useState(false);
-  const [catalogSearchTerm, setCatalogSearchTerm] = useState('');
-  const [selectedCatalogProducts, setSelectedCatalogProducts] = useState<Set<string>>(new Set());
-
   useEffect(() => {
     if (!isFormOpen) return;
 
@@ -267,11 +252,10 @@ export default function InvoicingPage() {
     }
   }, [user, authIsLoading, fetchCompanyProfile]);
 
-  const fetchInvoicesAndProducts = useCallback(async () => {
+  const fetchInvoices = useCallback(async () => {
     if (!user || !user.companyId) {
       setInvoices([]);
       setExistingClients([]);
-      setProductCatalog([]);
       setIsLoading(false);
       return;
     }
@@ -303,17 +287,10 @@ export default function InvoicingPage() {
       });
       setExistingClients(Array.from(clientsMap.values()));
 
-      // Fetch Products
-      const productsRef = collection(db, 'products');
-      const qProducts = query(productsRef, where('companyId', '==', user.companyId), orderBy('createdAt', 'desc'));
-      const productSnapshot = await getDocs(qProducts);
-      const fetchedProducts = productSnapshot.docs.map(docSnap => ({ id: docSnap.id, ...docSnap.data() } as Product));
-      setProductCatalog(fetchedProducts);
-
     } catch (error: any) {
-      console.error('[InvoicingPage fetchInvoicesAndProducts] Error fetching data:', error);
-      toast({ title: 'Error Fetching Data', description: `Could not load invoices or products. ${error.message || 'An unknown error occurred.'}`, variant: 'destructive' });
-      setInvoices([]); setExistingClients([]); setProductCatalog([]);
+      console.error('[InvoicingPage fetchInvoices] Error fetching invoices:', error);
+      toast({ title: 'Error Fetching Invoices', description: `Could not load invoices. ${error.message || 'An unknown error occurred.'}`, variant: 'destructive' });
+      setInvoices([]); setExistingClients([]);
     } finally {
       setIsLoading(false);
     }
@@ -324,10 +301,10 @@ export default function InvoicingPage() {
       setIsLoading(true); return;
     }
     if (!user || !user.companyId) {
-      setIsLoading(false); setInvoices([]); setExistingClients([]); setProductCatalog([]); return;
+      setIsLoading(false); setInvoices([]); setExistingClients([]); return;
     }
-    fetchInvoicesAndProducts();
-  }, [user, authIsLoading, fetchInvoicesAndProducts]);
+    fetchInvoices();
+  }, [user, authIsLoading, fetchInvoices]);
 
 
   const filteredInvoices = useMemo(() => {
@@ -419,7 +396,7 @@ export default function InvoicingPage() {
       localStorage.setItem(LOCAL_STORAGE_DISCOUNT_TYPE_KEY, currentInvoice.discountType || 'fixed');
       localStorage.setItem(LOCAL_STORAGE_DISCOUNT_VALUE_KEY, String(currentInvoice.discountValue || '0'));
 
-      fetchInvoicesAndProducts();
+      fetchInvoices();
       setIsFormOpen(false);
       setCurrentInvoice({});
       setIsEditing(false);
@@ -482,7 +459,7 @@ export default function InvoicingPage() {
             const invoiceRef = doc(db, 'invoices', invoiceToDeleteId);
             await deleteDoc(invoiceRef);
             toast({ title: "Invoice Deleted", description: "The invoice has been removed."});
-            fetchInvoicesAndProducts();
+            fetchInvoices();
             setInvoiceToDeleteId(null);
         } catch (error: any) {
             console.error("Error deleting invoice: ", error);
@@ -874,35 +851,6 @@ export default function InvoicingPage() {
     }
   }, [currentInvoice.notes, toast]);
 
-  const filteredCatalogProducts = useMemo(() => {
-    return productCatalog.filter(p => p.name.toLowerCase().includes(catalogSearchTerm.toLowerCase()));
-  }, [productCatalog, catalogSearchTerm]);
-
-  const handleAddFromCatalog = () => {
-    const newItems: InvoiceItem[] = [];
-    selectedCatalogProducts.forEach(productId => {
-        const product = productCatalog.find(p => p.id === productId);
-        if (product) {
-            newItems.push({
-                id: crypto.randomUUID(),
-                description: product.name,
-                quantity: 1,
-                unitPrice: product.price
-            });
-        }
-    });
-
-    setCurrentInvoice(prev => ({
-      ...prev,
-      items: [...(prev.items || []), ...newItems]
-    }));
-
-    setIsCatalogDialogOpen(false);
-    setSelectedCatalogProducts(new Set());
-    setCatalogSearchTerm('');
-  };
-
-
   if (authIsLoading) {
     return (
       <div className="flex items-center justify-center h-[calc(100vh-200px)]">
@@ -1143,10 +1091,7 @@ export default function InvoicingPage() {
             <div className="space-y-2 pt-2">
               <div className="flex justify-between items-center">
                 <Label className="text-base font-medium">Invoice Items</Label>
-                <div className="flex gap-2">
-                    <Button type="button" variant="outline" size="sm" onClick={() => setIsCatalogDialogOpen(true)} disabled={isSaving}><BookOpen className="mr-2 h-4 w-4" /> Add from Catalog</Button>
-                    <Button type="button" variant="outline" size="sm" onClick={handleAddItem} disabled={isSaving}><PlusCircle className="mr-2 h-4 w-4" /> Add Custom</Button>
-                </div>
+                <Button type="button" variant="outline" size="sm" onClick={handleAddItem} disabled={isSaving}><PlusCircle className="mr-2 h-4 w-4" /> Add Item</Button>
               </div>
               {(currentInvoice.items || []).map((item) => (
                 <div key={item.id} className="grid grid-cols-[1fr_auto_auto_auto] gap-2 items-end p-2 border rounded-md bg-muted/30">
@@ -1438,58 +1383,6 @@ export default function InvoicingPage() {
         </DialogContent>
       </Dialog>
       
-      <Dialog open={isCatalogDialogOpen} onOpenChange={(open) => { if (!open) { setCatalogSearchTerm(''); setSelectedCatalogProducts(new Set()); } setIsCatalogDialogOpen(open); }}>
-        <DialogContent className="sm:max-w-2xl max-h-[90vh] flex flex-col">
-            <DialogHeader>
-                <DialogTitle>Add from Catalog</DialogTitle>
-                <DialogDescription>Select products or services to add to the invoice.</DialogDescription>
-            </DialogHeader>
-            <div className="relative">
-              <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
-              <Input placeholder="Search catalog..." className="pl-8" value={catalogSearchTerm} onChange={e => setCatalogSearchTerm(e.target.value)} />
-            </div>
-            <ScrollArea className="flex-grow -mx-6 px-6">
-                <div className="space-y-2 py-4">
-                    {filteredCatalogProducts.length > 0 ? filteredCatalogProducts.map(product => (
-                        <div key={product.id} className="flex items-center space-x-3 p-3 rounded-md hover:bg-muted/50 transition-colors">
-                            <Checkbox 
-                                id={`product-${product.id}`}
-                                checked={selectedCatalogProducts.has(product.id)}
-                                onCheckedChange={(checked) => {
-                                    setSelectedCatalogProducts(prev => {
-                                        const newSet = new Set(prev);
-                                        if (checked) {
-                                            newSet.add(product.id);
-                                        } else {
-                                            newSet.delete(product.id);
-                                        }
-                                        return newSet;
-                                    });
-                                }}
-                            />
-                            <label htmlFor={`product-${product.id}`} className="flex-grow grid grid-cols-3 gap-4 cursor-pointer">
-                                <span className="font-medium col-span-1">{product.name}</span>
-                                <span className="text-sm text-muted-foreground col-span-1 truncate">{product.description}</span>
-                                <span className="text-sm text-right col-span-1">{currency}{product.price.toFixed(2)}</span>
-                            </label>
-                        </div>
-                    )) : (
-                        <p className="text-center text-sm text-muted-foreground py-8">No products found.</p>
-                    )}
-                </div>
-            </ScrollArea>
-            <DialogFooter>
-                <DialogClose asChild>
-                    <Button variant="outline">Cancel</Button>
-                </DialogClose>
-                <Button onClick={handleAddFromCatalog} disabled={selectedCatalogProducts.size === 0}>
-                    Add {selectedCatalogProducts.size > 0 ? selectedCatalogProducts.size : ''} Item(s)
-                </Button>
-            </DialogFooter>
-        </DialogContent>
-      </Dialog>
-
-
       <AlertDialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>
         <AlertDialogContent>
           <AlertDialogHeader>

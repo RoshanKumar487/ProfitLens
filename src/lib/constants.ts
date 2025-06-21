@@ -35,11 +35,6 @@ export const NAV_ITEMS: NavItem[] = [
     icon: Receipt,
   },
   {
-    label: 'Products & Services',
-    href: '/products-services',
-    icon: Package,
-  },
-  {
     label: 'Employees',
     href: '/employees',
     icon: Users2,
