@@ -29,6 +29,16 @@ export default function SignInPage() {
     }
   }, [searchParams]);
 
+  useEffect(() => {
+    if (error) {
+      if (error.code === 'auth/invalid-credential') {
+        setPageError('Invalid credentials. Please check your email and password, or sign up if you are a new user.');
+      } else {
+        setPageError(error.message);
+      }
+    }
+  }, [error]);
+
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
     setPageError(null);
@@ -38,9 +48,7 @@ export default function SignInPage() {
       return;
     }
     await signIn(email, password);
-    if (error) {
-        setPageError(error.message);
-    }
+    // The signIn function updates the `error` state in the context, which the useEffect hook above will catch.
   };
 
   return (
@@ -62,9 +70,6 @@ export default function SignInPage() {
           <form onSubmit={handleSubmit} className="space-y-4">
             {pageError && (
               <Alert variant="destructive"><AlertTriangle className="h-4 w-4"/><AlertTitle>{pageError}</AlertTitle></Alert>
-            )}
-             {error && !pageError && (
-              <Alert variant="destructive"><AlertTriangle className="h-4 w-4"/><AlertTitle>{error.message}</AlertTitle></Alert>
             )}
             <div>
               <Label htmlFor="email">Email Address</Label>

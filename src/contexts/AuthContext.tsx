@@ -234,7 +234,13 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       const caughtError = err as AuthError;
       console.error('AuthContext: Sign in error', caughtError);
       setAuthError(caughtError);
-      toast({ title: "Sign In Failed", description: caughtError.message, variant: "destructive"});
+
+      let errorMessage = caughtError.message;
+      if (caughtError.code === 'auth/invalid-credential') {
+        errorMessage = 'Invalid credentials. Please check your email and password, or sign up if you are a new user.';
+      }
+      
+      toast({ title: "Sign In Failed", description: errorMessage, variant: "destructive"});
       setIsLoading(false);
       return null;
     }
