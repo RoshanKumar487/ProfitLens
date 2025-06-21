@@ -1,4 +1,3 @@
-
 import React from 'react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Lightbulb } from 'lucide-react';
@@ -30,7 +29,7 @@ const HelpfulTipsCard = () => {
           width={600} 
           height={200} 
           className="rounded-lg mt-4 object-cover w-full" 
-          data-ai-hint="business growth" 
+          data-ai-hint="business graph"
         />
       </CardContent>
     </Card>

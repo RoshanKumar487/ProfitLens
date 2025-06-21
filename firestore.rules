@@ -1,0 +1,57 @@
+
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // Helper function to get the expected companyId for a given userId
+    function getExpectedCompanyIdForUser(userId) {
+      return "fb-default-company-" + userId.slice(0, 5);
+    }
+
+    // Company Profiles: Only the user associated with the companyId can manage it.
+    // The document ID {companyId} itself must match the derived ID for the authenticated user.
+    match /companyProfiles/{companyId} {
+      allow read, create, update, delete: if request.auth != null && companyId == getExpectedCompanyIdForUser(request.auth.uid);
+    }
+
+    // Appointments Collection
+    match /appointments/{appointmentId} {
+      // Allow create if the companyId in the new document matches the user's expected companyId
+      allow create: if request.auth != null && request.resource.data.companyId == getExpectedCompanyIdForUser(request.auth.uid);
+      // Allow read, update, delete if the companyId in the existing document matches the user's expected companyId
+      allow read, update, delete: if request.auth != null && resource.data.companyId == getExpectedCompanyIdForUser(request.auth.uid);
+      // Allow list operations (queries). Individual document reads are still protected by the 'read' rule.
+      // Client-side queries MUST include `where('companyId', '==', user.companyId)`.
+      allow list: if request.auth != null;
+    }
+
+    // Employees Collection
+    match /employees/{employeeId} {
+      allow create: if request.auth != null && request.resource.data.companyId == getExpectedCompanyIdForUser(request.auth.uid);
+      allow read, update, delete: if request.auth != null && resource.data.companyId == getExpectedCompanyIdForUser(request.auth.uid);
+      allow list: if request.auth != null;
+    }
+
+    // Expenses Collection
+    match /expenses/{expenseId} {
+      allow create: if request.auth != null && request.resource.data.companyId == getExpectedCompanyIdForUser(request.auth.uid);
+      allow read, update, delete: if request.auth != null && resource.data.companyId == getExpectedCompanyIdForUser(request.auth.uid);
+      allow list: if request.auth != null;
+    }
+
+    // Invoices Collection
+    match /invoices/{invoiceId} {
+      allow create: if request.auth != null && request.resource.data.companyId == getExpectedCompanyIdForUser(request.auth.uid);
+      allow read, update, delete: if request.auth != null && resource.data.companyId == getExpectedCompanyIdForUser(request.auth.uid);
+      allow list: if request.auth != null;
+    }
+
+    // Revenue Entries Collection
+    match /revenueEntries/{revenueEntryId} {
+      allow create: if request.auth != null && request.resource.data.companyId == getExpectedCompanyIdForUser(request.auth.uid);
+      allow read, update, delete: if request.auth != null && resource.data.companyId == getExpectedCompanyIdForUser(request.auth.uid);
+      allow list: if request.auth != null;
+    }
+  }
+}

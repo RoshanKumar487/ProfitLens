@@ -1,7 +1,6 @@
-
 'use client';
 
-import React, { useState, useEffect, FormEvent } from 'react';
+import React, { useState, useEffect, FormEvent, useCallback } from 'react';
 import PageTitle from '@/components/PageTitle';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -11,178 +10,157 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/com
 import { Calendar } from '@/components/ui/calendar';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { CalendarIcon, TrendingUp, Save, Loader2 } from 'lucide-react';
-import { format, parseISO } from 'date-fns';
+import { format } from 'date-fns';
 import { useToast } from '@/hooks/use-toast';
+import { useAuth } from '@/contexts/AuthContext';
+import { db } from '@/lib/firebaseConfig';
+import { collection, addDoc, getDocs, query, where, orderBy, limit, Timestamp, serverTimestamp } from 'firebase/firestore';
 
-interface RevenueEntry {
-  id: string; // MongoDB _id as string
-  date: Date; // Will be Date object in state, string from/to API
+interface RevenueEntryFirestore {
+  id?: string; 
+  date: Timestamp; 
+  amount: number;
+  source: string;
+  description?: string;
+  companyId: string;
+  createdAt: Timestamp;
+}
+
+interface RevenueEntryDisplay {
+  id: string;
+  date: Date; 
   amount: number;
   source: string;
   description?: string;
 }
 
 export default function RecordRevenuePage() {
+  const { user, isLoading: authIsLoading } = useAuth();
+  const currency = user?.currencySymbol || '$';
   const [date, setDate] = useState<Date | undefined>(new Date());
   const [amount, setAmount] = useState<string>('');
   const [source, setSource] = useState<string>('');
   const [description, setDescription] = useState<string>('');
-  const [recentEntries, setRecentEntries] = useState<RevenueEntry[]>([]);
+  const [recentEntries, setRecentEntries] = useState<RevenueEntryDisplay[]>([]);
   const [isLoadingEntries, setIsLoadingEntries] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
   const { toast } = useToast();
 
-  useEffect(() => {
-    const fetchRevenueEntries = async () => {
+  const fetchRevenueEntries = useCallback(async () => {
+    if (authIsLoading) {
       setIsLoadingEntries(true);
-      try {
-        const response = await fetch('/api/revenue-entries');
-        if (!response.ok) {
-          let errorMessage = 'Failed to fetch revenue entries.';
-          try {
-            const errorData = await response.json();
-            if (errorData && errorData.message) {
-              errorMessage = errorData.message;
-            } else {
-              errorMessage = `Request failed: ${response.statusText} (Status: ${response.status})`;
-            }
-          } catch (jsonError) {
-            console.error('Failed to parse API error response as JSON (fetch revenue):', jsonError);
-            if (response.status === 404) {
-                errorMessage = `API route /api/revenue-entries not found (404). Please verify the route exists.`;
-            } else if (response.status === 500) {
-                errorMessage = `Server Error (500) fetching revenue: Received HTML instead of JSON. Check MONGODB_URI and server logs.`;
-            } else {
-                errorMessage = `The server returned an unexpected response (not valid JSON) while fetching entries. Status: ${response.status} (${response.statusText}). Check server logs.`;
-            }
-          }
-          throw new Error(errorMessage);
-        }
-        const data = await response.json();
-        setRecentEntries(data.map((entry: any) => ({...entry, date: parseISO(entry.date)})));
-      } catch (error: any) {
-        console.error('Error fetching revenue entries:', error);
-        let desc = error.message || 'Could not load recent revenue entries. Please try again later.';
-        
-        if (error.name === 'SyntaxError') {
-          desc = `Failed to parse server response for revenue entries. Server may have sent HTML. Check server logs. (Details: ${error.message})`;
-        } else if (typeof error.message === 'string') {
-          if (error.message.includes('Invalid scheme') || error.message.includes('mongodb://') || error.message.includes('mongodb+srv://')) {
-            desc = 'Server DB Error: The database connection string (MONGODB_URI) appears invalid. Please check your .env file.';
-          } else if (error.message.includes('Failed to connect') || error.message.includes('ECONNREFUSED')) {
-            desc = 'Server DB Error: Could not connect to the database. Check MONGODB_URI and ensure database is running/accessible.';
-          }
-        }
-        toast({
-          title: 'Error Loading Entries',
-          description: desc,
-          variant: 'destructive',
-        });
-      } finally {
-        setIsLoadingEntries(false);
-      }
-    };
+      return;
+    }
+    if (!user || !user.companyId) {
+      setIsLoadingEntries(false);
+      setRecentEntries([]);
+      return;
+    }
 
+    setIsLoadingEntries(true);
+    try {
+      const entriesRef = collection(db, 'revenueEntries');
+      const q = query(entriesRef, where('companyId', '==', user.companyId), orderBy('date', 'desc'), limit(5));
+      const querySnapshot = await getDocs(q);
+      
+      const fetchedEntries = querySnapshot.docs.map(docSnap => {
+        const data = docSnap.data() as Omit<RevenueEntryFirestore, 'id'>;
+        return {
+          id: docSnap.id,
+          date: data.date.toDate(),
+          amount: data.amount,
+          source: data.source,
+          description: data.description,
+        };
+      });
+      setRecentEntries(fetchedEntries);
+    } catch (error: any) {
+      console.error('Error fetching revenue entries:', error);
+      toast({
+        title: 'Error Loading Entries',
+        description: error.message,
+        variant: 'destructive',
+      });
+      setRecentEntries([]);
+    } finally {
+      setIsLoadingEntries(false);
+    }
+  }, [user, authIsLoading, toast]);
+
+  useEffect(() => {
     fetchRevenueEntries();
-  }, [toast]);
+  }, [fetchRevenueEntries]);
 
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
+    if (!user || !user.companyId) {
+      toast({ title: 'Authentication Error', description: 'User not authenticated.', variant: 'destructive' });
+      return;
+    }
     if (!date || !amount || !source) {
-      toast({
-        title: 'Missing Information',
-        description: 'Please fill in date, amount, and source.',
-        variant: 'destructive',
-      });
+      toast({ title: 'Missing Information', description: 'Please fill in date, amount, and source.', variant: 'destructive' });
       return;
     }
     
     const amountNum = parseFloat(amount);
     if (isNaN(amountNum) || amountNum <= 0) {
-        toast({
-            title: 'Invalid Amount',
-            description: 'Amount must be a positive number.',
-            variant: 'destructive',
-        });
-        return;
+      toast({ title: 'Invalid Amount', description: 'Amount must be a positive number.', variant: 'destructive' });
+      return;
     }
 
     setIsSaving(true);
     const newEntryPayload = {
-      date: date.toISOString(), // Send as ISO string
+      date: Timestamp.fromDate(date), 
       amount: amountNum,
       source,
-      description,
+      description: description || '',
+      companyId: user.companyId,
+      createdAt: serverTimestamp(),
     };
 
     try {
-      const response = await fetch('/api/revenue-entries', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(newEntryPayload),
-      });
-
-      if (!response.ok) {
-        let errorMessageFromServer = 'Failed to save revenue entry.';
-        try {
-          const errorData = await response.json();
-          if (errorData && errorData.message) {
-            errorMessageFromServer = errorData.message; 
-          } else {
-             errorMessageFromServer = `Request failed: ${response.statusText} (Status: ${response.status})`;
-          }
-        } catch (jsonError) {
-           console.error('Failed to parse API error response as JSON (save revenue):', jsonError);
-           if (response.status === 404) {
-               errorMessageFromServer = `API route /api/revenue-entries (POST) not found (404).`;
-           } else if (response.status === 500) {
-                errorMessageFromServer = `Server Error (500) saving revenue: Received HTML instead of JSON. Check MONGODB_URI and server logs.`;
-           } else {
-               errorMessageFromServer = `The server returned an unexpected response (not valid JSON) while saving. Status: ${response.status} (${response.statusText}). This likely means the API route encountered an error. Check server logs.`;
-           }
-        }
-        throw new Error(errorMessageFromServer);
-      }
-      
-      const savedEntry = await response.json();
-
-      setRecentEntries(prevEntries => 
-        [{ ...savedEntry, date: parseISO(savedEntry.date) }, ...prevEntries].slice(0, 5)
-      );
-      
+      await addDoc(collection(db, 'revenueEntries'), newEntryPayload);
+      fetchRevenueEntries(); 
       toast({
         title: 'Revenue Recorded',
-        description: `Successfully recorded $${amountNum.toFixed(2)} from ${source}.`,
+        description: `Successfully recorded ${currency}${amountNum.toFixed(2)} from ${source}.`,
       });
-
       setDate(new Date());
       setAmount('');
       setSource('');
       setDescription('');
     } catch (error: any) {
       console.error('Error saving revenue entry:', error);
-      let desc = error.message || 'Could not save revenue entry. Please try again.';
-
-      if (error.name === 'SyntaxError') {
-        desc = `Failed to parse server response after saving revenue. Server may have sent HTML. Check server logs. (Details: ${error.message})`;
-      } else if (typeof error.message === 'string') {
-         if (error.message.includes('Invalid scheme') || error.message.includes('mongodb://') || error.message.includes('mongodb+srv://')) {
-            desc = 'Server DB Error: The database connection string (MONGODB_URI) appears invalid. Please check your .env file.';
-          } else if (error.message.includes('Failed to connect') || error.message.includes('ECONNREFUSED')) {
-            desc = 'Server DB Error: Could not connect to the database while saving. Check MONGODB_URI and ensure database is running/accessible.';
-          }
-      }
       toast({
         title: 'Save Failed',
-        description: desc,
+        description: error.message,
         variant: 'destructive',
       });
     } finally {
       setIsSaving(false);
     }
   };
+
+  if (authIsLoading) {
+    return (
+      <div className="flex justify-center items-center h-64">
+        <Loader2 className="h-12 w-12 animate-spin text-primary" />
+         <p className="ml-2">Loading authentication...</p>
+      </div>
+    );
+  }
+
+  if (!user && !authIsLoading) {
+     return (
+      <div className="space-y-6">
+        <PageTitle title="Record Revenue" subtitle="Log your daily or transaction-based income." icon={TrendingUp} />
+        <Card className="shadow-lg">
+          <CardHeader><CardTitle>Access Denied</CardTitle></CardHeader>
+          <CardContent><p>Please sign in to record revenue.</p></CardContent>
+        </Card>
+      </div>
+    )
+  }
 
   return (
     <div className="space-y-6">
@@ -222,7 +200,7 @@ export default function RecordRevenuePage() {
               </div>
 
               <div>
-                <Label htmlFor="amount">Amount ($)</Label>
+                <Label htmlFor="amount">Amount ({currency})</Label>
                 <Input
                   id="amount"
                   type="number"
@@ -292,9 +270,8 @@ export default function RecordRevenuePage() {
               recentEntries.map(entry => (
                 <div key={entry.id} className="p-3 bg-muted/50 rounded-lg border border-border">
                   <div className="flex justify-between items-center">
-                    <span className="font-semibold text-foreground">${entry.amount.toFixed(2)}</span>
-                    {/* Ensure entry.date is a Date object before formatting */}
-                    <span className="text-xs text-muted-foreground">{entry.date instanceof Date ? format(entry.date, 'PP') : format(parseISO(entry.date as unknown as string), 'PP')}</span>
+                    <span className="font-semibold text-foreground">{currency}{entry.amount.toFixed(2)}</span>
+                    <span className="text-xs text-muted-foreground">{format(entry.date, 'PP')}</span>
                   </div>
                   <p className="text-sm text-muted-foreground">{entry.source}</p>
                   {entry.description && <p className="text-xs text-muted-foreground mt-1">{entry.description}</p>}

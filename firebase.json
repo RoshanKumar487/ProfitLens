@@ -1,0 +1,21 @@
+
+{
+  "hosting": {
+    "site": "YOUR_PROJECT_ID",
+    "source": ".",
+    "appAssociation": "AUTO",
+    "rewrites": [
+      {
+        "source": "**",
+        "apphosting": {
+          "backendId": "profitlens-backend",
+          "region": "us-central1"
+        }
+      }
+    ]
+  },
+  "firestore": {
+    "rules": "firestore.rules",
+    "indexes": "firestore.indexes.json"
+  }
+}

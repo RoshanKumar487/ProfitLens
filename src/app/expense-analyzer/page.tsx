@@ -11,9 +11,12 @@ import { Sparkles, CheckCircle, AlertTriangle, Loader2, Info } from 'lucide-reac
 import { analyzeExpenseOpportunities, type AnalyzeExpenseOpportunitiesOutput } from '@/ai/flows/analyze-expense-opportunities';
 import { useToast } from '@/hooks/use-toast';
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { useAuth } from '@/contexts/AuthContext';
 
 
 export default function ExpenseAnalyzerPage() {
+  const { user } = useAuth();
+  const currency = user?.currencySymbol || '$';
   const [revenue, setRevenue] = useState<string>('');
   const [expenses, setExpenses] = useState<string>('');
   const [additionalContext, setAdditionalContext] = useState<string>('');
@@ -90,7 +93,7 @@ export default function ExpenseAnalyzerPage() {
           <CardContent>
             <form onSubmit={handleSubmit} className="space-y-4">
               <div>
-                <Label htmlFor="revenue">Total Revenue ($)</Label>
+                <Label htmlFor="revenue">Total Revenue ({currency})</Label>
                 <Input
                   id="revenue"
                   type="number"
@@ -103,7 +106,7 @@ export default function ExpenseAnalyzerPage() {
               </div>
 
               <div>
-                <Label htmlFor="expenses">Total Expenses ($)</Label>
+                <Label htmlFor="expenses">Total Expenses ({currency})</Label>
                 <Input
                   id="expenses"
                   type="number"

@@ -1,4 +1,3 @@
-
 'use client';
 
 import React, { useState, useEffect, type FormEvent } from 'react';
@@ -10,166 +9,150 @@ import { Textarea } from '@/components/ui/textarea';
 import { Button } from '@/components/ui/button';
 import { useToast } from '@/hooks/use-toast';
 import { Building, Loader2, Save } from 'lucide-react';
+import { useAuth } from '@/contexts/AuthContext';
+import { db } from '@/lib/firebaseConfig';
+import { doc, getDoc, setDoc, Timestamp } from 'firebase/firestore';
+import { Separator } from '@/components/ui/separator';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { COUNTRIES } from '@/lib/countries';
 
-interface CompanyDetails {
+
+interface CompanyDetailsFirestore {
   name: string;
-  address: string;
+  address: string; // Street address
+  city: string;
+  state: string; // State or Province
+  country: string;
   gstin: string;
   phone: string;
   email: string;
   website: string;
+  createdAt?: Timestamp; // Added for consistency, usually set on creation
+  updatedAt?: Timestamp;
 }
 
 export default function CompanyDetailsPage() {
-  const [companyDetails, setCompanyDetails] = useState<CompanyDetails>({
+  const { user, isLoading: authIsLoading } = useAuth();
+  const [companyDetails, setCompanyDetails] = useState<CompanyDetailsFirestore>({
     name: '',
     address: '',
+    city: '',
+    state: '',
+    country: '',
     gstin: '',
     phone: '',
     email: '',
     website: '',
   });
-  const [isLoading, setIsLoading] = useState(true);
+  const [isFetching, setIsFetching] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
   const { toast } = useToast();
 
   useEffect(() => {
     const fetchCompanyDetails = async () => {
-      setIsLoading(true);
+      if (authIsLoading) {
+        setIsFetching(true);
+        return;
+      }
+      if (!user || !user.companyId) {
+        setIsFetching(false);
+        console.log("CompanyDetails: User or companyId not found for fetching.");
+        setCompanyDetails({ name: '', address: '', city: '', state: '', country: '', gstin: '', phone: '', email: '', website: '' });
+        return;
+      }
+
+      setIsFetching(true);
       try {
-        const response = await fetch('/api/company-details');
-        if (!response.ok) {
-           let errorMessage = 'Failed to fetch details.';
-           try {
-             const errorData = await response.json();
-             if (errorData && errorData.message) {
-               errorMessage = errorData.message;
-             } else {
-                errorMessage = `Request failed: ${response.statusText} (Status: ${response.status})`;
-             }
-           } catch (jsonError) {
-             console.error('Failed to parse API error response as JSON (fetch):', jsonError);
-             if (response.status === 404) {
-                errorMessage = `API route /api/company-details not found (404). Please verify the route exists and the server is correctly configured. Server logs may provide more details.`;
-             } else if (response.status === 500) {
-                errorMessage = `Server Error (500): Received an HTML error page instead of JSON. This usually means a critical server-side issue, often related to database configuration (e.g., missing or incorrect MONGODB_URI in .env) or an unhandled error in the API route. Please check your server logs for the specific error.`;
-             } else {
-                errorMessage = `Received an unexpected non-JSON response from the server (Status: ${response.status} - ${response.statusText}). This often indicates a server-side error. Please check server logs.`;
-             }
-           }
-          throw new Error(errorMessage);
+        const docRef = doc(db, 'companyProfiles', user.companyId);
+        const docSnap = await getDoc(docRef);
+
+        if (docSnap.exists()) {
+          const data = docSnap.data() as Partial<CompanyDetailsFirestore>;
+          setCompanyDetails({
+            name: data.name || '',
+            address: data.address || '',
+            city: data.city || '',
+            state: data.state || '',
+            country: data.country || '',
+            gstin: data.gstin || '',
+            phone: data.phone || '',
+            email: data.email || '',
+            website: data.website || '',
+            createdAt: data.createdAt, // Persist if exists
+            updatedAt: data.updatedAt,
+          });
+          console.log("CompanyDetails: Fetched details for companyId:", user.companyId);
+        } else {
+          console.log("CompanyDetails: No details found for companyId:", user.companyId, ". Initializing empty form.");
+          // This case should be less common now as profile is created on signup
+          setCompanyDetails({ name: user.displayName || '', address: '', city: '', state: '', country: '', gstin: '', phone: '', email: user.email || '', website: '' });
         }
-        const data = await response.json();
-        setCompanyDetails(data);
       } catch (error: any) {
-        console.error('Error fetching company details:', error);
-        let description = error.message || 'Could not load company details. Please try again later.';
-        
-        if (error.name === 'SyntaxError') {
-          description = `Failed to parse server response as JSON. The server may have returned HTML (e.g., an error page) instead of the expected data. Please check server logs. (Details: ${error.message})`;
-        } else if (typeof error.message === 'string') {
-          if (error.message.includes('Invalid scheme') || error.message.includes('mongodb+srv') || error.message.includes('mongodb://')) {
-            description = `Server Error: ${error.message}. Please ensure your MONGODB_URI environment variable is correctly configured in your .env file.`;
-          } else if (error.message.includes('ECONNREFUSED') || error.message.includes('failed to connect') || error.message.includes('ENOTFOUND')) {
-            description = `Server Error: Could not connect to the database. ${error.message}. Check MONGODB_URI and database server status.`;
-          }
-        }
-        
+        console.error('Error fetching company details from Firestore:', error);
         toast({
           title: 'Error Loading Details',
-          description: description,
+          description: error.message || 'Could not load company details from Firestore.',
           variant: 'destructive',
         });
+        setCompanyDetails({ name: '', address: '', city: '', state: '', country: '', gstin: '', phone: '', email: '', website: '' });
       } finally {
-        setIsLoading(false);
+        setIsFetching(false);
       }
     };
 
     fetchCompanyDetails();
-  }, [toast]);
+  }, [user, authIsLoading, toast]);
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
     const { name, value } = e.target;
     setCompanyDetails(prev => ({ ...prev, [name]: value }));
   };
+  
+  const handleCountryChange = (value: string) => {
+    setCompanyDetails(prev => ({...prev, country: value}));
+  };
 
   const handleSave = async (e?: React.FormEvent) => {
     if (e) e.preventDefault();
+    if (!user || !user.companyId) {
+      toast({ title: "Save Failed", description: "User not authenticated.", variant: "destructive" });
+      return;
+    }
+    if (!companyDetails.name || !companyDetails.address || !companyDetails.city || !companyDetails.state || !companyDetails.country || !companyDetails.gstin) {
+        toast({ title: "Missing Information", description: "Company Name, Address, City, State, Country and GSTIN/Tax ID are required.", variant: "destructive" });
+        return;
+    }
+
     setIsSaving(true);
     try {
-      const response = await fetch('/api/company-details', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(companyDetails),
-      });
-
-      if (!response.ok) {
-        let errorMessage = 'Failed to save details.';
-        try {
-          const errorData = await response.json();
-          if (errorData && errorData.message) {
-            errorMessage = errorData.message;
-          } else {
-            errorMessage = `Request failed: ${response.statusText} (Status: ${response.status})`;
-          }
-        } catch (jsonError) {
-          console.error('Failed to parse API error response as JSON (save):', jsonError);
-           if (response.status === 404) {
-             errorMessage = `API route /api/company-details (POST) not found (404). Please verify the route exists and the server is correctly configured.`;
-          } else if (response.status === 500) {
-              errorMessage = `Server Error (500) when saving: Received an HTML error page instead of JSON. This points to a critical server-side issue (e.g., database configuration error like MONGODB_URI, or an unhandled error in the API POST route). Please check your server logs for details.`;
-           } else if (response.status === 400) {
-             // Attempt to read body for more info on 400, if it's not already JSON
-             try {
-                const errorBodyText = await response.text(); // Read as text first
-                try {
-                    const errorBodyJson = JSON.parse(errorBodyText); // Try to parse
-                    if (errorBodyJson && errorBodyJson.message) {
-                        errorMessage = `Bad Request (400): ${errorBodyJson.message}`;
-                    } else {
-                        errorMessage = `Bad Request (400): ${errorBodyText || response.statusText}`;
-                    }
-                } catch (parseError) { // If text itself is not JSON
-                     if (errorBodyText.toLowerCase().includes("invalid json")) { // Check if the text indicates invalid JSON payload from client
-                        errorMessage = 'Server Error: Invalid JSON data sent in the request body when saving.';
-                    } else {
-                        errorMessage = `Bad Request (400): ${errorBodyText || response.statusText}`;
-                    }
-                }
-             } catch (bodyReadError) {
-                errorMessage = `Bad Request (400), and failed to read error body. Status: ${response.statusText}`;
-             }
-           } else {
-             errorMessage = `Received an unexpected non-JSON response from the server when saving (Status: ${response.status} - ${response.statusText}). Check server logs.`;
-          }
-        }
-        throw new Error(errorMessage);
-      }
-
-      const savedData = await response.json();
-      setCompanyDetails(savedData);
+      const docRef = doc(db, 'companyProfiles', user.companyId);
+      const detailsToSave: CompanyDetailsFirestore = {
+        name: companyDetails.name,
+        address: companyDetails.address,
+        city: companyDetails.city,
+        state: companyDetails.state,
+        country: companyDetails.country,
+        gstin: companyDetails.gstin,
+        phone: companyDetails.phone || '',
+        email: companyDetails.email || '',
+        website: companyDetails.website || '',
+        createdAt: companyDetails.createdAt || Timestamp.now(), // Preserve or set if new
+        updatedAt: Timestamp.now(),
+      };
+      await setDoc(docRef, detailsToSave, { merge: true }); 
+      
+      setCompanyDetails(detailsToSave); 
       toast({
         title: 'Details Saved',
-        description: 'Company information updated successfully.',
+        description: 'Company information updated. Currency may update on next refresh.',
       });
+      console.log("CompanyDetails: Saved details for companyId:", user.companyId);
 
     } catch (error: any) {
-      console.error('Error saving company details:', error);
-      let description = error.message || 'Could not save company details. Please try again later.';
-      if (error.name === 'SyntaxError') {
-        description = `Failed to parse server response as JSON after saving. The server might have returned HTML (e.g., an error page) instead of the expected data. Please check server logs. (Details: ${error.message})`;
-      } else if (typeof error.message === 'string') {
-         if (error.message.includes('Invalid scheme') || error.message.includes('mongodb+srv') || error.message.includes('mongodb://')) {
-            description = `Server Error: ${error.message}. Please ensure your MONGODB_URI environment variable is correctly configured.`;
-        } else if (error.message.includes('ECONNREFUSED') || error.message.includes('failed to connect') || error.message.includes('ENOTFOUND')) {
-            description = `Server Error: Could not connect to the database. ${error.message}. Check MONGODB_URI and database server status.`;
-        }
-      }
+      console.error('Error saving company details to Firestore:', error);
       toast({
         title: 'Save Failed',
-        description: description,
+        description: error.message || 'Could not save company details to Firestore.',
         variant: 'destructive',
       });
     } finally {
@@ -177,8 +160,7 @@ export default function CompanyDetailsPage() {
     }
   };
 
-
-  if (isLoading) {
+  if (isFetching || authIsLoading) {
     return (
       <div className="space-y-6">
         <PageTitle title="Company Details" subtitle="Manage your business information." icon={Building} />
@@ -188,7 +170,7 @@ export default function CompanyDetailsPage() {
             <CardDescription>Loading company details...</CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
-            {[...Array(6)].map((_, i) => (
+            {[...Array(8)].map((_, i) => ( // Increased skeleton count
               <div key={i} className="space-y-2">
                 <div className="h-4 bg-muted rounded w-1/4 animate-pulse"></div>
                 <div className="h-10 bg-muted rounded w-full animate-pulse"></div>
@@ -200,6 +182,23 @@ export default function CompanyDetailsPage() {
       </div>
     );
   }
+
+  if (!user && !authIsLoading) {
+    return (
+       <div className="space-y-6">
+        <PageTitle title="Company Details" subtitle="Manage your business information." icon={Building} />
+        <Card className="shadow-lg max-w-2xl mx-auto">
+          <CardHeader>
+            <CardTitle className="font-headline">Access Denied</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <p>Please sign in to manage your company details.</p>
+          </CardContent>
+        </Card>
+      </div>
+    )
+  }
+
 
   return (
     <div className="space-y-6">
@@ -225,18 +224,60 @@ export default function CompanyDetailsPage() {
               />
             </div>
             <div>
-              <Label htmlFor="address">Full Address</Label>
+              <Label htmlFor="address">Street Address</Label>
               <Textarea
                 id="address"
                 name="address"
                 value={companyDetails.address}
                 onChange={handleChange}
-                placeholder="e.g., 123 Main Street, Anytown, ST 12345"
-                rows={3}
+                placeholder="e.g., 123 Main Street"
+                rows={2}
                 required
                 disabled={isSaving}
               />
             </div>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div>
+                <Label htmlFor="city">City</Label>
+                <Input
+                  id="city"
+                  name="city"
+                  value={companyDetails.city}
+                  onChange={handleChange}
+                  placeholder="e.g., Anytown"
+                  required
+                  disabled={isSaving}
+                />
+              </div>
+              <div>
+                <Label htmlFor="state">State / Province</Label>
+                <Input
+                  id="state"
+                  name="state"
+                  value={companyDetails.state}
+                  onChange={handleChange}
+                  placeholder="e.g., CA or Ontario"
+                  required
+                  disabled={isSaving}
+                />
+              </div>
+            </div>
+            <div>
+                <Label htmlFor="country">Country</Label>
+                 <Select value={companyDetails.country} onValueChange={handleCountryChange} required disabled={isSaving}>
+                    <SelectTrigger id="country">
+                        <SelectValue placeholder="Select a country" />
+                    </SelectTrigger>
+                    <SelectContent>
+                        {COUNTRIES.map((c) => (
+                        <SelectItem key={c.code} value={c.code}>
+                            {c.name}
+                        </SelectItem>
+                        ))}
+                    </SelectContent>
+                </Select>
+            </div>
+             <Separator className="my-4" />
             <div>
               <Label htmlFor="gstin">GSTIN / Tax ID</Label>
               <Input
@@ -262,7 +303,7 @@ export default function CompanyDetailsPage() {
               />
             </div>
             <div>
-              <Label htmlFor="email">Email Address (Optional)</Label>
+              <Label htmlFor="email">Contact Email (Optional)</Label>
               <Input
                 id="email"
                 name="email"
@@ -285,7 +326,7 @@ export default function CompanyDetailsPage() {
                 disabled={isSaving}
               />
             </div>
-            <Button type="submit" disabled={isSaving || isLoading} className="w-full sm:w-auto">
+            <Button type="submit" disabled={isSaving || isFetching} className="w-full sm:w-auto">
               {isSaving ? (
                 <Loader2 className="mr-2 h-4 w-4 animate-spin" />
               ) : (
