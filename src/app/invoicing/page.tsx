@@ -16,9 +16,9 @@ import {
 } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger, DropdownMenuSeparator } from '@/components/ui/dropdown-menu';
-import { Receipt, PlusCircle, Search, MoreHorizontal, Edit, Trash2, Eye, Mail, FileDown, Calendar as CalendarIconLucide, Save, Loader2, UserPlus, Printer, FileText, CalendarIcon } from 'lucide-react'; // Added FileText, CalendarIcon
+import { Receipt, PlusCircle, Search, MoreHorizontal, Edit, Trash2, Eye, Mail, FileDown, Calendar as CalendarIconLucide, Save, Loader2, UserPlus, Printer, FileText, CalendarIcon } from 'lucide-react';
 import { format } from 'date-fns';
-import type { DateRange } from 'react-day-picker'; // Added DateRange
+import type { DateRange } from 'react-day-picker';
 import { useToast } from '@/hooks/use-toast';
 import {
   Dialog,
@@ -44,12 +44,12 @@ import { Textarea } from '@/components/ui/textarea';
 import { Calendar } from '@/components/ui/calendar';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Card, CardContent, CardHeader, CardTitle, CardDescription as CardDesc } from '@/components/ui/card'; // Renamed CardDescription
+import { Card, CardContent, CardHeader, CardTitle, CardDescription as CardDesc } from '@/components/ui/card';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { useAuth } from '@/contexts/AuthContext';
 import { collection, addDoc, getDocs, doc, updateDoc, deleteDoc, query, where, orderBy, Timestamp, serverTimestamp, getDoc } from 'firebase/firestore';
 import { db } from '@/lib/firebaseConfig';
-import { cn, downloadCsv } from '@/lib/utils'; // Added downloadCsv
+import { cn, downloadCsv } from '@/lib/utils';
 import jsPDF from 'jspdf';
 import html2canvas from 'html2canvas';
 import Image from 'next/image';
@@ -67,6 +67,7 @@ interface InvoiceFirestore {
   invoiceNumber: string;
   clientName: string;
   clientEmail?: string;
+  clientAddress?: string;
   amount: number;
   dueDate: Timestamp;
   status: 'Paid' | 'Pending' | 'Overdue' | 'Draft';
@@ -83,11 +84,13 @@ interface InvoiceDisplay extends Omit<InvoiceFirestore, 'dueDate' | 'issuedDate'
   issuedDate: Date;
   items: InvoiceItem[];
   notes?: string;
+  clientAddress?: string;
 }
 
 interface ExistingClient {
   name: string;
-  email?: string; 
+  email?: string;
+  address?: string;
 }
 
 interface CompanyDetailsFirestore {
@@ -100,9 +103,7 @@ interface CompanyDetailsFirestore {
 }
 
 const LOCAL_STORAGE_EMAIL_TEMPLATE_KEY = 'bizsight-invoice-email-template-v2';
-
 const DEFAULT_EMAIL_SUBJECT_TEMPLATE = "Invoice {{invoiceNumber}} from {{companyName}}";
-
 const DEFAULT_EDITABLE_EMAIL_BODY_TEXT = `
 Dear {{clientName}},
 
@@ -117,7 +118,6 @@ Thank you for your business!
 Sincerely,
 {{companyName}}
 `;
-
 
 export default function InvoicingPage() {
   const { user, isLoading: authIsLoading } = useAuth();
@@ -145,8 +145,6 @@ export default function InvoicingPage() {
 
   const [existingClients, setExistingClients] = useState<ExistingClient[]>([]);
   const [isClientPopoverOpen, setIsClientPopoverOpen] = useState(false);
-  const clientNameInputRef = useRef<HTMLInputElement>(null);
-  const popoverContentRef = useRef<HTMLDivElement>(null);
   const invoicePrintRef = useRef<HTMLDivElement>(null);
 
   const [isViewInvoiceDialogOpen, setIsViewInvoiceDialogOpen] = useState(false);
@@ -155,7 +153,6 @@ export default function InvoicingPage() {
 
   const [exportDateRange, setExportDateRange] = useState<DateRange | undefined>();
   const [isExporting, setIsExporting] = useState(false);
-
 
   const fetchCompanyProfile = useCallback(async () => {
     if (user && user.companyId) {
@@ -190,7 +187,6 @@ export default function InvoicingPage() {
     }
   }, [user, authIsLoading, fetchCompanyProfile]);
 
-
   const fetchInvoices = useCallback(async () => {
     if (!user || !user.companyId) {
       setInvoices([]);
@@ -211,6 +207,7 @@ export default function InvoicingPage() {
           invoiceNumber: data.invoiceNumber,
           clientName: data.clientName,
           clientEmail: data.clientEmail,
+          clientAddress: data.clientAddress,
           amount: data.amount,
           dueDate: data.dueDate.toDate(),
           status: data.status,
@@ -228,7 +225,8 @@ export default function InvoicingPage() {
             const existingEntry = clientsMap.get(inv.clientName.toLowerCase());
             clientsMap.set(inv.clientName.toLowerCase(), { 
                 name: inv.clientName, 
-                email: inv.clientEmail || existingEntry?.email || '' 
+                email: inv.clientEmail || existingEntry?.email || '',
+                address: inv.clientAddress || existingEntry?.address || ''
             });
         }
       });
@@ -248,7 +246,6 @@ export default function InvoicingPage() {
     }
   }, [user, toast]);
 
-
   useEffect(() => {
     if (authIsLoading) {
       setIsLoading(true);
@@ -262,7 +259,6 @@ export default function InvoicingPage() {
     }
     fetchInvoices();
   }, [user, authIsLoading, fetchInvoices]);
-
 
   const filteredInvoices = useMemo(() => {
     return invoices.filter(
@@ -311,12 +307,13 @@ export default function InvoicingPage() {
     const invoiceDataToSaveCore = {
       clientName: currentInvoice.clientName!,
       clientEmail: currentInvoice.clientEmail || '', 
+      clientAddress: currentInvoice.clientAddress || '',
       amount: Number(currentInvoice.amount) || 0,
       issuedDate: issuedDateForFirestore,
       dueDate: dueDateForFirestore,
       status: currentInvoice.status || 'Draft',
       items: currentInvoice.items || [],
-      notes: currentInvoice.notes || '', // Ensure notes is a string
+      notes: currentInvoice.notes || '',
       companyId: user.companyId,
     };
 
@@ -360,17 +357,18 @@ export default function InvoicingPage() {
         invoiceNumber: `INV${(Date.now()).toString().slice(-6)}`,
         clientName: '',
         clientEmail: '',
+        clientAddress: '',
         notes: '',
     });
     setIsEditing(false);
     setIsFormOpen(true);
-    setTimeout(() => clientNameInputRef.current?.focus(), 0);
   };
 
   const handleEditInvoice = (invoice: InvoiceDisplay) => {
     setCurrentInvoice({ 
       ...invoice,
-      notes: invoice.notes || '' 
+      notes: invoice.notes || '',
+      clientAddress: invoice.clientAddress || '',
     });
     setIsEditing(true);
     setIsFormOpen(true);
@@ -537,6 +535,7 @@ export default function InvoicingPage() {
     const companyWebsite = company?.website || '';
     const companyGstin = company?.gstin || '';
 
+    const clientAddressHtml = invoice.clientAddress ? `<p style="margin:2px 0; font-size: 0.9em; white-space: pre-wrap;">${invoice.clientAddress.replace(/\n/g, '<br>')}</p>` : '';
     const statusBadgeStyle = `display: inline-block; padding: 4px 8px; font-size: 0.8em; border-radius: 4px; color: white; background-color: ${invoice.status === 'Paid' ? '#28a745' : invoice.status === 'Overdue' ? '#dc3545' : '#6c757d'};`;
   
     return `
@@ -565,6 +564,7 @@ export default function InvoicingPage() {
           <h3 style="margin:0 0 5px 0; font-size: 1.1em;">Bill To:</h3>
           <p style="margin:0; font-weight: bold;">${invoice.clientName}</p>
           ${invoice.clientEmail ? `<p style="margin:2px 0; font-size: 0.9em;">${invoice.clientEmail}</p>` : ''}
+          ${clientAddressHtml}
         </div>
   
         <table style="width: 100%; border-collapse: collapse; margin-bottom: 20px;">
@@ -600,7 +600,6 @@ export default function InvoicingPage() {
       </div>
     `;
   };
-
 
   const loadAndPrepareEmailTemplate = (invoice: InvoiceDisplay, useDefault: boolean = false) => {
     let templateSubject = DEFAULT_EMAIL_SUBJECT_TEMPLATE;
@@ -753,18 +752,12 @@ export default function InvoicingPage() {
     }
   }, [currentInvoice.items]);
 
-
   const handleClientNameInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const typedValue = e.target.value;
     setCurrentInvoice(prev => ({
       ...prev,
       clientName: typedValue,
     }));
-    if (typedValue || existingClients.length > 0) {
-      setIsClientPopoverOpen(true);
-    } else {
-      setIsClientPopoverOpen(false);
-    }
   };
 
   const handleClientSuggestionClick = (client: ExistingClient) => {
@@ -772,38 +765,20 @@ export default function InvoicingPage() {
       ...prev,
       clientName: client.name,
       clientEmail: client.email || '',
+      clientAddress: client.address || '',
     }));
     setIsClientPopoverOpen(false);
-    clientNameInputRef.current?.focus();
   };
-  
-  const handleClientNameInputFocus = () => {
-    if (currentInvoice.clientName || existingClients.length > 0) {
-      setIsClientPopoverOpen(true);
-    }
-  };
-  
-  const handleClientNameInputBlur = (e: React.FocusEvent<HTMLInputElement>) => {
-    setTimeout(() => {
-      if (popoverContentRef.current && !popoverContentRef.current.contains(document.activeElement)) {
-        setIsClientPopoverOpen(false);
-      }
-    }, 150); 
-  };
-
 
   const filteredClientSuggestions = useMemo(() => {
     const currentName = currentInvoice.clientName?.toLowerCase() || '';
-    if (!currentName && isClientPopoverOpen) { 
-        return existingClients;
-    }
     if (!currentName) {
-        return []; 
+        return existingClients;
     }
     return existingClients.filter(client =>
       client.name.toLowerCase().includes(currentName)
     );
-  }, [currentInvoice.clientName, existingClients, isClientPopoverOpen]);
+  }, [currentInvoice.clientName, existingClients]);
 
   const isNewClient = useMemo(() => {
     if (!currentInvoice.clientName || currentInvoice.clientName.trim() === '') return false;
@@ -869,7 +844,6 @@ export default function InvoicingPage() {
     }
   };
 
-
   if (authIsLoading) {
     return (
       <div className="flex items-center justify-center h-[calc(100vh-200px)]">
@@ -890,7 +864,6 @@ export default function InvoicingPage() {
       </div>
     )
   }
-
 
   return (
     <div className="space-y-6">
@@ -1031,61 +1004,54 @@ export default function InvoicingPage() {
           </DialogHeader>
           <form onSubmit={handleFormSubmit} id="invoice-form-explicit" className="space-y-4 overflow-y-auto flex-grow p-1 pr-3">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div className="relative">
-                  <Label htmlFor="clientName">Client Name</Label>
-                  <Popover open={isClientPopoverOpen} onOpenChange={setIsClientPopoverOpen}>
-                    <PopoverTrigger asChild>
-                        <Input
-                          id="clientName"
-                          ref={clientNameInputRef}
-                          value={currentInvoice.clientName || ''}
-                          onChange={handleClientNameInputChange}
-                          onFocus={handleClientNameInputFocus}
-                          onBlur={handleClientNameInputBlur}
-                          placeholder="Enter client name"
-                          required
-                          autoComplete="off"
-                          disabled={isSaving}
-                          className="w-full"
-                        />
-                    </PopoverTrigger>
-                    {isClientPopoverOpen && (
-                      <PopoverContent
-                        ref={popoverContentRef}
-                        className="w-[--radix-popover-trigger-width] p-0 max-h-60 overflow-y-auto"
-                        side="bottom"
-                        align="start"
-                        onOpenAutoFocus={(e) => e.preventDefault()} 
-                      >
-                        <ScrollArea className="max-h-56">
-                          {filteredClientSuggestions.length > 0 ? (
-                            filteredClientSuggestions.map((client) => (
-                              <div
-                                key={client.name}
-                                className="px-3 py-2 text-sm hover:bg-accent cursor-pointer"
-                                onMouseDown={() => handleClientSuggestionClick(client)}
-                              >
-                                {client.name}
-                                {client.email && <span className="text-xs text-muted-foreground ml-2">({client.email})</span>}
-                              </div>
-                            ))
-                          ) : (
-                            <div className="px-3 py-2 text-sm text-muted-foreground">
-                              {currentInvoice.clientName && currentInvoice.clientName.trim() !== '' ? 'No matching clients found.' : (existingClients.length > 0 ? 'Type to search or select...' : 'No existing clients. Type to add new.')}
-                            </div>
-                          )}
-                        </ScrollArea>
-                      </PopoverContent>
+                <div>
+                    <Label htmlFor="clientName">Client Name</Label>
+                    <Popover open={isClientPopoverOpen} onOpenChange={setIsClientPopoverOpen}>
+                        <PopoverTrigger asChild>
+                            <Input
+                                id="clientName"
+                                value={currentInvoice.clientName || ''}
+                                onChange={handleClientNameInputChange}
+                                onFocus={() => setIsClientPopoverOpen(true)}
+                                placeholder="Enter client name"
+                                required
+                                autoComplete="off"
+                                disabled={isSaving}
+                                className="w-full"
+                            />
+                        </PopoverTrigger>
+                        <PopoverContent
+                            className="w-[--radix-popover-trigger-width] p-0 max-h-60 overflow-y-auto"
+                            side="bottom"
+                            align="start"
+                        >
+                            <ScrollArea className="max-h-56">
+                            {filteredClientSuggestions.length > 0 ? (
+                                filteredClientSuggestions.map((client) => (
+                                <div
+                                    key={client.name}
+                                    className="px-3 py-2 text-sm hover:bg-accent cursor-pointer"
+                                    onMouseDown={() => handleClientSuggestionClick(client)}
+                                >
+                                    {client.name}
+                                    {client.email && <span className="text-xs text-muted-foreground ml-2">({client.email})</span>}
+                                </div>
+                                ))
+                            ) : (
+                                <div className="px-3 py-2 text-sm text-muted-foreground">
+                                No matching clients found.
+                                </div>
+                            )}
+                            </ScrollArea>
+                        </PopoverContent>
+                    </Popover>
+                    {isNewClient && currentInvoice.clientName && currentInvoice.clientName.trim() !== '' && (
+                        <p className="text-xs text-muted-foreground mt-1 flex items-center">
+                        <UserPlus className="h-3 w-3 mr-1 text-accent" />
+                        New client: '{currentInvoice.clientName}' will be added.
+                        </p>
                     )}
-                  </Popover>
-                   {isNewClient && currentInvoice.clientName && currentInvoice.clientName.trim() !== '' && (
-                    <p className="text-xs text-muted-foreground mt-1 flex items-center">
-                      <UserPlus className="h-3 w-3 mr-1 text-accent" />
-                      New client: '{currentInvoice.clientName}' will be added.
-                    </p>
-                  )}
                 </div>
-
 
                 <div>
                     <Label htmlFor="clientEmail">Client Email</Label>
@@ -1098,6 +1064,21 @@ export default function InvoicingPage() {
                         disabled={isSaving}
                     />
                 </div>
+            </div>
+
+            <div>
+                <Label htmlFor="clientAddress">Client Address</Label>
+                <Textarea
+                    id="clientAddress"
+                    value={currentInvoice.clientAddress || ''}
+                    onChange={(e) => setCurrentInvoice({ ...currentInvoice, clientAddress: e.target.value })}
+                    placeholder="Enter client's billing address"
+                    disabled={isSaving}
+                    rows={3}
+                />
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                  <div>
                     <Label htmlFor="invoiceNumber">Invoice Number</Label>
                     <Input id="invoiceNumber" value={currentInvoice.invoiceNumber || ''} onChange={(e) => setCurrentInvoice({ ...currentInvoice, invoiceNumber: e.target.value })} required disabled={isSaving || isEditing} />
@@ -1228,6 +1209,7 @@ export default function InvoicingPage() {
                     <h3 className="text-lg font-semibold text-foreground mb-2">Bill To:</h3>
                     <p className="font-medium text-foreground">{invoiceToView.clientName}</p>
                     {invoiceToView.clientEmail && <p className="text-sm text-muted-foreground">{invoiceToView.clientEmail}</p>}
+                    {invoiceToView.clientAddress && <p className="text-sm text-muted-foreground whitespace-pre-line">{invoiceToView.clientAddress}</p>}
                   </section>
 
                   <section className="mb-8">
