@@ -470,44 +470,43 @@ export default function InvoicingPage() {
         printWindow.document.write('<html><head><title>Print Invoice</title>');
         printWindow.document.write(`
           <style>
-            body { font-family: 'PT Sans', sans-serif; margin: 20px; color: #333; }
-            .invoice-view-container { max-width: 750px; margin: auto; padding: 20px; border: 1px solid #eee; box-shadow: 0 0 10px rgba(0,0,0,0.1); }
-            img { max-width: 150px; margin-bottom: 20px; }
+            body { font-family: 'PT Sans', sans-serif; margin: 20px; color: #333; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+            .invoice-view-container { max-width: 780px; margin: auto; padding: 0; border: none; }
+            img { max-width: 150px; }
             table { width: 100%; border-collapse: collapse; margin-bottom: 1rem; }
-            th, td { border: 1px solid #ddd; padding: 8px; text-align: left; font-size: 0.9em; }
-            th { background-color: #f9f9f9; }
+            th, td { padding: 10px; text-align: left; font-size: 0.9em; border: 1px solid #e5e7eb; }
+            th { background-color: #f9fafb !important; color: #6b7280; font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em;}
             .text-right { text-align: right; }
-            .font-bold { font-weight: bold; }
-            .text-lg { font-size: 1.125rem; }
-            .text-2xl { font-size: 1.5rem; }
-            .text-4xl { font-size: 2.25rem; }
+            .font-bold { font-weight: 700; } .font-semibold { font-weight: 600; } .font-extrabold { font-weight: 800; }
+            .text-lg { font-size: 1.125rem; } .text-xl { font-size: 1.25rem; } .text-2xl { font-size: 1.5rem; } .text-3xl { font-size: 1.875rem; } .text-4xl { font-size: 2.25rem; }
             .mb-2 { margin-bottom: 0.5rem; } .mb-4 { margin-bottom: 1rem; } .mb-8 { margin-bottom: 2rem; }
-            .mt-2 { margin-top: 0.5rem; } .mt-4 { margin-top: 1rem; } .mt-8 { margin-top: 2rem; }
-            .grid { display: grid; } .grid-cols-2 { grid-template-columns: repeat(2, minmax(0, 1fr)); } .gap-8 { gap: 2rem; }
-            .items-start { align-items: flex-start; }
-            .p-4 { padding: 1rem; } .p-6 { padding: 1.5rem; }
-            .bg-muted-light { background-color: #f8f9fa; } 
+            .mt-1 { margin-top: 0.25rem; } .mt-2 { margin-top: 0.5rem; } .mt-4 { margin-top: 1rem; }
+            .pb-8 { padding-bottom: 2rem; } .pt-8 { padding-top: 2rem; }
+            .p-2 { padding: 0.5rem; } .p-3 { padding: 0.75rem; } .p-4 { padding: 1rem; }
+            .flex { display: flex; } .justify-between { justify-content: space-between; } .items-start { align-items: flex-start; } .items-center { align-items: center; }
+            .flex-1 { flex: 1 1 0%; }
+            .space-y-1 > * + * { margin-top: 0.25rem; }
+            .bg-muted\\/30 { background-color: rgba(227, 242, 253, 0.3) !important; }
+            .bg-primary\\/10 { background-color: rgba(100, 181, 246, 0.1) !important; }
             .rounded-lg { border-radius: 0.5rem; }
             .uppercase { text-transform: uppercase; }
-            .text-primary-print { color: #007bff; } 
-            .text-muted-foreground-print { color: #6c757d; }
+            .tracking-wider { letter-spacing: 0.05em; }
+            .text-primary { color: #64B5F6 !important; } 
+            .text-muted-foreground { color: #64748b !important; }
             .whitespace-pre-line { white-space: pre-line; }
-            .border { border: 1px solid #dee2e6; }
-            .border-t { border-top: 1px solid #dee2e6; }
-            .pt-2 { padding-top: 0.5rem; } .pt-8 { padding-top: 2rem; }
-            h1,h2,h3,h4 { margin-top:0; margin-bottom: 0.5rem; font-weight: 600; }
+            .border-b-2 { border-bottom-width: 2px; } .border-t { border-top-width: 1px; }
+            .border-primary\\/20 { border-color: rgba(100, 181, 246, 0.2) !important; }
+            .text-xs { font-size: 0.75rem; } .text-sm { font-size: 0.875rem; }
+            .no-print { display: none !important; }
             @media print {
-              body * { visibility: hidden; }
+              body { margin: 0; }
               .printable-area, .printable-area * { visibility: visible; }
-              .printable-area { position: absolute; left: 0; top: 0; width: 100%; margin: 0; padding:0; border: none; box-shadow: none;}
-              .no-print { display: none !important; }
-              @page { margin: 20mm; size: auto; }
+              .printable-area { position: absolute; left: 0; top: 0; width: 100%; }
             }
           </style>
         `);
         printWindow.document.write('</head><body>');
         printWindow.document.write(`<div class="printable-area">${printContents}</div>`);
-        printWindow.document.write('</body></html>');
         printWindow.document.close();
         printWindow.focus();
         
@@ -1170,7 +1169,7 @@ export default function InvoicingPage() {
 
       <Dialog open={isViewInvoiceDialogOpen} onOpenChange={(open) => { setIsViewInvoiceDialogOpen(open); if (!open) setInvoiceToView(null); }}>
         <DialogContent className="sm:max-w-4xl max-h-[90vh] flex flex-col p-0">
-          <DialogHeader className="p-6 pb-0">
+          <DialogHeader className="p-4 sm:p-6 pb-0">
             <DialogTitle className="font-headline text-2xl">Invoice Details</DialogTitle>
             <DialogDescription>
               Viewing Invoice {invoiceToView?.invoiceNumber}. Use actions below to print or download.
@@ -1178,42 +1177,45 @@ export default function InvoicingPage() {
           </DialogHeader>
           
           <ScrollArea className="flex-grow overflow-y-auto">
-            <div ref={invoicePrintRef} className="invoice-view-container p-6 bg-card text-card-foreground">
+            <div ref={invoicePrintRef} className="invoice-view-container p-4 sm:p-8 bg-card text-card-foreground">
               {isFetchingCompanyProfile && <div className="text-center p-10"><Loader2 className="h-8 w-8 animate-spin text-primary mx-auto" /> <p>Loading company details...</p></div>}
               {!isFetchingCompanyProfile && invoiceToView && companyProfileDetails && (
                 <>
-                  <header className="mb-8">
-                    <div className="grid grid-cols-2 gap-8 items-start">
-                      <div>
-                         <Image src="https://placehold.co/200x80.png?text=Your+Logo" alt="Company Logo" width={150} height={60} className="mb-4" data-ai-hint="company logo" />
-                        <h2 className="text-2xl font-bold text-primary">{companyProfileDetails.name}</h2>
-                        <p className="text-sm text-muted-foreground whitespace-pre-line">{companyProfileDetails.address}</p>
-                        {companyProfileDetails.email && <p className="text-sm text-muted-foreground">Email: {companyProfileDetails.email}</p>}
-                        {companyProfileDetails.phone && <p className="text-sm text-muted-foreground">Phone: {companyProfileDetails.phone}</p>}
-                        {companyProfileDetails.website && <p className="text-sm text-muted-foreground">Website: <a href={companyProfileDetails.website} target="_blank" rel="noopener noreferrer" className="text-primary hover:underline">{companyProfileDetails.website}</a></p>}
-                        {companyProfileDetails.gstin && <p className="text-sm text-muted-foreground">GSTIN/Tax ID: {companyProfileDetails.gstin}</p>}
+                  <header className="mb-8 pb-8 border-b-2 border-primary/20">
+                    <div className="flex flex-col md:flex-row justify-between items-start gap-8">
+                      <div className="flex-1">
+                        <Image src="https://placehold.co/200x80.png?text=Your+Logo" alt="Company Logo" width={150} height={60} className="mb-4" data-ai-hint="company logo" />
+                        <h2 className="text-xl font-bold text-primary">{companyProfileDetails.name}</h2>
+                        <p className="text-xs text-muted-foreground whitespace-pre-line">{companyProfileDetails.address}</p>
+                        {companyProfileDetails.email && <p className="text-xs text-muted-foreground mt-1">Email: {companyProfileDetails.email}</p>}
+                        {companyProfileDetails.phone && <p className="text-xs text-muted-foreground">Phone: {companyProfileDetails.phone}</p>}
+                        {companyProfileDetails.gstin && <p className="text-xs text-muted-foreground">GSTIN/Tax ID: {companyProfileDetails.gstin}</p>}
                       </div>
-                      <div className="text-right">
-                        <h1 className="text-4xl font-bold uppercase text-foreground mb-2">Invoice</h1>
-                        <p className="text-md"><span className="font-semibold">Invoice #:</span> {invoiceToView.invoiceNumber}</p>
-                        <p className="text-md"><span className="font-semibold">Date Issued:</span> {format(invoiceToView.issuedDate, 'PPP')}</p>
-                        <p className="text-md"><span className="font-semibold">Date Due:</span> {format(invoiceToView.dueDate, 'PPP')}</p>
-                        <Badge variant={getStatusBadgeVariant(invoiceToView.status)} className={cn('mt-2 text-sm px-3 py-1', invoiceToView.status === 'Paid' ? 'bg-accent text-accent-foreground' : invoiceToView.status === 'Overdue' ? 'bg-destructive text-destructive-foreground' : '')}>
+                      <div className="text-left md:text-right flex-1">
+                        <h1 className="text-3xl md:text-4xl font-extrabold uppercase text-foreground mb-4 tracking-wider">Invoice</h1>
+                        <div className="space-y-1 text-sm">
+                            <p><span className="font-semibold text-muted-foreground w-28 inline-block">Invoice #</span> {invoiceToView.invoiceNumber}</p>
+                            <p><span className="font-semibold text-muted-foreground w-28 inline-block">Date Issued</span> {format(invoiceToView.issuedDate, 'PPP')}</p>
+                            <p><span className="font-semibold text-muted-foreground w-28 inline-block">Date Due</span> {format(invoiceToView.dueDate, 'PPP')}</p>
+                        </div>
+                        <Badge variant={getStatusBadgeVariant(invoiceToView.status)} className={cn('mt-4 text-base px-4 py-1.5', invoiceToView.status === 'Paid' ? 'bg-accent text-accent-foreground' : invoiceToView.status === 'Overdue' ? 'bg-destructive text-destructive-foreground' : '')}>
                           {invoiceToView.status}
                         </Badge>
                       </div>
                     </div>
                   </header>
 
-                  <section className="mb-8 p-4 bg-muted/30 rounded-lg">
-                    <h3 className="text-lg font-semibold text-foreground mb-2">Bill To:</h3>
-                    <p className="font-medium text-foreground">{invoiceToView.clientName}</p>
-                    {invoiceToView.clientEmail && <p className="text-sm text-muted-foreground">{invoiceToView.clientEmail}</p>}
-                    {invoiceToView.clientAddress && <p className="text-sm text-muted-foreground whitespace-pre-line">{invoiceToView.clientAddress}</p>}
+                  <section className="mb-8">
+                    <h3 className="text-sm font-semibold uppercase text-muted-foreground mb-2 tracking-wider">Bill To</h3>
+                    <div className="p-4 bg-muted/30 rounded-lg text-sm">
+                        <p className="font-bold text-foreground">{invoiceToView.clientName}</p>
+                        {invoiceToView.clientEmail && <p className="text-muted-foreground">{invoiceToView.clientEmail}</p>}
+                        {invoiceToView.clientAddress && <p className="text-muted-foreground whitespace-pre-line mt-1">{invoiceToView.clientAddress}</p>}
+                    </div>
                   </section>
 
                   <section className="mb-8">
-                    <Table className="border">
+                    <Table className="border rounded-lg">
                       <TableHeader className="bg-muted/50">
                         <TableRow>
                           <TableHead className="w-[50px]">#</TableHead>
@@ -1226,11 +1228,11 @@ export default function InvoicingPage() {
                       <TableBody>
                         {(invoiceToView.items || []).map((item, index) => (
                           <TableRow key={item.id}>
-                            <TableCell>{index + 1}</TableCell>
-                            <TableCell>{item.description}</TableCell>
-                            <TableCell className="text-right">{item.quantity}</TableCell>
-                            <TableCell className="text-right">{currency}{item.unitPrice.toFixed(2)}</TableCell>
-                            <TableCell className="text-right font-medium">{currency}{(item.quantity * item.unitPrice).toFixed(2)}</TableCell>
+                            <TableCell className="text-muted-foreground">{index + 1}</TableCell>
+                            <TableCell className="font-medium text-foreground">{item.description}</TableCell>
+                            <TableCell className="text-right text-muted-foreground">{item.quantity}</TableCell>
+                            <TableCell className="text-right text-muted-foreground">{currency}{item.unitPrice.toFixed(2)}</TableCell>
+                            <TableCell className="text-right font-semibold text-foreground">{currency}{(item.quantity * item.unitPrice).toFixed(2)}</TableCell>
                           </TableRow>
                         ))}
                         {(!invoiceToView.items || invoiceToView.items.length === 0) && (
@@ -1240,48 +1242,50 @@ export default function InvoicingPage() {
                     </Table>
                   </section>
                   
-                  <section className="flex justify-end mb-8">
-                     <div className="w-full max-w-sm space-y-2 text-right">
-                        <div className="flex justify-between items-center">
-                           <p className="text-muted-foreground">Subtotal:</p>
-                           <p className="font-medium">{currency}{invoiceToView.subtotal.toFixed(2)}</p>
-                        </div>
-                        {invoiceToView.discountAmount > 0 && (
-                             <div className="flex justify-between items-center">
-                                <p className="text-muted-foreground">Discount:</p>
-                                <p className="font-medium">- {currency}{invoiceToView.discountAmount.toFixed(2)}</p>
-                            </div>
-                        )}
-                        {invoiceToView.taxAmount > 0 && (
-                            <div className="flex justify-between items-center">
-                                <p className="text-muted-foreground">Tax ({invoiceToView.taxRate}%):</p>
-                                <p className="font-medium">+ {currency}{invoiceToView.taxAmount.toFixed(2)}</p>
-                            </div>
-                        )}
-                       <div className="flex justify-between items-center border-t pt-2 mt-2 text-lg">
-                         <p className="font-semibold text-foreground">Grand Total:</p>
-                         <p className="font-bold text-primary">{currency}{invoiceToView.amount.toFixed(2)}</p>
-                       </div>
-                    </div>
+                  <section className="grid grid-cols-1 md:grid-cols-2 gap-8 mb-8">
+                      <div className="space-y-2">
+                          {invoiceToView.notes && (
+                          <div>
+                              <h4 className="font-semibold text-foreground mb-1">Notes:</h4>
+                              <p className="text-sm text-muted-foreground whitespace-pre-wrap p-4 bg-muted/30 rounded-lg">{invoiceToView.notes}</p>
+                          </div>
+                          )}
+                      </div>
+                      <div className="space-y-2 text-sm">
+                          <div className="flex justify-between items-center p-2 rounded-md">
+                            <p className="text-muted-foreground">Subtotal</p>
+                            <p className="font-medium text-foreground">{currency}{invoiceToView.subtotal.toFixed(2)}</p>
+                          </div>
+                          {invoiceToView.discountAmount > 0 && (
+                               <div className="flex justify-between items-center p-2 rounded-md">
+                                  <p className="text-muted-foreground">Discount</p>
+                                  <p className="font-medium text-foreground">- {currency}{invoiceToView.discountAmount.toFixed(2)}</p>
+                              </div>
+                          )}
+                          {invoiceToView.taxAmount > 0 && (
+                          <div className="flex justify-between items-center p-2 rounded-md">
+                              <p className="text-muted-foreground">Tax ({invoiceToView.taxRate}%)</p>
+                              <p className="font-medium text-foreground">+ {currency}{invoiceToView.taxAmount.toFixed(2)}</p>
+                          </div>
+                          )}
+                          <Separator className="my-2 bg-primary/20" />
+                          <div className="flex justify-between items-center p-3 bg-primary/10 rounded-lg text-lg">
+                            <p className="font-bold text-primary">Grand Total</p>
+                            <p className="font-extrabold text-primary">{currency}{invoiceToView.amount.toFixed(2)}</p>
+                          </div>
+                      </div>
                   </section>
 
-                  {invoiceToView.notes && (
-                    <section className="mb-8 p-4 bg-muted/30 rounded-lg">
-                      <h4 className="font-semibold text-foreground mb-1">Notes:</h4>
-                      <p className="text-sm text-muted-foreground whitespace-pre-wrap">{invoiceToView.notes}</p>
-                    </section>
-                  )}
-
-                  <footer className="text-center text-sm text-muted-foreground pt-8 border-t">
+                  <footer className="text-center text-xs text-muted-foreground/80 pt-8 border-t">
                     <p>Thank you for your business!</p>
-                    <p>{companyProfileDetails.name} - Payment is due by {format(invoiceToView.dueDate, 'PPP')}.</p>
+                    <p className="mt-2">Invoice created by ProfitLens. Please visit <a href="https://www.profitlens.com" target="_blank" rel="noopener noreferrer" className="text-primary/80 hover:underline">www.profitlens.com</a>.</p>
                   </footer>
                 </>
               )}
             </div>
           </ScrollArea>
           
-          <DialogFooter className="p-6 border-t bg-background no-print">
+          <DialogFooter className="p-4 sm:p-6 border-t bg-background no-print">
              <Button type="button" variant="outline" onClick={handlePrintInvoice} disabled={isDownloadingPDF}>
                 <Printer className="mr-2 h-4 w-4" /> Print Invoice
              </Button>
@@ -1366,5 +1370,7 @@ export default function InvoicingPage() {
     </div>
   );
 }
+
+    
 
     
