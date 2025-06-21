@@ -908,7 +908,7 @@ export default function InvoicingPage() {
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
                     <Label htmlFor="clientName">Client Name</Label>
-                    <Popover open={isClientPopoverOpen} onOpenChange={setIsClientPopoverOpen}>
+                    <Popover open={isClientPopoverOpen && !!currentInvoice.clientName} onOpenChange={setIsClientPopoverOpen}>
                         <PopoverTrigger asChild>
                             <Input
                                 id="clientName"
@@ -925,6 +925,7 @@ export default function InvoicingPage() {
                             className="w-[--radix-popover-trigger-width] p-0 max-h-60 overflow-y-auto"
                             side="bottom"
                             align="start"
+                            onOpenAutoFocus={(e) => e.preventDefault()}
                         >
                             <ScrollArea className="max-h-56">
                             {filteredClientSuggestions.length > 0 ? (
