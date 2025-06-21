@@ -756,9 +756,6 @@ export default function InvoicingPage() {
       ...prev,
       clientName: typedValue,
     }));
-    if (!isClientPopoverOpen) {
-      setIsClientPopoverOpen(true);
-    }
   };
 
   const handleClientSuggestionClick = (client: ExistingClient) => {
@@ -774,7 +771,7 @@ export default function InvoicingPage() {
   const filteredClientSuggestions = useMemo(() => {
     const currentName = currentInvoice.clientName?.toLowerCase() || '';
     if (!currentName) {
-        return existingClients;
+        return [];
     }
     return existingClients.filter(client =>
       client.name.toLowerCase().includes(currentName)
@@ -908,45 +905,43 @@ export default function InvoicingPage() {
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
                     <Label htmlFor="clientName">Client Name</Label>
-                    <Popover open={isClientPopoverOpen && !!currentInvoice.clientName} onOpenChange={setIsClientPopoverOpen}>
-                        <PopoverTrigger asChild>
-                            <Input
-                                id="clientName"
-                                value={currentInvoice.clientName || ''}
-                                onChange={handleClientNameInputChange}
-                                placeholder="Enter client name"
-                                required
-                                autoComplete="off"
-                                disabled={isSaving}
-                                className="w-full"
-                            />
-                        </PopoverTrigger>
-                        <PopoverContent
-                            className="w-[--radix-popover-trigger-width] p-0 max-h-60 overflow-y-auto"
-                            side="bottom"
-                            align="start"
-                            onOpenAutoFocus={(e) => e.preventDefault()}
-                        >
-                            <ScrollArea className="max-h-56">
-                            {filteredClientSuggestions.length > 0 ? (
-                                filteredClientSuggestions.map((client) => (
-                                <div
-                                    key={client.name}
-                                    className="px-3 py-2 text-sm hover:bg-accent cursor-pointer"
-                                    onMouseDown={() => handleClientSuggestionClick(client)}
-                                >
-                                    {client.name}
-                                    {client.email && <span className="text-xs text-muted-foreground ml-2">({client.email})</span>}
-                                </div>
-                                ))
-                            ) : (
-                                <div className="px-3 py-2 text-sm text-muted-foreground">
-                                No matching clients found.
-                                </div>
-                            )}
-                            </ScrollArea>
-                        </PopoverContent>
-                    </Popover>
+                    <div className="relative">
+                        <Input
+                            id="clientName"
+                            value={currentInvoice.clientName || ''}
+                            onChange={handleClientNameInputChange}
+                            onFocus={() => setIsClientPopoverOpen(true)}
+                            onBlur={() => {
+                                // Delay closing to allow click on suggestions
+                                setTimeout(() => {
+                                    setIsClientPopoverOpen(false);
+                                }, 150);
+                            }}
+                            placeholder="Enter client name"
+                            required
+                            autoComplete="off"
+                            disabled={isSaving}
+                            className="w-full"
+                        />
+                        {isClientPopoverOpen && filteredClientSuggestions.length > 0 && (
+                            <Card className="absolute z-10 w-full mt-1 shadow-lg max-h-60 overflow-y-auto p-0">
+                                <CardContent className="p-0">
+                                    <ScrollArea className="max-h-56">
+                                        {filteredClientSuggestions.map((client) => (
+                                        <div
+                                            key={client.name}
+                                            className="px-3 py-2 text-sm hover:bg-accent cursor-pointer"
+                                            onMouseDown={() => handleClientSuggestionClick(client)} // Important: onMouseDown to not lose focus before click
+                                        >
+                                            {client.name}
+                                            {client.email && <span className="text-xs text-muted-foreground ml-2">({client.email})</span>}
+                                        </div>
+                                        ))}
+                                    </ScrollArea>
+                                </CardContent>
+                            </Card>
+                        )}
+                    </div>
                     {isNewClient && currentInvoice.clientName && currentInvoice.clientName.trim() !== '' && (
                         <p className="text-xs text-muted-foreground mt-1 flex items-center">
                         <UserPlus className="h-3 w-3 mr-1 text-accent" />
