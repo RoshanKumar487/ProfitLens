@@ -16,7 +16,7 @@ import {
 } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger, DropdownMenuSeparator } from '@/components/ui/dropdown-menu';
-import { Receipt, PlusCircle, Search, MoreHorizontal, Edit, Trash2, Eye, Mail, FileDown, Calendar as CalendarIconLucide, Save, Loader2, UserPlus, Printer } from 'lucide-react';
+import { Receipt, PlusCircle, Search, MoreHorizontal, Edit, Trash2, Eye, Mail, FileDown, Calendar as CalendarIconLucide, Save, Loader2, UserPlus, Printer, Percent } from 'lucide-react';
 import { format } from 'date-fns';
 import { useToast } from '@/hooks/use-toast';
 import {
@@ -52,6 +52,8 @@ import jsPDF from 'jspdf';
 import html2canvas from 'html2canvas';
 import Image from 'next/image';
 import { sendInvoiceEmailAction } from './actions'; 
+import { cn } from '@/lib/utils';
+import { Separator } from '@/components/ui/separator';
 
 interface InvoiceItem {
   id: string;
@@ -60,13 +62,23 @@ interface InvoiceItem {
   unitPrice: number;
 }
 
+type DiscountType = 'fixed' | 'percentage';
+
 interface InvoiceFirestore {
   id?: string; 
   invoiceNumber: string;
   clientName: string;
   clientEmail?: string;
   clientAddress?: string;
-  amount: number;
+  
+  subtotal: number;
+  discountType: DiscountType;
+  discountValue: number;
+  discountAmount: number;
+  taxRate: number;
+  taxAmount: number;
+  amount: number; // This is the final total
+
   dueDate: Timestamp;
   status: 'Paid' | 'Pending' | 'Overdue' | 'Draft';
   issuedDate: Timestamp;
@@ -152,6 +164,35 @@ export default function InvoicingPage() {
   const [invoiceToView, setInvoiceToView] = useState<InvoiceDisplay | null>(null);
   const [isDownloadingPDF, setIsDownloadingPDF] = useState(false);
 
+  useEffect(() => {
+    if (!isFormOpen) return;
+
+    const subtotal = (currentInvoice.items || []).reduce((sum, item) => sum + (Number(item.quantity || 0) * Number(item.unitPrice || 0)), 0);
+
+    const discountValue = parseFloat(String(currentInvoice.discountValue) || '0');
+    let discountAmount = 0;
+    if (currentInvoice.discountType === 'percentage') {
+        discountAmount = subtotal * (discountValue / 100);
+    } else {
+        discountAmount = discountValue;
+    }
+
+    const taxRate = parseFloat(String(currentInvoice.taxRate) || '0');
+    const taxableAmount = subtotal - discountAmount;
+    const taxAmount = taxableAmount * (taxRate / 100);
+    
+    const total = taxableAmount + taxAmount;
+
+    setCurrentInvoice(prev => ({ 
+        ...prev, 
+        subtotal: isNaN(subtotal) ? 0 : subtotal,
+        discountAmount: isNaN(discountAmount) ? 0 : discountAmount,
+        taxAmount: isNaN(taxAmount) ? 0 : taxAmount,
+        amount: isNaN(total) ? 0 : total,
+    }));
+  }, [currentInvoice.items, currentInvoice.discountType, currentInvoice.discountValue, currentInvoice.taxRate, isFormOpen]);
+
+
   const fetchCompanyProfile = useCallback(async () => {
     if (user && user.companyId) {
       setIsFetchingCompanyProfile(true);
@@ -206,6 +247,12 @@ export default function InvoicingPage() {
           clientName: data.clientName,
           clientEmail: data.clientEmail,
           clientAddress: data.clientAddress,
+          subtotal: data.subtotal || 0,
+          discountType: data.discountType || 'fixed',
+          discountValue: data.discountValue || 0,
+          discountAmount: data.discountAmount || 0,
+          taxRate: data.taxRate || 0,
+          taxAmount: data.taxAmount || 0,
           amount: data.amount,
           dueDate: data.dueDate.toDate(),
           status: data.status,
@@ -306,7 +353,15 @@ export default function InvoicingPage() {
       clientName: currentInvoice.clientName!,
       clientEmail: currentInvoice.clientEmail || '', 
       clientAddress: currentInvoice.clientAddress || '',
-      amount: Number(currentInvoice.amount) || 0,
+      
+      subtotal: currentInvoice.subtotal || 0,
+      discountType: currentInvoice.discountType || 'fixed',
+      discountValue: Number(currentInvoice.discountValue) || 0,
+      discountAmount: currentInvoice.discountAmount || 0,
+      taxRate: Number(currentInvoice.taxRate) || 0,
+      taxAmount: currentInvoice.taxAmount || 0,
+      amount: Number(currentInvoice.amount) || 0, // This is the total
+
       issuedDate: issuedDateForFirestore,
       dueDate: dueDateForFirestore,
       status: currentInvoice.status || 'Draft',
@@ -351,12 +406,18 @@ export default function InvoicingPage() {
         dueDate: new Date(new Date().setDate(new Date().getDate() + 30)),
         status: 'Draft',
         items: [],
-        amount: 0,
         invoiceNumber: `INV${(Date.now()).toString().slice(-6)}`,
         clientName: '',
         clientEmail: '',
         clientAddress: '',
         notes: '',
+        subtotal: 0,
+        discountType: 'fixed',
+        discountValue: 0,
+        discountAmount: 0,
+        taxRate: 0,
+        taxAmount: 0,
+        amount: 0,
     });
     setIsEditing(false);
     setIsFormOpen(true);
@@ -580,8 +641,11 @@ export default function InvoicingPage() {
           </tbody>
         </table>
   
-        <div style="text-align: right; margin-bottom: 20px;">
-          <p style="font-size: 1.2em; font-weight: bold; margin:0;">Grand Total: ${currency}${invoice.amount.toFixed(2)}</p>
+        <div style="text-align: right; margin-bottom: 20px; padding-top: 10px; border-top: 1px solid #eee;">
+          <p style="margin: 2px 0;"><strong>Subtotal:</strong> ${currency}${invoice.subtotal.toFixed(2)}</p>
+          ${invoice.discountAmount > 0 ? `<p style="margin: 2px 0;"><strong>Discount:</strong> -${currency}${invoice.discountAmount.toFixed(2)}</p>` : ''}
+          ${invoice.taxAmount > 0 ? `<p style="margin: 2px 0;"><strong>Tax (${invoice.taxRate}%):</strong> +${currency}${invoice.taxAmount.toFixed(2)}</p>` : ''}
+          <p style="font-size: 1.2em; font-weight: bold; margin:5px 0 0 0; padding-top: 5px; border-top: 1px solid #333;"><strong>Grand Total:</strong> ${currency}${invoice.amount.toFixed(2)}</p>
         </div>
   
         ${invoice.notes ? `
@@ -739,17 +803,6 @@ export default function InvoicingPage() {
     }));
   };
 
-  useEffect(() => {
-    if (currentInvoice.items && currentInvoice.items.length > 0) {
-      const totalAmount = currentInvoice.items.reduce((sum, item) => sum + (Number(item.quantity) * Number(item.unitPrice)), 0);
-      setCurrentInvoice(prev => ({ ...prev, amount: totalAmount }));
-    } else if ((currentInvoice.items || []).length === 0 ) {
-        if (currentInvoice.amount === undefined || currentInvoice.amount === null) {
-             setCurrentInvoice(prev => ({ ...prev, amount: 0}));
-        }
-    }
-  }, [currentInvoice.items]);
-
   const handleClientNameInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const typedValue = e.target.value;
     setCurrentInvoice(prev => ({
@@ -837,7 +890,7 @@ export default function InvoicingPage() {
         <CardContent>
           {(isLoading || isFetchingCompanyProfile) && invoices.length === 0 && (
              <div className="flex items-center justify-center py-10">
-                <Loader2 className="h-8 w-8 animate-spin text-primary" />
+                <Loader2 className="h-8 w-8 animate-spin text-primary mx-auto" />
                 <span className="ml-2">Loading data...</span>
             </div>
           )}
@@ -899,7 +952,7 @@ export default function InvoicingPage() {
       </Card>
 
       <Dialog open={isFormOpen} onOpenChange={(open) => { setIsFormOpen(open); if (!open) { setCurrentInvoice({}); setIsEditing(false); setIsClientSuggestionsVisible(false); } }}>
-        <DialogContent className="sm:max-w-2xl max-h-[90vh] flex flex-col">
+        <DialogContent className="sm:max-w-3xl max-h-[90vh] flex flex-col">
           <DialogHeader>
             <DialogTitle className="font-headline">{isEditing ? 'Edit Invoice' : 'Create New Invoice'}</DialogTitle>
             <DialogDescription>
@@ -907,6 +960,7 @@ export default function InvoicingPage() {
             </DialogDescription>
           </DialogHeader>
           <form onSubmit={handleFormSubmit} id="invoice-form-explicit" className="space-y-4 overflow-y-auto flex-grow p-1 pr-3">
+            
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
                     <Label htmlFor="clientName">Client Name</Label>
@@ -917,7 +971,6 @@ export default function InvoicingPage() {
                             onChange={handleClientNameInputChange}
                             onFocus={() => { if ((currentInvoice.clientName || '').length > 0) setIsClientSuggestionsVisible(true); }}
                             onBlur={() => {
-                                // Delay closing to allow click on suggestions
                                 setTimeout(() => {
                                     setIsClientSuggestionsVisible(false);
                                 }, 150);
@@ -980,7 +1033,7 @@ export default function InvoicingPage() {
                 />
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
                  <div>
                     <Label htmlFor="invoiceNumber">Invoice Number</Label>
                     <Input id="invoiceNumber" value={currentInvoice.invoiceNumber || ''} onChange={(e) => setCurrentInvoice({ ...currentInvoice, invoiceNumber: e.target.value })} required disabled={isSaving || isEditing} />
@@ -1023,14 +1076,16 @@ export default function InvoicingPage() {
                 </div>
             </div>
 
+            <Separator/>
+
             <div className="space-y-2 pt-2">
               <div className="flex justify-between items-center">
-                <Label>Invoice Items</Label>
+                <Label className="text-base font-medium">Invoice Items</Label>
                 <Button type="button" variant="outline" size="sm" onClick={handleAddItem} disabled={isSaving}><PlusCircle className="mr-2 h-4 w-4" /> Add Item</Button>
               </div>
               {(currentInvoice.items || []).map((item) => (
-                <div key={item.id} className="flex gap-2 items-end p-2 border rounded-md bg-muted/30">
-                  <div className="flex-grow space-y-1">
+                <div key={item.id} className="grid grid-cols-[1fr_auto_auto_auto] gap-2 items-end p-2 border rounded-md bg-muted/30">
+                  <div className="space-y-1">
                     <Label htmlFor={`item-desc-${item.id}`} className="text-xs">Description</Label>
                     <Input id={`item-desc-${item.id}`} value={item.description} onChange={e => handleItemChange(item.id, 'description', e.target.value)} placeholder="Service or Product" disabled={isSaving} />
                   </div>
@@ -1048,9 +1103,52 @@ export default function InvoicingPage() {
                { (currentInvoice.items || []).length === 0 && <p className="text-xs text-muted-foreground text-center py-2">No items added. Total amount can be set manually.</p>}
             </div>
 
-            <div>
-                <Label htmlFor="amount">Total Amount ({currency})</Label>
-                <Input id="amount" type="number" value={currentInvoice.amount === undefined || currentInvoice.amount === null ? '' : currentInvoice.amount.toFixed(2)} onChange={(e) => setCurrentInvoice({ ...currentInvoice, amount: parseFloat(e.target.value) || 0 })} placeholder="Calculated if items exist, or set manually" disabled={(currentInvoice.items || []).length > 0 || isSaving} required min="0" step="0.01" />
+            <Separator/>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-4">
+                <div className="space-y-4">
+                    <div className="grid grid-cols-2 gap-2">
+                        <div>
+                            <Label htmlFor="discountType">Discount Type</Label>
+                             <Select value={currentInvoice.discountType || 'fixed'} onValueChange={(value: DiscountType) => setCurrentInvoice(prev => ({ ...prev, discountType: value }))} disabled={isSaving}>
+                                <SelectTrigger><SelectValue/></SelectTrigger>
+                                <SelectContent>
+                                    <SelectItem value="fixed">Fixed ({currency})</SelectItem>
+                                    <SelectItem value="percentage">Percentage (%)</SelectItem>
+                                </SelectContent>
+                            </Select>
+                        </div>
+                        <div>
+                            <Label htmlFor="discountValue">Discount Value</Label>
+                            <Input id="discountValue" type="number" value={currentInvoice.discountValue || ''} onChange={(e) => setCurrentInvoice(prev => ({...prev, discountValue: e.target.value}))} min="0" step="0.01" disabled={isSaving} />
+                        </div>
+                    </div>
+                    <div>
+                        <Label htmlFor="taxRate">Tax Rate (%)</Label>
+                        <Input id="taxRate" type="number" value={currentInvoice.taxRate || ''} onChange={(e) => setCurrentInvoice(prev => ({...prev, taxRate: e.target.value}))} min="0" step="0.01" placeholder="e.g. 5 or 12.5" disabled={isSaving} />
+                    </div>
+                </div>
+
+                <div className="space-y-2 p-4 bg-muted/50 rounded-lg">
+                    <h4 className="font-medium text-center mb-2">Summary</h4>
+                    <div className="flex justify-between text-sm">
+                        <span className="text-muted-foreground">Subtotal:</span>
+                        <span className="font-medium">{currency}{(currentInvoice.subtotal || 0).toFixed(2)}</span>
+                    </div>
+                    <div className="flex justify-between text-sm">
+                        <span className="text-muted-foreground">Discount:</span>
+                        <span className="font-medium text-destructive">- {currency}{(currentInvoice.discountAmount || 0).toFixed(2)}</span>
+                    </div>
+                    <div className="flex justify-between text-sm">
+                        <span className="text-muted-foreground">Tax ({currentInvoice.taxRate || 0}%):</span>
+                        <span className="font-medium text-green-600">+ {currency}{(currentInvoice.taxAmount || 0).toFixed(2)}</span>
+                    </div>
+                    <Separator className="my-2" />
+                    <div className="flex justify-between text-lg font-bold">
+                        <span>Grand Total:</span>
+                        <span>{currency}{(currentInvoice.amount || 0).toFixed(2)}</span>
+                    </div>
+                </div>
             </div>
 
             <div>
@@ -1100,7 +1198,7 @@ export default function InvoicingPage() {
                         <p className="text-md"><span className="font-semibold">Invoice #:</span> {invoiceToView.invoiceNumber}</p>
                         <p className="text-md"><span className="font-semibold">Date Issued:</span> {format(invoiceToView.issuedDate, 'PPP')}</p>
                         <p className="text-md"><span className="font-semibold">Date Due:</span> {format(invoiceToView.dueDate, 'PPP')}</p>
-                        <Badge variant={getStatusBadgeVariant(invoiceToView.status)} className={`mt-2 text-sm px-3 py-1 ${invoiceToView.status === 'Paid' ? 'bg-accent text-accent-foreground' : invoiceToView.status === 'Overdue' ? 'bg-destructive text-destructive-foreground' : ''}`}>
+                        <Badge variant={getStatusBadgeVariant(invoiceToView.status)} className={cn('mt-2 text-sm px-3 py-1', invoiceToView.status === 'Paid' ? 'bg-accent text-accent-foreground' : invoiceToView.status === 'Overdue' ? 'bg-destructive text-destructive-foreground' : '')}>
                           {invoiceToView.status}
                         </Badge>
                       </div>
@@ -1143,10 +1241,26 @@ export default function InvoicingPage() {
                   </section>
                   
                   <section className="flex justify-end mb-8">
-                    <div className="w-full max-w-xs space-y-2">
-                       <div className="flex justify-between items-center border-t pt-2">
-                         <p className="text-lg font-semibold text-foreground">Grand Total:</p>
-                         <p className="text-lg font-bold text-primary">{currency}{invoiceToView.amount.toFixed(2)}</p>
+                     <div className="w-full max-w-sm space-y-2 text-right">
+                        <div className="flex justify-between items-center">
+                           <p className="text-muted-foreground">Subtotal:</p>
+                           <p className="font-medium">{currency}{invoiceToView.subtotal.toFixed(2)}</p>
+                        </div>
+                        {invoiceToView.discountAmount > 0 && (
+                             <div className="flex justify-between items-center">
+                                <p className="text-muted-foreground">Discount:</p>
+                                <p className="font-medium">- {currency}{invoiceToView.discountAmount.toFixed(2)}</p>
+                            </div>
+                        )}
+                        {invoiceToView.taxAmount > 0 && (
+                            <div className="flex justify-between items-center">
+                                <p className="text-muted-foreground">Tax ({invoiceToView.taxRate}%):</p>
+                                <p className="font-medium">+ {currency}{invoiceToView.taxAmount.toFixed(2)}</p>
+                            </div>
+                        )}
+                       <div className="flex justify-between items-center border-t pt-2 mt-2 text-lg">
+                         <p className="font-semibold text-foreground">Grand Total:</p>
+                         <p className="font-bold text-primary">{currency}{invoiceToView.amount.toFixed(2)}</p>
                        </div>
                     </div>
                   </section>
@@ -1252,3 +1366,5 @@ export default function InvoicingPage() {
     </div>
   );
 }
+
+    
