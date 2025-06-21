@@ -7,7 +7,6 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Calendar as CalendarIcon, FileBarChart, Loader2, FileText, User, TrendingDown, Receipt as ReceiptIcon, DollarSign, CalendarDays } from 'lucide-react';
 import { format } from 'date-fns';
-import type { DateRange } from 'react-day-picker';
 import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/contexts/AuthContext';
 import { db } from '@/lib/firebaseConfig';
@@ -28,26 +27,32 @@ export default function ReportsPage() {
   const { user, isLoading: authIsLoading } = useAuth();
   const { toast } = useToast();
 
-  // State for each report type
-  const [employeeDateRange, setEmployeeDateRange] = useState<DateRange | undefined>();
+  // State for each report type using separate from/to dates
+  const [employeeFromDate, setEmployeeFromDate] = useState<Date | undefined>();
+  const [employeeToDate, setEmployeeToDate] = useState<Date | undefined>();
   const [isExportingEmployees, setIsExportingEmployees] = useState(false);
 
-  const [expenseDateRange, setExpenseDateRange] = useState<DateRange | undefined>();
+  const [expenseFromDate, setExpenseFromDate] = useState<Date | undefined>();
+  const [expenseToDate, setExpenseToDate] = useState<Date | undefined>();
   const [isExportingExpenses, setIsExportingExpenses] = useState(false);
 
-  const [invoiceDateRange, setInvoiceDateRange] = useState<DateRange | undefined>();
+  const [invoiceFromDate, setInvoiceFromDate] = useState<Date | undefined>();
+  const [invoiceToDate, setInvoiceToDate] = useState<Date | undefined>();
   const [isExportingInvoices, setIsExportingInvoices] = useState(false);
 
-  const [revenueDateRange, setRevenueDateRange] = useState<DateRange | undefined>();
+  const [revenueFromDate, setRevenueFromDate] = useState<Date | undefined>();
+  const [revenueToDate, setRevenueToDate] = useState<Date | undefined>();
   const [isExportingRevenue, setIsExportingRevenue] = useState(false);
   
-  const [appointmentDateRange, setAppointmentDateRange] = useState<DateRange | undefined>();
+  const [appointmentFromDate, setAppointmentFromDate] = useState<Date | undefined>();
+  const [appointmentToDate, setAppointmentToDate] = useState<Date | undefined>();
   const [isExportingAppointments, setIsExportingAppointments] = useState(false);
 
   const handleExport = useCallback(async (
     reportType: 'Employees' | 'Expenses' | 'Invoices' | 'Revenue' | 'Appointments',
     collectionName: string,
-    dateRange: DateRange | undefined,
+    fromDate: Date | undefined,
+    toDate: Date | undefined,
     dateField: string,
     headers: string[],
     dataMapper: (docData: any) => Record<string, any>,
@@ -57,8 +62,8 @@ export default function ReportsPage() {
       toast({ title: 'Authentication Error', description: 'User not authenticated.', variant: 'destructive' });
       return;
     }
-    if (!dateRange || !dateRange.from || !dateRange.to) {
-      toast({ title: 'Date Range Required', description: `Please select a date range for the ${reportType} report.`, variant: 'destructive' });
+    if (!fromDate || !toDate) {
+      toast({ title: 'Date Range Required', description: `Please select a 'From' and 'To' date for the ${reportType} report.`, variant: 'destructive' });
       return;
     }
 
@@ -68,8 +73,8 @@ export default function ReportsPage() {
       const q = query(
         collectionRef,
         where('companyId', '==', user.companyId),
-        where(dateField, '>=', Timestamp.fromDate(dateRange.from)),
-        where(dateField, '<=', Timestamp.fromDate(new Date(dateRange.to.setHours(23, 59, 59, 999)))),
+        where(dateField, '>=', Timestamp.fromDate(fromDate)),
+        where(dateField, '<=', Timestamp.fromDate(new Date(toDate.setHours(23, 59, 59, 999)))),
         orderBy(dateField, 'asc')
       );
       const querySnapshot = await getDocs(q);
@@ -86,7 +91,7 @@ export default function ReportsPage() {
         ...dataToExport.map(row => headers.map(header => `"${String(row[header] ?? '').replace(/"/g, '""')}"`).join(','))
       ];
       const csvString = csvRows.join('\n');
-      const filename = `BizSight_${reportType}_${format(dateRange.from, 'yyyyMMdd')}_to_${format(dateRange.to, 'yyyyMMdd')}.csv`;
+      const filename = `BizSight_${reportType}_${format(fromDate, 'yyyyMMdd')}_to_${format(toDate, 'yyyyMMdd')}.csv`;
       downloadCsv(csvString, filename);
       toast({ title: 'Export Successful', description: `${dataToExport.length} ${reportType.toLowerCase()} exported.` });
 
@@ -123,13 +128,17 @@ export default function ReportsPage() {
       title: string,
       description: string,
       icon: React.ElementType,
-      dateRange: DateRange | undefined,
-      setDateRange: React.Dispatch<React.SetStateAction<DateRange | undefined>>,
+      fromDate: Date | undefined,
+      setFromDate: React.Dispatch<React.SetStateAction<Date | undefined>>,
+      toDate: Date | undefined,
+      setToDate: React.Dispatch<React.SetStateAction<Date | undefined>>,
       isExporting: boolean,
       onExport: () => void,
       dateFieldLabel: string
   ) => {
     const IconComponent = icon;
+    const currentYear = new Date().getFullYear();
+
     return (
         <Card className="shadow-lg">
             <CardHeader>
@@ -141,36 +150,47 @@ export default function ReportsPage() {
                     </div>
                 </div>
             </CardHeader>
-            <CardContent className="flex flex-col sm:flex-row gap-2 items-center">
-                <Popover>
+            <CardContent className="flex flex-col sm:flex-row gap-2 items-center flex-wrap">
+                 <Popover>
                     <PopoverTrigger asChild>
-                    <Button variant={"outline"} className="w-full sm:w-[280px] justify-start text-left font-normal" disabled={isExporting}>
+                    <Button variant={"outline"} className="w-full sm:w-[240px] justify-start text-left font-normal" disabled={isExporting}>
                         <CalendarIcon className="mr-2 h-4 w-4" />
-                        {dateRange?.from ? (
-                        dateRange.to ? (
-                            <>
-                            {format(dateRange.from, "LLL dd, y")} - {format(dateRange.to, "LLL dd, y")}
-                            </>
-                        ) : (
-                            format(dateRange.from, "LLL dd, y")
-                        )
-                        ) : (
-                        <span>Pick {dateFieldLabel} date range</span>
-                        )}
+                        {fromDate ? format(fromDate, "LLL dd, y") : <span>Pick 'from' {dateFieldLabel} date</span>}
                     </Button>
                     </PopoverTrigger>
                     <PopoverContent className="w-auto p-0" align="start">
                     <Calendar
+                        mode="single"
+                        selected={fromDate}
+                        onSelect={setFromDate}
+                        captionLayout="dropdown-buttons"
+                        fromYear={currentYear - 20}
+                        toYear={currentYear}
                         initialFocus
-                        mode="range"
-                        defaultMonth={dateRange?.from}
-                        selected={dateRange}
-                        onSelect={setDateRange}
-                        numberOfMonths={2}
                     />
                     </PopoverContent>
                 </Popover>
-                <Button onClick={onExport} disabled={isExporting || !dateRange?.from || !dateRange?.to} className="w-full sm:w-auto">
+                 <Popover>
+                    <PopoverTrigger asChild>
+                    <Button variant={"outline"} className="w-full sm:w-[240px] justify-start text-left font-normal" disabled={isExporting || !fromDate}>
+                        <CalendarIcon className="mr-2 h-4 w-4" />
+                        {toDate ? format(toDate, "LLL dd, y") : <span>Pick 'to' {dateFieldLabel} date</span>}
+                    </Button>
+                    </PopoverTrigger>
+                    <PopoverContent className="w-auto p-0" align="start">
+                    <Calendar
+                        mode="single"
+                        selected={toDate}
+                        onSelect={setToDate}
+                        disabled={{ before: fromDate }}
+                        captionLayout="dropdown-buttons"
+                        fromYear={currentYear - 20}
+                        toYear={currentYear}
+                        initialFocus
+                    />
+                    </PopoverContent>
+                </Popover>
+                <Button onClick={onExport} disabled={isExporting || !fromDate || !toDate} className="w-full sm:w-auto">
                     {isExporting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <FileText className="mr-2 h-4 w-4" />}
                     Export CSV
                 </Button>
@@ -187,23 +207,18 @@ export default function ReportsPage() {
             'Employee Report',
             'Export employee data including salary and position.',
             User,
-            employeeDateRange,
-            setEmployeeDateRange,
+            employeeFromDate,
+            setEmployeeFromDate,
+            employeeToDate,
+            setEmployeeToDate,
             isExportingEmployees,
             () => handleExport(
-                'Employees',
-                'employees',
-                employeeDateRange,
-                'createdAt',
+                'Employees', 'employees', employeeFromDate, employeeToDate, 'createdAt',
                 ['Name', 'Position', 'Salary', 'Description', 'Profile Picture URL', 'Associated File Name', 'Created At'],
                 (data: EmployeeFirestore) => ({
-                    'Name': data.name,
-                    'Position': data.position,
-                    'Salary': data.salary,
-                    'Description': data.description || '',
-                    'Profile Picture URL': data.profilePictureUrl || '',
-                    'Associated File Name': data.associatedFileName || '',
-                    'Created At': format(data.createdAt.toDate(), 'yyyy-MM-dd HH:mm:ss'),
+                    'Name': data.name, 'Position': data.position, 'Salary': data.salary,
+                    'Description': data.description || '', 'Profile Picture URL': data.profilePictureUrl || '',
+                    'Associated File Name': data.associatedFileName || '', 'Created At': format(data.createdAt.toDate(), 'yyyy-MM-dd HH:mm:ss'),
                 }),
                 setIsExportingEmployees
             ),
@@ -213,21 +228,17 @@ export default function ReportsPage() {
             'Expense Report',
             'Export a list of all expenses.',
             TrendingDown,
-            expenseDateRange,
-            setExpenseDateRange,
+            expenseFromDate,
+            setExpenseFromDate,
+            expenseToDate,
+            setExpenseToDate,
             isExportingExpenses,
             () => handleExport(
-                'Expenses',
-                'expenses',
-                expenseDateRange,
-                'date',
+                'Expenses', 'expenses', expenseFromDate, expenseToDate, 'date',
                 ['Date', 'Amount', 'Category', 'Vendor', 'Description'],
                 (data: ExpenseFirestore) => ({
-                    'Date': format(data.date.toDate(), 'yyyy-MM-dd'),
-                    'Amount': data.amount.toFixed(2),
-                    'Category': data.category,
-                    'Vendor': data.vendor || '',
-                    'Description': data.description || '',
+                    'Date': format(data.date.toDate(), 'yyyy-MM-dd'), 'Amount': data.amount.toFixed(2),
+                    'Category': data.category, 'Vendor': data.vendor || '', 'Description': data.description || '',
                 }),
                 setIsExportingExpenses
             ),
@@ -237,24 +248,18 @@ export default function ReportsPage() {
             'Invoice Report',
             'Export a list of all invoices.',
             ReceiptIcon,
-            invoiceDateRange,
-            setInvoiceDateRange,
+            invoiceFromDate,
+            setInvoiceFromDate,
+            invoiceToDate,
+            setInvoiceToDate,
             isExportingInvoices,
             () => handleExport(
-                'Invoices',
-                'invoices',
-                invoiceDateRange,
-                'issuedDate',
+                'Invoices', 'invoices', invoiceFromDate, invoiceToDate, 'issuedDate',
                 ['Invoice Number', 'Client Name', 'Client Email', 'Amount', 'Issued Date', 'Due Date', 'Status', 'Notes'],
                 (data: InvoiceFirestore) => ({
-                    'Invoice Number': data.invoiceNumber,
-                    'Client Name': data.clientName,
-                    'Client Email': data.clientEmail || '',
-                    'Amount': data.amount.toFixed(2),
-                    'Issued Date': format(data.issuedDate.toDate(), 'yyyy-MM-dd'),
-                    'Due Date': format(data.dueDate.toDate(), 'yyyy-MM-dd'),
-                    'Status': data.status,
-                    'Notes': data.notes || '',
+                    'Invoice Number': data.invoiceNumber, 'Client Name': data.clientName, 'Client Email': data.clientEmail || '',
+                    'Amount': data.amount.toFixed(2), 'Issued Date': format(data.issuedDate.toDate(), 'yyyy-MM-dd'),
+                    'Due Date': format(data.dueDate.toDate(), 'yyyy-MM-dd'), 'Status': data.status, 'Notes': data.notes || '',
                 }),
                 setIsExportingInvoices
             ),
@@ -264,20 +269,17 @@ export default function ReportsPage() {
             'Revenue Report',
             'Export a list of all revenue entries.',
             DollarSign,
-            revenueDateRange,
-            setRevenueDateRange,
+            revenueFromDate,
+            setRevenueFromDate,
+            revenueToDate,
+            setRevenueToDate,
             isExportingRevenue,
             () => handleExport(
-                'Revenue',
-                'revenueEntries',
-                revenueDateRange,
-                'date',
+                'Revenue', 'revenueEntries', revenueFromDate, revenueToDate, 'date',
                 ['Date', 'Amount', 'Source', 'Description'],
                 (data: RevenueEntryFirestore) => ({
-                    'Date': format(data.date.toDate(), 'yyyy-MM-dd'),
-                    'Amount': data.amount.toFixed(2),
-                    'Source': data.source,
-                    'Description': data.description || '',
+                    'Date': format(data.date.toDate(), 'yyyy-MM-dd'), 'Amount': data.amount.toFixed(2),
+                    'Source': data.source, 'Description': data.description || '',
                 }),
                 setIsExportingRevenue
             ),
@@ -287,21 +289,17 @@ export default function ReportsPage() {
             'Appointments Report',
             'Export your calendar appointments.',
             CalendarDays,
-            appointmentDateRange,
-            setAppointmentDateRange,
+            appointmentFromDate,
+            setAppointmentFromDate,
+            appointmentToDate,
+            setAppointmentToDate,
             isExportingAppointments,
             () => handleExport(
-                'Appointments',
-                'appointments',
-                appointmentDateRange,
-                'date',
+                'Appointments', 'appointments', appointmentFromDate, appointmentToDate, 'date',
                 ['Date', 'Time', 'Title', 'Location', 'Notes'],
                 (data: AppointmentFirestore) => ({
-                    'Date': format(data.date.toDate(), 'yyyy-MM-dd'),
-                    'Time': data.time || '',
-                    'Title': data.title,
-                    'Location': data.location || '',
-                    'Notes': data.notes || '',
+                    'Date': format(data.date.toDate(), 'yyyy-MM-dd'), 'Time': data.time || '',
+                    'Title': data.title, 'Location': data.location || '', 'Notes': data.notes || '',
                 }),
                 setIsExportingAppointments
             ),
