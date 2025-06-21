@@ -83,7 +83,7 @@ export default function EmployeesPage() {
   const [employees, setEmployees] = useState<EmployeeDisplay[]>([]);
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [currentEmployee, setCurrentEmployee] = useState<Partial<EmployeeDisplay & { salary?: string | number }>>({});
-  const [isEditing, setIsEditing] = useState(false);
+  const [isEditing, setIsEditing] = useState(isFalse);
   const { toast } = useToast();
   const [isLoadingEmployees, setIsLoadingEmployees] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
@@ -97,6 +97,15 @@ export default function EmployeesPage() {
   const [profilePictureFile, setProfilePictureFile] = useState<File | null>(null);
   const [profilePicturePreview, setProfilePicturePreview] = useState<string | null>(null);
   const [associatedFile, setAssociatedFile] = useState<File | null>(null);
+
+  useEffect(() => {
+    // This is to clean up the object URL to avoid memory leaks
+    return () => {
+      if (profilePicturePreview && profilePicturePreview.startsWith('blob:')) {
+        URL.revokeObjectURL(profilePicturePreview);
+      }
+    };
+  }, [profilePicturePreview]);
 
   const cleanupWebcam = useCallback(() => {
     if (videoRef.current && videoRef.current.srcObject) {
@@ -211,7 +220,6 @@ export default function EmployeesPage() {
 
     setIsSaving(true);
     
-    // Use a new doc ID for new employees, or the existing one for edits
     const employeeDocId = currentEmployee.id || doc(collection(db, 'employees')).id;
 
     try {
@@ -222,17 +230,14 @@ export default function EmployeesPage() {
       let newAssociatedFileStoragePath = currentEmployee.associatedFileStoragePath || '';
 
       // --- Handle Profile Picture (Sequential) ---
-      // If a new picture is uploaded, delete the old one first if editing.
       if (profilePictureFile && isEditing && currentEmployee.profilePictureStoragePath) {
         await deleteFileFromStorage(currentEmployee.profilePictureStoragePath);
       }
-      // If the picture was removed in the UI (not replaced), delete the old one.
       if (isEditing && !profilePictureFile && currentEmployee.profilePictureUrl === undefined && currentEmployee.profilePictureStoragePath) {
         await deleteFileFromStorage(currentEmployee.profilePictureStoragePath);
         newProfilePicUrl = '';
         newProfilePicStoragePath = '';
       }
-      // Now, upload the new file if it exists.
       if (profilePictureFile) {
         const fileExtension = profilePictureFile.name.split('.').pop() || 'png';
         const path = `employees/${user.companyId}/${employeeDocId}/profileImage.${fileExtension}`;
@@ -350,18 +355,69 @@ export default function EmployeesPage() {
     setCurrentEmployee(prev => ({ ...prev, [name]: value }));
   };
 
-  const handleProfilePictureFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const resizeImage = (file: File, maxWidth: number = 800): Promise<File> => {
+      return new Promise((resolve, reject) => {
+          const reader = new FileReader();
+          reader.readAsDataURL(file);
+          reader.onload = (event) => {
+              const img = new Image();
+              img.src = event.target?.result as string;
+              img.onload = () => {
+                  let { width, height } = img;
+                  if (width > height) {
+                      if (width > maxWidth) {
+                          height = Math.round((height * maxWidth) / width);
+                          width = maxWidth;
+                      }
+                  } else {
+                      if (height > maxWidth) {
+                          width = Math.round((width * maxWidth) / height);
+                          height = maxWidth;
+                      }
+                  }
+                  const canvas = document.createElement('canvas');
+                  canvas.width = width;
+                  canvas.height = height;
+                  const ctx = canvas.getContext('2d');
+                  ctx?.drawImage(img, 0, 0, width, height);
+                  canvas.toBlob((blob) => {
+                      if (blob) {
+                          resolve(new File([blob], file.name, {
+                              type: file.type,
+                              lastModified: Date.now()
+                          }));
+                      } else {
+                          reject(new Error('Canvas to Blob failed.'));
+                      }
+                  }, file.type, 0.9); // quality 0.9 for JPEG/WebP
+              };
+              img.onerror = (err) => reject(err);
+          };
+          reader.onerror = (err) => reject(err);
+      });
+  };
+
+  const handleProfilePictureFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files[0]) {
       const file = e.target.files[0];
-      if (file.size > 5 * 1024 * 1024) { // 5MB limit
+      if (file.size > 5 * 1024 * 1024) { // 5MB limit on original
         toast({ title: "File Too Large", description: "Profile picture must be less than 5MB.", variant: "destructive"});
         e.target.value = ""; 
         return;
       }
-      setProfilePictureFile(file);
-      const reader = new FileReader();
-      reader.onloadend = () => { setProfilePicturePreview(reader.result as string); };
-      reader.readAsDataURL(file);
+      
+      const objectUrl = URL.createObjectURL(file);
+      setProfilePicturePreview(objectUrl);
+
+      try {
+        const resizedFile = await resizeImage(file);
+        setProfilePictureFile(resizedFile);
+      } catch (error) {
+        console.error("Image resize error:", error);
+        toast({ title: "Image Processing Failed", description: "Could not process image. Using original file.", variant: "destructive"});
+        setProfilePictureFile(file); // Fallback to original file
+      }
+
       if(showWebcam) setShowWebcam(false); 
     }
   };
@@ -382,15 +438,34 @@ export default function EmployeesPage() {
     if (videoRef.current && canvasRef.current && videoRef.current.readyState >= videoRef.current.HAVE_METADATA) {
       const video = videoRef.current;
       const canvas = canvasRef.current;
-      canvas.width = video.videoWidth;
-      canvas.height = video.videoHeight;
+      
+      const MAX_WIDTH = 800;
+      let { videoWidth: width, videoHeight: height } = video;
+
+      if (width > height) {
+          if (width > MAX_WIDTH) {
+              height = Math.round((height * MAX_WIDTH) / width);
+              width = MAX_WIDTH;
+          }
+      } else {
+          if (height > MAX_WIDTH) {
+              width = Math.round((width * MAX_WIDTH) / height);
+              height = MAX_WIDTH;
+          }
+      }
+      
+      canvas.width = width;
+      canvas.height = height;
       const context = canvas.getContext('2d');
-      context?.drawImage(video, 0, 0, canvas.width, canvas.height);
+      context?.drawImage(video, 0, 0, width, height);
+      
+      const previewDataUrl = canvas.toDataURL('image/png');
+      setProfilePicturePreview(previewDataUrl);
+
       canvas.toBlob(blob => {
         if (blob) {
           const capturedFile = new File([blob], `webcam_capture_${Date.now()}.png`, { type: 'image/png' });
           setProfilePictureFile(capturedFile);
-          setProfilePicturePreview(canvas.toDataURL('image/png'));
         }
       }, 'image/png');
       setShowWebcam(false);
@@ -602,3 +677,5 @@ export default function EmployeesPage() {
     </div>
   );
 }
+
+    
