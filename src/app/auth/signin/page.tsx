@@ -1,4 +1,3 @@
-
 'use client';
 
 import React, { useState, type FormEvent, useEffect } from 'react';
@@ -83,7 +82,7 @@ export default function SignInPage() {
                 disabled={isLoading}
               />
             </div>
-            <div>
+            <div className="space-y-1">
               <Label htmlFor="password">Password</Label>
               <Input
                 id="password"
@@ -94,6 +93,11 @@ export default function SignInPage() {
                 required
                 disabled={isLoading}
               />
+              <div className="text-right">
+                 <Link href="/auth/forgot-password" className="text-xs font-medium text-primary hover:underline">
+                    Forgot Password?
+                </Link>
+              </div>
             </div>
             <Button type="submit" className="w-full" disabled={isLoading}>
               {isLoading ? (

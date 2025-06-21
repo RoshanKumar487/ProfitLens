@@ -1,4 +1,3 @@
-
 'use client';
 
 import type { User as FirebaseUser, AuthError } from 'firebase/auth';
@@ -133,7 +132,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   }, [toast, router, pathname]);
 
   useEffect(() => {
-    const publicPaths = ['/auth/signin', '/auth/signup'];
+    const publicPaths = ['/auth/signin', '/auth/signup', '/auth/forgot-password'];
     const isAuthPage = publicPaths.some(path => pathname.startsWith(path));
 
     if (!isLoading && !user && !isAuthPage) {
@@ -264,12 +263,11 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     setAuthError(null);
     try {
       await sendPasswordResetEmail(auth, email);
-      toast({ title: "Password Reset Email Sent", description: "Check your inbox for instructions." });
     } catch (err) {
       const caughtError = err as AuthError;
       console.error('AuthContext: Password reset error', caughtError);
       setAuthError(caughtError);
-      toast({ title: "Password Reset Failed", description: caughtError.message, variant: "destructive"});
+      throw caughtError;
     }
   };
 
