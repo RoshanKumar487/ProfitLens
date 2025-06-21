@@ -1,3 +1,4 @@
+
 'use client';
 
 import React, { useState, useEffect, FormEvent, useCallback, useRef } from 'react';
@@ -660,6 +661,7 @@ export default function EmployeesPage() {
             <TableHead className="w-[60px]">Avatar</TableHead>
             <TableHead>Name</TableHead>
             <TableHead>Position</TableHead>
+            <TableHead>Description</TableHead>
             <TableHead className="text-right">Salary</TableHead>
             <TableHead>File</TableHead>
             <TableHead className="text-right w-[100px]">Actions</TableHead>
@@ -672,6 +674,7 @@ export default function EmployeesPage() {
                 <TableCell><Skeleton className="h-10 w-10 rounded-full" /></TableCell>
                 <TableCell><Skeleton className="h-4 w-3/4" /></TableCell>
                 <TableCell><Skeleton className="h-4 w-1/2" /></TableCell>
+                <TableCell><Skeleton className="h-4 w-3/4" /></TableCell>
                 <TableCell className="text-right"><Skeleton className="h-4 w-1/4 ml-auto" /></TableCell>
                 <TableCell><Skeleton className="h-4 w-1/2" /></TableCell>
                 <TableCell className="text-right"><Skeleton className="h-8 w-8 ml-auto" /></TableCell>
@@ -688,6 +691,7 @@ export default function EmployeesPage() {
                   </TableCell>
                   <TableCell className="font-medium">Roshan Kumar</TableCell>
                   <TableCell>Super Admin</TableCell>
+                  <TableCell>N/A</TableCell>
                   <TableCell className="text-right">N/A</TableCell>
                   <TableCell>
                       <span className="text-sm text-muted-foreground">System</span>
@@ -708,6 +712,9 @@ export default function EmployeesPage() {
               </TableCell>
               <TableCell className="font-medium">{employee.name}</TableCell>
               <TableCell>{employee.position}</TableCell>
+              <TableCell className="max-w-[200px] truncate text-sm text-muted-foreground" title={employee.description}>
+                {employee.description || '-'}
+              </TableCell>
               <TableCell className="text-right">{currency}{employee.salary.toLocaleString()}</TableCell>
               <TableCell>
                 {employee.associatedFileUrl && employee.associatedFileName ? (
