@@ -1,3 +1,4 @@
+
 'use client';
 
 import PageTitle from '@/components/PageTitle';
@@ -51,6 +52,7 @@ const HelpfulTipsCardSkeleton = () => (
 
 const HelpfulTipsCard = dynamic(() => import('@/components/dashboard/HelpfulTipsCard'), {
   loading: () => <HelpfulTipsCardSkeleton />,
+  ssr: false,
 });
 
 
