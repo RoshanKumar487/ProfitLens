@@ -45,6 +45,7 @@ import { db } from '@/lib/firebaseConfig';
 import { collection, addDoc, getDocs, doc, updateDoc, deleteDoc, query, where, orderBy, Timestamp, serverTimestamp, setDoc } from 'firebase/firestore';
 import { uploadFileToStorage, deleteFileFromStorage } from '@/lib/firebaseStorageUtils';
 import { Skeleton } from '@/components/ui/skeleton';
+import { Badge } from '@/components/ui/badge';
 
 interface EmployeeFirestore {
   id?: string;
@@ -248,12 +249,12 @@ export default function EmployeesPage() {
   const handleFormSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!user || !user.companyId) {
-      toast({ title: "Authentication Error", description: "User not authenticated.", variant: "destructive" });
-      return;
+        toast({ title: "Authentication Error", description: "User not authenticated.", variant: "destructive" });
+        return;
     }
     if (!currentEmployee.name || !currentEmployee.position || currentEmployee.salary === undefined) {
-      toast({ title: "Missing Information", description: "Name, position, and salary are required.", variant: "destructive" });
-      return;
+        toast({ title: "Missing Information", description: "Name, position, and salary are required.", variant: "destructive" });
+        return;
     }
 
     const salaryNum = Number(currentEmployee.salary);
@@ -265,79 +266,77 @@ export default function EmployeesPage() {
     setIsSaving(true);
     
     try {
-      const employeeDocId = currentEmployee.id || doc(collection(db, 'employees')).id;
+        const employeeDocId = currentEmployee.id || doc(collection(db, 'employees')).id;
 
-      // Start with current data and update as we go
-      let dataToSave: any = {
-        name: currentEmployee.name!,
-        position: currentEmployee.position!,
-        salary: salaryNum,
-        description: currentEmployee.description || '',
-        companyId: user.companyId,
-      };
+        // Clone current employee to avoid mutating state directly
+        const updatedEmployeeData: any = { ...currentEmployee };
 
-      // --- Handle Profile Picture ---
-      if (profilePictureFile) { 
-        const oldPath = isEditing ? currentEmployee.profilePictureStoragePath : undefined;
-        if (oldPath) {
-          await deleteFileFromStorage(oldPath).catch(e => console.warn("Old profile pic deletion failed, continuing...", e));
+        // Handle Profile Picture
+        if (profilePictureFile) { 
+            const oldPath = isEditing ? currentEmployee.profilePictureStoragePath : undefined;
+            if (oldPath) {
+                await deleteFileFromStorage(oldPath).catch(e => console.warn("Old profile pic deletion failed, continuing...", e));
+            }
+            const fileExtension = profilePictureFile.name.split('.').pop() || 'jpeg';
+            const newPath = `employees/${user.companyId}/${employeeDocId}/profileImage.${fileExtension}`;
+            const newUrl = await uploadFileToStorage(profilePictureFile, newPath);
+            updatedEmployeeData.profilePictureUrl = newUrl;
+            updatedEmployeeData.profilePictureStoragePath = newPath;
+        } else if (isEditing && currentEmployee.profilePictureUrl === undefined) { 
+            const oldPath = currentEmployee.profilePictureStoragePath;
+            if (oldPath) {
+                await deleteFileFromStorage(oldPath).catch(e => console.warn("Profile pic deletion failed, continuing...", e));
+            }
+            updatedEmployeeData.profilePictureUrl = '';
+            updatedEmployeeData.profilePictureStoragePath = '';
         }
-        const fileExtension = profilePictureFile.name.split('.').pop() || 'jpeg';
-        const newPath = `employees/${user.companyId}/${employeeDocId}/profileImage.${fileExtension}`;
-        const newUrl = await uploadFileToStorage(profilePictureFile, newPath);
-        dataToSave.profilePictureUrl = newUrl;
-        dataToSave.profilePictureStoragePath = newPath;
-      } else if (isEditing && currentEmployee.profilePictureUrl === undefined) { 
-        const oldPath = currentEmployee.profilePictureStoragePath;
-        if (oldPath) {
-          await deleteFileFromStorage(oldPath).catch(e => console.warn("Profile pic deletion failed, continuing...", e));
-        }
-        dataToSave.profilePictureUrl = '';
-        dataToSave.profilePictureStoragePath = '';
-      } else if (isEditing) {
-        dataToSave.profilePictureUrl = currentEmployee.profilePictureUrl;
-        dataToSave.profilePictureStoragePath = currentEmployee.profilePictureStoragePath;
-      }
 
+        // Handle Associated File
+        if (associatedFile) {
+            const oldPath = isEditing ? currentEmployee.associatedFileStoragePath : undefined;
+            if (oldPath) {
+                await deleteFileFromStorage(oldPath).catch(e => console.warn("Old assoc. file deletion failed, continuing...", e));
+            }
+            const newPath = `employees/${user.companyId}/${employeeDocId}/associatedFiles/${associatedFile.name}`;
+            const newUrl = await uploadFileToStorage(associatedFile, newPath);
+            updatedEmployeeData.associatedFileUrl = newUrl;
+            updatedEmployeeData.associatedFileStoragePath = newPath;
+            updatedEmployeeData.associatedFileName = associatedFile.name;
+        } else if (isEditing && currentEmployee.associatedFileUrl === undefined) {
+            const oldPath = currentEmployee.associatedFileStoragePath;
+            if (oldPath) {
+                await deleteFileFromStorage(oldPath).catch(e => console.warn("Assoc. file deletion failed, continuing...", e));
+            }
+            updatedEmployeeData.associatedFileUrl = '';
+            updatedEmployeeData.associatedFileStoragePath = '';
+            updatedEmployeeData.associatedFileName = '';
+        }
 
-      // --- Handle Associated File ---
-      if (associatedFile) {
-        const oldPath = isEditing ? currentEmployee.associatedFileStoragePath : undefined;
-        if (oldPath) {
-          await deleteFileFromStorage(oldPath).catch(e => console.warn("Old assoc. file deletion failed, continuing...", e));
+        const dataToSave = {
+            name: updatedEmployeeData.name!,
+            position: updatedEmployeeData.position!,
+            salary: salaryNum,
+            description: updatedEmployeeData.description || '',
+            companyId: user.companyId,
+            profilePictureUrl: updatedEmployeeData.profilePictureUrl || '',
+            profilePictureStoragePath: updatedEmployeeData.profilePictureStoragePath || '',
+            associatedFileUrl: updatedEmployeeData.associatedFileUrl || '',
+            associatedFileName: updatedEmployeeData.associatedFileName || '',
+            associatedFileStoragePath: updatedEmployeeData.associatedFileStoragePath || '',
+        };
+
+        if (isEditing && currentEmployee.id) {
+            const employeeRef = doc(db, 'employees', currentEmployee.id);
+            await updateDoc(employeeRef, { ...dataToSave, updatedAt: serverTimestamp() });
+            toast({ title: "Employee Updated" });
+        } else {
+            const newEmployeeRef = doc(db, 'employees', employeeDocId);
+            await setDoc(newEmployeeRef, { ...dataToSave, createdAt: serverTimestamp() });
+            toast({ title: "Employee Added" });
         }
-        const newPath = `employees/${user.companyId}/${employeeDocId}/associatedFiles/${associatedFile.name}`;
-        const newUrl = await uploadFileToStorage(associatedFile, newPath);
-        dataToSave.associatedFileUrl = newUrl;
-        dataToSave.associatedFileStoragePath = newPath;
-        dataToSave.associatedFileName = associatedFile.name;
-      } else if (isEditing && currentEmployee.associatedFileUrl === undefined) {
-        const oldPath = currentEmployee.associatedFileStoragePath;
-        if (oldPath) {
-          await deleteFileFromStorage(oldPath).catch(e => console.warn("Assoc. file deletion failed, continuing...", e));
-        }
-        dataToSave.associatedFileUrl = '';
-        dataToSave.associatedFileStoragePath = '';
-        dataToSave.associatedFileName = '';
-      } else if (isEditing) {
-        dataToSave.associatedFileUrl = currentEmployee.associatedFileUrl;
-        dataToSave.associatedFileName = currentEmployee.associatedFileName;
-        dataToSave.associatedFileStoragePath = currentEmployee.associatedFileStoragePath;
-      }
-      
-      // --- Save to Firestore ---
-      if (isEditing && currentEmployee.id) {
-        const employeeRef = doc(db, 'employees', currentEmployee.id);
-        await updateDoc(employeeRef, { ...dataToSave, updatedAt: serverTimestamp() });
-        toast({ title: "Employee Updated" });
-      } else {
-        const newEmployeeRef = doc(db, 'employees', employeeDocId);
-        await setDoc(newEmployeeRef, { ...dataToSave, createdAt: serverTimestamp() });
-        toast({ title: "Employee Added" });
-      }
     
-      fetchEmployees();
-      resetFormState();
+        fetchEmployees();
+        resetFormState();
 
     } catch (error: any) {
         console.error("Error saving employee:", error);
@@ -404,7 +403,7 @@ export default function EmployeesPage() {
     setCurrentEmployee(prev => ({ ...prev, [name]: value }));
   };
 
-  const resizeImage = (file: File, maxWidth: number = 600, targetSizeKB: number = 80): Promise<File> => {
+  const resizeImage = (file: File, maxWidth: number = 800, targetSizeKB: number = 80): Promise<File> => {
       return new Promise((resolve, reject) => {
           const reader = new FileReader();
           reader.readAsDataURL(file);
@@ -435,7 +434,7 @@ export default function EmployeesPage() {
 
                   // IIFE to handle async logic for quality adjustment
                   (async () => {
-                      let quality = 0.8;
+                      let quality = 0.9; // Start with higher quality
                       let blob: Blob | null = null;
                       
                       const getBlob = (q: number): Promise<Blob | null> => {
@@ -448,7 +447,7 @@ export default function EmployeesPage() {
 
                       // Reduce quality if file is too large
                       while (blob && blob.size / 1024 > targetSizeKB && quality > 0.1) {
-                          quality = Math.max(0.1, quality - 0.1); // Ensure quality doesn't go below 0.1
+                          quality = Math.max(0.1, quality - 0.15); // Reduce more aggressively
                           blob = await getBlob(quality);
                       }
 
@@ -619,6 +618,27 @@ export default function EmployeesPage() {
               </TableRow>
             ))
           )}
+
+          {/* Manually added Super Admin row */}
+          {user?.email === 'roshankumar70975@gmail.com' && (
+              <TableRow key="super-admin-row" className="bg-primary/5 hover:bg-primary/10">
+                  <TableCell>
+                      <Avatar className="h-10 w-10 border-2 border-primary">
+                          <AvatarFallback className="bg-primary/20">SA</AvatarFallback>
+                      </Avatar>
+                  </TableCell>
+                  <TableCell className="font-medium">Roshan Kumar</TableCell>
+                  <TableCell>Super Admin</TableCell>
+                  <TableCell className="text-right">N/A</TableCell>
+                  <TableCell>
+                      <span className="text-sm text-muted-foreground">System</span>
+                  </TableCell>
+                  <TableCell className="text-right">
+                      <Badge variant="secondary">System User</Badge>
+                  </TableCell>
+              </TableRow>
+          )}
+
           {!isLoadingEmployees && employees.map((employee) => (
             <TableRow key={employee.id}>
               <TableCell>
