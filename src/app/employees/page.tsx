@@ -38,7 +38,7 @@ import {
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger, DropdownMenuSeparator } from '@/components/ui/dropdown-menu';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
-import { Users2, PlusCircle, MoreHorizontal, Edit, Trash2, Loader2, Save, Camera, UploadCloud, FileText, XCircle } from 'lucide-react';
+import { Users2, PlusCircle, MoreHorizontal, Edit, Trash2, Loader2, Save, Camera, UploadCloud, FileText, XCircle, SwitchCamera } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/contexts/AuthContext';
 import { db } from '@/lib/firebaseConfig';
@@ -98,6 +98,10 @@ export default function EmployeesPage() {
   const [profilePicturePreview, setProfilePicturePreview] = useState<string | null>(null);
   const [associatedFile, setAssociatedFile] = useState<File | null>(null);
 
+  const [facingMode, setFacingMode] = useState<'user' | 'environment'>('user');
+  const [hasMultipleCameras, setHasMultipleCameras] = useState(false);
+  const [isSwitchingCamera, setIsSwitchingCamera] = useState(false);
+
   useEffect(() => {
     // This is to clean up the object URL to avoid memory leaks
     return () => {
@@ -106,6 +110,22 @@ export default function EmployeesPage() {
       }
     };
   }, [profilePicturePreview]);
+  
+  useEffect(() => {
+    const checkForMultipleCameras = async () => {
+      if (navigator.mediaDevices && navigator.mediaDevices.enumerateDevices) {
+        try {
+          const devices = await navigator.mediaDevices.enumerateDevices();
+          const videoDevices = devices.filter(device => device.kind === 'videoinput');
+          setHasMultipleCameras(videoDevices.length > 1);
+        } catch (error) {
+          console.error("Could not enumerate devices:", error);
+          setHasMultipleCameras(false);
+        }
+      }
+    };
+    checkForMultipleCameras();
+  }, []);
 
   const cleanupWebcam = useCallback(() => {
     if (videoRef.current && videoRef.current.srcObject) {
@@ -114,33 +134,57 @@ export default function EmployeesPage() {
       videoRef.current.srcObject = null;
     }
   }, []);
-
-  useEffect(() => {
-    if (showWebcam) {
-      const getCameraPermission = async () => {
+  
+  const startWebcam = useCallback(async (mode: 'user' | 'environment') => {
+      setIsSwitchingCamera(true);
+      cleanupWebcam(); // Stop previous stream before starting a new one
+      try {
+        const constraints = { video: { facingMode: { exact: mode } } };
+        const stream = await navigator.mediaDevices.getUserMedia(constraints);
+        setHasCameraPermission(true);
+        if (videoRef.current) {
+          videoRef.current.srcObject = stream;
+        }
+      } catch (error) {
+        console.error('Error switching camera:', error);
         try {
+          console.log("Fallback to default camera");
           const stream = await navigator.mediaDevices.getUserMedia({ video: true });
           setHasCameraPermission(true);
           if (videoRef.current) {
             videoRef.current.srcObject = stream;
           }
-        } catch (error) {
-          console.error('Error accessing camera:', error);
-          setHasCameraPermission(false);
+          setFacingMode('user'); 
           toast({
-            variant: 'destructive',
-            title: 'Camera Access Denied',
-            description: 'Please enable camera permissions in your browser settings.',
+            variant: 'default',
+            title: 'Camera not available',
+            description: 'Switched to default camera.',
           });
-          setShowWebcam(false); 
+        } catch (fallbackError) {
+           console.error('Error accessing any camera:', fallbackError);
+           setHasCameraPermission(false);
+           toast({
+              variant: 'destructive',
+              title: 'Camera Access Denied',
+              description: 'Please enable camera permissions in your browser settings.',
+           });
+           setShowWebcam(false);
         }
+      } finally {
+          setIsSwitchingCamera(false);
+      }
+    }, [cleanupWebcam, toast]);
+  
+    useEffect(() => {
+      if (showWebcam) {
+        startWebcam(facingMode);
+      } else {
+        cleanupWebcam();
+      }
+      return () => {
+          if (showWebcam) cleanupWebcam();
       };
-      getCameraPermission();
-    } else {
-      cleanupWebcam();
-    }
-    return () => { if (showWebcam) cleanupWebcam();};
-  }, [showWebcam, toast, cleanupWebcam]);
+    }, [showWebcam, facingMode, startWebcam, cleanupWebcam]);
 
 
   const fetchEmployees = useCallback(async () => {
@@ -482,15 +526,23 @@ export default function EmployeesPage() {
       const context = canvas.getContext('2d');
       context?.drawImage(video, 0, 0, width, height);
       
-      const previewDataUrl = canvas.toDataURL('image/jpeg', 0.9);
-      setProfilePicturePreview(previewDataUrl);
-
-      canvas.toBlob(blob => {
+      canvas.toBlob(async (blob) => {
         if (blob) {
-          const capturedFile = new File([blob], `webcam_capture_${Date.now()}.jpeg`, { type: 'image/jpeg' });
-          setProfilePictureFile(capturedFile);
+          try {
+            const file = new File([blob], `webcam_capture_${Date.now()}.jpeg`, { type: 'image/jpeg' });
+            const resizedFile = await resizeImage(file);
+            
+            const previewDataUrl = URL.createObjectURL(resizedFile);
+            setProfilePicturePreview(previewDataUrl);
+            setProfilePictureFile(resizedFile);
+
+          } catch (error) {
+            console.error("Error resizing captured photo:", error);
+            toast({ title: "Capture Failed", description: "Could not process captured image.", variant: "destructive"});
+          }
         }
-      }, 'image/jpeg', 0.8);
+      }, 'image/jpeg', 0.9);
+
       setShowWebcam(false);
     } else {
       toast({title: "Webcam Error", description: "Webcam not ready or stream not available.", variant: "destructive"});
@@ -646,7 +698,17 @@ export default function EmployeesPage() {
                     <Alert variant="destructive" className="p-2 text-xs"><Camera className="h-3.5 w-3.5"/><AlertTitle className="text-xs">Cam Access Denied</AlertTitle><DialogDescription className="text-xs">Enable in browser.</DialogDescription></Alert>
                   )}
                   {hasCameraPermission === true && (
-                    <Button type="button" onClick={handleCapturePhoto} className="w-full h-9 text-xs" disabled={isSaving}><Camera className="mr-1.5 h-3.5 w-3.5" /> Capture</Button>
+                    <div className="flex gap-2">
+                      {hasMultipleCameras && (
+                        <Button type="button" onClick={() => setFacingMode(prev => prev === 'user' ? 'environment' : 'user')} className="flex-1 h-9 text-xs" disabled={isSaving || isSwitchingCamera}>
+                          {isSwitchingCamera ? <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" /> : <SwitchCamera className="mr-1.5 h-3.5 w-3.5" />}
+                          {isSwitchingCamera ? 'Switching...' : 'Switch Cam'}
+                        </Button>
+                      )}
+                      <Button type="button" onClick={handleCapturePhoto} className="flex-1 h-9 text-xs" disabled={isSaving || isSwitchingCamera}>
+                          <Camera className="mr-1.5 h-3.5 w-3.5" /> Capture
+                      </Button>
+                    </div>
                   )}
                 </div>
               )}
