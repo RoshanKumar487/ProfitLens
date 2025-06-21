@@ -5,12 +5,12 @@ import React, { useState, useCallback } from 'react';
 import PageTitle from '@/components/PageTitle';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
-import { Calendar as CalendarIcon, FileBarChart, Loader2, FileText, User, TrendingDown, Receipt as ReceiptIcon, DollarSign } from 'lucide-react';
+import { Calendar as CalendarIcon, FileBarChart, Loader2, FileText, User, TrendingDown, Receipt as ReceiptIcon, DollarSign, Banknote } from 'lucide-react';
 import { format } from 'date-fns';
 import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/contexts/AuthContext';
 import { db } from '@/lib/firebaseConfig';
-import { collection, getDocs, query, where, orderBy, Timestamp } from 'firebase/firestore';
+import { collection, getDocs, query, where, orderBy, Timestamp, collectionGroup } from 'firebase/firestore';
 import { downloadCsv } from '@/lib/utils';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Calendar } from '@/components/ui/calendar';
@@ -20,6 +20,7 @@ interface EmployeeFirestore { name: string; position: string; salary: number; de
 interface ExpenseFirestore { date: Timestamp; amount: number; category: string; vendor?: string; description?: string; }
 interface InvoiceFirestore { invoiceNumber: string; clientName: string; clientEmail?: string; amount: number; issuedDate: Timestamp; dueDate: Timestamp; status: string; notes?: string; }
 interface RevenueEntryFirestore { date: Timestamp; amount: number; source: string; description?: string; }
+interface BankTransactionFirestore { date: Timestamp; amount: number; type: 'deposit' | 'withdrawal'; category: string; description: string; accountId: string; }
 
 
 export default function ReportsPage() {
@@ -42,17 +43,22 @@ export default function ReportsPage() {
   const [revenueFromDate, setRevenueFromDate] = useState<Date | undefined>();
   const [revenueToDate, setRevenueToDate] = useState<Date | undefined>();
   const [isExportingRevenue, setIsExportingRevenue] = useState(false);
+
+  const [bankTransactionFromDate, setBankTransactionFromDate] = useState<Date | undefined>();
+  const [bankTransactionToDate, setBankTransactionToDate] = useState<Date | undefined>();
+  const [isExportingBankTransactions, setIsExportingBankTransactions] = useState(false);
   
 
   const handleExport = useCallback(async (
-    reportType: 'Employees' | 'Expenses' | 'Invoices' | 'Revenue',
+    reportType: string,
     collectionName: string,
     fromDate: Date | undefined,
     toDate: Date | undefined,
     dateField: string,
     headers: string[],
     dataMapper: (docData: any) => Record<string, any>,
-    setIsExporting: React.Dispatch<React.SetStateAction<boolean>>
+    setIsExporting: React.Dispatch<React.SetStateAction<boolean>>,
+    useCollectionGroup: boolean = false
   ) => {
     if (!user || !user.companyId) {
       toast({ title: 'Authentication Error', description: 'User not authenticated.', variant: 'destructive' });
@@ -65,9 +71,9 @@ export default function ReportsPage() {
 
     setIsExporting(true);
     try {
-      const collectionRef = collection(db, collectionName);
+      const ref = useCollectionGroup ? collectionGroup(db, collectionName) : collection(db, collectionName);
       const q = query(
-        collectionRef,
+        ref,
         where('companyId', '==', user.companyId),
         where(dateField, '>=', Timestamp.fromDate(fromDate)),
         where(dateField, '<=', Timestamp.fromDate(new Date(toDate.setHours(23, 59, 59, 999)))),
@@ -280,6 +286,31 @@ export default function ReportsPage() {
                 setIsExportingRevenue
             ),
             'revenue'
+        )}
+         {renderReportCard(
+            'Bank Transactions Report',
+            'Export all bank account transactions.',
+            Banknote,
+            bankTransactionFromDate,
+            setBankTransactionFromDate,
+            bankTransactionToDate,
+            setBankTransactionToDate,
+            isExportingBankTransactions,
+            () => handleExport(
+                'Bank Transactions', 'transactions', bankTransactionFromDate, bankTransactionToDate, 'date',
+                ['Date', 'Account ID', 'Type', 'Amount', 'Category', 'Description'],
+                (data: BankTransactionFirestore) => ({
+                    'Date': format(data.date.toDate(), 'yyyy-MM-dd'), 
+                    'Account ID': data.accountId,
+                    'Type': data.type,
+                    'Amount': data.amount.toFixed(2),
+                    'Category': data.category,
+                    'Description': data.description,
+                }),
+                setIsExportingBankTransactions,
+                true // Use collectionGroup query
+            ),
+            'transaction'
         )}
       </div>
     </div>

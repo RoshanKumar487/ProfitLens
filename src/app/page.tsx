@@ -55,6 +55,21 @@ const HelpfulTipsCard = dynamic(() => import('@/components/dashboard/HelpfulTips
   ssr: false,
 });
 
+const TransactionPieChart = dynamic(() => import('@/components/dashboard/TransactionPieChart'), {
+  loading: () => (
+    <Card className="shadow-lg">
+      <CardHeader>
+        <Skeleton className="h-6 w-3/4" />
+        <Skeleton className="h-4 w-1/2" />
+      </CardHeader>
+      <CardContent className="flex items-center justify-center h-[300px] sm:h-[350px]">
+        <Skeleton className="h-48 w-48 rounded-full" />
+      </CardContent>
+    </Card>
+  ),
+  ssr: false,
+});
+
 
 export default function DashboardPage() {
   const { user } = useAuth();
@@ -102,34 +117,7 @@ export default function DashboardPage() {
           </CardContent>
         </Card>
         
-        <Card className="shadow-lg">
-          <CardHeader>
-            <CardTitle className="font-headline">Quick Stats</CardTitle>
-          </CardHeader>
-          <CardContent className="grid gap-4">
-              <div className="flex items-center justify-between p-3 bg-background rounded-lg border">
-                <div>
-                    <p className="text-sm text-muted-foreground">New Customers</p>
-                    <p className="text-2xl font-bold">{newCustomers}</p>
-                </div>
-                <Users className="h-8 w-8 text-primary" />
-              </div>
-              <div className="flex items-center justify-between p-3 bg-background rounded-lg border">
-                <div>
-                    <p className="text-sm text-muted-foreground">Active Projects</p>
-                    <p className="text-2xl font-bold">{activeProjects}</p>
-                </div>
-                <Activity className="h-8 w-8 text-accent" />
-              </div>
-               <div className="flex items-center justify-between p-3 bg-background rounded-lg border">
-                 <div>
-                    <p className="text-sm text-muted-foreground">Pending Invoices</p>
-                    <p className="text-2xl font-bold">3</p>
-                 </div>
-                 <FileText className="h-8 w-8 text-destructive" />
-              </div>
-          </CardContent>
-        </Card>
+        <TransactionPieChart />
       </div>
 
       <div className="grid gap-4 md:grid-cols-2">
