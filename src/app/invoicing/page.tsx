@@ -478,7 +478,7 @@ export default function InvoicingPage() {
 
   const handlePrintInvoice = () => {
     if (!invoicePrintRef.current || !invoiceToView) return;
-  
+
     const printContents = invoicePrintRef.current.innerHTML;
     const printWindow = window.open('', '_blank');
     
@@ -492,8 +492,8 @@ export default function InvoicingPage() {
               @media print {
                 @page { size: A4; margin: 0; }
                 body { 
-                  -webkit-print-color-adjust: exact; 
-                  print-color-adjust: exact;
+                  -webkit-print-color-adjust: exact !important; 
+                  print-color-adjust: exact !important;
                 }
               }
             </style>
@@ -506,16 +506,14 @@ export default function InvoicingPage() {
       
       printWindow.document.close();
       
-      const tailwindScript = printWindow.document.createElement('script');
-      tailwindScript.src = "https://cdn.tailwindcss.com";
-      tailwindScript.onload = () => {
-        setTimeout(() => { // Small delay to ensure styles are applied
+      // The onload event on the window will fire after all resources (like the script) are loaded.
+      printWindow.onload = () => {
+        setTimeout(() => { // A minimal timeout to ensure styles are processed by Tailwind's JIT
           printWindow.focus();
           printWindow.print();
           printWindow.close();
         }, 250);
       };
-      printWindow.document.head.appendChild(tailwindScript);
   
     } else {
       toast({ title: "Print Error", description: "Could not open print window. Please check pop-up blocker settings.", variant: "destructive"});
@@ -810,7 +808,10 @@ export default function InvoicingPage() {
   };
 
   const handleClientSuggestionClick = (client: ExistingClient) => {
-    const mostRecentInvoice = invoices.find(inv => inv.clientName === client.name);
+    const mostRecentInvoice = invoices
+      .filter(inv => inv.clientName === client.name)
+      .sort((a, b) => b.issuedDate.getTime() - a.issuedDate.getTime())[0];
+
 
     if (mostRecentInvoice) {
       // Create a new invoice draft based on the most recent one
