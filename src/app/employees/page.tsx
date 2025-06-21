@@ -209,73 +209,97 @@ export default function EmployeesPage() {
     }
 
     setIsSaving(true);
+    
     let newProfilePicUrl = currentEmployee.profilePictureUrl || '';
     let newProfilePicStoragePath = currentEmployee.profilePictureStoragePath || '';
     let newAssociatedFileUrl = currentEmployee.associatedFileUrl || '';
     let newAssociatedFileName = currentEmployee.associatedFileName || '';
     let newAssociatedFileStoragePath = currentEmployee.associatedFileStoragePath || '';
-
+    
     const employeeDocId = currentEmployee.id || doc(collection(db, 'employees')).id;
 
     try {
-      if (profilePictureFile) {
-        if (isEditing && currentEmployee.profilePictureStoragePath) {
-          await deleteFileFromStorage(currentEmployee.profilePictureStoragePath).catch(err => console.warn("Old profile pic deletion failed:", err));
+        const deletionPromises: Promise<void>[] = [];
+        const uploadPromises: Promise<void>[] = [];
+
+        // --- Handle Profile Picture ---
+        if (profilePictureFile) { // New file is being uploaded
+            if (isEditing && currentEmployee.profilePictureStoragePath) {
+                deletionPromises.push(deleteFileFromStorage(currentEmployee.profilePictureStoragePath));
+            }
+            const fileExtension = profilePictureFile.name.split('.').pop() || 'png';
+            newProfilePicStoragePath = `employees/${user.companyId}/${employeeDocId}/profileImage.${fileExtension}`;
+            
+            uploadPromises.push(
+                uploadFileToStorage(profilePictureFile, newProfilePicStoragePath).then(url => {
+                    newProfilePicUrl = url;
+                })
+            );
+        } else if (isEditing && currentEmployee.profilePictureUrl === undefined && currentEmployee.profilePictureStoragePath) {
+            // File was removed in the UI
+            deletionPromises.push(deleteFileFromStorage(currentEmployee.profilePictureStoragePath));
+            newProfilePicUrl = '';
+            newProfilePicStoragePath = '';
         }
-        const fileExtension = profilePictureFile.name.split('.').pop() || 'png';
-        newProfilePicStoragePath = `employees/${user.companyId}/${employeeDocId}/profileImage.${fileExtension}`;
-        newProfilePicUrl = await uploadFileToStorage(profilePictureFile, newProfilePicStoragePath);
-      } else if (isEditing && currentEmployee.profilePictureUrl === undefined && currentEmployee.profilePictureStoragePath) {
-        await deleteFileFromStorage(currentEmployee.profilePictureStoragePath).catch(err => console.warn("Profile pic deletion failed:", err));
-        newProfilePicUrl = '';
-        newProfilePicStoragePath = '';
-      }
 
+        // --- Handle Associated File ---
+        if (associatedFile) { // New file is being uploaded
+            if (isEditing && currentEmployee.associatedFileStoragePath) {
+                deletionPromises.push(deleteFileFromStorage(currentEmployee.associatedFileStoragePath));
+            }
+            newAssociatedFileStoragePath = `employees/${user.companyId}/${employeeDocId}/associatedFiles/${associatedFile.name}`;
+            newAssociatedFileName = associatedFile.name;
 
-      if (associatedFile) {
-        if (isEditing && currentEmployee.associatedFileStoragePath) {
-          await deleteFileFromStorage(currentEmployee.associatedFileStoragePath).catch(err => console.warn("Old associated file deletion failed:", err));
+            uploadPromises.push(
+                uploadFileToStorage(associatedFile, newAssociatedFileStoragePath).then(url => {
+                    newAssociatedFileUrl = url;
+                })
+            );
+        } else if (isEditing && currentEmployee.associatedFileUrl === undefined && currentEmployee.associatedFileStoragePath) {
+            // File was removed in the UI
+            deletionPromises.push(deleteFileFromStorage(currentEmployee.associatedFileStoragePath));
+            newAssociatedFileUrl = '';
+            newAssociatedFileName = '';
+            newAssociatedFileStoragePath = '';
         }
-        newAssociatedFileStoragePath = `employees/${user.companyId}/${employeeDocId}/associatedFiles/${associatedFile.name}`;
-        newAssociatedFileUrl = await uploadFileToStorage(associatedFile, newAssociatedFileStoragePath);
-        newAssociatedFileName = associatedFile.name;
-      } else if (isEditing && currentEmployee.associatedFileUrl === undefined && currentEmployee.associatedFileStoragePath) {
-        await deleteFileFromStorage(currentEmployee.associatedFileStoragePath).catch(err => console.warn("Associated file deletion failed:", err));
-        newAssociatedFileUrl = '';
-        newAssociatedFileName = '';
-        newAssociatedFileStoragePath = '';
-      }
 
-      const employeeDataToSave: Omit<EmployeeFirestore, 'id' | 'createdAt' | 'updatedAt'> & {companyId: string} = {
-        name: currentEmployee.name!,
-        position: currentEmployee.position!,
-        salary: salaryNum,
-        description: currentEmployee.description || '',
-        profilePictureUrl: newProfilePicUrl,
-        profilePictureStoragePath: newProfilePicStoragePath,
-        associatedFileUrl: newAssociatedFileUrl,
-        associatedFileName: newAssociatedFileName,
-        associatedFileStoragePath: newAssociatedFileStoragePath,
-        companyId: user.companyId,
-      };
+        // Execute all deletions and uploads in parallel
+        await Promise.all([...deletionPromises, ...uploadPromises]).catch(err => {
+            console.warn("An error occurred during file operations:", err);
+            throw new Error("File operation failed. Please try again.");
+        });
 
-      if (isEditing && currentEmployee.id) {
-        const employeeRef = doc(db, 'employees', currentEmployee.id);
-        await updateDoc(employeeRef, { ...employeeDataToSave, updatedAt: serverTimestamp() });
-        toast({ title: "Employee Updated" });
-      } else {
-        const newEmployeeRef = doc(db, 'employees', employeeDocId);
-        await setDoc(newEmployeeRef, { ...employeeDataToSave, createdAt: serverTimestamp() });
-        toast({ title: "Employee Added" });
-      }
+        // --- Save to Firestore ---
+        const employeeDataToSave: Omit<EmployeeFirestore, 'id' | 'createdAt' | 'updatedAt'> & {companyId: string} = {
+            name: currentEmployee.name!,
+            position: currentEmployee.position!,
+            salary: salaryNum,
+            description: currentEmployee.description || '',
+            profilePictureUrl: newProfilePicUrl,
+            profilePictureStoragePath: newProfilePicStoragePath,
+            associatedFileUrl: newAssociatedFileUrl,
+            associatedFileName: newAssociatedFileName,
+            associatedFileStoragePath: newAssociatedFileStoragePath,
+            companyId: user.companyId,
+        };
+
+        if (isEditing && currentEmployee.id) {
+            const employeeRef = doc(db, 'employees', currentEmployee.id);
+            await updateDoc(employeeRef, { ...employeeDataToSave, updatedAt: serverTimestamp() });
+            toast({ title: "Employee Updated" });
+        } else {
+            const newEmployeeRef = doc(db, 'employees', employeeDocId);
+            await setDoc(newEmployeeRef, { ...employeeDataToSave, createdAt: serverTimestamp() });
+            toast({ title: "Employee Added" });
+        }
       
-      fetchEmployees();
-      resetFormState();
+        fetchEmployees();
+        resetFormState();
     } catch (error: any) {
-      console.error("Error saving employee:", error);
-      toast({ title: "Save Failed", description: error.message, variant: "destructive" });
+        console.error("Error saving employee:", error);
+        toast({ title: "Save Failed", description: error.message, variant: "destructive" });
     } finally {
-      setIsSaving(false);
+        setIsSaving(false);
     }
   };
 
@@ -310,12 +334,14 @@ export default function EmployeesPage() {
     try {
       const employeeToDelete = employees.find(emp => emp.id === employeeToDeleteId);
       if (employeeToDelete) {
+        const deletionPromises: Promise<void>[] = [];
         if (employeeToDelete.profilePictureStoragePath) {
-          await deleteFileFromStorage(employeeToDelete.profilePictureStoragePath).catch(e => console.warn("Failed to delete profile pic from storage", e));
+          deletionPromises.push(deleteFileFromStorage(employeeToDelete.profilePictureStoragePath));
         }
         if (employeeToDelete.associatedFileStoragePath) {
-          await deleteFileFromStorage(employeeToDelete.associatedFileStoragePath).catch(e => console.warn("Failed to delete associated file from storage", e));
+          deletionPromises.push(deleteFileFromStorage(employeeToDelete.associatedFileStoragePath));
         }
+        await Promise.all(deletionPromises).catch(e => console.warn("Failed to delete all files from storage", e));
       }
       await deleteDoc(doc(db, 'employees', employeeToDeleteId));
       toast({ title: "Employee Deleted", variant: "destructive"});
@@ -586,3 +612,5 @@ export default function EmployeesPage() {
     </div>
   );
 }
+
+    
