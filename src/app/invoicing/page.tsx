@@ -490,7 +490,7 @@ export default function InvoicingPage() {
       .join('');
 
     // Get the HTML content of the invoice
-    const printContents = invoicePrintRef.current.innerHTML;
+    const printContents = invoicePrintRef.current.outerHTML;
     
     const printWindow = window.open('', '_blank');
 
@@ -1234,7 +1234,7 @@ export default function InvoicingPage() {
             <ScrollArea className="flex-grow overflow-y-auto bg-gray-100 dark:bg-background">
                 {isFetchingCompanyProfile && <div className="text-center p-10"><Loader2 className="h-8 w-8 animate-spin text-primary mx-auto" /> <p>Loading company details...</p></div>}
                 {!isFetchingCompanyProfile && invoiceToView && companyProfileDetails && (
-                    <div ref={invoicePrintRef} className="invoice-view-container relative p-8 sm:p-12 text-[#333] font-sans bg-white min-h-[1123px] w-[794px] mx-auto my-4 shadow-lg overflow-hidden border border-gray-200">
+                    <div ref={invoicePrintRef} className="invoice-view-container relative p-12 sm:p-16 text-[#333] font-sans bg-white min-h-[1123px] w-[794px] mx-auto my-4 shadow-lg overflow-hidden border border-gray-200">
                         <TopRightArt />
                         <BottomLeftArt />
                         <div className="relative z-10">
