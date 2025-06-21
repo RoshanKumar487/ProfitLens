@@ -11,14 +11,12 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/com
 import { Calendar } from '@/components/ui/calendar';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { CalendarIcon, TrendingDown, Save, Loader2, FileText } from 'lucide-react';
+import { CalendarIcon, TrendingDown, Save, Loader2 } from 'lucide-react';
 import { format } from 'date-fns';
-import type { DateRange } from 'react-day-picker';
 import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/contexts/AuthContext';
 import { db } from '@/lib/firebaseConfig';
 import { collection, addDoc, getDocs, query, where, orderBy, limit, Timestamp, serverTimestamp } from 'firebase/firestore';
-import { downloadCsv } from '@/lib/utils';
 
 const EXPENSE_CATEGORIES = [
   'Software & Subscriptions',
@@ -64,9 +62,6 @@ export default function RecordExpensesPage() {
   const [isLoadingEntries, setIsLoadingEntries] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
   const { toast } = useToast();
-
-  const [exportDateRange, setExportDateRange] = useState<DateRange | undefined>();
-  const [isExporting, setIsExporting] = useState(false);
 
   const fetchExpenseEntries = useCallback(async () => {
     if (authIsLoading) {
@@ -166,62 +161,6 @@ export default function RecordExpensesPage() {
     }
   };
 
-  const handleExportExpenses = async () => {
-    if (!user || !user.companyId) {
-      toast({ title: 'Authentication Error', description: 'User not authenticated.', variant: 'destructive' });
-      return;
-    }
-    if (!exportDateRange || !exportDateRange.from || !exportDateRange.to) {
-      toast({ title: 'Date Range Required', description: 'Please select a date range for export.', variant: 'destructive' });
-      return;
-    }
-
-    setIsExporting(true);
-    try {
-      const expensesRef = collection(db, 'expenses');
-      const q = query(
-        expensesRef,
-        where('companyId', '==', user.companyId),
-        where('date', '>=', Timestamp.fromDate(exportDateRange.from)),
-        where('date', '<=', Timestamp.fromDate(exportDateRange.to)),
-        orderBy('date', 'asc')
-      );
-      const querySnapshot = await getDocs(q);
-      const expensesToExport = querySnapshot.docs.map(docSnap => {
-        const data = docSnap.data() as ExpenseEntryFirestore;
-        return {
-          Date: format(data.date.toDate(), 'yyyy-MM-dd'),
-          Amount: data.amount.toFixed(2),
-          Category: data.category,
-          Vendor: data.vendor || '',
-          Description: data.description || '',
-        };
-      });
-
-      if (expensesToExport.length === 0) {
-        toast({ title: 'No Data', description: 'No expenses found in the selected date range.', variant: 'default' });
-        setIsExporting(false);
-        return;
-      }
-
-      const headers = ['Date', 'Amount', 'Category', 'Vendor', 'Description'];
-      const csvRows = [
-        headers.join(','),
-        ...expensesToExport.map(row => headers.map(header => `"${String(row[header as keyof typeof row]).replace(/"/g, '""')}"`).join(','))
-      ];
-      const csvString = csvRows.join('\n');
-      const filename = `BizSight_Expenses_${format(exportDateRange.from, 'yyyyMMdd')}_to_${format(exportDateRange.to, 'yyyyMMdd')}.csv`;
-      downloadCsv(csvString, filename);
-      toast({ title: 'Export Successful', description: `${expensesToExport.length} expenses exported.` });
-
-    } catch (error: any) {
-      console.error('Error exporting expenses:', error);
-      toast({ title: 'Export Failed', description: error.message, variant: 'destructive' });
-    } finally {
-      setIsExporting(false);
-    }
-  };
-  
   if (authIsLoading) {
     return (
       <div className="flex justify-center items-center h-64">
@@ -246,49 +185,7 @@ export default function RecordExpensesPage() {
 
   return (
     <div className="space-y-6">
-      <PageTitle title="Record Expenses" subtitle="Log your business expenditures." icon={TrendingDown}>
-        <div className="flex flex-col sm:flex-row gap-2 items-center">
-          <Popover>
-            <PopoverTrigger asChild>
-              <Button
-                id="date-range-expenses"
-                variant={"outline"}
-                className="w-full sm:w-[260px] justify-start text-left font-normal"
-                disabled={isExporting}
-              >
-                <CalendarIcon className="mr-2 h-4 w-4" />
-                {exportDateRange?.from ? (
-                  exportDateRange.to ? (
-                    <>
-                      {format(exportDateRange.from, "LLL dd, y")} - {" "}
-                      {format(exportDateRange.to, "LLL dd, y")}
-                    </>
-                  ) : (
-                    format(exportDateRange.from, "LLL dd, y")
-                  )
-                ) : (
-                  <span>Pick a date range</span>
-                )}
-              </Button>
-            </PopoverTrigger>
-            <PopoverContent className="w-auto p-0" align="end">
-              <Calendar
-                initialFocus
-                mode="range"
-                defaultMonth={exportDateRange?.from}
-                selected={exportDateRange}
-                onSelect={setExportDateRange}
-                numberOfMonths={2}
-              />
-            </PopoverContent>
-          </Popover>
-          <Button onClick={handleExportExpenses} disabled={isExporting || !exportDateRange?.from || !exportDateRange?.to} className="w-full sm:w-auto">
-            {isExporting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <FileText className="mr-2 h-4 w-4" />}
-            Export CSV
-          </Button>
-        </div>
-      </PageTitle>
-
+      <PageTitle title="Record Expenses" subtitle="Log your business expenditures." icon={TrendingDown} />
       <div className="grid gap-6 md:grid-cols-2">
         <Card className="shadow-lg">
           <CardHeader>
