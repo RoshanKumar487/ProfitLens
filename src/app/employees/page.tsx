@@ -264,79 +264,83 @@ export default function EmployeesPage() {
 
     setIsSaving(true);
     
-    const employeeDocId = currentEmployee.id || doc(collection(db, 'employees')).id;
-
     try {
-      let newProfilePicUrl = currentEmployee.profilePictureUrl || '';
-      let newProfilePicStoragePath = currentEmployee.profilePictureStoragePath || '';
-      let newAssociatedFileUrl = currentEmployee.associatedFileUrl || '';
-      let newAssociatedFileName = currentEmployee.associatedFileName || '';
-      let newAssociatedFileStoragePath = currentEmployee.associatedFileStoragePath || '';
+      const employeeDocId = currentEmployee.id || doc(collection(db, 'employees')).id;
 
-      // --- Handle Profile Picture (Sequential) ---
-      if (profilePictureFile && isEditing && currentEmployee.profilePictureStoragePath) {
-        await deleteFileFromStorage(currentEmployee.profilePictureStoragePath);
-      }
-      if (isEditing && !profilePictureFile && currentEmployee.profilePictureUrl === undefined && currentEmployee.profilePictureStoragePath) {
-        await deleteFileFromStorage(currentEmployee.profilePictureStoragePath);
-        newProfilePicUrl = '';
-        newProfilePicStoragePath = '';
-      }
-      if (profilePictureFile) {
-        const fileExtension = profilePictureFile.name.split('.').pop() || 'png';
-        const path = `employees/${user.companyId}/${employeeDocId}/profileImage.${fileExtension}`;
-        const url = await uploadFileToStorage(profilePictureFile, path);
-        newProfilePicUrl = url;
-        newProfilePicStoragePath = path;
-      }
-
-      // --- Handle Associated File (Sequential) ---
-      if (associatedFile && isEditing && currentEmployee.associatedFileStoragePath) {
-        await deleteFileFromStorage(currentEmployee.associatedFileStoragePath);
-      }
-      if (isEditing && !associatedFile && currentEmployee.associatedFileUrl === undefined && currentEmployee.associatedFileStoragePath) {
-        await deleteFileFromStorage(currentEmployee.associatedFileStoragePath);
-        newAssociatedFileUrl = '';
-        newAssociatedFileName = '';
-        newAssociatedFileStoragePath = '';
-      }
-      if (associatedFile) {
-        const path = `employees/${user.companyId}/${employeeDocId}/associatedFiles/${associatedFile.name}`;
-        const url = await uploadFileToStorage(associatedFile, path);
-        newAssociatedFileUrl = url;
-        newAssociatedFileStoragePath = path;
-        newAssociatedFileName = associatedFile.name;
-      }
-
-      // --- Prepare and Save to Firestore ---
-      const employeeDataToSave: Omit<EmployeeFirestore, 'id' | 'createdAt' | 'updatedAt'> & {companyId: string} = {
-          name: currentEmployee.name!,
-          position: currentEmployee.position!,
-          salary: salaryNum,
-          description: currentEmployee.description || '',
-          profilePictureUrl: newProfilePicUrl,
-          profilePictureStoragePath: newProfilePicStoragePath,
-          associatedFileUrl: newAssociatedFileUrl,
-          associatedFileName: newAssociatedFileName,
-          associatedFileStoragePath: newAssociatedFileStoragePath,
-          companyId: user.companyId,
+      // Start with current data and update as we go
+      const dataToSave: any = {
+        name: currentEmployee.name!,
+        position: currentEmployee.position!,
+        salary: salaryNum,
+        description: currentEmployee.description || '',
+        companyId: user.companyId,
+        // Carry over existing file data unless it's changed
+        profilePictureUrl: currentEmployee.profilePictureUrl || '',
+        profilePictureStoragePath: currentEmployee.profilePictureStoragePath || '',
+        associatedFileUrl: currentEmployee.associatedFileUrl || '',
+        associatedFileName: currentEmployee.associatedFileName || '',
+        associatedFileStoragePath: currentEmployee.associatedFileStoragePath || '',
       };
 
+      // --- Handle Profile Picture ---
+      if (profilePictureFile) { // A new file is being uploaded
+        const oldPath = isEditing ? currentEmployee.profilePictureStoragePath : undefined;
+        if (oldPath) {
+          // Don't let a failed deletion stop the update.
+          await deleteFileFromStorage(oldPath).catch(e => console.warn("Old profile pic deletion failed, continuing...", e));
+        }
+        const fileExtension = profilePictureFile.name.split('.').pop() || 'jpeg';
+        const newPath = `employees/${user.companyId}/${employeeDocId}/profileImage.${fileExtension}`;
+        const newUrl = await uploadFileToStorage(profilePictureFile, newPath);
+        dataToSave.profilePictureUrl = newUrl;
+        dataToSave.profilePictureStoragePath = newPath;
+      } else if (isEditing && currentEmployee.profilePictureUrl === undefined) { // An existing picture was removed
+        const oldPath = currentEmployee.profilePictureStoragePath;
+        if (oldPath) {
+          await deleteFileFromStorage(oldPath).catch(e => console.warn("Profile pic deletion failed, continuing...", e));
+        }
+        dataToSave.profilePictureUrl = '';
+        dataToSave.profilePictureStoragePath = '';
+      }
+
+      // --- Handle Associated File ---
+      if (associatedFile) { // A new file is being uploaded
+        const oldPath = isEditing ? currentEmployee.associatedFileStoragePath : undefined;
+        if (oldPath) {
+          await deleteFileFromStorage(oldPath).catch(e => console.warn("Old assoc. file deletion failed, continuing...", e));
+        }
+        const newPath = `employees/${user.companyId}/${employeeDocId}/associatedFiles/${associatedFile.name}`;
+        const newUrl = await uploadFileToStorage(associatedFile, newPath);
+        dataToSave.associatedFileUrl = newUrl;
+        dataToSave.associatedFileStoragePath = newPath;
+        dataToSave.associatedFileName = associatedFile.name;
+      } else if (isEditing && currentEmployee.associatedFileUrl === undefined) { // An existing file was removed
+        const oldPath = currentEmployee.associatedFileStoragePath;
+        if (oldPath) {
+          await deleteFileFromStorage(oldPath).catch(e => console.warn("Assoc. file deletion failed, continuing...", e));
+        }
+        dataToSave.associatedFileUrl = '';
+        dataToSave.associatedFileStoragePath = '';
+        dataToSave.associatedFileName = '';
+      }
+      
+      // --- Save to Firestore ---
       if (isEditing && currentEmployee.id) {
-          const employeeRef = doc(db, 'employees', currentEmployee.id);
-          await updateDoc(employeeRef, { ...employeeDataToSave, updatedAt: serverTimestamp() });
-          toast({ title: "Employee Updated" });
+        const employeeRef = doc(db, 'employees', currentEmployee.id);
+        await updateDoc(employeeRef, { ...dataToSave, updatedAt: serverTimestamp() });
+        toast({ title: "Employee Updated" });
       } else {
-          const newEmployeeRef = doc(db, 'employees', employeeDocId);
-          await setDoc(newEmployeeRef, { ...employeeDataToSave, createdAt: serverTimestamp() });
-          toast({ title: "Employee Added" });
+        const newEmployeeRef = doc(db, 'employees', employeeDocId);
+        await setDoc(newEmployeeRef, { ...dataToSave, createdAt: serverTimestamp() });
+        toast({ title: "Employee Added" });
       }
     
       fetchEmployees();
       resetFormState();
+
     } catch (error: any) {
         console.error("Error saving employee:", error);
-        toast({ title: "Save Failed", description: error.message, variant: "destructive" });
+        toast({ title: "Save Failed", description: `An unexpected error occurred: ${error.message}`, variant: "destructive" });
     } finally {
         setIsSaving(false);
     }
