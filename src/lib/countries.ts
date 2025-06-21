@@ -4,7 +4,7 @@ export const COUNTRIES = [
   { code: 'CA', name: 'Canada', currency: 'C$' },
   { code: 'GB', name: 'United Kingdom', currency: '£' },
   { code: 'AU', name: 'Australia', currency: 'A$' },
-  { code: 'IN', name: 'India', currency: '₹' },
+  { code: 'IN', name: 'India', currency: 'INR' },
   { code: 'DE', name: 'Germany', currency: '€' },
   { code: 'FR', name: 'France', currency: '€' },
   { code: 'JP', name: 'Japan', currency: '¥' },
