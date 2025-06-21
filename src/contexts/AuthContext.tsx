@@ -1,3 +1,4 @@
+
 'use client';
 
 import type { User as FirebaseUser, AuthError } from 'firebase/auth';
@@ -191,7 +192,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       }
     } catch (err) {
       const caughtError = err as AuthError;
-      console.error('AuthContext: Sign up error', caughtError);
       setAuthError(caughtError);
       toast({ title: "Sign Up Failed", description: caughtError.message, variant: "destructive"});
       setIsLoading(false);
@@ -231,7 +231,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       return userCredential.user;
     } catch (err) {
       const caughtError = err as AuthError;
-      console.error('AuthContext: Sign in error', caughtError);
       setAuthError(caughtError);
 
       let errorMessage = caughtError.message;
@@ -253,7 +252,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       toast({ title: "Signed Out", description: "You have been successfully signed out."});
     } catch (err) {
       const caughtError = err as AuthError;
-      console.error('AuthContext: Sign out error', caughtError);
       setAuthError(caughtError);
       toast({ title: "Sign Out Failed", description: caughtError.message, variant: "destructive"});
     }
@@ -265,7 +263,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       await sendPasswordResetEmail(auth, email);
     } catch (err) {
       const caughtError = err as AuthError;
-      console.error('AuthContext: Password reset error', caughtError);
       setAuthError(caughtError);
       throw caughtError;
     }
