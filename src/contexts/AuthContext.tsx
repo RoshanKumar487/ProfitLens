@@ -1,4 +1,3 @@
-
 'use client';
 
 import type { User as FirebaseUser, AuthError } from 'firebase/auth';
@@ -12,15 +11,18 @@ import {
   updateProfile,
   sendPasswordResetEmail,
 } from 'firebase/auth';
-import { doc, setDoc, serverTimestamp } from 'firebase/firestore'; // Import Firestore functions
+import { doc, setDoc, serverTimestamp, getDoc } from 'firebase/firestore'; // Import Firestore functions
 import { useRouter, usePathname } from 'next/navigation';
 import { useToast } from '@/hooks/use-toast';
+import { getCurrencySymbol } from '@/lib/countries';
 
 interface User {
   uid: string;
   email: string | null;
   displayName: string | null;
   companyId: string;
+  country?: string; // Add country
+  currencySymbol: string; // Add currency symbol
 }
 
 interface AuthContextType {
@@ -34,7 +36,8 @@ interface AuthContextType {
     companyName: string,
     companyAddress: string,
     city: string,
-    stateOrProvince: string // Renamed to avoid conflict with React state
+    stateOrProvince: string,
+    country: string, // Add country
   ) => Promise<FirebaseUser | null>;
   signIn: (email: string, password: string) => Promise<FirebaseUser | null>;
   signOut: () => Promise<void>;
@@ -56,17 +59,34 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const { toast } = useToast();
 
   useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, (firebaseUser) => {
+    const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
       if (firebaseUser) {
         const companyId = getDerivedCompanyId(firebaseUser.uid);
+        
+        // Fetch company profile to get country and determine currency
+        let userCountry: string | undefined = undefined;
+        try {
+          const companyDocRef = doc(db, 'companyProfiles', companyId);
+          const companyDocSnap = await getDoc(companyDocRef);
+          if (companyDocSnap.exists()) {
+            userCountry = companyDocSnap.data()?.country;
+          }
+        } catch (e) {
+            console.error("AuthContext: Could not fetch company profile for currency.", e);
+        }
+
+        const currencySymbol = getCurrencySymbol(userCountry);
+
         const appUser: User = {
           uid: firebaseUser.uid,
           email: firebaseUser.email,
           displayName: firebaseUser.displayName,
           companyId: companyId,
+          country: userCountry,
+          currencySymbol: currencySymbol,
         };
         setUser(appUser);
-        console.log(`AuthContext: User authenticated. UID: ${firebaseUser.uid}, CompanyID: ${companyId}`);
+        console.log(`AuthContext: User authenticated. UID: ${firebaseUser.uid}, CompanyID: ${companyId}, Currency: ${currencySymbol}`);
         const authPages = ['/auth/signin', '/auth/signup'];
         if (authPages.includes(pathname)) {
           router.push('/');
@@ -104,7 +124,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     companyName: string,
     companyAddress: string,
     city: string,
-    stateOrProvince: string
+    stateOrProvince: string,
+    country: string
   ): Promise<FirebaseUser | null> => {
     setIsLoading(true);
     setAuthError(null);
@@ -124,6 +145,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         address: companyAddress,
         city: city,
         state: stateOrProvince,
+        country: country, // Save country
         gstin: '', // Initialize empty
         phone: '', // Initialize empty
         email: firebaseUser.email || '', // Pre-fill with user's email
@@ -208,5 +230,3 @@ export const useAuth = (): AuthContextType => {
   }
   return context;
 };
-
-    

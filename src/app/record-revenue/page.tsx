@@ -1,4 +1,3 @@
-
 'use client';
 
 import React, { useState, useEffect, FormEvent, useCallback } from 'react';
@@ -37,6 +36,7 @@ interface RevenueEntryDisplay {
 
 export default function RecordRevenuePage() {
   const { user, isLoading: authIsLoading } = useAuth();
+  const currency = user?.currencySymbol || '$';
   const [date, setDate] = useState<Date | undefined>(new Date());
   const [amount, setAmount] = useState<string>('');
   const [source, setSource] = useState<string>('');
@@ -123,7 +123,7 @@ export default function RecordRevenuePage() {
       fetchRevenueEntries(); 
       toast({
         title: 'Revenue Recorded',
-        description: `Successfully recorded $${amountNum.toFixed(2)} from ${source}.`,
+        description: `Successfully recorded ${currency}${amountNum.toFixed(2)} from ${source}.`,
       });
       setDate(new Date());
       setAmount('');
@@ -200,7 +200,7 @@ export default function RecordRevenuePage() {
               </div>
 
               <div>
-                <Label htmlFor="amount">Amount ($)</Label>
+                <Label htmlFor="amount">Amount ({currency})</Label>
                 <Input
                   id="amount"
                   type="number"
@@ -270,7 +270,7 @@ export default function RecordRevenuePage() {
               recentEntries.map(entry => (
                 <div key={entry.id} className="p-3 bg-muted/50 rounded-lg border border-border">
                   <div className="flex justify-between items-center">
-                    <span className="font-semibold text-foreground">${entry.amount.toFixed(2)}</span>
+                    <span className="font-semibold text-foreground">{currency}{entry.amount.toFixed(2)}</span>
                     <span className="text-xs text-muted-foreground">{format(entry.date, 'PP')}</span>
                   </div>
                   <p className="text-sm text-muted-foreground">{entry.source}</p>

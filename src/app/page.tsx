@@ -1,4 +1,3 @@
-
 'use client';
 
 import PageTitle from '@/components/PageTitle';
@@ -8,6 +7,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/com
 import { ResponsiveContainer, BarChart, XAxis, YAxis, Tooltip, Legend, Bar, CartesianGrid } from 'recharts';
 import dynamic from 'next/dynamic';
 import { Skeleton } from '@/components/ui/skeleton'; // For loading state
+import { useAuth } from '@/contexts/AuthContext';
 
 
 const mockChartData = [
@@ -55,10 +55,13 @@ const HelpfulTipsCard = dynamic(() => import('@/components/dashboard/HelpfulTips
 
 
 export default function DashboardPage() {
+  const { user } = useAuth();
+  const currency = user?.currencySymbol || '$';
+
   // Placeholder data
-  const revenue = "$12,345.67";
-  const expenses = "$5,678.90";
-  const profit = "$6,666.77";
+  const revenue = "12,345.67";
+  const expenses = "5,678.90";
+  const profit = "6,666.77";
   const newCustomers = "12";
   const activeProjects = "5";
 
@@ -67,9 +70,9 @@ export default function DashboardPage() {
       <PageTitle title="Dashboard" subtitle="Overview of your business performance." icon={BarChartBig} />
 
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-3">
-        <DataCard title="Total Revenue" value={revenue} icon={DollarSign} trend="up" trendValue="+15.2% from last month" className="bg-gradient-to-br from-green-50 to-green-100 border-green-300 dark:from-green-900/50 dark:to-green-950/50 dark:border-green-700" />
-        <DataCard title="Total Expenses" value={expenses} icon={TrendingDown} trend="down" trendValue="-3.5% from last month" className="bg-gradient-to-br from-red-50 to-red-100 border-red-300 dark:from-red-900/50 dark:to-red-950/50 dark:border-red-700" />
-        <DataCard title="Net Profit" value={profit} icon={TrendingUp} trend="up" trendValue="+20.1% from last month" className="bg-gradient-to-br from-green-50 to-green-100 border-green-300 dark:from-green-900/50 dark:to-green-950/50 dark:border-green-700" />
+        <DataCard title="Total Revenue" value={`${currency}${revenue}`} icon={DollarSign} trend="up" trendValue="+15.2% from last month" className="bg-gradient-to-br from-green-50 to-green-100 border-green-300 dark:from-green-900/50 dark:to-green-950/50 dark:border-green-700" />
+        <DataCard title="Total Expenses" value={`${currency}${expenses}`} icon={TrendingDown} trend="down" trendValue="-3.5% from last month" className="bg-gradient-to-br from-red-50 to-red-100 border-red-300 dark:from-red-900/50 dark:to-red-950/50 dark:border-red-700" />
+        <DataCard title="Net Profit" value={`${currency}${profit}`} icon={TrendingUp} trend="up" trendValue="+20.1% from last month" className="bg-gradient-to-br from-green-50 to-green-100 border-green-300 dark:from-green-900/50 dark:to-green-950/50 dark:border-green-700" />
       </div>
 
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-1 xl:grid-cols-2">
@@ -83,7 +86,7 @@ export default function DashboardPage() {
               <BarChart data={mockChartData}>
                 <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
                 <XAxis dataKey="name" stroke="hsl(var(--muted-foreground))" fontSize={12} />
-                <YAxis stroke="hsl(var(--muted-foreground))" fontSize={12} tickFormatter={(value) => `$${value/1000}k`} />
+                <YAxis stroke="hsl(var(--muted-foreground))" fontSize={12} tickFormatter={(value) => `${currency}${value/1000}k`} />
                 <Tooltip
                   contentStyle={{ backgroundColor: 'hsl(var(--background))', border: '1px solid hsl(var(--border))', borderRadius: 'var(--radius)'}}
                   labelStyle={{ color: 'hsl(var(--foreground))' }}

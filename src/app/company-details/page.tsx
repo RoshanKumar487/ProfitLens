@@ -1,4 +1,3 @@
-
 'use client';
 
 import React, { useState, useEffect, type FormEvent } from 'react';
@@ -14,6 +13,8 @@ import { useAuth } from '@/contexts/AuthContext';
 import { db } from '@/lib/firebaseConfig';
 import { doc, getDoc, setDoc, Timestamp } from 'firebase/firestore';
 import { Separator } from '@/components/ui/separator';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { COUNTRIES } from '@/lib/countries';
 
 
 interface CompanyDetailsFirestore {
@@ -21,6 +22,7 @@ interface CompanyDetailsFirestore {
   address: string; // Street address
   city: string;
   state: string; // State or Province
+  country: string;
   gstin: string;
   phone: string;
   email: string;
@@ -36,6 +38,7 @@ export default function CompanyDetailsPage() {
     address: '',
     city: '',
     state: '',
+    country: '',
     gstin: '',
     phone: '',
     email: '',
@@ -54,7 +57,7 @@ export default function CompanyDetailsPage() {
       if (!user || !user.companyId) {
         setIsFetching(false);
         console.log("CompanyDetails: User or companyId not found for fetching.");
-        setCompanyDetails({ name: '', address: '', city: '', state: '', gstin: '', phone: '', email: '', website: '' });
+        setCompanyDetails({ name: '', address: '', city: '', state: '', country: '', gstin: '', phone: '', email: '', website: '' });
         return;
       }
 
@@ -70,6 +73,7 @@ export default function CompanyDetailsPage() {
             address: data.address || '',
             city: data.city || '',
             state: data.state || '',
+            country: data.country || '',
             gstin: data.gstin || '',
             phone: data.phone || '',
             email: data.email || '',
@@ -81,7 +85,7 @@ export default function CompanyDetailsPage() {
         } else {
           console.log("CompanyDetails: No details found for companyId:", user.companyId, ". Initializing empty form.");
           // This case should be less common now as profile is created on signup
-          setCompanyDetails({ name: user.displayName || '', address: '', city: '', state: '', gstin: '', phone: '', email: user.email || '', website: '' });
+          setCompanyDetails({ name: user.displayName || '', address: '', city: '', state: '', country: '', gstin: '', phone: '', email: user.email || '', website: '' });
         }
       } catch (error: any) {
         console.error('Error fetching company details from Firestore:', error);
@@ -90,7 +94,7 @@ export default function CompanyDetailsPage() {
           description: error.message || 'Could not load company details from Firestore.',
           variant: 'destructive',
         });
-        setCompanyDetails({ name: '', address: '', city: '', state: '', gstin: '', phone: '', email: '', website: '' });
+        setCompanyDetails({ name: '', address: '', city: '', state: '', country: '', gstin: '', phone: '', email: '', website: '' });
       } finally {
         setIsFetching(false);
       }
@@ -103,6 +107,10 @@ export default function CompanyDetailsPage() {
     const { name, value } = e.target;
     setCompanyDetails(prev => ({ ...prev, [name]: value }));
   };
+  
+  const handleCountryChange = (value: string) => {
+    setCompanyDetails(prev => ({...prev, country: value}));
+  };
 
   const handleSave = async (e?: React.FormEvent) => {
     if (e) e.preventDefault();
@@ -110,8 +118,8 @@ export default function CompanyDetailsPage() {
       toast({ title: "Save Failed", description: "User not authenticated.", variant: "destructive" });
       return;
     }
-    if (!companyDetails.name || !companyDetails.address || !companyDetails.city || !companyDetails.state || !companyDetails.gstin) {
-        toast({ title: "Missing Information", description: "Company Name, Address, City, State, and GSTIN/Tax ID are required.", variant: "destructive" });
+    if (!companyDetails.name || !companyDetails.address || !companyDetails.city || !companyDetails.state || !companyDetails.country || !companyDetails.gstin) {
+        toast({ title: "Missing Information", description: "Company Name, Address, City, State, Country and GSTIN/Tax ID are required.", variant: "destructive" });
         return;
     }
 
@@ -123,6 +131,7 @@ export default function CompanyDetailsPage() {
         address: companyDetails.address,
         city: companyDetails.city,
         state: companyDetails.state,
+        country: companyDetails.country,
         gstin: companyDetails.gstin,
         phone: companyDetails.phone || '',
         email: companyDetails.email || '',
@@ -135,7 +144,7 @@ export default function CompanyDetailsPage() {
       setCompanyDetails(detailsToSave); 
       toast({
         title: 'Details Saved',
-        description: 'Company information updated successfully in Firestore.',
+        description: 'Company information updated. Currency may update on next refresh.',
       });
       console.log("CompanyDetails: Saved details for companyId:", user.companyId);
 
@@ -253,6 +262,21 @@ export default function CompanyDetailsPage() {
                 />
               </div>
             </div>
+            <div>
+                <Label htmlFor="country">Country</Label>
+                 <Select value={companyDetails.country} onValueChange={handleCountryChange} required disabled={isSaving}>
+                    <SelectTrigger id="country">
+                        <SelectValue placeholder="Select a country" />
+                    </SelectTrigger>
+                    <SelectContent>
+                        {COUNTRIES.map((c) => (
+                        <SelectItem key={c.code} value={c.code}>
+                            {c.name}
+                        </SelectItem>
+                        ))}
+                    </SelectContent>
+                </Select>
+            </div>
              <Separator className="my-4" />
             <div>
               <Label htmlFor="gstin">GSTIN / Tax ID</Label>
@@ -316,5 +340,3 @@ export default function CompanyDetailsPage() {
     </div>
   );
 }
-
-    

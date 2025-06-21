@@ -1,4 +1,3 @@
-
 'use client';
 
 import React, { useState, useEffect, FormEvent, useCallback, useRef } from 'react';
@@ -79,6 +78,7 @@ const getInitials = (name: string = "") => {
 
 export default function EmployeesPage() {
   const { user, isLoading: authIsLoading } = useAuth();
+  const currency = user?.currencySymbol || '$';
   const [employees, setEmployees] = useState<EmployeeDisplay[]>([]);
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [currentEmployee, setCurrentEmployee] = useState<Partial<EmployeeDisplay & { salary?: string | number }>>({});
@@ -458,7 +458,7 @@ export default function EmployeesPage() {
               </TableCell>
               <TableCell className="font-medium">{employee.name}</TableCell>
               <TableCell>{employee.position}</TableCell>
-              <TableCell className="text-right">${employee.salary.toLocaleString()}</TableCell>
+              <TableCell className="text-right">{currency}{employee.salary.toLocaleString()}</TableCell>
               <TableCell>
                 {employee.associatedFileUrl && employee.associatedFileName ? (
                   <a href={employee.associatedFileUrl} target="_blank" rel="noopener noreferrer" className="text-sm text-primary hover:underline truncate max-w-[120px] inline-block" title={employee.associatedFileName}>
@@ -500,7 +500,7 @@ export default function EmployeesPage() {
               <Input id="positionEmp" name="position" value={currentEmployee.position || ''} onChange={handleInputChange} required disabled={isSaving} />
             </div>
             <div>
-              <Label htmlFor="salaryEmp">Annual Salary ($)</Label>
+              <Label htmlFor="salaryEmp">Annual Salary ({currency})</Label>
               <Input id="salaryEmp" name="salary" type="number" value={currentEmployee.salary === undefined ? '' : String(currentEmployee.salary)} onChange={handleInputChange} required min="0" disabled={isSaving} />
             </div>
             

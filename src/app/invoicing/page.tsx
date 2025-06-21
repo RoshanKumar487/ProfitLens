@@ -1,4 +1,3 @@
-
 'use client';
 
 import React, { useState, useMemo, useEffect, type FormEvent, useCallback, useRef } from 'react';
@@ -101,12 +100,12 @@ interface CompanyDetailsFirestore {
 }
 
 const LOCAL_STORAGE_EMAIL_TEMPLATE_KEY = 'bizsight-invoice-email-template-v2';
-const DEFAULT_EMAIL_SUBJECT_TEMPLATE = "Invoice {{invoiceNumber}} from {{companyName}}";
-const DEFAULT_EDITABLE_EMAIL_BODY_TEXT = `
+
+const getDefaultEmailBody = (currency: string) => `
 Dear {{clientName}},
 
 Please find invoice {{invoiceNumber}} detailed below.
-Total Amount: $ {{amount}}
+Total Amount: ${currency}{{amount}}
 Due Date: {{dueDate}}
 
 If you have any questions, please let us know.
@@ -117,8 +116,11 @@ Sincerely,
 {{companyName}}
 `;
 
+const DEFAULT_EMAIL_SUBJECT_TEMPLATE = "Invoice {{invoiceNumber}} from {{companyName}}";
+
 export default function InvoicingPage() {
   const { user, isLoading: authIsLoading } = useAuth();
+  const currency = user?.currencySymbol || '$';
   const [invoices, setInvoices] = useState<InvoiceDisplay[]>([]);
   const [searchTerm, setSearchTerm] = useState<string>('');
   const [isFormOpen, setIsFormOpen] = useState(false);
@@ -514,8 +516,8 @@ export default function InvoicingPage() {
             <td style="border: 1px solid #ddd; padding: 8px;">${index + 1}</td>
             <td style="border: 1px solid #ddd; padding: 8px;">${item.description}</td>
             <td style="border: 1px solid #ddd; padding: 8px; text-align: right;">${item.quantity}</td>
-            <td style="border: 1px solid #ddd; padding: 8px; text-align: right;">$${item.unitPrice.toFixed(2)}</td>
-            <td style="border: 1px solid #ddd; padding: 8px; text-align: right;">$${(item.quantity * item.unitPrice).toFixed(2)}</td>
+            <td style="border: 1px solid #ddd; padding: 8px; text-align: right;">${currency}${item.unitPrice.toFixed(2)}</td>
+            <td style="border: 1px solid #ddd; padding: 8px; text-align: right;">${currency}${(item.quantity * item.unitPrice).toFixed(2)}</td>
           </tr>
         `;
       });
@@ -578,7 +580,7 @@ export default function InvoicingPage() {
         </table>
   
         <div style="text-align: right; margin-bottom: 20px;">
-          <p style="font-size: 1.2em; font-weight: bold; margin:0;">Grand Total: $${invoice.amount.toFixed(2)}</p>
+          <p style="font-size: 1.2em; font-weight: bold; margin:0;">Grand Total: ${currency}${invoice.amount.toFixed(2)}</p>
         </div>
   
         ${invoice.notes ? `
@@ -598,7 +600,7 @@ export default function InvoicingPage() {
 
   const loadAndPrepareEmailTemplate = (invoice: InvoiceDisplay, useDefault: boolean = false) => {
     let templateSubject = DEFAULT_EMAIL_SUBJECT_TEMPLATE;
-    let templateUserText = DEFAULT_EDITABLE_EMAIL_BODY_TEXT;
+    let templateUserText = getDefaultEmailBody(currency);
 
     if (!useDefault) {
         const storedTemplateString = localStorage.getItem(LOCAL_STORAGE_EMAIL_TEMPLATE_KEY);
@@ -857,7 +859,7 @@ export default function InvoicingPage() {
                 <TableRow key={invoice.id}>
                   <TableCell className="font-medium">{invoice.invoiceNumber}</TableCell>
                   <TableCell>{invoice.clientName}</TableCell>
-                  <TableCell className="text-right">${invoice.amount.toFixed(2)}</TableCell>
+                  <TableCell className="text-right">{currency}{invoice.amount.toFixed(2)}</TableCell>
                   <TableCell>{format(invoice.issuedDate, 'PP')}</TableCell>
                   <TableCell>{format(invoice.dueDate, 'PP')}</TableCell>
                   <TableCell>
@@ -1043,7 +1045,7 @@ export default function InvoicingPage() {
             </div>
 
             <div>
-                <Label htmlFor="amount">Total Amount ($)</Label>
+                <Label htmlFor="amount">Total Amount ({currency})</Label>
                 <Input id="amount" type="number" value={currentInvoice.amount === undefined || currentInvoice.amount === null ? '' : currentInvoice.amount.toFixed(2)} onChange={(e) => setCurrentInvoice({ ...currentInvoice, amount: parseFloat(e.target.value) || 0 })} placeholder="Calculated if items exist, or set manually" disabled={(currentInvoice.items || []).length > 0 || isSaving} required min="0" step="0.01" />
             </div>
 
@@ -1125,8 +1127,8 @@ export default function InvoicingPage() {
                             <TableCell>{index + 1}</TableCell>
                             <TableCell>{item.description}</TableCell>
                             <TableCell className="text-right">{item.quantity}</TableCell>
-                            <TableCell className="text-right">${item.unitPrice.toFixed(2)}</TableCell>
-                            <TableCell className="text-right font-medium">${(item.quantity * item.unitPrice).toFixed(2)}</TableCell>
+                            <TableCell className="text-right">{currency}{item.unitPrice.toFixed(2)}</TableCell>
+                            <TableCell className="text-right font-medium">{currency}{(item.quantity * item.unitPrice).toFixed(2)}</TableCell>
                           </TableRow>
                         ))}
                         {(!invoiceToView.items || invoiceToView.items.length === 0) && (
@@ -1140,7 +1142,7 @@ export default function InvoicingPage() {
                     <div className="w-full max-w-xs space-y-2">
                        <div className="flex justify-between items-center border-t pt-2">
                          <p className="text-lg font-semibold text-foreground">Grand Total:</p>
-                         <p className="text-lg font-bold text-primary">${invoiceToView.amount.toFixed(2)}</p>
+                         <p className="text-lg font-bold text-primary">{currency}{invoiceToView.amount.toFixed(2)}</p>
                        </div>
                     </div>
                   </section>

@@ -1,4 +1,3 @@
-
 'use client';
 
 import React, { useState, type FormEvent } from 'react';
@@ -12,6 +11,8 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/com
 import { UserPlus, Loader2, AlertTriangle, Building } from 'lucide-react'; 
 import { useToast } from '@/hooks/use-toast';
 import { Separator } from '@/components/ui/separator';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { COUNTRIES } from '@/lib/countries';
 
 export default function SignUpPage() {
   const [displayName, setDisplayName] = useState(''); 
@@ -22,6 +23,7 @@ export default function SignUpPage() {
   const [companyAddress, setCompanyAddress] = useState('');
   const [city, setCity] = useState('');
   const [state, setState] = useState('');
+  const [country, setCountry] = useState('');
 
   const { signUp, isLoading, error } = useAuth(); // 'error' from context is used for auth errors
   const { toast } = useToast();
@@ -31,7 +33,7 @@ export default function SignUpPage() {
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
     setPageError(null); // Clear previous form-specific errors
-    if (!displayName || !email || !password || !confirmPassword || !companyName || !companyAddress || !city || !state) {
+    if (!displayName || !email || !password || !confirmPassword || !companyName || !companyAddress || !city || !state || !country) {
       setPageError("All fields are required.");
       toast({ title: "Missing Fields", description: "Please fill out all fields.", variant: "destructive" });
       return;
@@ -44,7 +46,7 @@ export default function SignUpPage() {
     
     // Call signUp. If it fails, AuthContext updates its 'error' state, which is displayed via JSX.
     // AuthContext also shows a toast for the error.
-    await signUp(email, password, displayName, companyName, companyAddress, city, state);
+    await signUp(email, password, displayName, companyName, companyAddress, city, state, country);
     
     // Navigation is handled by AuthContext on successful sign-up.
     // Error display is handled by the reactive 'error' state from useAuth() in the JSX.
@@ -177,6 +179,21 @@ export default function SignUpPage() {
                   disabled={isLoading}
                 />
               </div>
+            </div>
+             <div>
+                <Label htmlFor="country">Country</Label>
+                 <Select value={country} onValueChange={setCountry} required disabled={isLoading}>
+                    <SelectTrigger id="country">
+                        <SelectValue placeholder="Select a country" />
+                    </SelectTrigger>
+                    <SelectContent>
+                        {COUNTRIES.map((c) => (
+                        <SelectItem key={c.code} value={c.code}>
+                            {c.name}
+                        </SelectItem>
+                        ))}
+                    </SelectContent>
+                </Select>
             </div>
             
             <Button type="submit" className="w-full" disabled={isLoading}>
