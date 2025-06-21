@@ -1,6 +1,7 @@
+
 'use client';
 
-import React, { useState, type FormEvent } from 'react';
+import React, { useState, type FormEvent, useEffect } from 'react';
 import Link from 'next/link';
 import { useAuth } from '@/contexts/AuthContext';
 import PageTitle from '@/components/PageTitle';
@@ -8,8 +9,10 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
-import { LogIn, Loader2, AlertTriangle } from 'lucide-react';
+import { LogIn, Loader2, AlertTriangle, CheckCircle } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
+import { useSearchParams } from 'next/navigation';
+import { Alert, AlertTitle } from '@/components/ui/alert';
 
 export default function SignInPage() {
   const [email, setEmail] = useState('');
@@ -17,6 +20,14 @@ export default function SignInPage() {
   const { signIn, isLoading, error } = useAuth();
   const { toast } = useToast();
   const [pageError, setPageError] = useState<string | null>(null);
+  const searchParams = useSearchParams();
+  const [showPendingMessage, setShowPendingMessage] = useState(false);
+
+  useEffect(() => {
+    if (searchParams.get('status') === 'pending_approval') {
+      setShowPendingMessage(true);
+    }
+  }, [searchParams]);
 
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
@@ -27,8 +38,6 @@ export default function SignInPage() {
       return;
     }
     await signIn(email, password);
-    // Navigation is handled by AuthContext on successful sign-in
-    // Errors are also handled by AuthContext via toast, but we can display them here too
     if (error) {
         setPageError(error.message);
     }
@@ -43,16 +52,19 @@ export default function SignInPage() {
           <CardDescription>Enter your credentials to continue.</CardDescription>
         </CardHeader>
         <CardContent>
+          {showPendingMessage && (
+            <Alert variant="default" className="mb-4 bg-blue-50 border-blue-200">
+                <CheckCircle className="h-4 w-4 text-blue-600" />
+                <AlertTitle className="text-blue-800">Request Sent</AlertTitle>
+                <p className="text-xs text-blue-700">Your request to join a company is pending approval. You can sign in after an admin approves it.</p>
+            </Alert>
+          )}
           <form onSubmit={handleSubmit} className="space-y-4">
             {pageError && (
-              <div className="p-3 rounded-md bg-destructive/10 text-destructive text-sm flex items-center gap-2">
-                <AlertTriangle className="h-4 w-4"/> {pageError}
-              </div>
+              <Alert variant="destructive"><AlertTriangle className="h-4 w-4"/><AlertTitle>{pageError}</AlertTitle></Alert>
             )}
-             {error && !pageError && ( // Display general auth context error if not already shown by pageError
-              <div className="p-3 rounded-md bg-destructive/10 text-destructive text-sm flex items-center gap-2">
-                <AlertTriangle className="h-4 w-4"/> {error.message}
-              </div>
+             {error && !pageError && (
+              <Alert variant="destructive"><AlertTriangle className="h-4 w-4"/><AlertTitle>{error.message}</AlertTitle></Alert>
             )}
             <div>
               <Label htmlFor="email">Email Address</Label>

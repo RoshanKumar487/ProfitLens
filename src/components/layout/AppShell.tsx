@@ -1,7 +1,7 @@
 
 'use client';
 
-import React from 'react';
+import React, { useMemo } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import {
@@ -31,7 +31,7 @@ import {
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { Building, LogOut, LogIn, UserPlus, Loader2 } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
-import { cn } from '@/lib/utils'; // Import the cn function
+import { cn } from '@/lib/utils';
 
 const getInitials = (name?: string | null) => {
   if (!name) return '';
@@ -61,10 +61,22 @@ const AppShellLayout = ({ children }: { children: React.ReactNode }) => {
   };
 
   const isAuthPage = pathname.startsWith('/auth/');
+  
+  const visibleNavItems = useMemo(() => {
+    return NAV_ITEMS.filter(item => {
+      if (item.href === '/admin') {
+        return user?.role === 'admin';
+      }
+      if (!user && item.href !== '/') {
+        return false;
+      }
+      return true;
+    });
+  }, [user]);
 
   return (
     <>
-      {!isAuthPage && ( // Conditionally render sidebar if not an auth page (optional, for cleaner auth pages)
+      {!isAuthPage && (
         <Sidebar collapsible="icon" variant="sidebar" className="border-r">
           <SidebarHeader className="p-4">
             <Link href="/" onClick={handleNavigationClick}>
@@ -81,7 +93,7 @@ const AppShellLayout = ({ children }: { children: React.ReactNode }) => {
           <Separator />
           <SidebarContent className="p-2">
             <SidebarMenu>
-              {NAV_ITEMS.map((item) => (
+              {visibleNavItems.map((item) => (
                 <SidebarMenuItem key={item.label}>
                   <Link href={item.href} onClick={handleNavigationClick}>
                     <SidebarMenuButton
@@ -99,7 +111,7 @@ const AppShellLayout = ({ children }: { children: React.ReactNode }) => {
             </SidebarMenu>
           </SidebarContent>
           <SidebarFooter className="p-4 mt-auto border-t flex flex-col gap-2 items-center group-data-[collapsible=icon]:items-start">
-            {user && !authLoading ? (
+            {user && user.role !== 'pending' && user.role !== 'rejected' && !authLoading ? (
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
                   <Button variant="ghost" className="w-full flex items-center justify-start gap-2 group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:w-auto group-data-[collapsible=icon]:p-2 group-data-[collapsible=icon]:h-auto">
@@ -141,8 +153,8 @@ const AppShellLayout = ({ children }: { children: React.ReactNode }) => {
         </Sidebar>
       )}
 
-      <SidebarInset className={cn(isAuthPage && "md:!ml-0")}> {/* Remove margin for auth pages */}
-        {!isAuthPage && ( // Conditionally render header if not an auth page
+      <SidebarInset className={cn(isAuthPage && "md:!ml-0")}>
+        {!isAuthPage && (
            <header className="sticky top-0 z-10 flex h-14 items-center gap-4 border-b bg-background/80 px-4 backdrop-blur-sm sm:h-16 sm:px-6 md:hidden">
               <SidebarTrigger variant="outline" size="icon" />
               <Link href="/" onClick={handleNavigationClick}>
