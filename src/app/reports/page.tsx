@@ -5,7 +5,7 @@ import React, { useState, useCallback } from 'react';
 import PageTitle from '@/components/PageTitle';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
-import { Calendar as CalendarIcon, FileBarChart, Loader2, FileText, User, TrendingDown, Receipt as ReceiptIcon, DollarSign, CalendarDays } from 'lucide-react';
+import { Calendar as CalendarIcon, FileBarChart, Loader2, FileText, User, TrendingDown, Receipt as ReceiptIcon, DollarSign } from 'lucide-react';
 import { format } from 'date-fns';
 import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/contexts/AuthContext';
@@ -20,7 +20,6 @@ interface EmployeeFirestore { name: string; position: string; salary: number; de
 interface ExpenseFirestore { date: Timestamp; amount: number; category: string; vendor?: string; description?: string; }
 interface InvoiceFirestore { invoiceNumber: string; clientName: string; clientEmail?: string; amount: number; issuedDate: Timestamp; dueDate: Timestamp; status: string; notes?: string; }
 interface RevenueEntryFirestore { date: Timestamp; amount: number; source: string; description?: string; }
-interface AppointmentFirestore { date: Timestamp; time?: string; title: string; location?: string; notes?: string; }
 
 
 export default function ReportsPage() {
@@ -44,12 +43,9 @@ export default function ReportsPage() {
   const [revenueToDate, setRevenueToDate] = useState<Date | undefined>();
   const [isExportingRevenue, setIsExportingRevenue] = useState(false);
   
-  const [appointmentFromDate, setAppointmentFromDate] = useState<Date | undefined>();
-  const [appointmentToDate, setAppointmentToDate] = useState<Date | undefined>();
-  const [isExportingAppointments, setIsExportingAppointments] = useState(false);
 
   const handleExport = useCallback(async (
-    reportType: 'Employees' | 'Expenses' | 'Invoices' | 'Revenue' | 'Appointments',
+    reportType: 'Employees' | 'Expenses' | 'Invoices' | 'Revenue',
     collectionName: string,
     fromDate: Date | undefined,
     toDate: Date | undefined,
@@ -284,26 +280,6 @@ export default function ReportsPage() {
                 setIsExportingRevenue
             ),
             'revenue'
-        )}
-         {renderReportCard(
-            'Appointments Report',
-            'Export your calendar appointments.',
-            CalendarDays,
-            appointmentFromDate,
-            setAppointmentFromDate,
-            appointmentToDate,
-            setAppointmentToDate,
-            isExportingAppointments,
-            () => handleExport(
-                'Appointments', 'appointments', appointmentFromDate, appointmentToDate, 'date',
-                ['Date', 'Time', 'Title', 'Location', 'Notes'],
-                (data: AppointmentFirestore) => ({
-                    'Date': format(data.date.toDate(), 'yyyy-MM-dd'), 'Time': data.time || '',
-                    'Title': data.title, 'Location': data.location || '', 'Notes': data.notes || '',
-                }),
-                setIsExportingAppointments
-            ),
-            'appointment'
         )}
       </div>
     </div>
