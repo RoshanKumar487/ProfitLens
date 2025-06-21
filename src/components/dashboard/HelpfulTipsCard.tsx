@@ -1,36 +1,39 @@
+
 import React from 'react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
-import { Lightbulb } from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import { HelpCircle, ArrowRight } from 'lucide-react';
 import Image from 'next/image';
+import Link from 'next/link';
 
 const HelpfulTipsCard = () => {
   return (
-    <Card className="shadow-lg">
+    <Card className="shadow-lg flex flex-col">
       <CardHeader>
-        <CardTitle className="font-headline">Helpful Tips</CardTitle>
-        <CardDescription>Boost your business efficiency.</CardDescription>
+        <CardTitle className="font-headline">Need Help?</CardTitle>
+        <CardDescription>Our comprehensive guide has you covered.</CardDescription>
       </CardHeader>
-      <CardContent className="space-y-3">
-        <div className="flex items-start gap-3">
-          <Lightbulb className="h-5 w-5 text-primary mt-1" />
-          <p className="text-sm">Regularly review your Expense Analyzer suggestions to optimize spending.</p>
+      <CardContent className="flex-grow flex flex-col justify-between">
+        <p className="text-sm text-muted-foreground mb-4">
+          Unsure how a feature works? Check out our detailed user guide for step-by-step instructions and tips on how to get the most out of ProfitLens.
+        </p>
+        <div className="aspect-video w-full relative rounded-lg overflow-hidden mb-4">
+         <Image 
+            src="https://placehold.co/600x338.png" 
+            alt="Business illustration" 
+            layout="fill"
+            objectFit="cover"
+            className="rounded-lg"
+            data-ai-hint="documentation guide"
+          />
         </div>
-        <div className="flex items-start gap-3">
-          <Lightbulb className="h-5 w-5 text-primary mt-1" />
-          <p className="text-sm">Use invoice templates for faster billing and professional look.</p>
-        </div>
-        <div className="flex items-start gap-3">
-          <Lightbulb className="h-5 w-5 text-primary mt-1" />
-          <p className="text-sm">Schedule recurring appointments in the calendar to save time.</p>
-        </div>
-        <Image 
-          src="https://placehold.co/600x200.png" 
-          alt="Business illustration" 
-          width={600} 
-          height={200} 
-          className="rounded-lg mt-4 object-cover w-full" 
-          data-ai-hint="business graph"
-        />
+        <Button asChild className="w-full mt-auto">
+          <Link href="/guide">
+            <HelpCircle className="mr-2 h-4 w-4" />
+            View the Full Guide
+            <ArrowRight className="ml-2 h-4 w-4" />
+          </Link>
+        </Button>
       </CardContent>
     </Card>
   );
