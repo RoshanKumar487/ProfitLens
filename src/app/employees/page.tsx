@@ -46,6 +46,7 @@ import { collection, addDoc, getDocs, doc, updateDoc, deleteDoc, query, where, o
 import { uploadFileToStorage, deleteFileFromStorage } from '@/lib/firebaseStorageUtils';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Badge } from '@/components/ui/badge';
+import { cn } from '@/lib/utils';
 
 interface EmployeeFirestore {
   id?: string;
@@ -102,6 +103,9 @@ export default function EmployeesPage() {
   const [facingMode, setFacingMode] = useState<'user' | 'environment'>('user');
   const [hasMultipleCameras, setHasMultipleCameras] = useState(false);
   const [isSwitchingCamera, setIsSwitchingCamera] = useState(false);
+  
+  const [isDraggingProfile, setIsDraggingProfile] = useState(false);
+  const [isDraggingFile, setIsDraggingFile] = useState(false);
 
   useEffect(() => {
     // This is to clean up the object URL to avoid memory leaks
@@ -467,13 +471,17 @@ export default function EmployeesPage() {
           reader.onerror = (err) => reject(err);
       });
   };
+  
+  const handleFileSelect = async (file: File | null, type: 'profile' | 'associated') => {
+    if (!file) return;
 
-  const handleProfilePictureFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    if (e.target.files && e.target.files[0]) {
-      const file = e.target.files[0];
-      if (file.size > 5 * 1024 * 1024) { // 5MB limit on original
+    if (type === 'profile') {
+      if (!file.type.startsWith('image/')) {
+        toast({ title: "Invalid File Type", description: "Please select an image file.", variant: "destructive"});
+        return;
+      }
+      if (file.size > 5 * 1024 * 1024) { // 5MB limit
         toast({ title: "File Too Large", description: "Profile picture must be less than 5MB.", variant: "destructive"});
-        e.target.value = ""; 
         return;
       }
       
@@ -486,24 +494,32 @@ export default function EmployeesPage() {
       } catch (error) {
         console.error("Image resize error:", error);
         toast({ title: "Image Processing Failed", description: "Could not process image. Using original file.", variant: "destructive"});
-        setProfilePictureFile(file); // Fallback to original file
+        setProfilePictureFile(file); // Fallback
       }
 
       if(showWebcam) setShowWebcam(false); 
-    }
-  };
-  
-  const handleAssociatedFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    if (e.target.files && e.target.files[0]) {
-      const file = e.target.files[0];
+
+    } else { // associated file
        if (file.size > 10 * 1024 * 1024) { // 10MB limit
         toast({ title: "File Too Large", description: "Associated file must be less than 10MB.", variant: "destructive"});
-        e.target.value = "";
         return;
       }
       setAssociatedFile(file);
     }
   };
+
+  const handleProfilePictureFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) handleFileSelect(file, 'profile');
+    e.target.value = "";
+  };
+  
+  const handleAssociatedFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) handleFileSelect(file, 'associated');
+    e.target.value = "";
+  };
+
 
   const handleCapturePhoto = () => {
     if (videoRef.current && canvasRef.current && videoRef.current.readyState >= videoRef.current.HAVE_METADATA) {
@@ -567,6 +583,50 @@ export default function EmployeesPage() {
         setCurrentEmployee(prev => ({...prev, associatedFileUrl: undefined, associatedFileName: undefined, associatedFileStoragePath: prev.associatedFileStoragePath ? prev.associatedFileStoragePath : undefined }));
     }
   };
+  
+  const handleDragEvents = (e: React.DragEvent<HTMLDivElement>) => {
+    e.preventDefault();
+    e.stopPropagation();
+  };
+
+  // Profile Drop Zone handlers
+  const handleProfileDragEnter = (e: React.DragEvent<HTMLDivElement>) => {
+      handleDragEvents(e);
+      if (e.dataTransfer.items && e.dataTransfer.items.length > 0) {
+          setIsDraggingProfile(true);
+      }
+  };
+  const handleProfileDragLeave = (e: React.DragEvent<HTMLDivElement>) => {
+      handleDragEvents(e);
+      setIsDraggingProfile(false);
+  };
+  const handleProfileDrop = (e: React.DragEvent<HTMLDivElement>) => {
+      handleDragEvents(e);
+      setIsDraggingProfile(false);
+      const file = e.dataTransfer.files?.[0];
+      if (file) handleFileSelect(file, 'profile');
+      e.dataTransfer.clearData();
+  };
+
+  // Associated File Drop Zone handlers
+  const handleFileDragEnter = (e: React.DragEvent<HTMLDivElement>) => {
+      handleDragEvents(e);
+      if (e.dataTransfer.items && e.dataTransfer.items.length > 0) {
+          setIsDraggingFile(true);
+      }
+  };
+  const handleFileDragLeave = (e: React.DragEvent<HTMLDivElement>) => {
+      handleDragEvents(e);
+      setIsDraggingFile(false);
+  };
+  const handleFileDrop = (e: React.DragEvent<HTMLDivElement>) => {
+      handleDragEvents(e);
+      setIsDraggingFile(false);
+      const file = e.dataTransfer.files?.[0];
+      if (file) handleFileSelect(file, 'associated');
+      e.dataTransfer.clearData();
+  };
+
 
   if (authIsLoading) {
     return ( <div className="flex items-center justify-center h-[calc(100vh-200px)]"><Loader2 className="h-12 w-12 animate-spin text-primary" /> <p className="ml-2">Loading authentication...</p></div> );
@@ -619,7 +679,6 @@ export default function EmployeesPage() {
             ))
           )}
 
-          {/* Manually added Super Admin row */}
           {user?.email === 'roshankumar70975@gmail.com' && (
               <TableRow key="super-admin-row" className="bg-primary/5 hover:bg-primary/10">
                   <TableCell>
@@ -696,58 +755,95 @@ export default function EmployeesPage() {
             </div>
             
             <div className="space-y-2 pt-2 border-t">
-              <Label>Profile Picture</Label>
-              <div className="flex items-start gap-3">
-                <Avatar className="h-20 w-20 flex-shrink-0">
-                  <AvatarImage src={profilePicturePreview || currentEmployee.profilePictureUrl || `https://placehold.co/80x80.png?text=${getInitials(currentEmployee.name)}`} alt="Profile Preview" data-ai-hint="person portrait" />
-                  <AvatarFallback>{getInitials(currentEmployee.name)}</AvatarFallback>
-                </Avatar>
-                <div className="flex-grow space-y-1.5">
-                  <Input id="profilePictureFile" type="file" accept="image/*" onChange={handleProfilePictureFileChange} className="text-xs h-9" disabled={isSaving || showWebcam}/>
-                  <div className="flex gap-1.5">
-                    <Button type="button" variant="outline" size="sm" onClick={() => setShowWebcam(prev => !prev)} disabled={isSaving} className="flex-1 text-xs">
-                      <Camera className="mr-1.5 h-3.5 w-3.5" /> {showWebcam ? 'Close Cam' : 'Webcam'}
-                    </Button>
-                    {(profilePicturePreview || (isEditing && currentEmployee.profilePictureUrl)) && (
-                      <Button type="button" variant="ghost" size="sm" onClick={handleRemoveProfilePic} className="text-destructive hover:text-destructive-foreground hover:bg-destructive/90 flex-1 text-xs">
-                          <XCircle className="mr-1.5 h-3.5 w-3.5" /> Remove
-                      </Button>
-                    )}
-                  </div>
-                </div>
-              </div>
-              {showWebcam && (
-                <div className="mt-1.5 space-y-1.5 p-2 border rounded-md bg-muted/30">
-                  <video ref={videoRef} className="w-full aspect-[4/3] rounded-md bg-black" autoPlay muted playsInline />
-                  {hasCameraPermission === false && (
-                    <Alert variant="destructive" className="p-2 text-xs"><Camera className="h-3.5 w-3.5"/><AlertTitle className="text-xs">Cam Access Denied</AlertTitle><DialogDescription className="text-xs">Enable in browser.</DialogDescription></Alert>
-                  )}
-                  {hasCameraPermission === true && (
-                    <div className="flex gap-2">
-                      {hasMultipleCameras && (
-                        <Button type="button" onClick={() => setFacingMode(prev => prev === 'user' ? 'environment' : 'user')} className="flex-1 h-9 text-xs" disabled={isSaving || isSwitchingCamera}>
-                          {isSwitchingCamera ? <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" /> : <SwitchCamera className="mr-1.5 h-3.5 w-3.5" />}
-                          {isSwitchingCamera ? 'Switching...' : 'Switch Cam'}
-                        </Button>
-                      )}
-                      <Button type="button" onClick={handleCapturePhoto} className="flex-1 h-9 text-xs" disabled={isSaving || isSwitchingCamera}>
-                          <Camera className="mr-1.5 h-3.5 w-3.5" /> Capture
-                      </Button>
+                <Label>Profile Picture</Label>
+                <div className="flex items-start gap-3">
+                    <Avatar className="h-20 w-20 flex-shrink-0">
+                    <AvatarImage src={profilePicturePreview || currentEmployee.profilePictureUrl || `https://placehold.co/80x80.png?text=${getInitials(currentEmployee.name)}`} alt="Profile Preview" data-ai-hint="person portrait" />
+                    <AvatarFallback>{getInitials(currentEmployee.name)}</AvatarFallback>
+                    </Avatar>
+                    <div className="flex-grow space-y-1.5">
+                    <div 
+                        onDrop={handleProfileDrop}
+                        onDragOver={handleDragEvents}
+                        onDragEnter={handleProfileDragEnter}
+                        onDragLeave={handleProfileDragLeave}
+                        className={cn(
+                            "relative flex flex-col items-center justify-center w-full p-2 border-2 border-dashed rounded-lg cursor-pointer hover:bg-muted/50 transition-colors",
+                            isDraggingProfile && "border-primary bg-primary/10"
+                        )}
+                    >
+                        <UploadCloud className="h-6 w-6 text-muted-foreground"/>
+                        <p className="mt-1 text-xs text-muted-foreground">
+                            <span className="font-semibold text-primary">Click or drop image</span>
+                        </p>
+                        <Input id="profilePictureFile" type="file" accept="image/*" onChange={handleProfilePictureFileChange} className="absolute inset-0 w-full h-full opacity-0 cursor-pointer" disabled={isSaving || showWebcam}/>
                     </div>
-                  )}
+                    <div className="flex gap-1.5">
+                        <Button type="button" variant="outline" size="sm" onClick={() => setShowWebcam(prev => !prev)} disabled={isSaving} className="flex-1 text-xs">
+                        <Camera className="mr-1.5 h-3.5 w-3.5" /> {showWebcam ? 'Close Cam' : 'Webcam'}
+                        </Button>
+                        {(profilePicturePreview || (isEditing && currentEmployee.profilePictureUrl)) && (
+                        <Button type="button" variant="ghost" size="sm" onClick={handleRemoveProfilePic} className="text-destructive hover:text-destructive-foreground hover:bg-destructive/90 flex-1 text-xs">
+                            <XCircle className="mr-1.5 h-3.5 w-3.5" /> Remove
+                        </Button>
+                        )}
+                    </div>
+                    </div>
                 </div>
-              )}
-              <canvas ref={canvasRef} className="hidden" />
+                {showWebcam && (
+                    <div className="mt-1.5 space-y-1.5 p-2 border rounded-md bg-muted/30">
+                    <video ref={videoRef} className="w-full aspect-[4/3] rounded-md bg-black" autoPlay muted playsInline />
+                    {hasCameraPermission === false && (
+                        <Alert variant="destructive" className="p-2 text-xs"><Camera className="h-3.5 w-3.5"/><AlertTitle className="text-xs">Cam Access Denied</AlertTitle><DialogDescription className="text-xs">Enable in browser.</DialogDescription></Alert>
+                    )}
+                    {hasCameraPermission === true && (
+                        <div className="flex gap-2">
+                        {hasMultipleCameras && (
+                            <Button type="button" onClick={() => setFacingMode(prev => prev === 'user' ? 'environment' : 'user')} className="flex-1 h-9 text-xs" disabled={isSaving || isSwitchingCamera}>
+                            {isSwitchingCamera ? <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" /> : <SwitchCamera className="mr-1.5 h-3.5 w-3.5" />}
+                            {isSwitchingCamera ? 'Switching...' : 'Switch Cam'}
+                            </Button>
+                        )}
+                        <Button type="button" onClick={handleCapturePhoto} className="flex-1 h-9 text-xs" disabled={isSaving || isSwitchingCamera}>
+                            <Camera className="mr-1.5 h-3.5 w-3.5" /> Capture
+                        </Button>
+                        </div>
+                    )}
+                    </div>
+                )}
+                <canvas ref={canvasRef} className="hidden" />
             </div>
 
-             <div className="space-y-1.5 pt-2 border-t">
+            <div className="space-y-1.5 pt-2 border-t">
                 <Label htmlFor="associatedFile">Associated File (e.g., Resume)</Label>
-                <Input id="associatedFile" type="file" onChange={handleAssociatedFileChange} className="text-xs h-9" disabled={isSaving}/>
-                {associatedFile && <p className="text-xs text-muted-foreground">Selected: {associatedFile.name}</p> }
+                <div
+                    onDrop={handleFileDrop}
+                    onDragOver={handleDragEvents}
+                    onDragEnter={handleFileDragEnter}
+                    onDragLeave={handleFileDragLeave}
+                    className={cn(
+                        "relative flex flex-col items-center justify-center w-full p-4 border-2 border-dashed rounded-lg cursor-pointer hover:bg-muted/50 transition-colors",
+                        isDraggingFile && "border-primary bg-primary/10"
+                    )}
+                >
+                    <UploadCloud className="h-8 w-8 text-muted-foreground"/>
+                    <p className="mt-2 text-sm text-muted-foreground">
+                        <span className="font-semibold text-primary">Click to upload</span> or drag and drop
+                    </p>
+                    <p className="text-xs text-muted-foreground">PDF, DOCX, etc. (Max 10MB)</p>
+                    <Input id="associatedFile" type="file" onChange={handleAssociatedFileChange} className="absolute inset-0 w-full h-full opacity-0 cursor-pointer" disabled={isSaving}/>
+                </div>
+
+                {associatedFile && (
+                <div className="text-xs text-muted-foreground flex items-center justify-between p-2 bg-muted rounded-md">
+                    <span>Selected: <span className="font-medium">{associatedFile.name}</span></span>
+                    <Button type="button" variant="ghost" size="icon" onClick={handleRemoveAssociatedFile} className="text-destructive h-6 w-6"> <XCircle className="h-4 w-4" /> </Button>
+                </div>
+                )}
                 {!associatedFile && currentEmployee.associatedFileName && currentEmployee.associatedFileUrl && (
-                    <div className="text-xs text-muted-foreground flex items-center justify-between">
+                    <div className="text-xs text-muted-foreground flex items-center justify-between p-2 bg-muted rounded-md">
                         <a href={currentEmployee.associatedFileUrl} target="_blank" rel="noopener noreferrer" className="text-primary hover:underline truncate" title={currentEmployee.associatedFileName}>Current: {currentEmployee.associatedFileName}</a>
-                         <Button type="button" variant="ghost" size="icon" onClick={handleRemoveAssociatedFile} className="text-destructive h-6 w-6"> <XCircle className="h-4 w-4" /> </Button>
+                        <Button type="button" variant="ghost" size="icon" onClick={handleRemoveAssociatedFile} className="text-destructive h-6 w-6"> <XCircle className="h-4 w-4" /> </Button>
                     </div>
                 )}
             </div>
