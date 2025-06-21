@@ -73,6 +73,10 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
           const userData = userDocSnap.data();
           const companyId = userData.companyId;
 
+          // Super admin check
+          const isSuperAdmin = firebaseUser.email === 'roshankumar70975@gmail.com';
+          const userRole: UserRole = isSuperAdmin ? 'admin' : userData.role || 'pending';
+
           let userCountry: string | undefined = undefined;
           if (companyId) {
             try {
@@ -94,10 +98,15 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
             companyId: companyId || null,
             country: userCountry,
             currencySymbol: currencySymbol,
-            role: userData.role || 'pending',
+            role: userRole,
           };
           setUser(appUser);
-          console.log(`AuthContext: User authenticated. UID: ${firebaseUser.uid}, Role: ${appUser.role}`);
+          
+          if (isSuperAdmin) {
+            console.log(`AuthContext: Super admin authenticated. UID: ${firebaseUser.uid}`);
+          } else {
+            console.log(`AuthContext: User authenticated. UID: ${firebaseUser.uid}, Role: ${appUser.role}`);
+          }
           
           const authPages = ['/auth/signin', '/auth/signup'];
           if (authPages.includes(pathname)) {
@@ -196,21 +205,25 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     setAuthError(null);
     try {
       const userCredential = await signInWithEmailAndPassword(auth, email, password);
-      // Check user role from firestore
-      const userDocRef = doc(db, 'users', userCredential.user.uid);
-      const userDocSnap = await getDoc(userDocRef);
-      if (!userDocSnap.exists() || userDocSnap.data().role === 'pending' || userDocSnap.data().role === 'rejected') {
-        const role = userDocSnap.exists() ? userDocSnap.data().role : 'unknown';
-        let message = "Your account is not yet active. Please wait for admin approval.";
-        if (role === 'rejected') {
-            message = "Your request to join the company was rejected.";
-        } else if (role === 'unknown') {
-            message = "Your user profile could not be found. Please sign up first."
+
+      // Super admin check
+      if (userCredential.user.email !== 'roshankumar70975@gmail.com') {
+        // Check user role from firestore for non-super-admins
+        const userDocRef = doc(db, 'users', userCredential.user.uid);
+        const userDocSnap = await getDoc(userDocRef);
+        if (!userDocSnap.exists() || userDocSnap.data().role === 'pending' || userDocSnap.data().role === 'rejected') {
+          const role = userDocSnap.exists() ? userDocSnap.data().role : 'unknown';
+          let message = "Your account is not yet active. Please wait for admin approval.";
+          if (role === 'rejected') {
+              message = "Your request to join the company was rejected.";
+          } else if (role === 'unknown') {
+              message = "Your user profile could not be found. Please sign up first."
+          }
+          await firebaseSignOut(auth);
+          toast({ title: "Sign In Failed", description: message, variant: "destructive"});
+          setIsLoading(false);
+          return null;
         }
-        await firebaseSignOut(auth);
-        toast({ title: "Sign In Failed", description: message, variant: "destructive"});
-        setIsLoading(false);
-        return null;
       }
 
       console.log('AuthContext: User signed in successfully:', userCredential.user.uid);
