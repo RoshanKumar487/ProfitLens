@@ -1,4 +1,3 @@
-
 'use client';
 
 import React, { useState, useMemo, useEffect, type FormEvent, useCallback, useRef } from 'react';
@@ -113,6 +112,8 @@ interface CompanyDetailsFirestore {
 }
 
 const LOCAL_STORAGE_EMAIL_TEMPLATE_KEY = 'profitlens-invoice-email-template-v2';
+const LOCAL_STORAGE_NOTES_TEMPLATE_KEY = 'profitlens-invoice-notes-template-v1';
+
 
 const getDefaultEmailBody = (currency: string) => `
 Dear {{clientName}},
@@ -420,6 +421,8 @@ export default function InvoicingPage() {
   };
 
   const handleCreateNew = () => {
+    const savedNotes = localStorage.getItem(LOCAL_STORAGE_NOTES_TEMPLATE_KEY) || 'Full payment is due upon receipt. Late payments may incur additional charges.';
+
     setCurrentInvoice({
         issuedDate: new Date(),
         dueDate: new Date(new Date().setDate(new Date().getDate() + 30)),
@@ -429,7 +432,7 @@ export default function InvoicingPage() {
         clientName: '',
         clientEmail: '',
         clientAddress: '',
-        notes: '',
+        notes: savedNotes,
         subtotal: 0,
         discountType: 'fixed',
         discountValue: 0,
@@ -482,36 +485,48 @@ export default function InvoicingPage() {
   };
 
   const handlePrintInvoice = () => {
-    const printContents = invoicePrintRef.current?.innerHTML;
-    if (printContents && typeof window !== 'undefined') {
-        const printWindow = window.open('', '_blank', 'height=800,width=800');
-        if (printWindow) {
-            printWindow.document.write('<html><head><title>Print Invoice</title>');
-            printWindow.document.write(`
-                <style>
-                    body { margin: 0; font-family: sans-serif; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
-                    .invoice-print-container { width: 794px; min-height: 1123px; margin: auto; }
-                    @media print {
-                      body { margin: 0; }
-                      .printable-area, .printable-area * { visibility: visible; }
-                      .printable-area { position: absolute; left: 0; top: 0; width: 100%; }
-                    }
-                </style>
-                <script src="https://cdn.tailwindcss.com"></script>
-            `);
-            printWindow.document.write('</head><body>');
-            printWindow.document.write(`<div class="invoice-print-container">${printContents}</div>`);
-            printWindow.document.close();
-            printWindow.focus();
-            
-            setTimeout(() => {
-                printWindow.print();
-                printWindow.close();
-            }, 500); // Increased timeout for styles to apply
-
-        } else {
-            toast({ title: "Print Error", description: "Could not open print window. Please check pop-up blocker settings.", variant: "destructive"});
-        }
+    if (!invoicePrintRef.current || !invoiceToView) return;
+  
+    const printContents = invoicePrintRef.current.innerHTML;
+    const printWindow = window.open('', '_blank');
+    
+    if (printWindow) {
+      printWindow.document.write(`
+        <html>
+          <head>
+            <title>Invoice ${invoiceToView.invoiceNumber}</title>
+            <script src="https://cdn.tailwindcss.com"></script>
+            <style>
+              @media print {
+                @page { size: A4; margin: 0; }
+                body { 
+                  -webkit-print-color-adjust: exact; 
+                  print-color-adjust: exact;
+                }
+              }
+            </style>
+          </head>
+          <body>
+            ${printContents}
+          </body>
+        </html>
+      `);
+      
+      printWindow.document.close();
+      
+      const tailwindScript = printWindow.document.createElement('script');
+      tailwindScript.src = "https://cdn.tailwindcss.com";
+      tailwindScript.onload = () => {
+        setTimeout(() => { // Small delay to ensure styles are applied
+          printWindow.focus();
+          printWindow.print();
+          printWindow.close();
+        }, 250);
+      };
+      printWindow.document.head.appendChild(tailwindScript);
+  
+    } else {
+      toast({ title: "Print Error", description: "Could not open print window. Please check pop-up blocker settings.", variant: "destructive"});
     }
   };
 
@@ -815,6 +830,24 @@ export default function InvoicingPage() {
     if (!currentInvoice.clientName || currentInvoice.clientName.trim() === '') return false;
     return !existingClients.some(c => c.name.toLowerCase() === currentInvoice.clientName!.toLowerCase());
   }, [currentInvoice.clientName, existingClients]);
+
+  const handleSaveNotesAsDefault = useCallback(() => {
+    const notesToSave = currentInvoice.notes;
+    if (notesToSave && notesToSave.trim().length > 0) {
+        localStorage.setItem(LOCAL_STORAGE_NOTES_TEMPLATE_KEY, notesToSave);
+        toast({
+            title: "Default Notes Saved",
+            description: "Your notes will be used for new invoices.",
+        });
+    } else {
+        toast({
+            title: "Cannot Save Empty Notes",
+            description: "Please enter some text to save as a default.",
+            variant: "destructive",
+        });
+    }
+  }, [currentInvoice.notes, toast]);
+
 
   if (authIsLoading) {
     return (
@@ -1127,8 +1160,13 @@ export default function InvoicingPage() {
             </div>
 
             <div>
-                <Label htmlFor="notes">Notes (Optional)</Label>
-                <Textarea id="notes" value={currentInvoice.notes || ''} onChange={(e) => setCurrentInvoice({ ...currentInvoice, notes: e.target.value })} placeholder="e.g., Payment terms, thank you message" disabled={isSaving} />
+              <div className="flex justify-between items-center mb-1">
+                <Label htmlFor="notes">Notes / Terms &amp; Conditions (Optional)</Label>
+                <Button type="button" variant="link" size="sm" className="h-auto p-0 text-xs" onClick={handleSaveNotesAsDefault} disabled={isSaving}>
+                    Save as Default
+                </Button>
+              </div>
+              <Textarea id="notes" value={currentInvoice.notes || ''} onChange={(e) => setCurrentInvoice({ ...currentInvoice, notes: e.target.value })} placeholder="e.g., Payment terms, thank you message" disabled={isSaving} />
             </div>
 
           </form>
@@ -1154,7 +1192,7 @@ export default function InvoicingPage() {
             <ScrollArea className="flex-grow overflow-y-auto bg-gray-100 dark:bg-background">
                 {isFetchingCompanyProfile && <div className="text-center p-10"><Loader2 className="h-8 w-8 animate-spin text-primary mx-auto" /> <p>Loading company details...</p></div>}
                 {!isFetchingCompanyProfile && invoiceToView && companyProfileDetails && (
-                    <div ref={invoicePrintRef} className="invoice-view-container relative p-8 sm:p-12 text-[#333] font-sans bg-white min-h-[1123px] w-[794px] mx-auto my-4 shadow-lg overflow-hidden">
+                    <div ref={invoicePrintRef} className="invoice-view-container relative p-8 sm:p-12 text-[#333] font-sans bg-white min-h-[1123px] w-[794px] mx-auto my-4 shadow-lg overflow-hidden border border-gray-200">
                         <TopRightArt />
                         <BottomLeftArt />
                         <div className="relative z-10">
@@ -1203,7 +1241,7 @@ export default function InvoicingPage() {
                                     <thead>
                                         <tr style={{ backgroundColor: '#1e4e8c', color: 'white' }}>
                                             <th className="p-3 w-12 text-center font-normal">#</th>
-                                            <th className="p-3 font-normal">Item & Description</th>
+                                            <th className="p-3 font-normal">Item &amp; Description</th>
                                             <th className="p-3 w-24 text-right font-normal">Qty</th>
                                             <th className="p-3 w-32 text-right font-normal">Rate</th>
                                             <th className="p-3 w-32 text-right font-normal">Amount</th>
@@ -1238,7 +1276,7 @@ export default function InvoicingPage() {
                                         <p className="font-semibold text-gray-700">Thanks for shopping with us.</p>
                                         {invoiceToView.notes && <p className="mt-1">{invoiceToView.notes}</p>}
                                         
-                                        <p className="font-bold mt-4 text-gray-800">Terms & Conditions</p>
+                                        <p className="font-bold mt-4 text-gray-800">Terms &amp; Conditions</p>
                                         <p className="text-xs">Full payment is due upon receipt of this invoice. Late payments may incur additional charges or interest as per the applicable laws.</p>
                                     </div>
                                     <div className="self-end">
