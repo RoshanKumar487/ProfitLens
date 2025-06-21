@@ -83,7 +83,7 @@ export default function EmployeesPage() {
   const [employees, setEmployees] = useState<EmployeeDisplay[]>([]);
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [currentEmployee, setCurrentEmployee] = useState<Partial<EmployeeDisplay & { salary?: string | number }>>({});
-  const [isEditing, setIsEditing] = useState(isFalse);
+  const [isEditing, setIsEditing] = useState(false);
   const { toast } = useToast();
   const [isLoadingEmployees, setIsLoadingEmployees] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
@@ -677,5 +677,3 @@ export default function EmployeesPage() {
     </div>
   );
 }
-
-    
