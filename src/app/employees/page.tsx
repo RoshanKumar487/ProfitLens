@@ -355,7 +355,7 @@ export default function EmployeesPage() {
     setCurrentEmployee(prev => ({ ...prev, [name]: value }));
   };
 
-  const resizeImage = (file: File, maxWidth: number = 800): Promise<File> => {
+  const resizeImage = (file: File, maxWidth: number = 800, targetSizeKB: number = 100): Promise<File> => {
       return new Promise((resolve, reject) => {
           const reader = new FileReader();
           reader.readAsDataURL(file);
@@ -379,17 +379,40 @@ export default function EmployeesPage() {
                   canvas.width = width;
                   canvas.height = height;
                   const ctx = canvas.getContext('2d');
-                  ctx?.drawImage(img, 0, 0, width, height);
-                  canvas.toBlob((blob) => {
+                  if (!ctx) {
+                      return reject(new Error('Could not get canvas context.'));
+                  }
+                  ctx.drawImage(img, 0, 0, width, height);
+
+                  // IIFE to handle async logic for quality adjustment
+                  (async () => {
+                      let quality = 0.9;
+                      let blob: Blob | null = null;
+                      
+                      const getBlob = (q: number): Promise<Blob | null> => {
+                          return new Promise(resolveBlob => {
+                              canvas.toBlob(blob => resolveBlob(blob), 'image/jpeg', q);
+                          });
+                      };
+
+                      blob = await getBlob(quality);
+
+                      // Reduce quality if file is too large
+                      while (blob && blob.size / 1024 > targetSizeKB && quality > 0.1) {
+                          quality = Math.max(0.1, quality - 0.1); // Ensure quality doesn't go below 0.1
+                          blob = await getBlob(quality);
+                      }
+
                       if (blob) {
-                          resolve(new File([blob], file.name, {
-                              type: file.type,
+                          const newFileName = (file.name.split('.').slice(0, -1).join('.') || file.name) + ".jpeg";
+                          resolve(new File([blob], newFileName, {
+                              type: 'image/jpeg',
                               lastModified: Date.now()
                           }));
                       } else {
                           reject(new Error('Canvas to Blob failed.'));
                       }
-                  }, file.type, 0.9); // quality 0.9 for JPEG/WebP
+                  })();
               };
               img.onerror = (err) => reject(err);
           };
@@ -459,15 +482,15 @@ export default function EmployeesPage() {
       const context = canvas.getContext('2d');
       context?.drawImage(video, 0, 0, width, height);
       
-      const previewDataUrl = canvas.toDataURL('image/png');
+      const previewDataUrl = canvas.toDataURL('image/jpeg', 0.9);
       setProfilePicturePreview(previewDataUrl);
 
       canvas.toBlob(blob => {
         if (blob) {
-          const capturedFile = new File([blob], `webcam_capture_${Date.now()}.png`, { type: 'image/png' });
+          const capturedFile = new File([blob], `webcam_capture_${Date.now()}.jpeg`, { type: 'image/jpeg' });
           setProfilePictureFile(capturedFile);
         }
-      }, 'image/png');
+      }, 'image/jpeg', 0.8);
       setShowWebcam(false);
     } else {
       toast({title: "Webcam Error", description: "Webcam not ready or stream not available.", variant: "destructive"});
