@@ -1,3 +1,4 @@
+
 'use client';
 
 import React, { useState, useMemo, useEffect, type FormEvent, useCallback, useRef } from 'react';
@@ -113,6 +114,9 @@ interface CompanyDetailsFirestore {
 
 const LOCAL_STORAGE_EMAIL_TEMPLATE_KEY = 'profitlens-invoice-email-template-v2';
 const LOCAL_STORAGE_NOTES_TEMPLATE_KEY = 'profitlens-invoice-notes-template-v1';
+const LOCAL_STORAGE_TAX_RATE_KEY = 'profitlens-invoice-tax-rate-v1';
+const LOCAL_STORAGE_DISCOUNT_TYPE_KEY = 'profitlens-invoice-discount-type-v1';
+const LOCAL_STORAGE_DISCOUNT_VALUE_KEY = 'profitlens-invoice-discount-value-v1';
 
 
 const getDefaultEmailBody = (currency: string) => `
@@ -408,6 +412,12 @@ export default function InvoicingPage() {
         });
         toast({ title: "Invoice Created", description: `Invoice ${newInvoiceNumber} created successfully.` });
       }
+      
+      // Save settings as default
+      localStorage.setItem(LOCAL_STORAGE_TAX_RATE_KEY, String(currentInvoice.taxRate || '0'));
+      localStorage.setItem(LOCAL_STORAGE_DISCOUNT_TYPE_KEY, currentInvoice.discountType || 'fixed');
+      localStorage.setItem(LOCAL_STORAGE_DISCOUNT_VALUE_KEY, String(currentInvoice.discountValue || '0'));
+
       fetchInvoices();
       setIsFormOpen(false);
       setCurrentInvoice({});
@@ -422,6 +432,10 @@ export default function InvoicingPage() {
 
   const handleCreateNew = () => {
     const savedNotes = localStorage.getItem(LOCAL_STORAGE_NOTES_TEMPLATE_KEY) || 'Full payment is due upon receipt. Late payments may incur additional charges.';
+    const savedTaxRate = parseFloat(localStorage.getItem(LOCAL_STORAGE_TAX_RATE_KEY) || '0');
+    const savedDiscountType = (localStorage.getItem(LOCAL_STORAGE_DISCOUNT_TYPE_KEY) as DiscountType) || 'fixed';
+    const savedDiscountValue = parseFloat(localStorage.getItem(LOCAL_STORAGE_DISCOUNT_VALUE_KEY) || '0');
+
 
     setCurrentInvoice({
         issuedDate: new Date(),
@@ -434,10 +448,10 @@ export default function InvoicingPage() {
         clientAddress: '',
         notes: savedNotes,
         subtotal: 0,
-        discountType: 'fixed',
-        discountValue: 0,
+        discountType: savedDiscountType,
+        discountValue: savedDiscountValue,
         discountAmount: 0,
-        taxRate: 0,
+        taxRate: savedTaxRate,
         taxAmount: 0,
         amount: 0,
     });
