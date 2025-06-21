@@ -1,14 +1,16 @@
 'use client'
 
 import * as React from "react"
+import Link from "next/link"
 import { Pie, PieChart, ResponsiveContainer, Cell, Tooltip } from "recharts"
 import { useAuth } from "@/contexts/AuthContext"
 import { db } from "@/lib/firebaseConfig"
 import { collectionGroup, query, where, onSnapshot, Timestamp } from "firebase/firestore"
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card"
+import { Button } from "@/components/ui/button"
 import { Skeleton } from "@/components/ui/skeleton"
 import { Alert, AlertTitle } from "@/components/ui/alert"
-import { PiggyBank, Info } from "lucide-react"
+import { Info, ArrowRight } from "lucide-react"
 
 interface Transaction {
   id: string;
@@ -83,8 +85,18 @@ export default function TransactionPieChart() {
   return (
     <Card className="shadow-lg">
       <CardHeader>
-        <CardTitle className="font-headline">Expense Breakdown</CardTitle>
-        <CardDescription>Withdrawals by category from your bank accounts.</CardDescription>
+        <div className="flex justify-between items-start">
+            <div>
+                <CardTitle className="font-headline">Expense Breakdown</CardTitle>
+                <CardDescription>Withdrawals by category from your bank accounts.</CardDescription>
+            </div>
+            <Button asChild variant="ghost" size="sm" className="flex-shrink-0">
+                <Link href="/bank-accounts">
+                    Manage Accounts
+                    <ArrowRight className="ml-2 h-4 w-4" />
+                </Link>
+            </Button>
+        </div>
       </CardHeader>
       <CardContent className="h-[300px] sm:h-[350px]">
         {isLoading ? (
