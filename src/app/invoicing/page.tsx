@@ -131,6 +131,25 @@ Sincerely,
 
 const DEFAULT_EMAIL_SUBJECT_TEMPLATE = "Invoice {{invoiceNumber}} from {{companyName}}";
 
+const TopRightArt = () => (
+  <svg width="200" height="100" viewBox="0 0 200 100" className="absolute top-0 right-0 h-auto">
+    <path d="M100 0 L200 0 L200 100 Z" fill="#e3f2fd" />
+    <path d="M125 0 L200 0 L200 75 Z" fill="#bbdefb" />
+    <path d="M150 0 L200 0 L200 50 Z" fill="#90caf9" />
+    <path d="M175 0 L200 0 L200 25 Z" fill="#64b5f6" />
+  </svg>
+);
+
+const BottomLeftArt = () => (
+   <svg width="200" height="100" viewBox="0 0 200 100" className="absolute bottom-0 left-0 h-auto">
+    <path d="M0 0 L100 100 L0 100 Z" fill="#e3f2fd" />
+    <path d="M0 25 L75 100 L0 100 Z" fill="#bbdefb" />
+    <path d="M0 50 L50 100 L0 100 Z" fill="#90caf9" />
+    <path d="M0 75 L25 100 L0 100 Z" fill="#64b5f6" />
+  </svg>
+);
+
+
 export default function InvoicingPage() {
   const { user, isLoading: authIsLoading } = useAuth();
   const currency = user?.currencySymbol || '$';
@@ -465,57 +484,34 @@ export default function InvoicingPage() {
   const handlePrintInvoice = () => {
     const printContents = invoicePrintRef.current?.innerHTML;
     if (printContents && typeof window !== 'undefined') {
-      const printWindow = window.open('', '_blank', 'height=800,width=800');
-      if (printWindow) {
-        printWindow.document.write('<html><head><title>Print Invoice</title>');
-        printWindow.document.write(`
-          <style>
-            body { font-family: 'PT Sans', sans-serif; margin: 20px; color: #333; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
-            .invoice-view-container { max-width: 780px; margin: auto; padding: 0; border: none; }
-            img { max-width: 150px; }
-            table { width: 100%; border-collapse: collapse; margin-bottom: 1rem; }
-            th, td { padding: 10px; text-align: left; font-size: 0.9em; border: 1px solid #e5e7eb; }
-            th { background-color: #f9fafb !important; color: #6b7280; font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em;}
-            .text-right { text-align: right; } .text-left { text-align: left; } .text-center { text-align: center; }
-            .font-bold { font-weight: 700; } .font-semibold { font-weight: 600; } .font-extrabold { font-weight: 800; }
-            .text-xs { font-size: 0.75rem; } .text-sm { font-size: 0.875rem; } .text-base { font-size: 1rem; } .text-lg { font-size: 1.125rem; } .text-xl { font-size: 1.25rem; } .text-2xl { font-size: 1.5rem; } .text-3xl { font-size: 1.875rem; } .text-4xl { font-size: 2.25rem; }
-            .mb-1 { margin-bottom: 0.25rem; } .mb-2 { margin-bottom: 0.5rem; } .mb-4 { margin-bottom: 1rem; } .mb-8 { margin-bottom: 2rem; }
-            .mt-1 { margin-top: 0.25rem; } .mt-2 { margin-top: 0.5rem; } .mt-4 { margin-top: 1rem; }
-            .pb-8 { padding-bottom: 2rem; } .pt-8 { padding-top: 2rem; }
-            .p-2 { padding: 0.5rem; } .p-3 { padding: 0.75rem; } .p-4 { padding: 1rem; }
-            .flex { display: flex; } .justify-between { justify-content: space-between; } .items-start { align-items: flex-start; } .items-center { align-items: center; }
-            .flex-col { flex-direction: column; } .flex-1 { flex: 1 1 0%; }
-            .space-y-1 > * + * { margin-top: 0.25rem; } .space-y-2 > * + * { margin-top: 0.5rem; }
-            .gap-8 { gap: 2rem; }
-            .bg-gray-50 { background-color: #f9fafb !important; } .bg-gray-100 { background-color: #f3f4f6 !important; }
-            .rounded-lg { border-radius: 0.5rem; }
-            .uppercase { text-transform: uppercase; } .tracking-wider { letter-spacing: 0.05em; }
-            .text-gray-900 { color: #111827 !important; } .text-gray-800 { color: #1f2937 !important; } .text-gray-700 { color: #374151 !important; }
-            .text-gray-500 { color: #6b7280 !important; } .text-gray-400 { color: #9ca3af !important; }
-            .whitespace-pre-line { white-space: pre-line; }
-            .border-b-2 { border-bottom-width: 2px; } .border-t { border-top-width: 1px; }
-            .border-gray-200 { border-color: #e5e7eb !important; }
-            .no-print { display: none !important; }
-            @media print {
-              body { margin: 0; }
-              .printable-area, .printable-area * { visibility: visible; }
-              .printable-area { position: absolute; left: 0; top: 0; width: 100%; }
-            }
-          </style>
-        `);
-        printWindow.document.write('</head><body>');
-        printWindow.document.write(`<div class="printable-area">${printContents}</div>`);
-        printWindow.document.close();
-        printWindow.focus();
-        
-        setTimeout(() => {
-            printWindow.print();
-            printWindow.close();
-        }, 250);
+        const printWindow = window.open('', '_blank', 'height=800,width=800');
+        if (printWindow) {
+            printWindow.document.write('<html><head><title>Print Invoice</title>');
+            printWindow.document.write(`
+                <style>
+                    body { margin: 0; font-family: sans-serif; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+                    .invoice-print-container { width: 794px; min-height: 1123px; margin: auto; }
+                    @media print {
+                      body { margin: 0; }
+                      .printable-area, .printable-area * { visibility: visible; }
+                      .printable-area { position: absolute; left: 0; top: 0; width: 100%; }
+                    }
+                </style>
+                <script src="https://cdn.tailwindcss.com"></script>
+            `);
+            printWindow.document.write('</head><body>');
+            printWindow.document.write(`<div class="invoice-print-container">${printContents}</div>`);
+            printWindow.document.close();
+            printWindow.focus();
+            
+            setTimeout(() => {
+                printWindow.print();
+                printWindow.close();
+            }, 500); // Increased timeout for styles to apply
 
-      } else {
-        toast({ title: "Print Error", description: "Could not open print window. Please check pop-up blocker settings.", variant: "destructive"});
-      }
+        } else {
+            toast({ title: "Print Error", description: "Could not open print window. Please check pop-up blocker settings.", variant: "destructive"});
+        }
     }
   };
 
@@ -527,35 +523,17 @@ export default function InvoicingPage() {
         scale: 2, 
         useCORS: true,
         logging: false, 
-        onclone: (document) => { 
-            const clonedContainer = document.querySelector('.invoice-view-container');
-            if(clonedContainer) {
-              (clonedContainer as HTMLElement).style.border = 'none'; 
-              (clonedContainer as HTMLElement).style.boxShadow = 'none'; 
-            }
-        }
+        width: 794,
+        windowWidth: 794,
       });
       const imgData = canvas.toDataURL('image/png');
       const pdf = new jsPDF({
         orientation: 'portrait',
-        unit: 'pt', 
-        format: 'a4'
+        unit: 'px', 
+        format: [794, 1123] // A4 size in pixels at 96 DPI
       });
 
-      const pdfWidth = pdf.internal.pageSize.getWidth();
-      const pdfHeight = pdf.internal.pageSize.getHeight();
-      const imgProps = pdf.getImageProperties(imgData);
-      const imgWidth = imgProps.width;
-      const imgHeight = imgProps.height;
-      const ratio = Math.min(pdfWidth / imgWidth, pdfHeight / imgHeight);
-      
-      const newImgWidth = imgWidth * ratio;
-      const newImgHeight = imgHeight * ratio;
-      
-      const xOffset = (pdfWidth - newImgWidth) / 2;
-      const yOffset = (pdfHeight - newImgHeight) / 2;
-
-      pdf.addImage(imgData, 'PNG', xOffset, yOffset, newImgWidth, newImgHeight);
+      pdf.addImage(imgData, 'PNG', 0, 0, 794, 1123);
       pdf.save(`Invoice-${invoiceToView.invoiceNumber}.pdf`);
       toast({ title: "PDF Downloaded", description: `Invoice ${invoiceToView.invoiceNumber}.pdf downloaded.`});
     } catch (error) {
@@ -1166,121 +1144,130 @@ export default function InvoicingPage() {
       </Dialog>
 
       <Dialog open={isViewInvoiceDialogOpen} onOpenChange={(open) => { setIsViewInvoiceDialogOpen(open); if (!open) setInvoiceToView(null); }}>
-        <DialogContent className="sm:max-w-4xl max-h-[90vh] flex flex-col p-0">
-          <DialogHeader className="p-4 sm:p-6 pb-0">
-            <DialogTitle className="font-headline text-2xl">Invoice Details</DialogTitle>
-            <DialogDescription>
-              Viewing Invoice {invoiceToView?.invoiceNumber}. Use actions below to print or download.
-            </DialogDescription>
-          </DialogHeader>
+        <DialogContent className="sm:max-w-5xl max-h-[90vh] flex flex-col p-0 bg-gray-100 dark:bg-background">
+            <DialogHeader className="p-4 sm:p-6 pb-2 border-b bg-background no-print">
+                <DialogTitle className="font-headline text-xl">
+                    Invoice {invoiceToView?.invoiceNumber}
+                </DialogTitle>
+            </DialogHeader>
           
-          <ScrollArea className="flex-grow overflow-y-auto">
-            <div ref={invoicePrintRef} className="invoice-view-container p-6 sm:p-8 bg-card text-card-foreground">
-              {isFetchingCompanyProfile && <div className="text-center p-10"><Loader2 className="h-8 w-8 animate-spin text-primary mx-auto" /> <p>Loading company details...</p></div>}
-              {!isFetchingCompanyProfile && invoiceToView && companyProfileDetails && (
-                <>
-                  <header className="mb-8 pb-8 border-b-2 border-gray-200 dark:border-gray-700">
-                    <div className="flex flex-col md:flex-row justify-between items-start gap-8">
-                      <div className="flex-1 space-y-1">
-                        <h2 className="text-2xl font-bold text-gray-800 dark:text-gray-100">{companyProfileDetails.name}</h2>
-                        <p className="text-sm text-gray-500 dark:text-gray-400 whitespace-pre-line">{companyProfileDetails.address}</p>
-                        {companyProfileDetails.email && <p className="text-sm text-gray-500 dark:text-gray-400">Email: {companyProfileDetails.email}</p>}
-                        {companyProfileDetails.phone && <p className="text-sm text-gray-500 dark:text-gray-400">Phone: {companyProfileDetails.phone}</p>}
-                        {companyProfileDetails.gstin && <p className="text-sm text-gray-500 dark:text-gray-400">GSTIN/Tax ID: {companyProfileDetails.gstin}</p>}
-                      </div>
-                      <div className="text-left md:text-right flex-1 space-y-2">
-                        <h1 className="text-4xl font-bold text-gray-800 dark:text-gray-100 uppercase tracking-wider">Invoice</h1>
-                        <div className="space-y-1 text-sm">
-                            <p className="text-gray-500 dark:text-gray-400"><span className="font-semibold text-gray-700 dark:text-gray-200 w-28 inline-block">Invoice #</span> {invoiceToView.invoiceNumber}</p>
-                            <p className="text-gray-500 dark:text-gray-400"><span className="font-semibold text-gray-700 dark:text-gray-200 w-28 inline-block">Date Issued</span> {format(invoiceToView.issuedDate, 'PPP')}</p>
-                            <p className="text-gray-500 dark:text-gray-400"><span className="font-semibold text-gray-700 dark:text-gray-200 w-28 inline-block">Date Due</span> {format(invoiceToView.dueDate, 'PPP')}</p>
+            <ScrollArea className="flex-grow overflow-y-auto bg-gray-100 dark:bg-background">
+                {isFetchingCompanyProfile && <div className="text-center p-10"><Loader2 className="h-8 w-8 animate-spin text-primary mx-auto" /> <p>Loading company details...</p></div>}
+                {!isFetchingCompanyProfile && invoiceToView && companyProfileDetails && (
+                    <div ref={invoicePrintRef} className="invoice-view-container relative p-8 sm:p-12 text-[#333] font-sans bg-white min-h-[1123px] w-[794px] mx-auto my-4 shadow-lg overflow-hidden">
+                        <TopRightArt />
+                        <BottomLeftArt />
+                        <div className="relative z-10">
+                            <header className="flex justify-between items-start mb-8">
+                                <div>
+                                <h2 className="text-2xl font-bold text-gray-800">{companyProfileDetails.name}</h2>
+                                <p className="text-sm text-gray-500 whitespace-pre-line">{companyProfileDetails.address}</p>
+                                </div>
+                                <div className="text-right">
+                                <h1 className="text-5xl font-light text-[#2962ff] tracking-wider">INVOICE</h1>
+                                </div>
+                            </header>
+
+                            <section className="flex justify-between border-y border-gray-200 py-4 mb-8">
+                                <div className="grid grid-cols-[max-content,1fr] gap-x-6 gap-y-1 text-sm">
+                                <span className="font-semibold text-gray-500">Invoice#</span>
+                                <span className="font-bold">{invoiceToView.invoiceNumber}</span>
+                                <span className="font-semibold text-gray-500">Invoice Date</span>
+                                <span>{format(invoiceToView.issuedDate, 'dd MMM yyyy')}</span>
+                                <span className="font-semibold text-gray-500">Terms</span>
+                                <span>Due on Receipt</span>
+                                <span className="font-semibold text-gray-500">Due Date</span>
+                                <span>{format(invoiceToView.dueDate, 'dd MMM yyyy')}</span>
+                                </div>
+                            </section>
+
+                            <section className="grid grid-cols-2 gap-8 mb-8">
+                                <div>
+                                    <div className="border-b border-gray-200 pb-1 mb-2">
+                                        <h3 className="text-sm font-semibold text-gray-600">Bill To</h3>
+                                    </div>
+                                    <p className="font-bold">{invoiceToView.clientName}</p>
+                                    <p className="text-sm text-gray-600 whitespace-pre-line">{invoiceToView.clientAddress}</p>
+                                </div>
+                                <div>
+                                    <div className="border-b border-gray-200 pb-1 mb-2">
+                                        <h3 className="text-sm font-semibold text-gray-600">Ship To</h3>
+                                    </div>
+                                    <p className="font-bold">{invoiceToView.clientName}</p>
+                                    <p className="text-sm text-gray-600 whitespace-pre-line">{invoiceToView.clientAddress}</p>
+                                </div>
+                            </section>
+
+                            <section>
+                                <table className="w-full text-left border-collapse">
+                                    <thead>
+                                        <tr style={{ backgroundColor: '#1e4e8c', color: 'white' }}>
+                                            <th className="p-3 w-12 text-center font-normal">#</th>
+                                            <th className="p-3 font-normal">Item & Description</th>
+                                            <th className="p-3 w-24 text-right font-normal">Qty</th>
+                                            <th className="p-3 w-32 text-right font-normal">Rate</th>
+                                            <th className="p-3 w-32 text-right font-normal">Amount</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                    {(invoiceToView.items || []).map((item, index) => (
+                                        <tr key={item.id} className="border-b border-gray-200">
+                                            <td className="p-3 text-center text-gray-600">{index + 1}</td>
+                                            <td className="p-3">
+                                                <p className="font-semibold text-gray-800">{item.description}</p>
+                                            </td>
+                                            <td className="p-3 text-right text-gray-600">{item.quantity.toFixed(2)}</td>
+                                            <td className="p-3 text-right text-gray-600">{currency}{item.unitPrice.toFixed(2)}</td>
+                                            <td className="p-3 text-right font-semibold text-gray-800">{currency}{(item.quantity * item.unitPrice).toFixed(2)}</td>
+                                        </tr>
+                                    ))}
+                                    {(!invoiceToView.items || invoiceToView.items.length === 0) && (
+                                        <TableRow><TableCell colSpan={5} className="text-center text-gray-500 py-4">No line items for this invoice.</TableCell></TableRow>
+                                    )}
+                                    </tbody>
+                                </table>
+                            </section>
+
+                            <footer className="mt-8">
+                                <div className="text-right mb-4 border-t border-gray-200 pt-2">
+                                    <span className="font-semibold text-gray-600 mr-4">Sub Total</span>
+                                    <span className="font-semibold text-gray-800">{currency}{invoiceToView.subtotal.toFixed(2)}</span>
+                                </div>
+                                <div className="grid grid-cols-2 gap-8">
+                                    <div className="text-sm text-gray-600">
+                                        <p className="font-semibold text-gray-700">Thanks for shopping with us.</p>
+                                        {invoiceToView.notes && <p className="mt-1">{invoiceToView.notes}</p>}
+                                        
+                                        <p className="font-bold mt-4 text-gray-800">Terms & Conditions</p>
+                                        <p className="text-xs">Full payment is due upon receipt of this invoice. Late payments may incur additional charges or interest as per the applicable laws.</p>
+                                    </div>
+                                    <div className="self-end">
+                                        <table className="w-full text-right" style={{ backgroundColor: '#e3f2fd' }}>
+                                            <tbody>
+                                                <tr>
+                                                    <td className="p-3 font-semibold text-gray-700">Tax Rate</td>
+                                                    <td className="p-3 font-semibold text-gray-800">{invoiceToView.taxRate.toFixed(2)}%</td>
+                                                </tr>
+                                                <tr className="font-bold text-lg">
+                                                    <td className="p-3 text-gray-800">Total</td>
+                                                    <td className="p-3 text-gray-900">{currency}{invoiceToView.amount.toFixed(2)}</td>
+                                                </tr>
+                                                <tr className="font-bold text-lg">
+                                                    <td className="p-3 text-gray-800">Balance Due</td>
+                                                    <td className="p-3 text-gray-900">{currency}{invoiceToView.amount.toFixed(2)}</td>
+                                                </tr>
+                                            </tbody>
+                                        </table>
+                                    </div>
+                                </div>
+                                <div className="text-center text-xs text-gray-400 pt-12 mt-8 border-t border-gray-100">
+                                    <p>Invoice created by ProfitLens. Please visit <a href="https://www.profitlens.com" target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:underline">www.profitlens.com</a>.</p>
+                                </div>
+                            </footer>
                         </div>
-                        <Badge variant={getStatusBadgeVariant(invoiceToView.status)} className={cn('mt-4 text-base px-4 py-1.5', invoiceToView.status === 'Paid' ? 'bg-green-600 text-white' : invoiceToView.status === 'Overdue' ? 'bg-red-600 text-white' : '')}>
-                          {invoiceToView.status}
-                        </Badge>
-                      </div>
                     </div>
-                  </header>
-
-                  <section className="mb-8">
-                    <h3 className="text-sm font-semibold uppercase text-gray-500 dark:text-gray-400 mb-2 tracking-wider">Bill To</h3>
-                    <div className="p-4 bg-gray-50 dark:bg-gray-800/50 rounded-lg text-sm">
-                        <p className="font-bold text-gray-800 dark:text-gray-100">{invoiceToView.clientName}</p>
-                        {invoiceToView.clientEmail && <p className="text-gray-600 dark:text-gray-300">{invoiceToView.clientEmail}</p>}
-                        {invoiceToView.clientAddress && <p className="text-gray-600 dark:text-gray-300 whitespace-pre-line mt-1">{invoiceToView.clientAddress}</p>}
-                    </div>
-                  </section>
-
-                  <section className="mb-8">
-                    <Table className="border rounded-lg">
-                      <TableHeader className="bg-gray-50 dark:bg-gray-800/50">
-                        <TableRow>
-                          <TableHead className="w-[50px] text-gray-600 dark:text-gray-300">#</TableHead>
-                          <TableHead className="text-gray-600 dark:text-gray-300">Description</TableHead>
-                          <TableHead className="text-right text-gray-600 dark:text-gray-300">Quantity</TableHead>
-                          <TableHead className="text-right text-gray-600 dark:text-gray-300">Unit Price</TableHead>
-                          <TableHead className="text-right text-gray-600 dark:text-gray-300">Amount</TableHead>
-                        </TableRow>
-                      </TableHeader>
-                      <TableBody>
-                        {(invoiceToView.items || []).map((item, index) => (
-                          <TableRow key={item.id} className="dark:border-gray-700">
-                            <TableCell className="text-gray-500 dark:text-gray-400">{index + 1}</TableCell>
-                            <TableCell className="font-medium text-gray-800 dark:text-gray-100">{item.description}</TableCell>
-                            <TableCell className="text-right text-gray-600 dark:text-gray-300">{item.quantity}</TableCell>
-                            <TableCell className="text-right text-gray-600 dark:text-gray-300">{currency}{item.unitPrice.toFixed(2)}</TableCell>
-                            <TableCell className="text-right font-semibold text-gray-800 dark:text-gray-100">{currency}{(item.quantity * item.unitPrice).toFixed(2)}</TableCell>
-                          </TableRow>
-                        ))}
-                        {(!invoiceToView.items || invoiceToView.items.length === 0) && (
-                           <TableRow><TableCell colSpan={5} className="text-center text-gray-500 dark:text-gray-400 py-4">No line items for this invoice.</TableCell></TableRow>
-                        )}
-                      </TableBody>
-                    </Table>
-                  </section>
-                  
-                  <section className="grid grid-cols-1 md:grid-cols-2 gap-8 mb-8">
-                      <div className="space-y-2">
-                          {invoiceToView.notes && (
-                          <div>
-                              <h4 className="font-semibold text-gray-800 dark:text-gray-100 mb-1">Notes:</h4>
-                              <p className="text-sm text-gray-600 dark:text-gray-300 whitespace-pre-wrap p-4 bg-gray-50 dark:bg-gray-800/50 rounded-lg">{invoiceToView.notes}</p>
-                          </div>
-                          )}
-                      </div>
-                      <div className="space-y-2 text-sm p-4 bg-gray-50 dark:bg-gray-800/50 rounded-lg">
-                          <div className="flex justify-between items-center">
-                            <p className="text-gray-600 dark:text-gray-300">Subtotal</p>
-                            <p className="font-medium text-gray-800 dark:text-gray-100">{currency}{invoiceToView.subtotal.toFixed(2)}</p>
-                          </div>
-                          {invoiceToView.discountAmount > 0 && (
-                               <div className="flex justify-between items-center">
-                                  <p className="text-gray-600 dark:text-gray-300">Discount</p>
-                                  <p className="font-medium text-gray-800 dark:text-gray-100">- {currency}{invoiceToView.discountAmount.toFixed(2)}</p>
-                              </div>
-                          )}
-                          {invoiceToView.taxAmount > 0 && (
-                          <div className="flex justify-between items-center">
-                              <p className="text-gray-600 dark:text-gray-300">Tax ({invoiceToView.taxRate}%)</p>
-                              <p className="font-medium text-gray-800 dark:text-gray-100">+ {currency}{invoiceToView.taxAmount.toFixed(2)}</p>
-                          </div>
-                          )}
-                          <Separator className="my-2 bg-gray-200 dark:bg-gray-700" />
-                          <div className="flex justify-between items-center p-3 bg-gray-100 dark:bg-gray-900/50 rounded-lg text-lg">
-                            <p className="font-bold text-gray-800 dark:text-gray-100">Grand Total</p>
-                            <p className="font-extrabold text-gray-900 dark:text-white">{currency}{invoiceToView.amount.toFixed(2)}</p>
-                          </div>
-                      </div>
-                  </section>
-
-                  <footer className="text-center text-xs text-gray-500/80 dark:text-gray-400/80 pt-8 border-t border-gray-200 dark:border-gray-700">
-                    <p>Thank you for your business!</p>
-                    <p className="mt-2">Invoice created by ProfitLens. Please visit <a href="https://www.profitlens.com" target="_blank" rel="noopener noreferrer" className="text-primary/80 hover:underline">www.profitlens.com</a>.</p>
-                  </footer>
-                </>
-              )}
-            </div>
-          </ScrollArea>
+                )}
+            </ScrollArea>
           
           <DialogFooter className="p-4 sm:p-6 border-t bg-background no-print">
              <Button type="button" variant="outline" onClick={handlePrintInvoice} disabled={isDownloadingPDF}>
