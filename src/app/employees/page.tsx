@@ -268,25 +268,18 @@ export default function EmployeesPage() {
       const employeeDocId = currentEmployee.id || doc(collection(db, 'employees')).id;
 
       // Start with current data and update as we go
-      const dataToSave: any = {
+      let dataToSave: any = {
         name: currentEmployee.name!,
         position: currentEmployee.position!,
         salary: salaryNum,
         description: currentEmployee.description || '',
         companyId: user.companyId,
-        // Carry over existing file data unless it's changed
-        profilePictureUrl: currentEmployee.profilePictureUrl || '',
-        profilePictureStoragePath: currentEmployee.profilePictureStoragePath || '',
-        associatedFileUrl: currentEmployee.associatedFileUrl || '',
-        associatedFileName: currentEmployee.associatedFileName || '',
-        associatedFileStoragePath: currentEmployee.associatedFileStoragePath || '',
       };
 
       // --- Handle Profile Picture ---
-      if (profilePictureFile) { // A new file is being uploaded
+      if (profilePictureFile) { 
         const oldPath = isEditing ? currentEmployee.profilePictureStoragePath : undefined;
         if (oldPath) {
-          // Don't let a failed deletion stop the update.
           await deleteFileFromStorage(oldPath).catch(e => console.warn("Old profile pic deletion failed, continuing...", e));
         }
         const fileExtension = profilePictureFile.name.split('.').pop() || 'jpeg';
@@ -294,17 +287,21 @@ export default function EmployeesPage() {
         const newUrl = await uploadFileToStorage(profilePictureFile, newPath);
         dataToSave.profilePictureUrl = newUrl;
         dataToSave.profilePictureStoragePath = newPath;
-      } else if (isEditing && currentEmployee.profilePictureUrl === undefined) { // An existing picture was removed
+      } else if (isEditing && currentEmployee.profilePictureUrl === undefined) { 
         const oldPath = currentEmployee.profilePictureStoragePath;
         if (oldPath) {
           await deleteFileFromStorage(oldPath).catch(e => console.warn("Profile pic deletion failed, continuing...", e));
         }
         dataToSave.profilePictureUrl = '';
         dataToSave.profilePictureStoragePath = '';
+      } else if (isEditing) {
+        dataToSave.profilePictureUrl = currentEmployee.profilePictureUrl;
+        dataToSave.profilePictureStoragePath = currentEmployee.profilePictureStoragePath;
       }
 
+
       // --- Handle Associated File ---
-      if (associatedFile) { // A new file is being uploaded
+      if (associatedFile) {
         const oldPath = isEditing ? currentEmployee.associatedFileStoragePath : undefined;
         if (oldPath) {
           await deleteFileFromStorage(oldPath).catch(e => console.warn("Old assoc. file deletion failed, continuing...", e));
@@ -314,7 +311,7 @@ export default function EmployeesPage() {
         dataToSave.associatedFileUrl = newUrl;
         dataToSave.associatedFileStoragePath = newPath;
         dataToSave.associatedFileName = associatedFile.name;
-      } else if (isEditing && currentEmployee.associatedFileUrl === undefined) { // An existing file was removed
+      } else if (isEditing && currentEmployee.associatedFileUrl === undefined) {
         const oldPath = currentEmployee.associatedFileStoragePath;
         if (oldPath) {
           await deleteFileFromStorage(oldPath).catch(e => console.warn("Assoc. file deletion failed, continuing...", e));
@@ -322,6 +319,10 @@ export default function EmployeesPage() {
         dataToSave.associatedFileUrl = '';
         dataToSave.associatedFileStoragePath = '';
         dataToSave.associatedFileName = '';
+      } else if (isEditing) {
+        dataToSave.associatedFileUrl = currentEmployee.associatedFileUrl;
+        dataToSave.associatedFileName = currentEmployee.associatedFileName;
+        dataToSave.associatedFileStoragePath = currentEmployee.associatedFileStoragePath;
       }
       
       // --- Save to Firestore ---
@@ -403,7 +404,7 @@ export default function EmployeesPage() {
     setCurrentEmployee(prev => ({ ...prev, [name]: value }));
   };
 
-  const resizeImage = (file: File, maxWidth: number = 800, targetSizeKB: number = 100): Promise<File> => {
+  const resizeImage = (file: File, maxWidth: number = 600, targetSizeKB: number = 80): Promise<File> => {
       return new Promise((resolve, reject) => {
           const reader = new FileReader();
           reader.readAsDataURL(file);
@@ -434,7 +435,7 @@ export default function EmployeesPage() {
 
                   // IIFE to handle async logic for quality adjustment
                   (async () => {
-                      let quality = 0.9;
+                      let quality = 0.8;
                       let blob: Blob | null = null;
                       
                       const getBlob = (q: number): Promise<Blob | null> => {
