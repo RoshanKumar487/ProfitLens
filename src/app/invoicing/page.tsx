@@ -479,15 +479,28 @@ export default function InvoicingPage() {
   const handlePrintInvoice = () => {
     if (!invoicePrintRef.current || !invoiceToView) return;
 
+    // Get all link tags with rel="stylesheet" from the main document head
+    const styleLinks = Array.from(document.querySelectorAll('link[rel="stylesheet"]'))
+      .map(link => link.outerHTML)
+      .join('');
+      
+    // Get all style tags from the main document head
+    const styleTags = Array.from(document.querySelectorAll('style'))
+      .map(style => style.outerHTML)
+      .join('');
+
+    // Get the HTML content of the invoice
     const printContents = invoicePrintRef.current.innerHTML;
-    const printWindow = window.open('', '_blank');
     
+    const printWindow = window.open('', '_blank');
+
     if (printWindow) {
       printWindow.document.write(`
         <html>
           <head>
             <title>Invoice ${invoiceToView.invoiceNumber}</title>
-            <script src="https://cdn.tailwindcss.com"></script>
+            ${styleLinks}
+            ${styleTags}
             <style>
               @media print {
                 @page { size: A4; margin: 0; }
@@ -498,25 +511,32 @@ export default function InvoicingPage() {
               }
             </style>
           </head>
-          <body>
+          <body class="bg-white">
             ${printContents}
           </body>
         </html>
       `);
-      
+
       printWindow.document.close();
       
-      // The onload event on the window will fire after all resources (like the script) are loaded.
-      printWindow.onload = () => {
-        setTimeout(() => { // A minimal timeout to ensure styles are processed by Tailwind's JIT
+      // Use a timeout to ensure rendering is complete before printing
+      setTimeout(() => {
+        try {
           printWindow.focus();
           printWindow.print();
-          printWindow.close();
-        }, 250);
-      };
-  
+        } catch (e) {
+          console.error("Print failed:", e);
+          toast({ title: "Print Failed", description: "There was an error opening the print dialog.", variant: "destructive"});
+          printWindow.close(); // Close only if printing fails
+        }
+      }, 500);
+
     } else {
-      toast({ title: "Print Error", description: "Could not open print window. Please check pop-up blocker settings.", variant: "destructive"});
+      toast({
+        title: "Print Error",
+        description: "Could not open print window. Please check your pop-up blocker settings.",
+        variant: "destructive"
+      });
     }
   };
 
