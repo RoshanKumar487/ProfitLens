@@ -10,15 +10,16 @@ import { format } from 'date-fns';
 import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/contexts/AuthContext';
 import { db } from '@/lib/firebaseConfig';
-import { collection, getDocs, query, where, orderBy, Timestamp, collectionGroup } from 'firebase/firestore';
+import { collection, getDocs, query, where, orderBy, Timestamp, collectionGroup, type QueryDocumentSnapshot, type DocumentData } from 'firebase/firestore';
 import { downloadCsv } from '@/lib/utils';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Calendar } from '@/components/ui/calendar';
 
 // Local interfaces for Firestore data structures
-interface EmployeeFirestore { name: string; position: string; salary: number; description?: string; profilePictureUrl?: string; associatedFileName?: string; createdAt: Timestamp; }
+interface EmployeeFirestore { name: string; position: string; salary: number; description?: string; profilePictureUrl?: string; associatedFileName?: string; associatedFileUrl?: string; createdAt: Timestamp; updatedAt?: Timestamp; }
 interface ExpenseFirestore { date: Timestamp; amount: number; category: string; vendor?: string; description?: string; }
-interface InvoiceFirestore { invoiceNumber: string; clientName: string; clientEmail?: string; amount: number; issuedDate: Timestamp; dueDate: Timestamp; status: string; notes?: string; }
+interface InvoiceItem { id: string; description: string; quantity: number; unitPrice: number; }
+interface InvoiceFirestore { invoiceNumber: string; clientName: string; clientEmail?: string; amount: number; subtotal: number; discountAmount: number; taxAmount: number; issuedDate: Timestamp; dueDate: Timestamp; status: string; notes?: string; items?: InvoiceItem[]; }
 interface RevenueEntryFirestore { date: Timestamp; amount: number; source: string; description?: string; }
 interface BankTransactionFirestore { date: Timestamp; amount: number; type: 'deposit' | 'withdrawal'; category: string; description: string; accountId: string; }
 
@@ -56,7 +57,7 @@ export default function ReportsPage() {
     toDate: Date | undefined,
     dateField: string,
     headers: string[],
-    dataMapper: (docData: any) => Record<string, any>,
+    dataMapper: (doc: QueryDocumentSnapshot<DocumentData>) => Record<string, any> | Record<string, any>[],
     setIsExporting: React.Dispatch<React.SetStateAction<boolean>>,
     useCollectionGroup: boolean = false
   ) => {
@@ -80,7 +81,11 @@ export default function ReportsPage() {
         orderBy(dateField, 'asc')
       );
       const querySnapshot = await getDocs(q);
-      const dataToExport = querySnapshot.docs.map(docSnap => dataMapper(docSnap.data()));
+
+      const dataToExport = querySnapshot.docs.flatMap(docSnap => {
+        const mappedData = dataMapper(docSnap);
+        return Array.isArray(mappedData) ? mappedData : [mappedData];
+      });
 
       if (dataToExport.length === 0) {
         toast({ title: 'No Data', description: `No ${reportType.toLowerCase()} found in the selected date range.`, variant: 'default' });
@@ -95,7 +100,7 @@ export default function ReportsPage() {
       const csvString = csvRows.join('\n');
       const filename = `ProfitLens_${reportType}_${format(fromDate, 'yyyyMMdd')}_to_${format(toDate, 'yyyyMMdd')}.csv`;
       downloadCsv(csvString, filename);
-      toast({ title: 'Export Successful', description: `${dataToExport.length} ${reportType.toLowerCase()} exported.` });
+      toast({ title: 'Export Successful', description: `${dataToExport.length} records exported for ${reportType}.` });
 
     } catch (error: any) {
       console.error(`Error exporting ${reportType}:`, error);
@@ -216,12 +221,22 @@ export default function ReportsPage() {
             isExportingEmployees,
             () => handleExport(
                 'Employees', 'employees', employeeFromDate, employeeToDate, 'createdAt',
-                ['Name', 'Position', 'Salary', 'Description', 'Profile Picture URL', 'Associated File Name', 'Created At'],
-                (data: EmployeeFirestore) => ({
-                    'Name': data.name, 'Position': data.position, 'Salary': data.salary,
-                    'Description': data.description || '', 'Profile Picture URL': data.profilePictureUrl || '',
-                    'Associated File Name': data.associatedFileName || '', 'Created At': format(data.createdAt.toDate(), 'yyyy-MM-dd HH:mm:ss'),
-                }),
+                ['ID', 'Name', 'Position', 'Salary', 'Description', 'Profile Picture URL', 'Associated File Name', 'Associated File URL', 'Created At', 'Updated At'],
+                (doc) => {
+                    const data = doc.data() as EmployeeFirestore;
+                    return {
+                        'ID': doc.id,
+                        'Name': data.name, 
+                        'Position': data.position, 
+                        'Salary': data.salary,
+                        'Description': data.description || '', 
+                        'Profile Picture URL': data.profilePictureUrl || '',
+                        'Associated File Name': data.associatedFileName || '', 
+                        'Associated File URL': data.associatedFileUrl || '',
+                        'Created At': format(data.createdAt.toDate(), 'yyyy-MM-dd HH:mm:ss'),
+                        'Updated At': data.updatedAt ? format(data.updatedAt.toDate(), 'yyyy-MM-dd HH:mm:ss') : 'N/A'
+                    };
+                },
                 setIsExportingEmployees
             ),
             'creation'
@@ -238,17 +253,20 @@ export default function ReportsPage() {
             () => handleExport(
                 'Expenses', 'expenses', expenseFromDate, expenseToDate, 'date',
                 ['Date', 'Amount', 'Category', 'Vendor', 'Description'],
-                (data: ExpenseFirestore) => ({
-                    'Date': format(data.date.toDate(), 'yyyy-MM-dd'), 'Amount': data.amount.toFixed(2),
-                    'Category': data.category, 'Vendor': data.vendor || '', 'Description': data.description || '',
-                }),
+                (doc) => {
+                    const data = doc.data() as ExpenseFirestore;
+                    return {
+                        'Date': format(data.date.toDate(), 'yyyy-MM-dd'), 'Amount': data.amount.toFixed(2),
+                        'Category': data.category, 'Vendor': data.vendor || '', 'Description': data.description || '',
+                    };
+                },
                 setIsExportingExpenses
             ),
             'expense'
         )}
         {renderReportCard(
-            'Invoice Report',
-            'Export a list of all invoices.',
+            'Itemized Invoice Report',
+            'Export a detailed list of all invoice items.',
             ReceiptIcon,
             invoiceFromDate,
             setInvoiceFromDate,
@@ -257,12 +275,34 @@ export default function ReportsPage() {
             isExportingInvoices,
             () => handleExport(
                 'Invoices', 'invoices', invoiceFromDate, invoiceToDate, 'issuedDate',
-                ['Invoice Number', 'Client Name', 'Client Email', 'Amount', 'Issued Date', 'Due Date', 'Status', 'Notes'],
-                (data: InvoiceFirestore) => ({
-                    'Invoice Number': data.invoiceNumber, 'Client Name': data.clientName, 'Client Email': data.clientEmail || '',
-                    'Amount': data.amount.toFixed(2), 'Issued Date': format(data.issuedDate.toDate(), 'yyyy-MM-dd'),
-                    'Due Date': format(data.dueDate.toDate(), 'yyyy-MM-dd'), 'Status': data.status, 'Notes': data.notes || '',
-                }),
+                ['Invoice Number', 'Invoice Status', 'Issued Date', 'Due Date', 'Client Name', 'Item Description', 'Item Quantity', 'Item Unit Price', 'Item Total'],
+                (doc) => {
+                    const data = doc.data() as InvoiceFirestore;
+                    if (!data.items || data.items.length === 0) {
+                        return [{
+                            'Invoice Number': data.invoiceNumber,
+                            'Invoice Status': data.status,
+                            'Issued Date': format(data.issuedDate.toDate(), 'yyyy-MM-dd'),
+                            'Due Date': format(data.dueDate.toDate(), 'yyyy-MM-dd'),
+                            'Client Name': data.clientName,
+                            'Item Description': 'N/A - Invoice total only',
+                            'Item Quantity': 1,
+                            'Item Unit Price': data.amount.toFixed(2),
+                            'Item Total': data.amount.toFixed(2)
+                        }];
+                    }
+                    return data.items.map(item => ({
+                        'Invoice Number': data.invoiceNumber,
+                        'Invoice Status': data.status,
+                        'Issued Date': format(data.issuedDate.toDate(), 'yyyy-MM-dd'),
+                        'Due Date': format(data.dueDate.toDate(), 'yyyy-MM-dd'),
+                        'Client Name': data.clientName,
+                        'Item Description': item.description,
+                        'Item Quantity': item.quantity,
+                        'Item Unit Price': item.unitPrice.toFixed(2),
+                        'Item Total': (item.quantity * item.unitPrice).toFixed(2)
+                    }));
+                },
                 setIsExportingInvoices
             ),
             'issued'
@@ -279,10 +319,13 @@ export default function ReportsPage() {
             () => handleExport(
                 'Revenue', 'revenueEntries', revenueFromDate, revenueToDate, 'date',
                 ['Date', 'Amount', 'Source', 'Description'],
-                (data: RevenueEntryFirestore) => ({
-                    'Date': format(data.date.toDate(), 'yyyy-MM-dd'), 'Amount': data.amount.toFixed(2),
-                    'Source': data.source, 'Description': data.description || '',
-                }),
+                (doc) => {
+                    const data = doc.data() as RevenueEntryFirestore;
+                    return {
+                        'Date': format(data.date.toDate(), 'yyyy-MM-dd'), 'Amount': data.amount.toFixed(2),
+                        'Source': data.source, 'Description': data.description || '',
+                    };
+                },
                 setIsExportingRevenue
             ),
             'revenue'
@@ -299,14 +342,17 @@ export default function ReportsPage() {
             () => handleExport(
                 'Bank Transactions', 'transactions', bankTransactionFromDate, bankTransactionToDate, 'date',
                 ['Date', 'Account ID', 'Type', 'Amount', 'Category', 'Description'],
-                (data: BankTransactionFirestore) => ({
-                    'Date': format(data.date.toDate(), 'yyyy-MM-dd'), 
-                    'Account ID': data.accountId,
-                    'Type': data.type,
-                    'Amount': data.amount.toFixed(2),
-                    'Category': data.category,
-                    'Description': data.description,
-                }),
+                (doc) => {
+                    const data = doc.data() as BankTransactionFirestore;
+                    return {
+                        'Date': format(data.date.toDate(), 'yyyy-MM-dd'), 
+                        'Account ID': data.accountId,
+                        'Type': data.type,
+                        'Amount': data.amount.toFixed(2),
+                        'Category': data.category,
+                        'Description': data.description,
+                    };
+                },
                 setIsExportingBankTransactions,
                 true // Use collectionGroup query
             ),
