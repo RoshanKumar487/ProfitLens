@@ -91,7 +91,7 @@ export default function ReportsPage() {
         ...dataToExport.map(row => headers.map(header => `"${String(row[header] ?? '').replace(/"/g, '""')}"`).join(','))
       ];
       const csvString = csvRows.join('\n');
-      const filename = `BizSight_${reportType}_${format(fromDate, 'yyyyMMdd')}_to_${format(toDate, 'yyyyMMdd')}.csv`;
+      const filename = `ProfitLens_${reportType}_${format(fromDate, 'yyyyMMdd')}_to_${format(toDate, 'yyyyMMdd')}.csv`;
       downloadCsv(csvString, filename);
       toast({ title: 'Export Successful', description: `${dataToExport.length} ${reportType.toLowerCase()} exported.` });
 

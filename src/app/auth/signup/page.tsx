@@ -54,11 +54,11 @@ export default function SignUpPage() {
 
   return (
     <div className="flex flex-col items-center justify-center min-h-[calc(100vh-12rem)] py-8">
-      <PageTitle title="Sign Up" subtitle="Create your BizSight account and set up your company." icon={UserPlus} />
+      <PageTitle title="Sign Up" subtitle="Create your ProfitLens account and set up your company." icon={UserPlus} />
       <Card className="w-full max-w-lg shadow-xl">
         <CardHeader>
           <CardTitle className="text-2xl font-headline">Create an Account</CardTitle>
-          <CardDescription>Join BizSight to manage your business effectively.</CardDescription>
+          <CardDescription>Join ProfitLens to manage your business effectively.</CardDescription>
         </CardHeader>
         <CardContent>
           <form onSubmit={handleSubmit} className="space-y-4">

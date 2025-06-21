@@ -39,7 +39,7 @@ export async function sendInvoiceEmailAction(payload: SendInvoiceEmailPayload): 
   });
 
   const mailOptions = {
-    from: `"${process.env.SMTP_FROM_NAME || 'BizSight'}" <${process.env.SMTP_FROM_EMAIL}>`,
+    from: `"${process.env.SMTP_FROM_NAME || 'ProfitLens'}" <${process.env.SMTP_FROM_EMAIL}>`,
     to: to, // recipient
     subject: subject,
     html: htmlBody,

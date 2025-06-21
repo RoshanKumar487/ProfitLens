@@ -74,7 +74,7 @@ const AppShellLayout = ({ children }: { children: React.ReactNode }) => {
                   <path d="M2 17l10 5 10-5"></path>
                   <path d="M2 12l10 5 10-5"></path>
                 </svg>
-                <h1 className="text-2xl font-headline font-semibold text-primary group-data-[collapsible=icon]:hidden">BizSight</h1>
+                <h1 className="text-2xl font-headline font-semibold text-primary group-data-[collapsible=icon]:hidden">ProfitLens</h1>
               </div>
             </Link>
           </SidebarHeader>
@@ -136,7 +136,7 @@ const AppShellLayout = ({ children }: { children: React.ReactNode }) => {
                  </Button>
               </div>
             ) : null }
-             <p className="text-xs text-muted-foreground group-data-[collapsible=icon]:hidden">© {new Date().getFullYear()} BizSight</p>
+             <p className="text-xs text-muted-foreground group-data-[collapsible=icon]:hidden">© {new Date().getFullYear()} ProfitLens</p>
           </SidebarFooter>
         </Sidebar>
       )}
@@ -152,7 +152,7 @@ const AppShellLayout = ({ children }: { children: React.ReactNode }) => {
                       <path d="M2 17l10 5 10-5"></path>
                       <path d="M2 12l10 5 10-5"></path>
                    </svg>
-                  <span className="font-headline text-lg font-semibold text-primary">BizSight</span>
+                  <span className="font-headline text-lg font-semibold text-primary">ProfitLens</span>
                 </div>
               </Link>
           </header>

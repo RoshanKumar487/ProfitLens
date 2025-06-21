@@ -7,7 +7,7 @@ import AppShell from '@/components/layout/AppShell';
 import { AuthProvider } from '@/contexts/AuthContext'; // Import AuthProvider
 
 export const metadata: Metadata = {
-  title: 'BizSight',
+  title: 'ProfitLens',
   description: 'Your Business Insights Dashboard',
 };
 

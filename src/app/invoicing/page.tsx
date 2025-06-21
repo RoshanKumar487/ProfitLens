@@ -100,7 +100,7 @@ interface CompanyDetailsFirestore {
   website: string;
 }
 
-const LOCAL_STORAGE_EMAIL_TEMPLATE_KEY = 'bizsight-invoice-email-template-v2';
+const LOCAL_STORAGE_EMAIL_TEMPLATE_KEY = 'profitlens-invoice-email-template-v2';
 
 const getDefaultEmailBody = (currency: string) => `
 Dear {{clientName}},
@@ -145,7 +145,7 @@ export default function InvoicingPage() {
   const [isSaving, setIsSaving] = useState(false);
 
   const [existingClients, setExistingClients] = useState<ExistingClient[]>([]);
-  const [isClientPopoverOpen, setIsClientPopoverOpen] = useState(false);
+  const [isClientSuggestionsVisible, setIsClientSuggestionsVisible] = useState(false);
   const invoicePrintRef = useRef<HTMLDivElement>(null);
 
   const [isViewInvoiceDialogOpen, setIsViewInvoiceDialogOpen] = useState(false);
@@ -756,6 +756,11 @@ export default function InvoicingPage() {
       ...prev,
       clientName: typedValue,
     }));
+    if (typedValue.length > 0) {
+      setIsClientSuggestionsVisible(true);
+    } else {
+      setIsClientSuggestionsVisible(false);
+    }
   };
 
   const handleClientSuggestionClick = (client: ExistingClient) => {
@@ -765,7 +770,7 @@ export default function InvoicingPage() {
       clientEmail: client.email || '',
       clientAddress: client.address || '',
     }));
-    setIsClientPopoverOpen(false);
+    setIsClientSuggestionsVisible(false);
   };
 
   const filteredClientSuggestions = useMemo(() => {
@@ -893,7 +898,7 @@ export default function InvoicingPage() {
         </CardContent>
       </Card>
 
-      <Dialog open={isFormOpen} onOpenChange={(open) => { setIsFormOpen(open); if (!open) { setCurrentInvoice({}); setIsEditing(false); setIsClientPopoverOpen(false); } }}>
+      <Dialog open={isFormOpen} onOpenChange={(open) => { setIsFormOpen(open); if (!open) { setCurrentInvoice({}); setIsEditing(false); setIsClientSuggestionsVisible(false); } }}>
         <DialogContent className="sm:max-w-2xl max-h-[90vh] flex flex-col">
           <DialogHeader>
             <DialogTitle className="font-headline">{isEditing ? 'Edit Invoice' : 'Create New Invoice'}</DialogTitle>
@@ -910,11 +915,11 @@ export default function InvoicingPage() {
                             id="clientName"
                             value={currentInvoice.clientName || ''}
                             onChange={handleClientNameInputChange}
-                            onFocus={() => setIsClientPopoverOpen(true)}
+                            onFocus={() => { if ((currentInvoice.clientName || '').length > 0) setIsClientSuggestionsVisible(true); }}
                             onBlur={() => {
                                 // Delay closing to allow click on suggestions
                                 setTimeout(() => {
-                                    setIsClientPopoverOpen(false);
+                                    setIsClientSuggestionsVisible(false);
                                 }, 150);
                             }}
                             placeholder="Enter client name"
@@ -923,15 +928,15 @@ export default function InvoicingPage() {
                             disabled={isSaving}
                             className="w-full"
                         />
-                        {isClientPopoverOpen && filteredClientSuggestions.length > 0 && (
-                            <Card className="absolute z-10 w-full mt-1 shadow-lg max-h-60 overflow-y-auto p-0">
+                        {isClientSuggestionsVisible && filteredClientSuggestions.length > 0 && (
+                             <Card className="absolute z-10 w-full mt-1 shadow-lg max-h-60 overflow-y-auto p-0">
                                 <CardContent className="p-0">
                                     <ScrollArea className="max-h-56">
                                         {filteredClientSuggestions.map((client) => (
                                         <div
                                             key={client.name}
                                             className="px-3 py-2 text-sm hover:bg-accent cursor-pointer"
-                                            onMouseDown={() => handleClientSuggestionClick(client)} // Important: onMouseDown to not lose focus before click
+                                            onMouseDown={() => handleClientSuggestionClick(client)}
                                         >
                                             {client.name}
                                             {client.email && <span className="text-xs text-muted-foreground ml-2">({client.email})</span>}
@@ -1056,7 +1061,7 @@ export default function InvoicingPage() {
           </form>
           <DialogFooter className="mt-auto pt-4 border-t">
             <DialogClose asChild>
-              <Button type="button" variant="outline" onClick={() => { setIsFormOpen(false); setCurrentInvoice({}); setIsEditing(false); setIsClientPopoverOpen(false); }} disabled={isSaving}>Cancel</Button>
+              <Button type="button" variant="outline" onClick={() => { setIsFormOpen(false); setCurrentInvoice({}); setIsEditing(false); setIsClientSuggestionsVisible(false); }} disabled={isSaving}>Cancel</Button>
             </DialogClose>
             <Button type="submit" form="invoice-form-explicit" disabled={isSaving}>
                 {isSaving ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : (isEditing ? 'Save Changes' : 'Create Invoice')}
