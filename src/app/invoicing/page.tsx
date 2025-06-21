@@ -110,6 +110,8 @@ interface CompanyDetailsFirestore {
   phone: string;
   email: string;
   website: string;
+  accountNumber?: string;
+  ifscCode?: string;
 }
 
 const LOCAL_STORAGE_EMAIL_TEMPLATE_KEY = 'profitlens-invoice-email-template-v2';
@@ -226,11 +228,11 @@ export default function InvoicingPage() {
         if (docSnap.exists()) {
           setCompanyProfileDetails(docSnap.data() as CompanyDetailsFirestore);
         } else {
-          setCompanyProfileDetails({ name: 'Your Company Name', address: 'Your Address', gstin: 'Your GSTIN', phone: '', email: '', website: '' });
+          setCompanyProfileDetails({ name: 'Your Company Name', address: 'Your Address', gstin: 'Your GSTIN', phone: '', email: '', website: '', accountNumber: '', ifscCode: '' });
         }
       } catch (error) {
         console.error("[InvoicingPage fetchCompanyProfile] Failed to fetch company details from Firestore:", error);
-        setCompanyProfileDetails({ name: 'Your Company Name', address: 'Your Address', gstin: 'Your GSTIN', phone: '', email: '', website: '' });
+        setCompanyProfileDetails({ name: 'Your Company Name', address: 'Your Address', gstin: 'Your GSTIN', phone: '', email: '', website: '', accountNumber: '', ifscCode: '' });
         toast({ title: "Error Fetching Company Info", description: "Could not load company details for invoices.", variant: "destructive" });
       } finally {
         setIsFetchingCompanyProfile(false);
@@ -597,6 +599,8 @@ export default function InvoicingPage() {
     const companyPhone = company?.phone || '';
     const companyWebsite = company?.website || '';
     const companyGstin = company?.gstin || '';
+    const companyAccountNumber = company?.accountNumber || '';
+    const companyIfscCode = company?.ifscCode || '';
 
     const clientAddressHtml = invoice.clientAddress ? `<p style="margin:2px 0; font-size: 0.9em; white-space: pre-wrap;">${invoice.clientAddress.replace(/\n/g, '<br>')}</p>` : '';
     const statusBadgeStyle = `display: inline-block; padding: 4px 8px; font-size: 0.8em; border-radius: 4px; color: white; background-color: ${invoice.status === 'Paid' ? '#28a745' : invoice.status === 'Overdue' ? '#dc3545' : '#6c757d'};`;
@@ -656,6 +660,15 @@ export default function InvoicingPage() {
           <div style="margin-bottom: 20px; padding: 10px; background-color: #f8f9fa; border-radius: 5px;">
             <h4 style="margin:0 0 5px 0; font-size: 1em;">Notes:</h4>
             <p style="margin:0; font-size: 0.9em; white-space: pre-wrap;">${invoice.notes}</p>
+          </div>
+        ` : ''}
+
+        ${companyAccountNumber ? `
+          <div style="margin-bottom: 20px; padding: 10px; background-color: #f8f9fa; border-radius: 5px;">
+            <h4 style="margin:0 0 5px 0; font-size: 1em;">Payment Details:</h4>
+            <p style="margin:0; font-size: 0.9em;"><strong>Account Name:</strong> ${companyName}</p>
+            <p style="margin:0; font-size: 0.9em;"><strong>Account Number:</strong> ${companyAccountNumber}</p>
+            ${companyIfscCode ? `<p style="margin:0; font-size: 0.9em;"><strong>IFSC/SWIFT Code:</strong> ${companyIfscCode}</p>` : ''}
           </div>
         ` : ''}
   
@@ -1289,6 +1302,15 @@ export default function InvoicingPage() {
                                     <div className="text-sm text-gray-600">
                                         <p className="font-semibold text-gray-700">Thanks for shopping with us.</p>
                                         {invoiceToView.notes && <p className="mt-1">{invoiceToView.notes}</p>}
+
+                                        {companyProfileDetails.accountNumber && (
+                                            <div className="mt-4">
+                                                <p className="font-bold text-gray-800">Payment Details</p>
+                                                <p className="text-xs">Account Name: {companyProfileDetails.name}</p>
+                                                <p className="text-xs">Account Number: {companyProfileDetails.accountNumber}</p>
+                                                {companyProfileDetails.ifscCode && <p className="text-xs">IFSC/SWIFT: {companyProfileDetails.ifscCode}</p>}
+                                            </div>
+                                        )}
                                         
                                         <p className="font-bold mt-4 text-gray-800">Terms &amp; Conditions</p>
                                         <p className="text-xs">Full payment is due upon receipt of this invoice. Late payments may incur additional charges or interest as per the applicable laws.</p>

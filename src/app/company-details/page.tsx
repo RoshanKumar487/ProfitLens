@@ -27,6 +27,8 @@ interface CompanyDetailsFirestore {
   phone: string;
   email: string;
   website: string;
+  accountNumber?: string;
+  ifscCode?: string;
   createdAt?: Timestamp; // Added for consistency, usually set on creation
   updatedAt?: Timestamp;
 }
@@ -43,6 +45,8 @@ export default function CompanyDetailsPage() {
     phone: '',
     email: '',
     website: '',
+    accountNumber: '',
+    ifscCode: '',
   });
   const [isFetching, setIsFetching] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
@@ -57,7 +61,7 @@ export default function CompanyDetailsPage() {
       if (!user || !user.companyId) {
         setIsFetching(false);
         console.log("CompanyDetails: User or companyId not found for fetching.");
-        setCompanyDetails({ name: '', address: '', city: '', state: '', country: '', gstin: '', phone: '', email: '', website: '' });
+        setCompanyDetails({ name: '', address: '', city: '', state: '', country: '', gstin: '', phone: '', email: '', website: '', accountNumber: '', ifscCode: '' });
         return;
       }
 
@@ -78,6 +82,8 @@ export default function CompanyDetailsPage() {
             phone: data.phone || '',
             email: data.email || '',
             website: data.website || '',
+            accountNumber: data.accountNumber || '',
+            ifscCode: data.ifscCode || '',
             createdAt: data.createdAt, // Persist if exists
             updatedAt: data.updatedAt,
           });
@@ -85,7 +91,7 @@ export default function CompanyDetailsPage() {
         } else {
           console.log("CompanyDetails: No details found for companyId:", user.companyId, ". Initializing empty form.");
           // This case should be less common now as profile is created on signup
-          setCompanyDetails({ name: user.displayName || '', address: '', city: '', state: '', country: '', gstin: '', phone: '', email: user.email || '', website: '' });
+          setCompanyDetails({ name: user.displayName || '', address: '', city: '', state: '', country: '', gstin: '', phone: '', email: user.email || '', website: '', accountNumber: '', ifscCode: '' });
         }
       } catch (error: any) {
         console.error('Error fetching company details from Firestore:', error);
@@ -94,7 +100,7 @@ export default function CompanyDetailsPage() {
           description: error.message || 'Could not load company details from Firestore.',
           variant: 'destructive',
         });
-        setCompanyDetails({ name: '', address: '', city: '', state: '', country: '', gstin: '', phone: '', email: '', website: '' });
+        setCompanyDetails({ name: '', address: '', city: '', state: '', country: '', gstin: '', phone: '', email: '', website: '', accountNumber: '', ifscCode: '' });
       } finally {
         setIsFetching(false);
       }
@@ -136,6 +142,8 @@ export default function CompanyDetailsPage() {
         phone: companyDetails.phone || '',
         email: companyDetails.email || '',
         website: companyDetails.website || '',
+        accountNumber: companyDetails.accountNumber || '',
+        ifscCode: companyDetails.ifscCode || '',
         createdAt: companyDetails.createdAt || Timestamp.now(), // Preserve or set if new
         updatedAt: Timestamp.now(),
       };
@@ -290,6 +298,36 @@ export default function CompanyDetailsPage() {
                 disabled={isSaving}
               />
             </div>
+             <Separator className="my-4" />
+             <div className="space-y-2">
+                <h3 className="text-md font-medium">Bank Details (Optional)</h3>
+                <p className="text-xs text-muted-foreground">These details will be shown on invoices for bank transfers.</p>
+            </div>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                    <Label htmlFor="accountNumber">Account Number</Label>
+                    <Input
+                        id="accountNumber"
+                        name="accountNumber"
+                        value={companyDetails.accountNumber || ''}
+                        onChange={handleChange}
+                        placeholder="e.g., 1234567890"
+                        disabled={isSaving}
+                    />
+                </div>
+                <div>
+                    <Label htmlFor="ifscCode">IFSC / SWIFT Code</Label>
+                    <Input
+                        id="ifscCode"
+                        name="ifscCode"
+                        value={companyDetails.ifscCode || ''}
+                        onChange={handleChange}
+                        placeholder="e.g., SBIN0001234 or SWIFT code"
+                        disabled={isSaving}
+                    />
+                </div>
+            </div>
+            <Separator className="my-4" />
             <div>
               <Label htmlFor="phone">Phone Number (Optional)</Label>
               <Input
