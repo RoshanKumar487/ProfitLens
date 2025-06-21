@@ -1,3 +1,4 @@
+
 'use client';
 
 import React, { useState, useMemo, useEffect, type FormEvent, useCallback, useRef } from 'react';
@@ -755,6 +756,9 @@ export default function InvoicingPage() {
       ...prev,
       clientName: typedValue,
     }));
+    if (!isClientPopoverOpen) {
+      setIsClientPopoverOpen(true);
+    }
   };
 
   const handleClientSuggestionClick = (client: ExistingClient) => {
@@ -910,7 +914,6 @@ export default function InvoicingPage() {
                                 id="clientName"
                                 value={currentInvoice.clientName || ''}
                                 onChange={handleClientNameInputChange}
-                                onFocus={() => setIsClientPopoverOpen(true)}
                                 placeholder="Enter client name"
                                 required
                                 autoComplete="off"
