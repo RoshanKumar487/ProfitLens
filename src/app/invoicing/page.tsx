@@ -810,14 +810,33 @@ export default function InvoicingPage() {
   };
 
   const handleClientSuggestionClick = (client: ExistingClient) => {
-    setCurrentInvoice(prev => ({
-      ...prev,
-      clientName: client.name,
-      clientEmail: client.email || '',
-      clientAddress: client.address || '',
-    }));
+    const mostRecentInvoice = invoices.find(inv => inv.clientName === client.name);
+
+    if (mostRecentInvoice) {
+      // Create a new invoice draft based on the most recent one
+      setCurrentInvoice({
+        ...mostRecentInvoice,
+        id: undefined, // This is a new invoice, so no ID yet
+        invoiceNumber: `INV${(Date.now()).toString().slice(-6)}`, // Generate a new invoice number
+        issuedDate: new Date(),
+        dueDate: new Date(new Date().setDate(new Date().getDate() + 30)),
+        status: 'Draft',
+        // The rest of the fields (items, notes, tax, discount) are carried over
+      });
+    } else {
+      // Fallback for safety, though every existing client should have at least one invoice.
+      // This will just fill in client details if no past invoice is found for some reason.
+      setCurrentInvoice(prev => ({
+        ...prev,
+        clientName: client.name,
+        clientEmail: client.email || '',
+        clientAddress: client.address || '',
+      }));
+    }
+    
     setIsClientSuggestionsVisible(false);
   };
+
 
   const filteredClientSuggestions = useMemo(() => {
     const currentName = currentInvoice.clientName?.toLowerCase() || '';
