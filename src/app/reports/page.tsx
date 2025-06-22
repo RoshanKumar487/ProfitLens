@@ -5,7 +5,7 @@ import React, { useState, useCallback } from 'react';
 import PageTitle from '@/components/PageTitle';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
-import { Calendar as CalendarIcon, FileBarChart, Loader2, FileText, User, TrendingDown, Receipt as ReceiptIcon, DollarSign, Banknote } from 'lucide-react';
+import { Calendar as CalendarIcon, FileBarChart, Loader2, FileText, User, TrendingDown, Receipt as ReceiptIcon, DollarSign, Banknote, ChevronDown } from 'lucide-react';
 import { format } from 'date-fns';
 import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/contexts/AuthContext';
@@ -14,6 +14,10 @@ import { collection, getDocs, query, where, orderBy, Timestamp, collectionGroup,
 import { downloadCsv } from '@/lib/utils';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Calendar } from '@/components/ui/calendar';
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
+import jsPDF from 'jspdf';
+import 'jspdf-autotable';
+
 
 // Local interfaces for Firestore data structures
 interface EmployeeFirestore { name: string; position: string; salary: number; description?: string; profilePictureUrl?: string; associatedFileName?: string; associatedFileUrl?: string; createdAt: Timestamp; updatedAt?: Timestamp; }
@@ -51,6 +55,7 @@ export default function ReportsPage() {
   
 
   const handleExport = useCallback(async (
+    format: 'csv' | 'pdf',
     reportType: string,
     collectionName: string,
     fromDate: Date | undefined,
@@ -93,14 +98,34 @@ export default function ReportsPage() {
         return;
       }
 
-      const csvRows = [
-        headers.join(','),
-        ...dataToExport.map(row => headers.map(header => `"${String(row[header] ?? '').replace(/"/g, '""')}"`).join(','))
-      ];
-      const csvString = csvRows.join('\n');
-      const filename = `ProfitLens_${reportType}_${format(fromDate, 'yyyyMMdd')}_to_${format(toDate, 'yyyyMMdd')}.csv`;
-      downloadCsv(csvString, filename);
-      toast({ title: 'Export Successful', description: `${dataToExport.length} records exported for ${reportType}.` });
+      const filenameBase = `ProfitLens_${reportType}_${format(fromDate, 'yyyyMMdd')}_to_${format(toDate, 'yyyyMMdd')}`;
+      
+      if (format === 'csv') {
+        const csvRows = [
+          headers.join(','),
+          ...dataToExport.map(row => headers.map(header => `"${String(row[header] ?? '').replace(/"/g, '""')}"`).join(','))
+        ];
+        const csvString = csvRows.join('\n');
+        downloadCsv(csvString, `${filenameBase}.csv`);
+        toast({ title: 'Export Successful', description: `${dataToExport.length} records exported to CSV.` });
+      } else { // PDF logic
+        const doc = new jsPDF();
+        
+        doc.text(`${reportType} Report`, 14, 16);
+        doc.setFontSize(10);
+        doc.text(`Date Range: ${format(fromDate, 'yyyy-MM-dd')} to ${format(toDate, 'yyyy-MM-dd')}`, 14, 22);
+
+        (doc as any).autoTable({
+          head: [headers],
+          body: dataToExport.map(row => headers.map(header => String(row[header] ?? ''))),
+          startY: 28,
+          headStyles: { fillColor: [30, 78, 140] }, // Blue header
+          styles: { fontSize: 8 },
+        });
+
+        doc.save(`${filenameBase}.pdf`);
+        toast({ title: 'Export Successful', description: `${dataToExport.length} records exported to PDF.` });
+      }
 
     } catch (error: any) {
       console.error(`Error exporting ${reportType}:`, error);
@@ -140,7 +165,7 @@ export default function ReportsPage() {
       toDate: Date | undefined,
       setToDate: React.Dispatch<React.SetStateAction<Date | undefined>>,
       isExporting: boolean,
-      onExport: () => void,
+      onExport: (format: 'csv' | 'pdf') => void,
       dateFieldLabel: string
   ) => {
     const IconComponent = icon;
@@ -197,10 +222,19 @@ export default function ReportsPage() {
                     />
                     </PopoverContent>
                 </Popover>
-                <Button onClick={onExport} disabled={isExporting || !fromDate || !toDate} className="w-full sm:w-auto">
-                    {isExporting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <FileText className="mr-2 h-4 w-4" />}
-                    Export CSV
-                </Button>
+                <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                        <Button disabled={isExporting || !fromDate || !toDate} className="w-full sm:w-auto">
+                             {isExporting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <FileText className="mr-2 h-4 w-4" />}
+                             Export
+                             <ChevronDown className="ml-2 h-4 w-4" />
+                        </Button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent>
+                        <DropdownMenuItem onClick={() => onExport('csv')}>Export as CSV</DropdownMenuItem>
+                        <DropdownMenuItem onClick={() => onExport('pdf')}>Export as PDF</DropdownMenuItem>
+                    </DropdownMenuContent>
+                </DropdownMenu>
             </CardContent>
         </Card>
     )
@@ -208,7 +242,7 @@ export default function ReportsPage() {
 
   return (
     <div className="space-y-6">
-      <PageTitle title="Reports" subtitle="Export your business data to CSV." icon={FileBarChart} />
+      <PageTitle title="Reports" subtitle="Export your business data to CSV or PDF." icon={FileBarChart} />
       <div className="grid gap-6 md:grid-cols-1 lg:grid-cols-2">
         {renderReportCard(
             'Employee Report',
@@ -219,7 +253,8 @@ export default function ReportsPage() {
             employeeToDate,
             setEmployeeToDate,
             isExportingEmployees,
-            () => handleExport(
+            (format) => handleExport(
+                format,
                 'Employees', 'employees', employeeFromDate, employeeToDate, 'createdAt',
                 ['ID', 'Name', 'Position', 'Salary', 'Description', 'Profile Picture URL', 'Associated File Name', 'Associated File URL', 'Created At', 'Updated At'],
                 (doc) => {
@@ -250,7 +285,8 @@ export default function ReportsPage() {
             expenseToDate,
             setExpenseToDate,
             isExportingExpenses,
-            () => handleExport(
+            (format) => handleExport(
+                format,
                 'Expenses', 'expenses', expenseFromDate, expenseToDate, 'date',
                 ['Date', 'Amount', 'Category', 'Vendor', 'Description'],
                 (doc) => {
@@ -273,7 +309,8 @@ export default function ReportsPage() {
             invoiceToDate,
             setInvoiceToDate,
             isExportingInvoices,
-            () => handleExport(
+            (format) => handleExport(
+                format,
                 'Invoices', 'invoices', invoiceFromDate, invoiceToDate, 'issuedDate',
                 ['Invoice Number', 'Invoice Status', 'Issued Date', 'Due Date', 'Client Name', 'Item Description', 'Item Quantity', 'Item Unit Price', 'Item Total'],
                 (doc) => {
@@ -316,7 +353,8 @@ export default function ReportsPage() {
             revenueToDate,
             setRevenueToDate,
             isExportingRevenue,
-            () => handleExport(
+            (format) => handleExport(
+                format,
                 'Revenue', 'revenueEntries', revenueFromDate, revenueToDate, 'date',
                 ['Date', 'Amount', 'Source', 'Description'],
                 (doc) => {
@@ -339,7 +377,8 @@ export default function ReportsPage() {
             bankTransactionToDate,
             setBankTransactionToDate,
             isExportingBankTransactions,
-            () => handleExport(
+            (format) => handleExport(
+                format,
                 'Bank Transactions', 'transactions', bankTransactionFromDate, bankTransactionToDate, 'date',
                 ['Date', 'Account ID', 'Type', 'Amount', 'Category', 'Description'],
                 (doc) => {
