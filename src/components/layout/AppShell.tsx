@@ -96,8 +96,8 @@ const AppShellLayout = ({ children }: { children: React.ReactNode }) => {
                 <DropdownMenu>
                     <DropdownMenuTrigger asChild>
                         <button className="flex items-center justify-center w-full gap-2 p-2 rounded-md hover:bg-sidebar-accent transition-colors group-data-[collapsible=icon]:w-10 group-data-[collapsible=icon]:h-10 group-data-[collapsible=icon]:p-0 group-data-[collapsible=icon]:justify-center">
-                            <Avatar className="h-9 w-9 bg-white">
-                                <AvatarFallback className="bg-white text-black font-semibold">
+                            <Avatar className="h-9 w-9">
+                                <AvatarFallback className="bg-muted text-muted-foreground font-semibold">
                                     {getInitials(user.displayName)}
                                 </AvatarFallback>
                             </Avatar>
