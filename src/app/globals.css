@@ -90,3 +90,28 @@ body {
     @apply transition-colors duration-300;
   }
 }
+
+/* New DataCard animation */
+@layer components {
+  .data-card::after {
+    content: '';
+    position: absolute;
+    bottom: -50%;
+    left: -25%;
+    width: 150%;
+    height: 150%;
+    background: radial-gradient(circle, hsla(var(--primary), 0.1) 0%, hsla(var(--primary), 0) 70%);
+    transform: scale(0);
+    transition: transform 0.6s cubic-bezier(0.25, 0.46, 0.45, 0.94);
+    z-index: 0;
+  }
+
+  .data-card:hover::after {
+    transform: scale(1.5);
+  }
+
+  .data-card > * {
+    position: relative;
+    z-index: 1;
+  }
+}
