@@ -42,6 +42,7 @@ interface AuthContextType {
   user: User | null;
   isLoading: boolean;
   error: AuthError | null;
+  currencySymbol: string;
   signUp: (
     email: string,
     password: string,
@@ -268,8 +269,10 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     }
   };
 
+  const currencySymbol = user?.currencySymbol || '$';
+
   return (
-    <AuthContext.Provider value={{ user, isLoading, error: authError, signUp, signIn, signOut, sendPasswordReset }}>
+    <AuthContext.Provider value={{ user, isLoading, error: authError, currencySymbol, signUp, signIn, signOut, sendPasswordReset }}>
       {children}
     </AuthContext.Provider>
   );
