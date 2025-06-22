@@ -48,8 +48,6 @@ import { ScrollArea } from '@/components/ui/scroll-area';
 import { useAuth } from '@/contexts/AuthContext';
 import { collection, addDoc, getDocs, doc, updateDoc, deleteDoc, query, where, orderBy, Timestamp, serverTimestamp, getDoc } from 'firebase/firestore';
 import { db } from '@/lib/firebaseConfig';
-import jsPDF from 'jspdf';
-import html2canvas from 'html2canvas';
 import Image from 'next/image';
 import { sendInvoiceEmailAction } from './actions'; 
 import { cn } from '@/lib/utils';
@@ -544,6 +542,8 @@ export default function InvoicingPage() {
     if (!invoicePrintRef.current || !invoiceToView) return;
     setIsDownloadingPDF(true);
     try {
+      const { default: jsPDF } = await import('jspdf');
+      const { default: html2canvas } = await import('html2canvas');
       const canvas = await html2canvas(invoicePrintRef.current, {
         scale: 2, 
         useCORS: true,

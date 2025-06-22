@@ -6,7 +6,7 @@ import Link from "next/link"
 import { Pie, PieChart, ResponsiveContainer, Cell, Tooltip } from "recharts"
 import { useAuth } from "@/contexts/AuthContext"
 import { db } from "@/lib/firebaseConfig"
-import { collectionGroup, query, where, onSnapshot, Timestamp } from "firebase/firestore"
+import { collectionGroup, query, where, getDocs } from "firebase/firestore"
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Skeleton } from "@/components/ui/skeleton"
@@ -36,38 +36,42 @@ export default function TransactionPieChart() {
       return;
     }
 
-    const q = query(
-      collectionGroup(db, 'transactions'),
-      where('companyId', '==', user.companyId),
-      where('type', '==', 'withdrawal')
-    );
+    const fetchData = async () => {
+      setIsLoading(true);
+      const q = query(
+        collectionGroup(db, 'transactions'),
+        where('companyId', '==', user.companyId),
+        where('type', '==', 'withdrawal')
+      );
 
-    const unsubscribe = onSnapshot(q, (snapshot) => {
-      const transactions: Transaction[] = [];
-      snapshot.forEach(doc => {
-        transactions.push({ id: doc.id, ...doc.data() } as Transaction);
-      });
+      try {
+        const snapshot = await getDocs(q);
+        const transactions: Transaction[] = [];
+        snapshot.forEach(doc => {
+            transactions.push({ id: doc.id, ...doc.data() } as Transaction);
+        });
 
-      const categoryTotals = transactions.reduce((acc, tx) => {
-        if (!acc[tx.category]) {
-          acc[tx.category] = 0;
-        }
-        acc[tx.category] += tx.amount;
-        return acc;
-      }, {} as { [key: string]: number });
+        const categoryTotals = transactions.reduce((acc, tx) => {
+            if (!acc[tx.category]) {
+            acc[tx.category] = 0;
+            }
+            acc[tx.category] += tx.amount;
+            return acc;
+        }, {} as { [key: string]: number });
 
-      const chartData = Object.entries(categoryTotals)
-        .map(([name, value]) => ({ name, value }))
-        .sort((a, b) => b.value - a.value);
+        const chartData = Object.entries(categoryTotals)
+            .map(([name, value]) => ({ name, value }))
+            .sort((a, b) => b.value - a.value);
 
-      setData(chartData);
-      setIsLoading(false);
-    }, (error) => {
-      console.error("Error fetching transaction data for chart:", error);
-      setIsLoading(false);
-    });
+        setData(chartData);
+      } catch (error) {
+          console.error("Error fetching transaction data for chart:", error);
+      } finally {
+          setIsLoading(false);
+      }
+    };
 
-    return () => unsubscribe();
+    fetchData();
   }, [user]);
 
   const CustomTooltip = ({ active, payload }: any) => {

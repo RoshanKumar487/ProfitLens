@@ -1,3 +1,4 @@
+
 'use client';
 
 import React, { useState, useCallback } from 'react';
@@ -14,8 +15,6 @@ import { downloadCsv } from '@/lib/utils';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Calendar } from '@/components/ui/calendar';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
-import jsPDF from 'jspdf';
-import 'jspdf-autotable';
 
 
 // Local interfaces for Firestore data structures
@@ -108,6 +107,8 @@ export default function ReportsPage() {
         downloadCsv(csvString, `${filenameBase}.csv`);
         toast({ title: 'Export Successful', description: `${dataToExport.length} records exported to CSV.` });
       } else { // PDF logic
+        const { default: jsPDF } = await import('jspdf');
+        await import('jspdf-autotable'); // For side effects
         const doc = new jsPDF();
         
         doc.text(`${reportType} Report`, 14, 16);

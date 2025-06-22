@@ -2,33 +2,40 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
+import dynamic from 'next/dynamic';
 import { useAuth } from '@/contexts/AuthContext';
 import { db } from '@/lib/firebaseConfig';
 import { collection, query, where, getDocs, orderBy, limit, Timestamp } from 'firebase/firestore';
 import { format, subMonths } from 'date-fns';
-import { ResponsiveContainer, BarChart, Bar, XAxis, YAxis, Tooltip, Legend } from 'recharts';
 
 import PageTitle from '@/components/PageTitle';
 import DataCard from '@/components/DataCard';
-import TransactionPieChart from '@/components/dashboard/TransactionPieChart';
-import HelpfulTipsCard from '@/components/dashboard/HelpfulTipsCard';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow, TableCaption } from '@/components/ui/table';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Badge } from '@/components/ui/badge';
 import { TrendingUp, TrendingDown, Users, Wallet, LayoutDashboard } from 'lucide-react';
+import type { MonthlyData } from '@/components/dashboard/RevenueVsExpensesChart';
+
+const DynamicPieChart = dynamic(() => import('@/components/dashboard/TransactionPieChart'), {
+  loading: () => <Skeleton className="h-[450px]" />,
+  ssr: false,
+});
+const DynamicHelpfulTips = dynamic(() => import('@/components/dashboard/HelpfulTipsCard'), {
+  loading: () => <Skeleton className="h-[460px]" />,
+  ssr: false,
+});
+const DynamicRevenueVsExpensesChart = dynamic(() => import('@/components/dashboard/RevenueVsExpensesChart'), {
+  loading: () => <div className="h-[350px]"><Skeleton className="h-full w-full" /></div>,
+  ssr: false,
+});
+
 
 interface FinancialData {
   totalRevenue: number;
   totalExpenses: number;
   netProfit: number;
   employeeCount: number;
-}
-
-interface MonthlyData {
-  month: string;
-  revenue: number;
-  expenses: number;
 }
 
 interface RecentActivity {
@@ -191,27 +198,11 @@ export default function DashboardPage() {
             <CardDescription>Monthly overview for the last 6 months.</CardDescription>
           </CardHeader>
           <CardContent className="h-[350px]">
-            <ResponsiveContainer width="100%" height="100%">
-              <BarChart data={monthlyChartData}>
-                <XAxis dataKey="month" stroke="#888888" fontSize={12} tickLine={false} axisLine={false} />
-                <YAxis stroke="#888888" fontSize={12} tickLine={false} axisLine={false} tickFormatter={(value) => `${currencySymbol}${value / 1000}k`} />
-                <Tooltip
-                    contentStyle={{
-                        backgroundColor: 'hsl(var(--background))',
-                        borderColor: 'hsl(var(--border))',
-                        borderRadius: 'var(--radius)',
-                    }}
-                    cursor={{ fill: 'hsl(var(--muted))' }}
-                />
-                <Legend iconType="circle" iconSize={10} />
-                <Bar dataKey="revenue" fill="hsl(var(--chart-2))" name="Revenue" radius={[4, 4, 0, 0]} />
-                <Bar dataKey="expenses" fill="hsl(var(--chart-1))" name="Expenses" radius={[4, 4, 0, 0]} />
-              </BarChart>
-            </ResponsiveContainer>
+            <DynamicRevenueVsExpensesChart data={monthlyChartData} currencySymbol={currencySymbol} />
           </CardContent>
         </Card>
 
-        <TransactionPieChart />
+        <DynamicPieChart />
       </div>
 
        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
@@ -251,7 +242,7 @@ export default function DashboardPage() {
                 </CardContent>
             </Card>
 
-            <HelpfulTipsCard />
+            <DynamicHelpfulTips />
         </div>
 
     </div>
