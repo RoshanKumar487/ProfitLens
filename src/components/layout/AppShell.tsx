@@ -24,7 +24,6 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel,
 import { Building, LogOut, Loader2 } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { cn } from '@/lib/utils';
-import Image from 'next/image';
 
 const AppShellLayout = ({ children }: { children: React.ReactNode }) => {
   const pathname = usePathname();
@@ -55,7 +54,6 @@ const AppShellLayout = ({ children }: { children: React.ReactNode }) => {
         <Sidebar collapsible="icon" variant="sidebar" className="border-r">
           <SidebarHeader className="p-4">
             <Link href="/" onClick={handleNavigationClick} className="flex items-center gap-2.5">
-               <Image src="/logo.svg" alt="ProfitLens Logo" width={32} height={32} />
               <h1 className="text-2xl font-bold text-sidebar-foreground group-data-[collapsible=icon]:hidden">ProfitLens</h1>
             </Link>
           </SidebarHeader>
@@ -121,7 +119,6 @@ const AppShellLayout = ({ children }: { children: React.ReactNode }) => {
            <header className="sticky top-0 z-10 flex h-14 items-center gap-4 border-b bg-background/80 px-4 backdrop-blur-sm sm:h-16 sm:px-6 md:hidden">
               <SidebarTrigger variant="outline" size="icon" />
               <Link href="/" onClick={handleNavigationClick} className="flex items-center gap-2 md:hidden">
-                  <Image src="/logo.svg" alt="ProfitLens Logo" width={24} height={24} />
                   <span className="font-bold text-lg text-foreground">ProfitLens</span>
               </Link>
           </header>
