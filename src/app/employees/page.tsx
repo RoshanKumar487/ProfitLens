@@ -36,7 +36,7 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger, DropdownMenuSeparator } from '@/components/ui/dropdown-menu';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Users2, PlusCircle, MoreHorizontal, Edit, Trash2, Loader2, Save, Camera, UploadCloud, FileText, XCircle, SwitchCamera } from 'lucide-react';
@@ -83,8 +83,7 @@ const getInitials = (name: string = "") => {
 
 
 export default function EmployeesPage() {
-  const { user, isLoading: authIsLoading } = useAuth();
-  const currency = user?.currencySymbol || '$';
+  const { user, isLoading: authIsLoading, currencySymbol } = useAuth();
   const [employees, setEmployees] = useState<EmployeeDisplay[]>([]);
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [currentEmployee, setCurrentEmployee] = useState<Partial<EmployeeDisplay & { salary?: string | number }>>({});
@@ -662,95 +661,106 @@ export default function EmployeesPage() {
         </Button>
       </PageTitle>
 
-      <Table>
-        <TableCaption>{employees.length === 0 && !isLoadingEmployees ? "No employees found." : "A list of your employees."}</TableCaption>
-        <TableHeader>
-          <TableRow>
-            <TableHead className="w-[60px]">Avatar</TableHead>
-            <TableHead>Name</TableHead>
-            <TableHead>Position</TableHead>
-            <TableHead>Description</TableHead>
-            <TableHead>Added By</TableHead>
-            <TableHead className="text-right">Salary</TableHead>
-            <TableHead>File</TableHead>
-            <TableHead className="text-right w-[100px]">Actions</TableHead>
-          </TableRow>
-        </TableHeader>
-        <TableBody>
-          {isLoadingEmployees && employees.length === 0 && (
-            [...Array(3)].map((_, i) => (
-              <TableRow key={`skel-${i}`}>
-                <TableCell><Skeleton className="h-10 w-10 rounded-full" /></TableCell>
-                <TableCell><Skeleton className="h-4 w-3/4" /></TableCell>
-                <TableCell><Skeleton className="h-4 w-1/2" /></TableCell>
-                <TableCell><Skeleton className="h-4 w-3/4" /></TableCell>
-                <TableCell><Skeleton className="h-4 w-1/2" /></TableCell>
-                <TableCell className="text-right"><Skeleton className="h-4 w-1/4 ml-auto" /></TableCell>
-                <TableCell><Skeleton className="h-4 w-1/2" /></TableCell>
-                <TableCell className="text-right"><Skeleton className="h-8 w-8 ml-auto" /></TableCell>
+      <Card className="shadow-lg">
+        <CardHeader>
+          <CardTitle>Team Members</CardTitle>
+          <CardDescription>
+            Manage your employees' information, salaries, and associated files.
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <Table>
+            <TableCaption>{employees.length === 0 && !isLoadingEmployees ? "No employees found." : "A list of your employees."}</TableCaption>
+            <TableHeader>
+              <TableRow>
+                <TableHead className="w-[60px]">Avatar</TableHead>
+                <TableHead>Name</TableHead>
+                <TableHead>Position</TableHead>
+                <TableHead>Description</TableHead>
+                <TableHead>Added By</TableHead>
+                <TableHead className="text-right">Salary</TableHead>
+                <TableHead>File</TableHead>
+                <TableHead className="text-right w-[100px]">Actions</TableHead>
               </TableRow>
-            ))
-          )}
+            </TableHeader>
+            <TableBody>
+              {isLoadingEmployees && employees.length === 0 && (
+                [...Array(3)].map((_, i) => (
+                  <TableRow key={`skel-${i}`}>
+                    <TableCell><Skeleton className="h-10 w-10 rounded-full" /></TableCell>
+                    <TableCell><Skeleton className="h-4 w-3/4" /></TableCell>
+                    <TableCell><Skeleton className="h-4 w-1/2" /></TableCell>
+                    <TableCell><Skeleton className="h-4 w-3/4" /></TableCell>
+                    <TableCell><Skeleton className="h-4 w-1/2" /></TableCell>
+                    <TableCell className="text-right"><Skeleton className="h-4 w-1/4 ml-auto" /></TableCell>
+                    <TableCell><Skeleton className="h-4 w-1/2" /></TableCell>
+                    <TableCell className="text-right"><Skeleton className="h-8 w-8 ml-auto" /></TableCell>
+                  </TableRow>
+                ))
+              )}
 
-          {user?.email === 'roshankumar70975@gmail.com' && (
-              <TableRow key="super-admin-row" className="bg-primary/5 hover:bg-primary/10">
+              {user?.email === 'roshankumar70975@gmail.com' && (
+                  <TableRow key="super-admin-row" className="bg-primary/5 hover:bg-primary/10">
+                      <TableCell>
+                          <Avatar className="h-10 w-10 border-2 border-primary">
+                              <AvatarFallback className="bg-primary/20">SA</AvatarFallback>
+                          </Avatar>
+                      </TableCell>
+                      <TableCell className="font-medium">Roshan Kumar</TableCell>
+                      <TableCell>Super Admin</TableCell>
+                      <TableCell>N/A</TableCell>
+                      <TableCell>System</TableCell>
+                      <TableCell className="text-right">N/A</TableCell>
+                      <TableCell>
+                          <span className="text-sm text-muted-foreground">System</span>
+                      </TableCell>
+                      <TableCell className="text-right">
+                          <Badge variant="secondary">System User</Badge>
+                      </TableCell>
+                  </TableRow>
+              )}
+
+              {!isLoadingEmployees && employees.map((employee) => (
+                <TableRow key={employee.id}>
                   <TableCell>
-                      <Avatar className="h-10 w-10 border-2 border-primary">
-                          <AvatarFallback className="bg-primary/20">SA</AvatarFallback>
-                      </Avatar>
+                    <Avatar className="h-10 w-10">
+                      <AvatarImage src={employee.profilePictureUrl || `https://placehold.co/40x40.png?text=${getInitials(employee.name)}`} alt={employee.name} data-ai-hint="person portrait" />
+                      <AvatarFallback>{getInitials(employee.name)}</AvatarFallback>
+                    </Avatar>
                   </TableCell>
-                  <TableCell className="font-medium">Roshan Kumar</TableCell>
-                  <TableCell>Super Admin</TableCell>
-                  <TableCell>N/A</TableCell>
-                  <TableCell>System</TableCell>
-                  <TableCell className="text-right">N/A</TableCell>
+                  <TableCell className="font-medium">{employee.name}</TableCell>
+                  <TableCell>{employee.position}</TableCell>
+                  <TableCell className="max-w-[200px] truncate text-sm text-muted-foreground" title={employee.description}>
+                    {employee.description || '-'}
+                  </TableCell>
+                  <TableCell>{employee.addedBy}</TableCell>
+                  <TableCell className="text-right">{currencySymbol}{employee.salary.toLocaleString()}</TableCell>
                   <TableCell>
-                      <span className="text-sm text-muted-foreground">System</span>
+                    {employee.associatedFileUrl && employee.associatedFileName ? (
+                      <a href={employee.associatedFileUrl} target="_blank" rel="noopener noreferrer" className="text-sm text-primary hover:underline truncate max-w-[120px] inline-block" title={employee.associatedFileName}>
+                        <FileText className="h-4 w-4 inline mr-1 flex-shrink-0" />{employee.associatedFileName}
+                      </a>
+                    ) : ( <span className="text-sm text-muted-foreground">None</span> )}
                   </TableCell>
                   <TableCell className="text-right">
-                      <Badge variant="secondary">System User</Badge>
+                    <DropdownMenu>
+                      <DropdownMenuTrigger asChild>
+                        <Button variant="ghost" size="icon" className="h-8 w-8" disabled={isSaving}><MoreHorizontal className="h-4 w-4" /></Button>
+                      </DropdownMenuTrigger>
+                      <DropdownMenuContent align="end">
+                        <DropdownMenuItem onClick={() => handleEditEmployee(employee)}><Edit className="mr-2 h-4 w-4" /> Edit</DropdownMenuItem>
+                        <DropdownMenuSeparator />
+                        <DropdownMenuItem onClick={() => promptDeleteEmployee(employee.id)} className="text-destructive focus:text-destructive focus:bg-destructive/10"><Trash2 className="mr-2 h-4 w-4" /> Delete</DropdownMenuItem>
+                      </DropdownMenuContent>
+                    </DropdownMenu>
                   </TableCell>
-              </TableRow>
-          )}
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+        </CardContent>
+      </Card>
 
-          {!isLoadingEmployees && employees.map((employee) => (
-            <TableRow key={employee.id}>
-              <TableCell>
-                <Avatar className="h-10 w-10">
-                  <AvatarImage src={employee.profilePictureUrl || `https://placehold.co/40x40.png?text=${getInitials(employee.name)}`} alt={employee.name} data-ai-hint="person portrait" />
-                  <AvatarFallback>{getInitials(employee.name)}</AvatarFallback>
-                </Avatar>
-              </TableCell>
-              <TableCell className="font-medium">{employee.name}</TableCell>
-              <TableCell>{employee.position}</TableCell>
-              <TableCell className="max-w-[200px] truncate text-sm text-muted-foreground" title={employee.description}>
-                {employee.description || '-'}
-              </TableCell>
-              <TableCell>{employee.addedBy}</TableCell>
-              <TableCell className="text-right">{currency}{employee.salary.toLocaleString()}</TableCell>
-              <TableCell>
-                {employee.associatedFileUrl && employee.associatedFileName ? (
-                  <a href={employee.associatedFileUrl} target="_blank" rel="noopener noreferrer" className="text-sm text-primary hover:underline truncate max-w-[120px] inline-block" title={employee.associatedFileName}>
-                    <FileText className="h-4 w-4 inline mr-1 flex-shrink-0" />{employee.associatedFileName}
-                  </a>
-                ) : ( <span className="text-sm text-muted-foreground">None</span> )}
-              </TableCell>
-              <TableCell className="text-right">
-                <DropdownMenu>
-                  <DropdownMenuTrigger asChild>
-                    <Button variant="ghost" size="icon" className="h-8 w-8" disabled={isSaving}><MoreHorizontal className="h-4 w-4" /></Button>
-                  </DropdownMenuTrigger>
-                  <DropdownMenuContent align="end">
-                    <DropdownMenuItem onClick={() => handleEditEmployee(employee)}><Edit className="mr-2 h-4 w-4" /> Edit</DropdownMenuItem>
-                    <DropdownMenuSeparator />
-                    <DropdownMenuItem onClick={() => promptDeleteEmployee(employee.id)} className="text-destructive focus:text-destructive focus:bg-destructive/10"><Trash2 className="mr-2 h-4 w-4" /> Delete</DropdownMenuItem>
-                  </DropdownMenuContent>
-                </DropdownMenu>
-              </TableCell>
-            </TableRow>
-          ))}
-        </TableBody>
-      </Table>
 
       <Dialog open={isFormOpen} onOpenChange={(open) => { if (!open) resetFormState(); else setIsFormOpen(true); }}>
         <DialogContent className="sm:max-w-lg max-h-[90vh] flex flex-col">
@@ -769,7 +779,7 @@ export default function EmployeesPage() {
               <Input id="positionEmp" name="position" value={currentEmployee.position || ''} onChange={handleInputChange} required disabled={isSaving} />
             </div>
             <div>
-              <Label htmlFor="salaryEmp">Annual Salary ({currency})</Label>
+              <Label htmlFor="salaryEmp">Annual Salary ({currencySymbol})</Label>
               <Input id="salaryEmp" name="salary" type="number" value={currentEmployee.salary === undefined ? '' : String(currentEmployee.salary)} onChange={handleInputChange} required min="0" disabled={isSaving} />
             </div>
             

@@ -27,13 +27,15 @@ import { cn } from '@/lib/utils';
 
 const AppShellLayout = ({ children }: { children: React.ReactNode }) => {
   const pathname = usePathname();
-  const { isMobile, setOpenMobile } = useSidebar();
+  const { isMobile, setOpenMobile, open, setOpen } = useSidebar();
   const { user, signOut, isLoading: authLoading } = useAuth(); 
   const getInitials = (name?: string | null) => name ? name.split(' ').map(n => n[0]).join('').toUpperCase() : 'U';
 
   const handleNavigationClick = () => {
     if (isMobile) {
       setOpenMobile(false);
+    } else if (open) {
+      setOpen(false);
     }
   };
 
@@ -137,7 +139,7 @@ const AppShellLayout = ({ children }: { children: React.ReactNode }) => {
 
 const AppShell = ({ children }: { children: React.ReactNode }) => {
   return (
-    <SidebarProvider defaultOpen={true}>
+    <SidebarProvider defaultOpen={false}>
       <AppShellLayout>{children}</AppShellLayout>
     </SidebarProvider>
   );
