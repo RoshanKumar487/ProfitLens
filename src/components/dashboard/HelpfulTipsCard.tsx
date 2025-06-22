@@ -4,6 +4,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/com
 import { Button } from '@/components/ui/button';
 import { HelpCircle, ArrowRight } from 'lucide-react';
 import Link from 'next/link';
+import Image from 'next/image';
 
 const HelpfulTipsCard = () => {
   return (
@@ -17,13 +18,13 @@ const HelpfulTipsCard = () => {
           Unsure how a feature works? Check out our detailed user guide for step-by-step instructions and tips on how to get the most out of ProfitLens.
         </p>
         <div className="aspect-video w-full relative rounded-lg overflow-hidden mb-4">
-          <video
-            src="https://videos.pexels.com/video-files/6981190/6981190-hd_1920_1080_25fps.mp4"
-            autoPlay
-            loop
-            muted
-            playsInline
-            className="absolute top-0 left-0 w-full h-full object-cover"
+           <Image
+            src="https://placehold.co/600x400.png"
+            alt="Employee creating documents on a laptop in an office."
+            fill
+            sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
+            className="object-cover"
+            data-ai-hint="office laptop"
           />
         </div>
         <Button asChild className="w-full mt-auto">
