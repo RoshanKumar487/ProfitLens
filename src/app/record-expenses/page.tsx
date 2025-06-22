@@ -1,3 +1,4 @@
+
 'use client';
 
 import React, { useState, useEffect, FormEvent, useCallback } from 'react';
@@ -37,6 +38,8 @@ interface ExpenseEntryFirestore {
   category: string;
   description?: string;
   vendor?: string;
+  addedById: string;
+  addedBy: string;
   companyId: string;
   createdAt: Timestamp;
 }
@@ -48,6 +51,7 @@ interface ExpenseEntryDisplay {
   category: string;
   description?: string;
   vendor?: string;
+  addedBy: string;
 }
 
 export default function RecordExpensesPage() {
@@ -89,6 +93,7 @@ export default function RecordExpensesPage() {
           category: data.category,
           description: data.description,
           vendor: data.vendor,
+          addedBy: data.addedBy || 'N/A',
         };
       });
       setRecentEntries(fetchedEntries);
@@ -135,6 +140,8 @@ export default function RecordExpensesPage() {
       vendor: vendor || '',
       companyId: user.companyId,
       createdAt: serverTimestamp(),
+      addedById: user.uid,
+      addedBy: user.displayName || user.email || 'System'
     };
 
     try {
@@ -310,6 +317,9 @@ export default function RecordExpensesPage() {
                   </div>
                   <p className="text-sm text-muted-foreground">{entry.category}{entry.vendor ? ` - ${entry.vendor}` : ''}</p>
                   {entry.description && <p className="text-xs text-muted-foreground mt-1">{entry.description}</p>}
+                  <p className="text-xs text-muted-foreground mt-1">
+                    Added by: <span className="font-medium">{entry.addedBy}</span>
+                  </p>
                 </div>
               ))
             ) : (

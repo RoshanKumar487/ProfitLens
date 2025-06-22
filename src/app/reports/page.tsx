@@ -1,3 +1,4 @@
+
 'use client';
 
 import React, { useState, useCallback } from 'react';
@@ -19,8 +20,8 @@ import 'jspdf-autotable';
 
 
 // Local interfaces for Firestore data structures
-interface EmployeeFirestore { name: string; position: string; salary: number; description?: string; profilePictureUrl?: string; associatedFileName?: string; associatedFileUrl?: string; createdAt: Timestamp; updatedAt?: Timestamp; }
-interface ExpenseFirestore { date: Timestamp; amount: number; category: string; vendor?: string; description?: string; }
+interface EmployeeFirestore { name: string; position: string; salary: number; description?: string; profilePictureUrl?: string; associatedFileName?: string; associatedFileUrl?: string; addedBy?: string; createdAt: Timestamp; updatedAt?: Timestamp; }
+interface ExpenseFirestore { date: Timestamp; amount: number; category: string; vendor?: string; description?: string; addedBy?: string; }
 interface InvoiceItem { id: string; description: string; quantity: number; unitPrice: number; }
 interface InvoiceFirestore { invoiceNumber: string; clientName: string; clientEmail?: string; amount: number; subtotal: number; discountAmount: number; taxAmount: number; issuedDate: Timestamp; dueDate: Timestamp; status: string; notes?: string; items?: InvoiceItem[]; }
 interface RevenueEntryFirestore { date: Timestamp; amount: number; source: string; description?: string; }
@@ -255,7 +256,7 @@ export default function ReportsPage() {
             (exportFormat) => handleExport(
                 exportFormat,
                 'Employees', 'employees', employeeFromDate, employeeToDate, 'createdAt',
-                ['ID', 'Name', 'Position', 'Salary', 'Description', 'Profile Picture URL', 'Associated File Name', 'Associated File URL', 'Created At', 'Updated At'],
+                ['ID', 'Name', 'Position', 'Salary', 'Description', 'Added By', 'Profile Picture URL', 'Associated File Name', 'Associated File URL', 'Created At', 'Updated At'],
                 (doc) => {
                     const data = doc.data() as EmployeeFirestore;
                     return {
@@ -264,6 +265,7 @@ export default function ReportsPage() {
                         'Position': data.position, 
                         'Salary': data.salary,
                         'Description': data.description || '', 
+                        'Added By': data.addedBy || 'N/A',
                         'Profile Picture URL': data.profilePictureUrl || '',
                         'Associated File Name': data.associatedFileName || '', 
                         'Associated File URL': data.associatedFileUrl || '',
@@ -287,12 +289,16 @@ export default function ReportsPage() {
             (exportFormat) => handleExport(
                 exportFormat,
                 'Expenses', 'expenses', expenseFromDate, expenseToDate, 'date',
-                ['Date', 'Amount', 'Category', 'Vendor', 'Description'],
+                ['Date', 'Amount', 'Category', 'Vendor', 'Description', 'Added By'],
                 (doc) => {
                     const data = doc.data() as ExpenseFirestore;
                     return {
-                        'Date': format(data.date.toDate(), 'yyyy-MM-dd'), 'Amount': data.amount.toFixed(2),
-                        'Category': data.category, 'Vendor': data.vendor || '', 'Description': data.description || '',
+                        'Date': format(data.date.toDate(), 'yyyy-MM-dd'), 
+                        'Amount': data.amount.toFixed(2),
+                        'Category': data.category, 
+                        'Vendor': data.vendor || '', 
+                        'Description': data.description || '',
+                        'Added By': data.addedBy || 'N/A',
                     };
                 },
                 setIsExportingExpenses

@@ -60,12 +60,14 @@ interface EmployeeFirestore {
   associatedFileUrl?: string;
   associatedFileName?: string;
   associatedFileStoragePath?: string;
+  addedById: string;
+  addedBy: string;
   companyId: string;
   createdAt: Timestamp;
   updatedAt?: Timestamp;
 }
 
-interface EmployeeDisplay extends Omit<EmployeeFirestore, 'createdAt' | 'updatedAt' | 'companyId'> {
+interface EmployeeDisplay extends Omit<EmployeeFirestore, 'createdAt' | 'updatedAt' | 'companyId' | 'addedById'> {
   id: string;
   createdAt: Date;
 }
@@ -223,6 +225,7 @@ export default function EmployeesPage() {
           associatedFileUrl: data.associatedFileUrl,
           associatedFileName: data.associatedFileName,
           associatedFileStoragePath: data.associatedFileStoragePath,
+          addedBy: data.addedBy || 'N/A',
           createdAt: data.createdAt.toDate(),
         };
       });
@@ -336,7 +339,12 @@ export default function EmployeesPage() {
             toast({ title: "Employee Updated" });
         } else {
             const newEmployeeRef = doc(db, 'employees', employeeDocId);
-            await setDoc(newEmployeeRef, { ...dataToSave, createdAt: serverTimestamp() });
+            await setDoc(newEmployeeRef, { 
+                ...dataToSave, 
+                createdAt: serverTimestamp(),
+                addedById: user.uid,
+                addedBy: user.displayName || user.email || 'System'
+            });
             toast({ title: "Employee Added" });
         }
     
@@ -662,6 +670,7 @@ export default function EmployeesPage() {
             <TableHead>Name</TableHead>
             <TableHead>Position</TableHead>
             <TableHead>Description</TableHead>
+            <TableHead>Added By</TableHead>
             <TableHead className="text-right">Salary</TableHead>
             <TableHead>File</TableHead>
             <TableHead className="text-right w-[100px]">Actions</TableHead>
@@ -675,6 +684,7 @@ export default function EmployeesPage() {
                 <TableCell><Skeleton className="h-4 w-3/4" /></TableCell>
                 <TableCell><Skeleton className="h-4 w-1/2" /></TableCell>
                 <TableCell><Skeleton className="h-4 w-3/4" /></TableCell>
+                <TableCell><Skeleton className="h-4 w-1/2" /></TableCell>
                 <TableCell className="text-right"><Skeleton className="h-4 w-1/4 ml-auto" /></TableCell>
                 <TableCell><Skeleton className="h-4 w-1/2" /></TableCell>
                 <TableCell className="text-right"><Skeleton className="h-8 w-8 ml-auto" /></TableCell>
@@ -692,6 +702,7 @@ export default function EmployeesPage() {
                   <TableCell className="font-medium">Roshan Kumar</TableCell>
                   <TableCell>Super Admin</TableCell>
                   <TableCell>N/A</TableCell>
+                  <TableCell>System</TableCell>
                   <TableCell className="text-right">N/A</TableCell>
                   <TableCell>
                       <span className="text-sm text-muted-foreground">System</span>
@@ -715,6 +726,7 @@ export default function EmployeesPage() {
               <TableCell className="max-w-[200px] truncate text-sm text-muted-foreground" title={employee.description}>
                 {employee.description || '-'}
               </TableCell>
+              <TableCell>{employee.addedBy}</TableCell>
               <TableCell className="text-right">{currency}{employee.salary.toLocaleString()}</TableCell>
               <TableCell>
                 {employee.associatedFileUrl && employee.associatedFileName ? (
