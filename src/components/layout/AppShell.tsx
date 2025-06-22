@@ -44,8 +44,6 @@ const AppShellLayout = ({ children }: { children: React.ReactNode }) => {
   const handleNavigationClick = () => {
     if (isMobile) {
       setOpenMobile(false);
-    } else if (open) {
-      setOpen(false);
     }
   };
 
@@ -55,6 +53,9 @@ const AppShellLayout = ({ children }: { children: React.ReactNode }) => {
     return NAV_ITEMS.filter(item => {
       if (item.href === '/admin') {
         return user?.role === 'admin';
+      }
+      if (item.href === '/company-details') {
+        return false; // Always hide from main nav now
       }
       return true;
     });
@@ -96,7 +97,9 @@ const AppShellLayout = ({ children }: { children: React.ReactNode }) => {
                     <DropdownMenuTrigger asChild>
                         <button className="flex items-center justify-start w-full gap-2 p-2 rounded-md hover:bg-sidebar-accent transition-colors group-data-[collapsible=icon]:w-10 group-data-[collapsible=icon]:h-10 group-data-[collapsible=icon]:p-0 group-data-[collapsible=icon]:justify-center">
                             <Avatar className="h-9 w-9">
-                                <AvatarFallback>{getInitials(user.displayName)}</AvatarFallback>
+                                <AvatarFallback className="bg-white text-black font-semibold">
+                                    {getInitials(user.displayName)}
+                                </AvatarFallback>
                             </Avatar>
                             <div className="text-left group-data-[collapsible=icon]:hidden">
                                 <p className="text-sm font-medium text-sidebar-foreground">{user.displayName}</p>
@@ -153,7 +156,7 @@ const AppShellLayout = ({ children }: { children: React.ReactNode }) => {
 
 const AppShell = ({ children }: { children: React.ReactNode }) => {
   return (
-    <SidebarProvider defaultOpen={false}>
+    <SidebarProvider defaultOpen>
       <AppShellLayout>{children}</AppShellLayout>
     </SidebarProvider>
   );
