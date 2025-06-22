@@ -27,7 +27,7 @@ import { cn } from '@/lib/utils';
 
 const AppShellLayout = ({ children }: { children: React.ReactNode }) => {
   const pathname = usePathname();
-  const { isMobile, setOpenMobile, open, setOpen } = useSidebar();
+  const { isMobile, setOpenMobile, setOpen } = useSidebar();
   const { user, signOut, isLoading: authLoading } = useAuth(); 
   
   const getInitials = (name?: string | null) => {
@@ -44,6 +44,8 @@ const AppShellLayout = ({ children }: { children: React.ReactNode }) => {
   const handleNavigationClick = () => {
     if (isMobile) {
       setOpenMobile(false);
+    } else {
+      setOpen(false);
     }
   };
 
