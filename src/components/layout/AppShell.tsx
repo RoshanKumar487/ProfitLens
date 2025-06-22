@@ -20,7 +20,7 @@ import { NAV_ITEMS } from '@/lib/constants';
 import { Separator } from '@/components/ui/separator';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
-import { LogOut, Loader2, Wallet } from 'lucide-react';
+import { LogOut, Loader2, Wallet, Building } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { cn } from '@/lib/utils';
 
@@ -85,7 +85,7 @@ const AppShellLayout = ({ children }: { children: React.ReactNode }) => {
                     <DropdownMenuTrigger asChild>
                         <button className="flex items-center w-full gap-2 p-2 rounded-md hover:bg-sidebar-accent transition-colors">
                             <Avatar className="h-9 w-9">
-                                <AvatarImage src={user.email === 'roshankumar70975@gmail.com' ? '/roshan.jpeg' : `https://placehold.co/40x40.png`} data-ai-hint="person portrait" />
+                                <AvatarImage src={`https://placehold.co/40x40.png`} data-ai-hint="person portrait" />
                                 <AvatarFallback>{getInitials(user.displayName)}</AvatarFallback>
                             </Avatar>
                             <div className="text-left group-data-[collapsible=icon]:hidden">
@@ -102,7 +102,14 @@ const AppShellLayout = ({ children }: { children: React.ReactNode }) => {
                           </div>
                         </DropdownMenuLabel>
                         <DropdownMenuSeparator />
-                        <DropdownMenuItem onClick={signOut} className="text-destructive focus:text-destructive">
+                        <DropdownMenuItem asChild>
+                            <Link href="/company-details" className="cursor-pointer">
+                                <Building className="mr-2 h-4 w-4" />
+                                <span>Company Details</span>
+                            </Link>
+                        </DropdownMenuItem>
+                        <DropdownMenuSeparator />
+                        <DropdownMenuItem onClick={signOut} className="text-destructive focus:text-destructive cursor-pointer">
                           <LogOut className="mr-2 h-4 w-4" /> Sign Out
                         </DropdownMenuItem>
                   </DropdownMenuContent>

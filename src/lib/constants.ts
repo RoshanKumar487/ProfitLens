@@ -49,11 +49,6 @@ export const NAV_ITEMS: NavItem[] = [
     icon: FileBarChart,
   },
   {
-    label: 'Company Details',
-    href: '/company-details',
-    icon: Building,
-  },
-  {
     label: 'Administration',
     href: '/admin',
     icon: Shield,
