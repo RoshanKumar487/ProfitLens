@@ -1,4 +1,3 @@
-
 'use client';
 
 import React from 'react';
@@ -10,7 +9,7 @@ import { HelpCircle, LayoutDashboard, Receipt, Banknote, Users, Sparkles, FileBa
 
 export default function GuidePage() {
   return (
-    <div className="space-y-8">
+    <div className="space-y-8 p-4 sm:p-6 lg:p-8">
       <PageTitle title="User Guide" subtitle="Your complete guide to mastering ProfitLens." icon={HelpCircle} />
 
       <Card>

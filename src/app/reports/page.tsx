@@ -1,4 +1,3 @@
-
 'use client';
 
 import React, { useState, useCallback } from 'react';
@@ -137,7 +136,7 @@ export default function ReportsPage() {
 
   if (authIsLoading) {
     return (
-      <div className="flex justify-center items-center h-64">
+      <div className="flex justify-center items-center h-64 p-4 sm:p-6 lg:p-8">
         <Loader2 className="h-12 w-12 animate-spin text-primary" />
         <p className="ml-2">Loading authentication...</p>
       </div>
@@ -146,7 +145,7 @@ export default function ReportsPage() {
 
   if (!user && !authIsLoading) {
      return (
-      <div className="space-y-6">
+      <div className="space-y-6 p-4 sm:p-6 lg:p-8">
         <PageTitle title="Reports" subtitle="Export your business data." icon={FileBarChart} />
         <Card className="shadow-lg">
           <CardHeader><CardTitle>Access Denied</CardTitle></CardHeader>
@@ -241,7 +240,7 @@ export default function ReportsPage() {
   }
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 p-4 sm:p-6 lg:p-8">
       <PageTitle title="Reports" subtitle="Export your business data to CSV or PDF." icon={FileBarChart} />
       <div className="grid gap-6 md:grid-cols-1 lg:grid-cols-2">
         {renderReportCard(

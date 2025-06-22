@@ -1,4 +1,3 @@
-
 'use client';
 
 import React, { useState } from 'react';
@@ -129,7 +128,7 @@ export default function ExpenseAnalyzerPage() {
 
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 p-4 sm:p-6 lg:p-8">
       <PageTitle title="Expense Analyzer" subtitle="AI-powered insights to reduce your business expenses." icon={Sparkles} />
 
       <div className="grid gap-6 md:grid-cols-2">
@@ -293,5 +292,3 @@ export default function ExpenseAnalyzerPage() {
     </div>
   );
 }
-
-    

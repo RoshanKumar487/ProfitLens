@@ -1,4 +1,3 @@
-
 'use client';
 
 import React, { useState, useEffect, FormEvent, useCallback, useMemo } from 'react';
@@ -239,7 +238,7 @@ export default function RecordExpensesPage() {
 
   if (authIsLoading) {
     return (
-      <div className="flex justify-center items-center h-64">
+      <div className="flex justify-center items-center h-64 p-4 sm:p-6 lg:p-8">
         <Loader2 className="h-12 w-12 animate-spin text-primary" />
          <p className="ml-2">Loading authentication...</p>
       </div>
@@ -248,7 +247,7 @@ export default function RecordExpensesPage() {
 
   if (!user && !authIsLoading) {
      return (
-      <div className="space-y-6">
+      <div className="space-y-6 p-4 sm:p-6 lg:p-8">
         <PageTitle title="Record Expenses" subtitle="Log your business expenditures." icon={TrendingDown} />
         <Card className="shadow-lg">
           <CardHeader><CardTitle>Access Denied</CardTitle></CardHeader>
@@ -260,7 +259,7 @@ export default function RecordExpensesPage() {
 
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 p-4 sm:p-6 lg:p-8">
       <PageTitle title="Record Expenses" subtitle="Log your business expenditures." icon={TrendingDown} />
       <div className="grid gap-6 md:grid-cols-2">
         <Card className="shadow-lg">

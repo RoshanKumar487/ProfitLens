@@ -1,4 +1,3 @@
-
 'use client';
 
 import React, { useMemo } from 'react';
@@ -79,7 +78,7 @@ const AppShellLayout = ({ children }: { children: React.ReactNode }) => {
               ))}
             </SidebarMenu>
           </SidebarContent>
-          <SidebarFooter className="p-4 mt-auto border-t border-sidebar-border flex flex-col gap-2 items-center group-data-[collapsible=icon]:items-start">
+          <SidebarFooter className="p-4 mt-auto border-t border-sidebar-border flex flex-col gap-2 items-stretch group-data-[collapsible=icon]:items-center">
              {user && (
                 <DropdownMenu>
                     <DropdownMenuTrigger asChild>

@@ -228,7 +228,7 @@ export default function BankAccountsPage() {
 
   if (!user) {
     return (
-      <div>
+      <div className="p-4 sm:p-6 lg:p-8">
         <PageTitle title="Bank Accounts" icon={Banknote} />
         <Card><CardHeader><CardTitle>Access Denied</CardTitle><CardContent><p>Please sign in to manage bank accounts.</p></CardContent></CardHeader></Card>
       </div>
@@ -236,7 +236,7 @@ export default function BankAccountsPage() {
   }
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 p-4 sm:p-6 lg:p-8">
       <PageTitle title="Bank Accounts" subtitle="Manage your accounts and track transactions." icon={Banknote}>
         <Button onClick={() => handleOpenAccountDialog()}>
           <PlusCircle className="mr-2 h-4 w-4" /> Add Account

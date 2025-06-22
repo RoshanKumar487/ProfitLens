@@ -170,9 +170,9 @@ export default function CompanyDetailsPage() {
 
   if (isFetching || authIsLoading) {
     return (
-      <div className="space-y-6">
+      <div className="space-y-6 p-4 sm:p-6 lg:p-8">
         <PageTitle title="Company Details" subtitle="Manage your business information." icon={Building} />
-        <Card className="shadow-lg max-w-2xl mx-auto">
+        <Card className="max-w-2xl mx-auto">
           <CardHeader>
             <CardTitle className="font-headline">Business Information</CardTitle>
             <CardDescription>Loading company details...</CardDescription>
@@ -193,9 +193,9 @@ export default function CompanyDetailsPage() {
 
   if (!user && !authIsLoading) {
     return (
-       <div className="space-y-6">
+       <div className="space-y-6 p-4 sm:p-6 lg:p-8">
         <PageTitle title="Company Details" subtitle="Manage your business information." icon={Building} />
-        <Card className="shadow-lg max-w-2xl mx-auto">
+        <Card className="max-w-2xl mx-auto">
           <CardHeader>
             <CardTitle className="font-headline">Access Denied</CardTitle>
           </CardHeader>
@@ -209,10 +209,10 @@ export default function CompanyDetailsPage() {
 
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 p-4 sm:p-6 lg:p-8">
       <PageTitle title="Company Details" subtitle="Manage your business information." icon={Building} />
 
-      <Card className="shadow-lg max-w-2xl mx-auto">
+      <Card className="max-w-2xl mx-auto">
         <CardHeader>
           <CardTitle className="font-headline">Business Information</CardTitle>
           <CardDescription>Update your company's official details. This information may be used in invoices or other documents.</CardDescription>

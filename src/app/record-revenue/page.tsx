@@ -1,4 +1,3 @@
-
 'use client';
 
 import React, { useState, useEffect, FormEvent, useCallback, useMemo } from 'react';
@@ -209,12 +208,12 @@ export default function RecordRevenuePage() {
 
 
   if (authIsLoading) {
-    return <div className="flex justify-center items-center h-64"><Loader2 className="h-12 w-12 animate-spin text-primary" /><p className="ml-2">Loading authentication...</p></div>;
+    return <div className="flex justify-center items-center h-64 p-4 sm:p-6 lg:p-8"><Loader2 className="h-12 w-12 animate-spin text-primary" /><p className="ml-2">Loading authentication...</p></div>;
   }
 
   if (!user && !authIsLoading) {
      return (
-      <div className="space-y-6">
+      <div className="space-y-6 p-4 sm:p-6 lg:p-8">
         <PageTitle title="Record Revenue" subtitle="Log your daily or transaction-based income." icon={TrendingUp} />
         <Card className="shadow-lg"><CardHeader><CardTitle>Access Denied</CardTitle></CardHeader><CardContent><p>Please sign in to record revenue.</p></CardContent></Card>
       </div>
@@ -222,7 +221,7 @@ export default function RecordRevenuePage() {
   }
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 p-4 sm:p-6 lg:p-8">
       <PageTitle title="Record Revenue" subtitle="Log your daily or transaction-based income." icon={TrendingUp} />
 
       <div className="grid gap-6 md:grid-cols-2">

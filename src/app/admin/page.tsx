@@ -1,4 +1,3 @@
-
 'use client';
 
 import React, { useState, useEffect, useCallback } from 'react';
@@ -96,7 +95,7 @@ export default function AdminPage() {
 
   if (authLoading || isLoading) {
     return (
-      <div className="flex justify-center items-center h-64">
+      <div className="flex justify-center items-center h-64 p-4 sm:p-6 lg:p-8">
         <Loader2 className="h-12 w-12 animate-spin text-primary" />
       </div>
     );
@@ -104,7 +103,7 @@ export default function AdminPage() {
 
   if (user?.role !== 'admin') {
     return (
-      <div>
+      <div className="p-4 sm:p-6 lg:p-8">
         <PageTitle title="Administration" icon={Shield} />
         <Card>
           <CardHeader>
@@ -133,7 +132,7 @@ export default function AdminPage() {
 
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 p-4 sm:p-6 lg:p-8">
       <PageTitle title="Administration" subtitle="Manage user access requests for your company." icon={Shield} />
       <Card>
         <CardHeader>
