@@ -75,17 +75,18 @@ const AppShellLayout = ({ children }: { children: React.ReactNode }) => {
             <SidebarMenu>
               {visibleNavItems.map((item) => (
                 <SidebarMenuItem key={item.label}>
-                  <Link href={item.href} onClick={handleNavigationClick}>
-                    <SidebarMenuButton
-                      isActive={pathname === item.href || (item.href !== '/' && pathname.startsWith(item.href))}
-                      tooltip={{ children: item.label, side: 'right', className: 'bg-card text-card-foreground' }}
-                      className="justify-start"
-                      disabled={authLoading} 
-                    >
+                  <SidebarMenuButton
+                    asChild
+                    isActive={pathname === item.href || (item.href !== '/' && pathname.startsWith(item.href))}
+                    tooltip={{ children: item.label, side: 'right', className: 'bg-card text-card-foreground' }}
+                    className="justify-start"
+                    disabled={authLoading} 
+                  >
+                    <Link href={item.href} onClick={handleNavigationClick}>
                       <item.icon className="h-5 w-5" />
                       <span className="group-data-[collapsible=icon]:hidden">{item.label}</span>
-                    </SidebarMenuButton>
-                  </Link>
+                    </Link>
+                  </SidebarMenuButton>
                 </SidebarMenuItem>
               ))}
             </SidebarMenu>
@@ -95,7 +96,7 @@ const AppShellLayout = ({ children }: { children: React.ReactNode }) => {
                 <DropdownMenu>
                     <DropdownMenuTrigger asChild>
                         <button className="flex items-center justify-center w-full gap-2 p-2 rounded-md hover:bg-sidebar-accent transition-colors group-data-[collapsible=icon]:w-10 group-data-[collapsible=icon]:h-10 group-data-[collapsible=icon]:p-0 group-data-[collapsible=icon]:justify-center">
-                            <Avatar className="h-9 w-9">
+                            <Avatar className="h-9 w-9 bg-white">
                                 <AvatarFallback className="bg-white text-black font-semibold">
                                     {getInitials(user.displayName)}
                                 </AvatarFallback>
