@@ -19,14 +19,18 @@ import {
 } from '@/components/ui/sidebar';
 import { NAV_ITEMS } from '@/lib/constants';
 import { Separator } from '@/components/ui/separator';
-import { Loader2 } from 'lucide-react';
+import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
+import { Building, LogOut, Loader2 } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { cn } from '@/lib/utils';
+import Image from 'next/image';
 
 const AppShellLayout = ({ children }: { children: React.ReactNode }) => {
   const pathname = usePathname();
   const { isMobile, setOpenMobile } = useSidebar();
-  const { user, isLoading: authLoading } = useAuth(); 
+  const { user, signOut, isLoading: authLoading } = useAuth(); 
+  const getInitials = (name?: string | null) => name ? name.split(' ').map(n => n[0]).join('').toUpperCase() : 'U';
 
   const handleNavigationClick = () => {
     if (isMobile) {
@@ -41,10 +45,6 @@ const AppShellLayout = ({ children }: { children: React.ReactNode }) => {
       if (item.href === '/admin') {
         return user?.role === 'admin';
       }
-      // Show all nav items for logged-in users, or only guide/dashboard for logged-out
-      if (!user && !['/', '/guide'].includes(item.href)) {
-         return false;
-      }
       return true;
     });
   }, [user]);
@@ -55,12 +55,8 @@ const AppShellLayout = ({ children }: { children: React.ReactNode }) => {
         <Sidebar collapsible="icon" variant="sidebar" className="border-r">
           <SidebarHeader className="p-4">
             <Link href="/" onClick={handleNavigationClick} className="flex items-center gap-2.5">
-               <svg role="img" aria-label="Dappr logo" className="h-7 w-7 text-white" viewBox="0 0 108 108" fill="none" xmlns="http://www.w3.org/2000/svg">
-                    <path d="M54 108C83.8233 108 108 83.8233 108 54C108 24.1767 83.8233 0 54 0C24.1767 0 0 24.1767 0 54C0 83.8233 24.1767 108 54 108Z" fill="white"/>
-                    <path d="M54 108C83.8233 108 108 83.8233 108 54C108 24.1767 83.8233 0 54 0C24.1767 0 0 24.1767 0 54C0 83.8233 24.1767 108 54 108Z" fill="white"/>
-                    <path d="M72.5859 54.1289C72.5859 64.082 64.1289 72.5859 54.1289 72.5859C44.1758 72.5859 35.6719 64.082 35.6719 54.1289C35.6719 44.1758 44.1758 35.6719 54.1289 35.6719C64.1289 35.6719 72.5859 44.1758 72.5859 54.1289Z" fill="black"/>
-                </svg>
-                <h1 className="text-2xl font-bold text-sidebar-foreground group-data-[collapsible=icon]:hidden">dappr</h1>
+               <Image src="/logo.svg" alt="ProfitLens Logo" width={32} height={32} />
+              <h1 className="text-2xl font-bold text-sidebar-foreground group-data-[collapsible=icon]:hidden">ProfitLens</h1>
             </Link>
           </SidebarHeader>
           <Separator className="bg-sidebar-border" />
@@ -84,7 +80,38 @@ const AppShellLayout = ({ children }: { children: React.ReactNode }) => {
             </SidebarMenu>
           </SidebarContent>
           <SidebarFooter className="p-4 mt-auto border-t border-sidebar-border flex flex-col gap-2 items-center group-data-[collapsible=icon]:items-start">
-             <p className="text-xs text-muted-foreground group-data-[collapsible=icon]:hidden">© {new Date().getFullYear()} ProfitLens</p>
+             {user && (
+                <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                        <button className="flex items-center w-full gap-2 p-2 rounded-md hover:bg-sidebar-accent transition-colors">
+                            <Avatar className="h-9 w-9">
+                                <AvatarImage src={user.email === 'roshankumar70975@gmail.com' ? '/roshan.jpeg' : `https://placehold.co/40x40.png`} data-ai-hint="person portrait" />
+                                <AvatarFallback>{getInitials(user.displayName)}</AvatarFallback>
+                            </Avatar>
+                            <div className="text-left group-data-[collapsible=icon]:hidden">
+                                <p className="text-sm font-medium text-sidebar-foreground">{user.displayName}</p>
+                                <p className="text-xs text-sidebar-foreground/70">{user.email}</p>
+                            </div>
+                        </button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent className="w-56 mb-2 ml-2" align="end" forceMount>
+                        <DropdownMenuLabel className="font-normal">
+                          <div className="flex flex-col space-y-1">
+                            <p className="text-sm font-medium leading-none">{user.displayName}</p>
+                            <p className="text-xs leading-none text-muted-foreground">{user.email}</p>
+                          </div>
+                        </DropdownMenuLabel>
+                        <DropdownMenuSeparator />
+                        <DropdownMenuItem asChild>
+                            <Link href="/company-details"><Building className="mr-2 h-4 w-4" />Company Details</Link>
+                        </DropdownMenuItem>
+                        <DropdownMenuSeparator />
+                        <DropdownMenuItem onClick={signOut} className="text-destructive focus:text-destructive">
+                          <LogOut className="mr-2 h-4 w-4" /> Sign Out
+                        </DropdownMenuItem>
+                  </DropdownMenuContent>
+                </DropdownMenu>
+              )}
           </SidebarFooter>
         </Sidebar>
       )}
@@ -94,12 +121,8 @@ const AppShellLayout = ({ children }: { children: React.ReactNode }) => {
            <header className="sticky top-0 z-10 flex h-14 items-center gap-4 border-b bg-background/80 px-4 backdrop-blur-sm sm:h-16 sm:px-6 md:hidden">
               <SidebarTrigger variant="outline" size="icon" />
               <Link href="/" onClick={handleNavigationClick} className="flex items-center gap-2 md:hidden">
-                  <svg role="img" aria-label="Dappr logo" className="h-6 w-6 text-black" viewBox="0 0 108 108" fill="none" xmlns="http://www.w3.org/2000/svg">
-                        <path d="M54 108C83.8233 108 108 83.8233 108 54C108 24.1767 83.8233 0 54 0C24.1767 0 0 24.1767 0 54C0 83.8233 24.1767 108 54 108Z" fill="black"/>
-                        <path d="M54 108C83.8233 108 108 83.8233 108 54C108 24.1767 83.8233 0 54 0C24.1767 0 0 24.1767 0 54C0 83.8233 24.1767 108 54 108Z" fill="black"/>
-                        <path d="M72.5859 54.1289C72.5859 64.082 64.1289 72.5859 54.1289 72.5859C44.1758 72.5859 35.6719 64.082 35.6719 54.1289C35.6719 44.1758 44.1758 35.6719 54.1289 35.6719C64.1289 35.6719 72.5859 44.1758 72.5859 54.1289Z" fill="white"/>
-                  </svg>
-                  <span className="font-bold text-lg text-foreground">dappr</span>
+                  <Image src="/logo.svg" alt="ProfitLens Logo" width={24} height={24} />
+                  <span className="font-bold text-lg text-foreground">ProfitLens</span>
               </Link>
           </header>
         )}
@@ -117,7 +140,7 @@ const AppShellLayout = ({ children }: { children: React.ReactNode }) => {
 
 const AppShell = ({ children }: { children: React.ReactNode }) => {
   return (
-    <SidebarProvider defaultOpen={false}>
+    <SidebarProvider defaultOpen={true}>
       <AppShellLayout>{children}</AppShellLayout>
     </SidebarProvider>
   );

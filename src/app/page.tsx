@@ -1,266 +1,259 @@
 
 'use client';
 
-import React from 'react';
-import type { LucideIcon } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
-import { ResponsiveContainer, LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip } from 'recharts';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
-import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
-import { Progress } from '@/components/ui/progress';
-import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator } from '@/components/ui/dropdown-menu';
-import {
-  Landmark, CreditCard, Clock, Users, MoreVertical, ArrowUp, ArrowDown, Calendar, Bell, HelpCircle, LogOut, Building, CheckCircle, Edit, FileText
-} from 'lucide-react';
-import { cn } from '@/lib/utils';
-import Link from 'next/link';
+import { db } from '@/lib/firebaseConfig';
+import { collection, query, where, getDocs, orderBy, limit, Timestamp } from 'firebase/firestore';
+import { format, subMonths } from 'date-fns';
+import { ResponsiveContainer, BarChart, Bar, XAxis, YAxis, Tooltip, Legend } from 'recharts';
 
-// Inline Components for the new dashboard
+import PageTitle from '@/components/PageTitle';
+import DataCard from '@/components/DataCard';
+import TransactionPieChart from '@/components/dashboard/TransactionPieChart';
+import HelpfulTipsCard from '@/components/dashboard/HelpfulTipsCard';
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow, TableCaption } from '@/components/ui/table';
+import { Skeleton } from '@/components/ui/skeleton';
+import { Badge } from '@/components/ui/badge';
+import { TrendingUp, TrendingDown, Users, Wallet, LayoutDashboard } from 'lucide-react';
 
-// Top-right header section
-const DashboardHeader = () => {
-  const { user, signOut } = useAuth();
-  const getInitials = (name?: string | null) => name ? name.split(' ').map(n => n[0]).join('').toUpperCase() : 'U';
+interface FinancialData {
+  totalRevenue: number;
+  totalExpenses: number;
+  netProfit: number;
+  employeeCount: number;
+}
+
+interface MonthlyData {
+  month: string;
+  revenue: number;
+  expenses: number;
+}
+
+interface RecentActivity {
+  id: string;
+  type: 'invoice' | 'expense';
+  description: string;
+  amount: number;
+  date: Date;
+  status?: string;
+}
+
+export default function DashboardPage() {
+  const { user, currencySymbol, isLoading: authIsLoading } = useAuth();
+  const [financialData, setFinancialData] = useState<FinancialData | null>(null);
+  const [monthlyChartData, setMonthlyChartData] = useState<MonthlyData[]>([]);
+  const [recentActivity, setRecentActivity] = useState<RecentActivity[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+
+  useEffect(() => {
+    if (!user || !user.companyId) {
+      setIsLoading(false);
+      return;
+    }
+
+    const fetchData = async () => {
+      setIsLoading(true);
+      const companyId = user.companyId;
+
+      try {
+        // Fetch financial data
+        const revenueQuery = query(collection(db, 'revenueEntries'), where('companyId', '==', companyId));
+        const expensesQuery = query(collection(db, 'expenses'), where('companyId', '==', companyId));
+        const employeesQuery = query(collection(db, 'employees'), where('companyId', '==', companyId));
+        const invoicesQuery = query(collection(db, 'invoices'), where('companyId', '==', companyId), orderBy('issuedDate', 'desc'), limit(3));
+        const recentExpensesQuery = query(collection(db, 'expenses'), where('companyId', '==', companyId), orderBy('date', 'desc'), limit(3));
+
+        const [revenueSnapshot, expensesSnapshot, employeesSnapshot, invoicesSnapshot, recentExpensesSnapshot] = await Promise.all([
+          getDocs(revenueQuery),
+          getDocs(expensesQuery),
+          getDocs(employeesQuery),
+          getDocs(invoicesSnapshot),
+          getDocs(recentExpensesSnapshot),
+        ]);
+
+        let totalRevenue = 0;
+        const revenueByMonth: { [key: string]: number } = {};
+        revenueSnapshot.forEach(doc => {
+          const data = doc.data();
+          totalRevenue += data.amount;
+          const month = format(data.date.toDate(), 'MMM yyyy');
+          revenueByMonth[month] = (revenueByMonth[month] || 0) + data.amount;
+        });
+
+        let totalExpenses = 0;
+        const expensesByMonth: { [key: string]: number } = {};
+        expensesSnapshot.forEach(doc => {
+          const data = doc.data();
+          totalExpenses += data.amount;
+          const month = format(data.date.toDate(), 'MMM yyyy');
+          expensesByMonth[month] = (expensesByMonth[month] || 0) + data.amount;
+        });
+
+        const employeeCount = employeesSnapshot.size;
+        const netProfit = totalRevenue - totalExpenses;
+
+        setFinancialData({ totalRevenue, totalExpenses, netProfit, employeeCount });
+
+        // Prepare chart data for the last 6 months
+        const months = Array.from({ length: 6 }, (_, i) => format(subMonths(new Date(), i), 'MMM yyyy')).reverse();
+        const chartData = months.map(month => ({
+          month,
+          revenue: revenueByMonth[month] || 0,
+          expenses: expensesByMonth[month] || 0,
+        }));
+        setMonthlyChartData(chartData);
+        
+        // Prepare recent activity feed
+        const invoiceActivities = invoicesSnapshot.docs.map(doc => ({
+          id: doc.id,
+          type: 'invoice' as const,
+          description: `Invoice #${doc.data().invoiceNumber} to ${doc.data().clientName}`,
+          amount: doc.data().amount,
+          date: (doc.data().issuedDate as Timestamp).toDate(),
+          status: doc.data().status
+        }));
+        const expenseActivities = recentExpensesSnapshot.docs.map(doc => ({
+            id: doc.id,
+            type: 'expense' as const,
+            description: doc.data().description || doc.data().category,
+            amount: doc.data().amount,
+            date: (doc.data().date as Timestamp).toDate(),
+            status: 'Expense'
+        }));
+        
+        const combinedActivities = [...invoiceActivities, ...expenseActivities]
+            .sort((a, b) => b.date.getTime() - a.date.getTime())
+            .slice(0, 5);
+
+        setRecentActivity(combinedActivities);
+
+      } catch (error) {
+        console.error("Error fetching dashboard data:", error);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    fetchData();
+  }, [user]);
+
+  const getStatusBadgeVariant = (status?: string) => {
+    switch (status) {
+      case 'Paid':
+        return 'bg-green-100 text-green-800 border-green-200';
+      case 'Pending':
+        return 'bg-yellow-100 text-yellow-800 border-yellow-200';
+      case 'Overdue':
+        return 'bg-red-100 text-red-800 border-red-200';
+      case 'Expense':
+        return 'bg-blue-100 text-blue-800 border-blue-200';
+      default:
+        return 'bg-gray-100 text-gray-800 border-gray-200';
+    }
+  };
+
+
+  if (authIsLoading || (isLoading && !financialData)) {
+    return (
+      <div className="p-4 sm:p-6 lg:p-8">
+        <PageTitle title="Dashboard" icon={LayoutDashboard} />
+        <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-4">
+          <Skeleton className="h-[126px]" />
+          <Skeleton className="h-[126px]" />
+          <Skeleton className="h-[126px]" />
+          <Skeleton className="h-[126px]" />
+        </div>
+        <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3 mt-6">
+            <Skeleton className="lg:col-span-2 h-[450px]" />
+            <Skeleton className="lg:col-span-1 h-[450px]" />
+        </div>
+      </div>
+    );
+  }
 
   return (
-    <div className="flex flex-wrap justify-between items-center mb-6 gap-4">
-      <div>
-        <h1 className="text-3xl font-bold text-gray-800 dark:text-gray-100">Good morning, {user?.displayName?.split(' ')[0] || 'User'}!</h1>
+    <div className="p-4 sm:p-6 lg:p-8 space-y-6">
+      <PageTitle title="Dashboard" subtitle="An overview of your business's financial health." icon={LayoutDashboard} />
+
+      <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-4">
+        <DataCard title="Total Revenue" value={`${currencySymbol}${financialData?.totalRevenue.toLocaleString() || '0'}`} icon={TrendingUp} trend="up" trendValue="+20.1% from last month" />
+        <DataCard title="Total Expenses" value={`${currencySymbol}${financialData?.totalExpenses.toLocaleString() || '0'}`} icon={TrendingDown} trend="neutral" trendValue="+12% from last month" />
+        <DataCard title="Net Profit" value={`${currencySymbol}${financialData?.netProfit.toLocaleString() || '0'}`} icon={Wallet} trend="up" trendValue="+15% from last month" />
+        <DataCard title="Employees" value={`${financialData?.employeeCount.toLocaleString() || '0'}`} icon={Users} />
       </div>
-      <div className="flex items-center gap-2 sm:gap-4">
-        <Button variant="ghost" size="icon" className="text-gray-500 dark:text-gray-400 rounded-full">
-          <Calendar className="h-5 w-5" />
-        </Button>
-        <Button variant="ghost" size="icon" className="text-gray-500 dark:text-gray-400 rounded-full">
-          <Bell className="h-5 w-5" />
-        </Button>
-        <Button variant="ghost" size="icon" className="text-gray-500 dark:text-gray-400 rounded-full">
-          <HelpCircle className="h-5 w-5" />
-        </Button>
-        <DropdownMenu>
-          <DropdownMenuTrigger asChild>
-            <Button variant="ghost" className="relative h-10 w-10 rounded-full">
-              <Avatar className="h-10 w-10">
-                <AvatarImage src={`https://placehold.co/40x40.png`} data-ai-hint="person portrait" />
-                <AvatarFallback>{getInitials(user?.displayName)}</AvatarFallback>
-              </Avatar>
-            </Button>
-          </DropdownMenuTrigger>
-          <DropdownMenuContent className="w-56" align="end" forceMount>
-            <DropdownMenuLabel className="font-normal">
-              <div className="flex flex-col space-y-1">
-                <p className="text-sm font-medium leading-none">{user?.displayName}</p>
-                <p className="text-xs leading-none text-muted-foreground">{user?.email}</p>
-              </div>
-            </DropdownMenuLabel>
-            <DropdownMenuSeparator />
-            <DropdownMenuItem asChild>
-                <Link href="/company-details"><Building className="mr-2 h-4 w-4" />Company Details</Link>
-            </DropdownMenuItem>
-            <DropdownMenuSeparator />
-            <DropdownMenuItem onClick={signOut} className="text-destructive focus:text-destructive">
-              <LogOut className="mr-2 h-4 w-4" /> Sign Out
-            </DropdownMenuItem>
-          </DropdownMenuContent>
-        </DropdownMenu>
+
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        <Card className="lg:col-span-2 shadow-lg">
+          <CardHeader>
+            <CardTitle className="font-headline">Revenue vs Expenses</CardTitle>
+            <CardDescription>Monthly overview for the last 6 months.</CardDescription>
+          </CardHeader>
+          <CardContent className="h-[350px]">
+            <ResponsiveContainer width="100%" height="100%">
+              <BarChart data={monthlyChartData}>
+                <XAxis dataKey="month" stroke="#888888" fontSize={12} tickLine={false} axisLine={false} />
+                <YAxis stroke="#888888" fontSize={12} tickLine={false} axisLine={false} tickFormatter={(value) => `${currencySymbol}${value / 1000}k`} />
+                <Tooltip
+                    contentStyle={{
+                        backgroundColor: 'hsl(var(--background))',
+                        borderColor: 'hsl(var(--border))',
+                        borderRadius: 'var(--radius)',
+                    }}
+                    cursor={{ fill: 'hsl(var(--muted))' }}
+                />
+                <Legend iconType="circle" iconSize={10} />
+                <Bar dataKey="revenue" fill="hsl(var(--accent))" name="Revenue" radius={[4, 4, 0, 0]} />
+                <Bar dataKey="expenses" fill="hsl(var(--primary))" name="Expenses" radius={[4, 4, 0, 0]} />
+              </BarChart>
+            </ResponsiveContainer>
+          </CardContent>
+        </Card>
+
+        <TransactionPieChart />
       </div>
+
+       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+            <Card className="lg:col-span-2 shadow-lg">
+                <CardHeader>
+                    <CardTitle className="font-headline">Recent Activity</CardTitle>
+                    <CardDescription>Latest invoices and expenses recorded.</CardDescription>
+                </CardHeader>
+                <CardContent>
+                    <Table>
+                        <TableCaption>{recentActivity.length === 0 ? "No recent activity." : "A list of your most recent transactions."}</TableCaption>
+                        <TableHeader>
+                        <TableRow>
+                            <TableHead>Description</TableHead>
+                            <TableHead>Date</TableHead>
+                            <TableHead>Status</TableHead>
+                            <TableHead className="text-right">Amount</TableHead>
+                        </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                        {recentActivity.map((activity) => (
+                            <TableRow key={activity.id}>
+                            <TableCell className="font-medium">{activity.description}</TableCell>
+                            <TableCell>{format(activity.date, 'PP')}</TableCell>
+                            <TableCell>
+                                <Badge variant="outline" className={getStatusBadgeVariant(activity.status)}>
+                                    {activity.status}
+                                </Badge>
+                            </TableCell>
+                            <TableCell className={`text-right font-semibold ${activity.type === 'invoice' ? 'text-accent' : 'text-destructive'}`}>
+                                {activity.type === 'invoice' ? '+' : '-'}{currencySymbol}{activity.amount.toLocaleString(undefined, { minimumFractionDigits: 2 })}
+                            </TableCell>
+                            </TableRow>
+                        ))}
+                        </TableBody>
+                    </Table>
+                </CardContent>
+            </Card>
+
+            <HelpfulTipsCard />
+        </div>
+
     </div>
   );
-};
-
-// Stat Card for the top row
-const StatCard = ({ icon: Icon, title, value }: { icon: LucideIcon; title: string; value: string; }) => (
-  <Card className="rounded-2xl shadow-sm hover:shadow-md transition-shadow bg-card p-4">
-    <div className="flex justify-between items-start">
-        <div className="bg-primary/10 p-2 rounded-lg">
-            <Icon className="h-6 w-6 text-primary" />
-        </div>
-        <Button variant="ghost" size="icon" className="h-8 w-8 text-gray-400 -mr-2 -mt-2">
-            <MoreVertical className="h-4 w-4" />
-        </Button>
-    </div>
-    <div className='mt-4'>
-        <p className="text-sm text-gray-500 dark:text-gray-400">{title}</p>
-        <p className="text-2xl font-bold text-gray-800 dark:text-gray-100">{value}</p>
-    </div>
-  </Card>
-);
-
-// Small Stat Card for the left column
-const MiniStatCard = ({ title, value, change }: { title: string, value: string, change: string }) => (
-  <Card className="rounded-2xl shadow-sm p-4 h-full">
-    <p className="text-sm text-gray-500">{title}</p>
-    <div className="flex items-baseline gap-4 mt-1">
-      <p className="text-4xl font-bold">{value}</p>
-      <div className={cn("flex items-center text-xs font-semibold", change.startsWith('+') ? 'text-green-500' : 'text-red-500')}>
-        {change.startsWith('+') ? <ArrowUp className="h-3 w-3" /> : <ArrowDown className="h-3 w-3" />}
-        <span>{change.slice(1)}</span>
-      </div>
-    </div>
-  </Card>
-);
-
-// Revenue Chart
-const revenueData = [
-  { name: 'Feb 14', lastWeek: 15000, thisWeek: 16000 },
-  { name: 'Feb 15', lastWeek: 16500, thisWeek: 16259 },
-  { name: 'Feb 16', lastWeek: 14000, thisWeek: 12790 },
-  { name: 'Feb 17', lastWeek: 17000, thisWeek: 15500 },
-  { name: 'Feb 18', lastWeek: 18000, thisWeek: 17000 },
-  { name: 'Feb 19', lastWeek: 16000, thisWeek: 18500 },
-  { name: 'Feb 20', lastWeek: 17500, thisWeek: 19000 },
-];
-const RevenueChart = () => (
-    <Card className="rounded-2xl shadow-sm h-full">
-        <CardHeader>
-            <div className="flex justify-between items-center">
-                <CardTitle className="font-semibold">Revenue</CardTitle>
-                <p className="text-xs text-gray-400">Last 7 days VS prior week</p>
-            </div>
-        </CardHeader>
-        <CardContent className="h-[250px]">
-            <ResponsiveContainer width="100%" height="100%">
-                <LineChart data={revenueData} margin={{ top: 5, right: 20, left: -20, bottom: 5 }}>
-                    <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="hsl(var(--border))"/>
-                    <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{ fontSize: 12, fill: 'hsl(var(--muted-foreground))' }} />
-                    <YAxis axisLine={false} tickLine={false} tick={{ fontSize: 12, fill: 'hsl(var(--muted-foreground))' }} tickFormatter={(value) => `${value / 1000}K`} />
-                    <Tooltip
-                        contentStyle={{
-                            backgroundColor: 'hsl(var(--card))',
-                            borderColor: 'hsl(var(--border))',
-                            borderRadius: 'var(--radius)',
-                            color: 'hsl(var(--card-foreground))'
-                        }}
-                        itemStyle={{
-                           color: 'hsl(var(--card-foreground))'
-                        }}
-                        labelStyle={{
-                           fontWeight: 'bold'
-                        }}
-                     />
-                    <Line type="monotone" dataKey="thisWeek" stroke="hsl(var(--chart-2))" strokeWidth={2} dot={false} name="This Week"/>
-                    <Line type="monotone" dataKey="lastWeek" stroke="hsl(var(--chart-1))" strokeWidth={2} dot={false} name="Last Week" />
-                </LineChart>
-            </ResponsiveContainer>
-        </CardContent>
-    </Card>
-);
-
-// Recent Emails
-const emails = [
-    { name: 'Hannah Morgan', subject: 'Meeting scheduled', time: '1:24 PM', avatar: 'https://placehold.co/40x40.png' },
-    { name: 'Megan Clark', subject: 'Update on marketing campaign', time: '12:32 PM', avatar: 'https://placehold.co/40x40.png' },
-    { name: 'Brandon Williams', subject: 'Designly 2.0 is about to launch', time: 'Yesterday', avatar: 'https://placehold.co/40x40.png' },
-    { name: 'Reid Smith', subject: 'My friend Julie loves Dappr!', time: 'Yesterday', avatar: 'https://placehold.co/40x40.png' },
-];
-const RecentEmails = () => (
-    <Card className="rounded-2xl shadow-sm">
-        <CardHeader><CardTitle>Recent Emails</CardTitle></CardHeader>
-        <CardContent>
-            <ul className="space-y-4">
-                {emails.map(email => (
-                    <li key={email.name} className="flex items-center gap-4">
-                        <Avatar className="h-10 w-10">
-                            <AvatarImage src={email.avatar} data-ai-hint="person portrait" />
-                            <AvatarFallback>{email.name.charAt(0)}</AvatarFallback>
-                        </Avatar>
-                        <div className="flex-grow">
-                            <p className="font-semibold">{email.name}</p>
-                            <p className="text-sm text-gray-500">{email.subject}</p>
-                        </div>
-                        <p className="text-xs text-gray-400">{email.time}</p>
-                    </li>
-                ))}
-            </ul>
-        </CardContent>
-    </Card>
-);
-
-// Right Sidebar Components
-const FormationStatus = () => (
-    <Card className="rounded-2xl bg-gray-900 text-white p-6">
-        <p className="font-semibold">Formation status</p>
-        <p className="text-sm text-gray-400 mt-2">In progress</p>
-        <Progress value={66} className="mt-4 h-2 bg-gray-700 [&>div]:bg-white" />
-        <div className="flex justify-between items-end mt-2">
-            <div>
-                <p className="text-sm text-gray-400">Estimated processing</p>
-                <p className="text-lg font-semibold">4-5 business days</p>
-            </div>
-            <Button variant="secondary" className="bg-white text-gray-900 hover:bg-gray-200 h-auto px-4 py-2">View status</Button>
-        </div>
-    </Card>
-);
-
-const todoItems = [
-    { icon: Edit, text: 'Run payroll', date: 'Mar 4 at 6:00 pm' },
-    { icon: Clock, text: 'Review time off request', date: 'Mar 7 at 6:00 pm' },
-    { icon: FileText, text: 'Sign board resolution', date: 'Mar 12 at 6:00 pm' },
-    { icon: Users, text: 'Finish onboarding Tony', date: 'Mar 12 at 6:00 pm' },
-];
-const TodoList = () => (
-    <div className="bg-card p-6 rounded-2xl shadow-sm">
-        <h3 className="font-semibold text-lg">Your to-Do list</h3>
-        <ul className="space-y-4 mt-4">
-            {todoItems.map((item, index) => (
-                <li key={index} className="flex items-center gap-4">
-                    <div className="bg-gray-100 dark:bg-gray-800 p-2 rounded-full">
-                        <item.icon className="h-5 w-5 text-gray-600 dark:text-gray-300" />
-                    </div>
-                    <div>
-                        <p className="font-medium">{item.text}</p>
-                        <p className="text-sm text-gray-500">{item.date}</p>
-                    </div>
-                </li>
-            ))}
-        </ul>
-    </div>
-);
-
-const BoardMeeting = () => (
-    <Card className="rounded-2xl bg-gray-900 text-white p-6">
-        <div className="flex items-center gap-2">
-            <CheckCircle className="h-4 w-4 text-green-400" />
-            <p className="font-semibold">Board meeting</p>
-        </div>
-        <p className="text-sm text-gray-400 mt-1">Feb 22 at 6:00 PM</p>
-        <p className="mt-4 text-gray-300">You have been invited to attend a meeting of the Board of Directors.</p>
-    </Card>
-);
-
-// Main Dashboard Page
-export default function DashboardPage() {
-    return (
-        <div className="p-4 sm:p-6 md:p-8">
-            <DashboardHeader />
-            <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
-                {/* Main content */}
-                <div className="xl:col-span-2 space-y-6">
-                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
-                        <StatCard icon={Landmark} title="Your bank balance" value="$143,624" />
-                        <StatCard icon={Clock} title="Uncategorized" value="12" />
-                        <StatCard icon={Users} title="Employees" value="7" />
-                        <StatCard icon={CreditCard} title="Card spending" value="$3,287.49" />
-                    </div>
-                    <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-                        <div className="lg:col-span-1 space-y-6">
-                            <MiniStatCard title="New clients" value="54" change="+18.7%" />
-                            <MiniStatCard title="Invoices overdue" value="6" change="+2.7%" />
-                        </div>
-                        <div className="lg:col-span-2">
-                           <RevenueChart />
-                        </div>
-                    </div>
-                    <RecentEmails />
-                </div>
-                {/* Right sidebar */}
-                <aside className="space-y-6">
-                    <FormationStatus />
-                    <TodoList />
-                    <BoardMeeting />
-                </aside>
-            </div>
-        </div>
-    );
 }
