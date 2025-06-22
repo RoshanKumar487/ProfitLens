@@ -1,3 +1,4 @@
+
 'use client';
 
 import React, { useMemo } from 'react';
@@ -55,7 +56,6 @@ const AppShellLayout = ({ children }: { children: React.ReactNode }) => {
         <Sidebar collapsible="icon" variant="sidebar" className="border-r">
           <SidebarHeader className="p-4">
             <Link href="/" onClick={handleNavigationClick} className="flex items-center gap-2.5">
-              <Wallet className="h-7 w-7 text-sidebar-primary group-data-[collapsible=icon]:h-8 group-data-[collapsible=icon]:w-8" />
               <h1 className="text-2xl font-bold text-sidebar-foreground group-data-[collapsible=icon]:hidden">ProfitLens</h1>
             </Link>
           </SidebarHeader>
@@ -83,7 +83,7 @@ const AppShellLayout = ({ children }: { children: React.ReactNode }) => {
              {user && (
                 <DropdownMenu>
                     <DropdownMenuTrigger asChild>
-                        <button className="flex items-center w-full gap-2 p-2 rounded-md hover:bg-sidebar-accent transition-colors">
+                        <button className="flex items-center justify-start w-full gap-2 p-2 rounded-md hover:bg-sidebar-accent transition-colors group-data-[collapsible=icon]:w-10 group-data-[collapsible=icon]:h-10 group-data-[collapsible=icon]:p-0 group-data-[collapsible=icon]:justify-center">
                             <Avatar className="h-9 w-9">
                                 <AvatarImage src={`https://placehold.co/40x40.png`} data-ai-hint="person portrait" />
                                 <AvatarFallback>{getInitials(user.displayName)}</AvatarFallback>
@@ -124,7 +124,6 @@ const AppShellLayout = ({ children }: { children: React.ReactNode }) => {
            <header className="sticky top-0 z-10 flex h-14 items-center gap-4 border-b bg-background/80 px-4 backdrop-blur-sm sm:h-16 sm:px-6 md:hidden">
               <SidebarTrigger variant="outline" size="icon" />
               <Link href="/" onClick={handleNavigationClick} className="flex items-center gap-2 md:hidden">
-                  <Wallet className="h-6 w-6 text-primary" />
                   <span className="font-bold text-lg text-foreground">ProfitLens</span>
               </Link>
           </header>
