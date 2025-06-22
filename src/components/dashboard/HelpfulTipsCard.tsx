@@ -3,7 +3,6 @@ import React from 'react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { HelpCircle, ArrowRight } from 'lucide-react';
-import Image from 'next/image';
 import Link from 'next/link';
 
 const HelpfulTipsCard = () => {
@@ -18,13 +17,13 @@ const HelpfulTipsCard = () => {
           Unsure how a feature works? Check out our detailed user guide for step-by-step instructions and tips on how to get the most out of ProfitLens.
         </p>
         <div className="aspect-video w-full relative rounded-lg overflow-hidden mb-4">
-         <Image 
-            src="https://placehold.co/600x338.png" 
-            alt="Business illustration" 
-            layout="fill"
-            objectFit="cover"
-            className="rounded-lg"
-            data-ai-hint="documentation guide"
+          <video
+            src="https://videos.pexels.com/video-files/853874/853874-hd_1280_720_25fps.mp4"
+            autoPlay
+            loop
+            muted
+            playsInline
+            className="absolute top-0 left-0 w-full h-full object-cover"
           />
         </div>
         <Button asChild className="w-full mt-auto">
