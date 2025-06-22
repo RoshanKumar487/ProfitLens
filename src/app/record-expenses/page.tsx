@@ -1,7 +1,7 @@
 
 'use client';
 
-import React, { useState, useEffect, FormEvent, useCallback } from 'react';
+import React, { useState, useEffect, FormEvent, useCallback, useMemo } from 'react';
 import PageTitle from '@/components/PageTitle';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -14,12 +14,12 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter, DialogClose } from "@/components/ui/dialog";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
-import { CalendarIcon, TrendingDown, Save, Loader2, MoreHorizontal, Edit, Trash2 } from 'lucide-react';
+import { CalendarIcon, TrendingDown, Save, Loader2, MoreHorizontal, Edit, Trash2, Search } from 'lucide-react';
 import { format } from 'date-fns';
 import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/contexts/AuthContext';
 import { db } from '@/lib/firebaseConfig';
-import { collection, addDoc, getDocs, query, where, orderBy, limit, Timestamp, serverTimestamp } from 'firebase/firestore';
+import { collection, addDoc, getDocs, query, where, orderBy, Timestamp, serverTimestamp } from 'firebase/firestore';
 import { updateExpenseEntry, deleteExpenseEntry, type ExpenseUpdateData } from './actions';
 
 const EXPENSE_CATEGORIES = [
@@ -73,6 +73,8 @@ export default function RecordExpensesPage() {
   const [isLoadingEntries, setIsLoadingEntries] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
   const { toast } = useToast();
+  
+  const [searchTerm, setSearchTerm] = useState<string>('');
 
   // State for editing and deleting
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
@@ -91,7 +93,7 @@ export default function RecordExpensesPage() {
     setIsLoadingEntries(true);
     try {
       const entriesRef = collection(db, 'expenses');
-      const q = query(entriesRef, where('companyId', '==', user.companyId), orderBy('date', 'desc'), limit(5));
+      const q = query(entriesRef, where('companyId', '==', user.companyId), orderBy('date', 'desc'));
       const querySnapshot = await getDocs(q);
       
       const fetchedEntries = querySnapshot.docs.map(docSnap => {
@@ -118,6 +120,18 @@ export default function RecordExpensesPage() {
   useEffect(() => {
     fetchExpenseEntries();
   }, [fetchExpenseEntries]);
+
+  const filteredEntries = useMemo(() => {
+    if (!searchTerm) {
+      return recentEntries;
+    }
+    const lowercasedTerm = searchTerm.toLowerCase();
+    return recentEntries.filter(entry => 
+      entry.category.toLowerCase().includes(lowercasedTerm) ||
+      (entry.vendor && entry.vendor.toLowerCase().includes(lowercasedTerm)) ||
+      (entry.description && entry.description.toLowerCase().includes(lowercasedTerm))
+    );
+  }, [recentEntries, searchTerm]);
 
   const handleNewEntrySubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -302,40 +316,59 @@ export default function RecordExpensesPage() {
 
         <Card className="shadow-lg">
           <CardHeader>
-            <CardTitle className="font-headline">Recent Expense Entries</CardTitle>
-            <CardDescription>Last 5 recorded expense entries.</CardDescription>
+            <div className="flex flex-col sm:flex-row items-center gap-2 justify-between">
+                <div className="flex-1">
+                    <CardTitle className="font-headline">Expense Entries</CardTitle>
+                    <CardDescription>A list of your recorded expense entries.</CardDescription>
+                </div>
+                <div className="relative w-full sm:w-auto">
+                    <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+                    <Input
+                    type="search"
+                    placeholder="Filter by category, vendor..."
+                    className="pl-8 sm:w-[200px] md:w-[250px]"
+                    value={searchTerm}
+                    onChange={(e) => setSearchTerm(e.target.value)}
+                    disabled={isLoadingEntries && recentEntries.length === 0}
+                    />
+                </div>
+            </div>
           </CardHeader>
           <CardContent className="space-y-3">
             {isLoadingEntries ? (
-               [...Array(3)].map((_, i) => (
+               [...Array(5)].map((_, i) => (
                 <div key={i} className="p-3 bg-muted/50 rounded-lg border border-border animate-pulse">
                   <div className="flex justify-between items-center"><div className="h-5 bg-muted rounded w-1/4"></div><div className="h-4 bg-muted rounded w-1/5"></div></div>
                   <div className="h-4 bg-muted rounded w-1/2 mt-1"></div><div className="h-3 bg-muted rounded w-3/4 mt-1"></div>
                 </div>
               ))
             ) : recentEntries.length > 0 ? (
-              recentEntries.map(entry => (
-                <div key={entry.id} className="group p-3 bg-muted/50 rounded-lg border border-border">
-                  <div className="flex justify-between items-start">
-                    <div>
-                        <div className="flex items-center gap-2">
-                           <span className="font-semibold text-foreground">{currency}{entry.amount.toFixed(2)}</span>
-                           <span className="text-xs text-muted-foreground">{format(entry.date, 'PP')}</span>
+                filteredEntries.length > 0 ? (
+                    filteredEntries.map(entry => (
+                        <div key={entry.id} className="group p-3 bg-muted/50 rounded-lg border border-border">
+                        <div className="flex justify-between items-start">
+                            <div>
+                                <div className="flex items-center gap-2">
+                                <span className="font-semibold text-foreground">{currency}{entry.amount.toFixed(2)}</span>
+                                <span className="text-xs text-muted-foreground">{format(entry.date, 'PP')}</span>
+                                </div>
+                                <p className="text-sm text-muted-foreground">{entry.category}{entry.vendor ? ` - ${entry.vendor}` : ''}</p>
+                            </div>
+                            <DropdownMenu>
+                            <DropdownMenuTrigger asChild><Button variant="ghost" size="icon" className="h-8 w-8 opacity-50 group-hover:opacity-100 transition-opacity"><MoreHorizontal className="h-4 w-4" /></Button></DropdownMenuTrigger>
+                            <DropdownMenuContent align="end">
+                                <DropdownMenuItem onClick={() => handleEditClick(entry)}><Edit className="mr-2 h-4 w-4"/>Edit</DropdownMenuItem>
+                                <DropdownMenuItem onClick={() => handleDeleteClick(entry.id)} className="text-destructive focus:text-destructive"><Trash2 className="mr-2 h-4 w-4"/>Delete</DropdownMenuItem>
+                            </DropdownMenuContent>
+                            </DropdownMenu>
                         </div>
-                        <p className="text-sm text-muted-foreground">{entry.category}{entry.vendor ? ` - ${entry.vendor}` : ''}</p>
-                    </div>
-                    <DropdownMenu>
-                      <DropdownMenuTrigger asChild><Button variant="ghost" size="icon" className="h-8 w-8 opacity-50 group-hover:opacity-100 transition-opacity"><MoreHorizontal className="h-4 w-4" /></Button></DropdownMenuTrigger>
-                      <DropdownMenuContent align="end">
-                        <DropdownMenuItem onClick={() => handleEditClick(entry)}><Edit className="mr-2 h-4 w-4"/>Edit</DropdownMenuItem>
-                        <DropdownMenuItem onClick={() => handleDeleteClick(entry.id)} className="text-destructive focus:text-destructive"><Trash2 className="mr-2 h-4 w-4"/>Delete</DropdownMenuItem>
-                      </DropdownMenuContent>
-                    </DropdownMenu>
-                  </div>
-                  {entry.description && <p className="text-xs text-muted-foreground mt-1">{entry.description}</p>}
-                  <p className="text-xs text-muted-foreground mt-1">Added by: <span className="font-medium">{entry.addedBy}</span></p>
-                </div>
-              ))
+                        {entry.description && <p className="text-xs text-muted-foreground mt-1">{entry.description}</p>}
+                        <p className="text-xs text-muted-foreground mt-1">Added by: <span className="font-medium">{entry.addedBy}</span></p>
+                        </div>
+                    ))
+                ) : (
+                    <p className="text-sm text-muted-foreground text-center py-4">No expenses match your search.</p>
+                )
             ) : (
               <p className="text-sm text-muted-foreground text-center py-4">No expenses recorded yet.</p>
             )}
