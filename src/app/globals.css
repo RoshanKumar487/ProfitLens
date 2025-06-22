@@ -65,11 +65,11 @@ body {
     --background: 224 71% 4%;
     --foreground: 210 40% 98%;
     
-    --card: 224 71% 4%;
-    --card-foreground: 210 40% 98%;
+    --card: 0 0% 100%;
+    --card-foreground: 222.2 47.4% 11.2%;
 
-    --popover: 224 71% 4%;
-    --popover-foreground: 210 40% 98%;
+    --popover: 0 0% 100%;
+    --popover-foreground: 222.2 47.4% 11.2%;
 
     --primary: 217 91% 60%;
     --primary-foreground: 210 40% 98%;
