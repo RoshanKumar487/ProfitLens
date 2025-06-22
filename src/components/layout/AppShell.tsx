@@ -44,6 +44,10 @@ const AppShellLayout = ({ children }: { children: React.ReactNode }) => {
   const handleNavigationClick = () => {
     if (isMobile) {
       setOpenMobile(false);
+    } else {
+      if (open) {
+        setOpen(false);
+      }
     }
   };
 
@@ -53,9 +57,6 @@ const AppShellLayout = ({ children }: { children: React.ReactNode }) => {
     return NAV_ITEMS.filter(item => {
       if (item.href === '/admin') {
         return user?.role === 'admin';
-      }
-      if (item.href === '/company-details') {
-        return false; // Always hide from main nav now
       }
       return true;
     });
@@ -70,7 +71,6 @@ const AppShellLayout = ({ children }: { children: React.ReactNode }) => {
               <Wallet className="h-8 w-8 text-sidebar-primary" />
               <h1 className="text-2xl font-bold text-sidebar-foreground group-data-[collapsible=icon]:hidden">ProfitLens</h1>
             </Link>
-            <SidebarTrigger className="hidden md:flex" variant="ghost" size="icon"/>
           </SidebarHeader>
           <Separator className="bg-sidebar-border" />
           <SidebarContent className="p-2">
@@ -96,7 +96,7 @@ const AppShellLayout = ({ children }: { children: React.ReactNode }) => {
              {user && (
                 <DropdownMenu>
                     <DropdownMenuTrigger asChild>
-                        <button className="flex items-center justify-start w-full gap-2 p-2 rounded-md hover:bg-sidebar-accent transition-colors group-data-[collapsible=icon]:w-10 group-data-[collapsible=icon]:h-10 group-data-[collapsible=icon]:p-0 group-data-[collapsible=icon]:justify-center">
+                        <button className="flex items-center justify-center w-full gap-2 p-2 rounded-md hover:bg-sidebar-accent transition-colors group-data-[collapsible=icon]:w-10 group-data-[collapsible=icon]:h-10 group-data-[collapsible=icon]:p-0 group-data-[collapsible=icon]:justify-center">
                             <Avatar className="h-9 w-9">
                                 <AvatarFallback className="bg-white text-black font-semibold">
                                     {getInitials(user.displayName)}
