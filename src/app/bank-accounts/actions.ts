@@ -12,6 +12,7 @@ import {
   query,
   where,
   getDocs,
+  getDoc,
 } from 'firebase/firestore';
 
 export interface BankAccountData {
@@ -71,9 +72,8 @@ export async function deleteBankAccount(id: string): Promise<{ success: boolean;
     const accountRef = doc(db, 'bankAccounts', id);
     batch.delete(accountRef);
 
-    // Delete all associated transactions
-    const transactionsRef = collection(db, 'bankAccounts', id, 'transactions');
-    const transactionsQuery = query(transactionsRef);
+    // Delete all associated transactions using a collection group query for efficiency
+    const transactionsQuery = query(collectionGroup(db, 'transactions'), where('accountId', '==', id));
     const transactionsSnapshot = await getDocs(transactionsQuery);
     transactionsSnapshot.forEach(doc => {
       batch.delete(doc.ref);
@@ -158,9 +158,4 @@ export async function deleteTransaction(accountId: string, transactionId: string
     console.error("Error deleting transaction:", error);
     return { success: false, message: `Failed to delete transaction: ${error.message}` };
   }
-}
-// Helper to get doc ref for server actions
-async function getDoc(ref: any) {
-  const { getDoc: get } = await import('firebase/firestore');
-  return get(ref);
 }

@@ -1,6 +1,6 @@
 
 import type { LucideIcon } from 'lucide-react';
-import { Home, TrendingUp, TrendingDown, Sparkles, FileText, Users, PieChart, Shield, HelpCircle } from 'lucide-react';
+import { LayoutDashboard, TrendingUp, TrendingDown, Sparkles, Receipt, Users, FileBarChart, Shield, HelpCircle, Banknote } from 'lucide-react';
 
 export interface NavItem {
   label: string;
@@ -12,7 +12,7 @@ export const NAV_ITEMS: NavItem[] = [
   {
     label: 'Dashboard',
     href: '/',
-    icon: Home,
+    icon: LayoutDashboard,
   },
   {
     label: 'Record Revenue',
@@ -32,7 +32,12 @@ export const NAV_ITEMS: NavItem[] = [
   {
     label: 'Invoicing',
     href: '/invoicing',
-    icon: FileText,
+    icon: Receipt,
+  },
+  {
+    label: 'Bank Accounts',
+    href: '/bank-accounts',
+    icon: Banknote,
   },
   {
     label: 'Employees',
@@ -42,7 +47,7 @@ export const NAV_ITEMS: NavItem[] = [
   {
     label: 'Reports',
     href: '/reports',
-    icon: PieChart,
+    icon: FileBarChart,
   },
   {
     label: 'Administration',
