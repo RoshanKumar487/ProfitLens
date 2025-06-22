@@ -69,7 +69,7 @@ export default function DashboardPage() {
           getDocs(revenueQuery),
           getDocs(expensesQuery),
           getDocs(employeesQuery),
-          getDocs(invoicesSnapshot),
+          getDocs(invoicesQuery),
           getDocs(recentExpensesSnapshot),
         ]);
 
