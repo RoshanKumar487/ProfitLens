@@ -155,7 +155,7 @@ export default function DashboardPage() {
   };
 
 
-  if (authIsLoading || (isLoading && !financialData)) {
+  if (authIsLoading || isLoading) {
     return (
       <div className="p-4 sm:p-6 lg:p-8">
         <PageTitle title="Dashboard" icon={LayoutDashboard} />
@@ -178,10 +178,10 @@ export default function DashboardPage() {
       <PageTitle title="Dashboard" subtitle="An overview of your business's financial health." icon={LayoutDashboard} />
 
       <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-4">
-        <DataCard title="Total Revenue" value={`${currencySymbol}${financialData?.totalRevenue.toLocaleString() || '0'}`} icon={TrendingUp} trend="up" trendValue="+20.1% from last month" />
-        <DataCard title="Total Expenses" value={`${currencySymbol}${financialData?.totalExpenses.toLocaleString() || '0'}`} icon={TrendingDown} trend="neutral" trendValue="+12% from last month" />
-        <DataCard title="Net Profit" value={`${currencySymbol}${financialData?.netProfit.toLocaleString() || '0'}`} icon={Wallet} trend="up" trendValue="+15% from last month" />
-        <DataCard title="Employees" value={`${financialData?.employeeCount.toLocaleString() || '0'}`} icon={Users} />
+        <DataCard title="Total Revenue" value={`${currencySymbol}${(financialData?.totalRevenue ?? 0).toLocaleString()}`} icon={TrendingUp} trend="up" trendValue="+20.1% from last month" />
+        <DataCard title="Total Expenses" value={`${currencySymbol}${(financialData?.totalExpenses ?? 0).toLocaleString()}`} icon={TrendingDown} trend="neutral" trendValue="+12% from last month" />
+        <DataCard title="Net Profit" value={`${currencySymbol}${(financialData?.netProfit ?? 0).toLocaleString()}`} icon={Wallet} trend="up" trendValue="+15% from last month" />
+        <DataCard title="Employees" value={`${(financialData?.employeeCount ?? 0).toLocaleString()}`} icon={Users} />
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
