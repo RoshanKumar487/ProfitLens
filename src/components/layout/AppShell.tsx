@@ -65,11 +65,12 @@ const AppShellLayout = ({ children }: { children: React.ReactNode }) => {
     <>
       {!isAuthPage && (
         <Sidebar collapsible="icon" variant="sidebar" className="border-r">
-          <SidebarHeader className="p-4">
+          <SidebarHeader className="p-4 flex items-center justify-between">
             <Link href="/" onClick={handleNavigationClick} className="flex items-center gap-2.5">
               <Wallet className="h-8 w-8 text-sidebar-primary" />
               <h1 className="text-2xl font-bold text-sidebar-foreground group-data-[collapsible=icon]:hidden">ProfitLens</h1>
             </Link>
+            <SidebarTrigger className="hidden md:flex" variant="ghost" size="icon"/>
           </SidebarHeader>
           <Separator className="bg-sidebar-border" />
           <SidebarContent className="p-2">
