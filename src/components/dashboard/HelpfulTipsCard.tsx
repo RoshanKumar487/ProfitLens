@@ -18,7 +18,7 @@ const HelpfulTipsCard = () => {
         </p>
         <div className="aspect-video w-full relative rounded-lg overflow-hidden mb-4">
           <video
-            src="https://videos.pexels.com/video-files/853874/853874-hd_1280_720_25fps.mp4"
+            src="https://videos.pexels.com/video-files/6981190/6981190-hd_1920_1080_25fps.mp4"
             autoPlay
             loop
             muted
