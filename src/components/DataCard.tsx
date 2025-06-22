@@ -18,7 +18,13 @@ const DataCard: React.FC<DataCardProps> = ({ title, value, icon: Icon, descripti
   const trendColor = trend === 'up' ? 'text-accent' : trend === 'down' ? 'text-destructive' : 'text-muted-foreground';
 
   return (
-    <Card className={cn("shadow-lg hover:shadow-xl transition-shadow duration-300", className)}>
+    <Card className={cn(
+      "transition-all duration-300 ease-out",
+      "bg-gradient-to-br from-card to-muted/20",
+      "hover:scale-[1.03] hover:shadow-2xl hover:brightness-105",
+      "shadow-lg",
+      className
+    )}>
       <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
         <CardTitle className="text-sm font-medium text-card-foreground/80">{title}</CardTitle>
         <Icon className="h-5 w-5 text-muted-foreground" />
