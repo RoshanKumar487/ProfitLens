@@ -1,3 +1,4 @@
+
 'use client';
 
 import React, { useState, useMemo, useEffect, type FormEvent, useCallback, useRef } from 'react';
@@ -315,7 +316,7 @@ export default function InvoicingPage() {
     );
   }, [invoices, searchTerm]);
 
-  const getStatusBadgeVariant = (status: InvoiceDisplay['status']) => {
+  const getStatusBadgeVariant = (status: InvoiceDisplay['status']): 'default' | 'secondary' | 'destructive' | 'outline' => {
     switch (status) {
       case 'Paid':
         return 'default';
@@ -971,7 +972,7 @@ export default function InvoicingPage() {
                   <TableCell>{format(invoice.issuedDate, 'PP')}</TableCell>
                   <TableCell>{format(invoice.dueDate, 'PP')}</TableCell>
                   <TableCell>
-                    <Badge variant={getStatusBadgeVariant(invoice.status)} className={`${invoice.status === 'Paid' ? 'bg-accent text-accent-foreground hover:bg-accent/80' : ''} ${invoice.status === 'Overdue' ? 'bg-destructive text-destructive-foreground hover:bg-destructive/80' : ''}`}>
+                    <Badge variant={getStatusBadgeVariant(invoice.status)}>
                       {invoice.status}
                     </Badge>
                   </TableCell>

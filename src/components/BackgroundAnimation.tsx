@@ -7,6 +7,7 @@ import styles from './BackgroundAnimation.module.css';
 const BackgroundAnimation: React.FC = () => {
   return (
     <div className={styles.area}>
+      {/*
       <ul className={styles.circles}>
         <li></li>
         <li></li>
@@ -19,6 +20,7 @@ const BackgroundAnimation: React.FC = () => {
         <li></li>
         <li></li>
       </ul>
+      */}
     </div>
   );
 };

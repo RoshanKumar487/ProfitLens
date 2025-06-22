@@ -21,7 +21,7 @@ import { NAV_ITEMS } from '@/lib/constants';
 import { Separator } from '@/components/ui/separator';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
-import { LogOut, Loader2, Wallet, Building } from 'lucide-react';
+import { LogOut, Loader2, Building, LayoutTemplate } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { cn } from '@/lib/utils';
 
@@ -44,10 +44,6 @@ const AppShellLayout = ({ children }: { children: React.ReactNode }) => {
   const handleNavigationClick = () => {
     if (isMobile) {
       setOpenMobile(false);
-    } else {
-      if (open) {
-        setOpen(false);
-      }
     }
   };
 
@@ -68,7 +64,7 @@ const AppShellLayout = ({ children }: { children: React.ReactNode }) => {
         <Sidebar collapsible="icon" variant="sidebar" className="border-r">
           <SidebarHeader className="p-4 flex items-center justify-between">
             <Link href="/" onClick={handleNavigationClick} className="flex items-center gap-2.5">
-              <Wallet className="h-8 w-8 text-sidebar-primary" />
+              <LayoutTemplate className="h-8 w-8 text-sidebar-primary" />
               <h1 className="text-2xl font-bold text-sidebar-foreground group-data-[collapsible=icon]:hidden">ProfitLens</h1>
             </Link>
           </SidebarHeader>
@@ -138,7 +134,7 @@ const AppShellLayout = ({ children }: { children: React.ReactNode }) => {
            <header className="sticky top-0 z-10 flex h-14 items-center gap-4 border-b bg-background/80 px-4 backdrop-blur-sm sm:h-16 sm:px-6 md:hidden">
               <SidebarTrigger variant="outline" size="icon" />
               <Link href="/" onClick={handleNavigationClick} className="flex items-center gap-2 md:hidden">
-                  <Wallet className="h-6 w-6 text-primary" />
+                  <LayoutTemplate className="h-6 w-6 text-primary" />
                   <span className="font-bold text-lg text-foreground">ProfitLens</span>
               </Link>
           </header>
