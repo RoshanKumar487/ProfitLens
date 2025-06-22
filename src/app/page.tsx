@@ -70,7 +70,7 @@ export default function DashboardPage() {
           getDocs(expensesQuery),
           getDocs(employeesQuery),
           getDocs(invoicesQuery),
-          getDocs(recentExpensesSnapshot),
+          getDocs(recentExpensesQuery),
         ]);
 
         let totalRevenue = 0;
