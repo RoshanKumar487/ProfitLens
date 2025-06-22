@@ -29,7 +29,17 @@ const AppShellLayout = ({ children }: { children: React.ReactNode }) => {
   const pathname = usePathname();
   const { isMobile, setOpenMobile, open, setOpen } = useSidebar();
   const { user, signOut, isLoading: authLoading } = useAuth(); 
-  const getInitials = (name?: string | null) => name ? name.split(' ').map(n => n[0]).join('').toUpperCase() : 'U';
+  
+  const getInitials = (name?: string | null) => {
+    if (!name) return 'U';
+    const names = name.trim().split(/\s+/);
+    if (names.length === 0 || names[0] === '') return 'U';
+    
+    const firstInitial = names[0][0];
+    const lastInitial = names.length > 1 ? names[names.length - 1][0] : '';
+    
+    return (firstInitial + lastInitial).toUpperCase();
+  };
 
   const handleNavigationClick = () => {
     if (isMobile) {
@@ -56,6 +66,7 @@ const AppShellLayout = ({ children }: { children: React.ReactNode }) => {
         <Sidebar collapsible="icon" variant="sidebar" className="border-r">
           <SidebarHeader className="p-4">
             <Link href="/" onClick={handleNavigationClick} className="flex items-center gap-2.5">
+              <Wallet className="h-8 w-8 text-sidebar-primary" />
               <h1 className="text-2xl font-bold text-sidebar-foreground group-data-[collapsible=icon]:hidden">ProfitLens</h1>
             </Link>
           </SidebarHeader>
@@ -85,7 +96,6 @@ const AppShellLayout = ({ children }: { children: React.ReactNode }) => {
                     <DropdownMenuTrigger asChild>
                         <button className="flex items-center justify-start w-full gap-2 p-2 rounded-md hover:bg-sidebar-accent transition-colors group-data-[collapsible=icon]:w-10 group-data-[collapsible=icon]:h-10 group-data-[collapsible=icon]:p-0 group-data-[collapsible=icon]:justify-center">
                             <Avatar className="h-9 w-9">
-                                <AvatarImage src={`https://placehold.co/40x40.png`} data-ai-hint="person portrait" />
                                 <AvatarFallback>{getInitials(user.displayName)}</AvatarFallback>
                             </Avatar>
                             <div className="text-left group-data-[collapsible=icon]:hidden">
@@ -124,6 +134,7 @@ const AppShellLayout = ({ children }: { children: React.ReactNode }) => {
            <header className="sticky top-0 z-10 flex h-14 items-center gap-4 border-b bg-background/80 px-4 backdrop-blur-sm sm:h-16 sm:px-6 md:hidden">
               <SidebarTrigger variant="outline" size="icon" />
               <Link href="/" onClick={handleNavigationClick} className="flex items-center gap-2 md:hidden">
+                  <Wallet className="h-6 w-6 text-primary" />
                   <span className="font-bold text-lg text-foreground">ProfitLens</span>
               </Link>
           </header>
