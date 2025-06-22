@@ -642,9 +642,9 @@ export default function EmployeesPage() {
 
   if (!user && !authIsLoading) {
      return (
-      <div className="space-y-6">
+      <div className="space-y-6 p-4 sm:p-6 lg:p-8">
         <PageTitle title="Employees" subtitle="Manage your team members." icon={Users2} />
-        <Card className="shadow-lg">
+        <Card>
           <CardHeader><CardTitle>Access Denied</CardTitle></CardHeader>
           <CardContent><p>Please sign in to manage employees.</p></CardContent>
         </Card>
@@ -654,14 +654,14 @@ export default function EmployeesPage() {
 
 
   return (
-    <div className="space-y-6">
-      <PageTitle title="Employees" subtitle="Manage your team members." icon={Users2}>
+    <div className="space-y-6 p-4 sm:p-6 lg:p-8">
+      <PageTitle title="Employees View" subtitle="Manage your team members." icon={Users2}>
         <Button onClick={handleCreateNew} disabled={isSaving || isLoadingEmployees}>
             <PlusCircle className="mr-2 h-4 w-4" /> Add Employee
         </Button>
       </PageTitle>
 
-      <Card className="shadow-lg">
+      <Card>
         <CardHeader>
           <CardTitle>Team Members</CardTitle>
           <CardDescription>
