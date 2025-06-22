@@ -38,6 +38,10 @@ body {
     --ring: 217 91% 60%;
 
     --radius: 0.5rem;
+    
+    --success-card: 140 70% 96%;
+    --danger-card: 0 80% 96%;
+
 
     /* Charts */
     --chart-1: 217 91% 60%;
@@ -85,6 +89,9 @@ body {
     --border: 217.2 32.6% 17.5%;
     --input: 217.2 32.6% 17.5%;
     --ring: 212.7 26.8% 83.9%;
+
+    --success-card: 140 80% 10%;
+    --danger-card: 0 80% 10%;
     
     /* Sidebar in dark mode should match the new style */
     --sidebar-background: 222.2 84% 4.9%;

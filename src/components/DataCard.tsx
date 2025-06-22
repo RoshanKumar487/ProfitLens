@@ -19,10 +19,9 @@ const DataCard: React.FC<DataCardProps> = ({ title, value, icon: Icon, descripti
 
   return (
     <Card className={cn(
-      "data-card relative overflow-hidden", // Add classes for new animation
+      "data-card relative overflow-hidden",
       "transition-all duration-300 ease-out",
-      "bg-gradient-to-br from-card to-muted/20",
-      "hover:scale-[1.03] hover:shadow-xl", // Keep scale, adjust shadow
+      "hover:scale-[1.03] hover:shadow-xl",
       "shadow-lg",
       className
     )}>

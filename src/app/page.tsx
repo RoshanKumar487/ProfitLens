@@ -70,7 +70,7 @@ export default function DashboardPage() {
           getDocs(expensesQuery),
           getDocs(employeesQuery),
           getDocs(invoicesQuery),
-          getDocs(recentExpensesQuery),
+          getDocs(recentExpensesSnapshot),
         ]);
 
         let totalRevenue = 0;
@@ -178,10 +178,10 @@ export default function DashboardPage() {
       <PageTitle title="Dashboard" subtitle="An overview of your business's financial health." icon={LayoutDashboard} />
 
       <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-4">
-        <DataCard title="Total Revenue" value={`${currencySymbol}${(financialData?.totalRevenue ?? 0).toLocaleString()}`} icon={TrendingUp} trend="up" trendValue="+20.1% from last month" />
-        <DataCard title="Total Expenses" value={`${currencySymbol}${(financialData?.totalExpenses ?? 0).toLocaleString()}`} icon={TrendingDown} trend="neutral" trendValue="+12% from last month" />
-        <DataCard title="Net Profit" value={`${currencySymbol}${(financialData?.netProfit ?? 0).toLocaleString()}`} icon={Wallet} trend="up" trendValue="+15% from last month" />
-        <DataCard title="Employees" value={`${(financialData?.employeeCount ?? 0).toLocaleString()}`} icon={Users} />
+        <DataCard title="Total Revenue" value={`${currencySymbol}${(financialData?.totalRevenue ?? 0).toLocaleString()}`} icon={TrendingUp} trend="up" trendValue="+20.1% from last month" className="bg-success-card" />
+        <DataCard title="Total Expenses" value={`${currencySymbol}${(financialData?.totalExpenses ?? 0).toLocaleString()}`} icon={TrendingDown} trend="neutral" trendValue="+12% from last month" className="bg-danger-card" />
+        <DataCard title="Net Profit" value={`${currencySymbol}${(financialData?.netProfit ?? 0).toLocaleString()}`} icon={Wallet} trend="up" trendValue="+15% from last month" className="bg-success-card" />
+        <DataCard title="Employees" value={`${(financialData?.employeeCount ?? 0).toLocaleString()}`} icon={Users} className="bg-card" />
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
@@ -204,8 +204,8 @@ export default function DashboardPage() {
                     cursor={{ fill: 'hsl(var(--muted))' }}
                 />
                 <Legend iconType="circle" iconSize={10} />
-                <Bar dataKey="revenue" fill="hsl(var(--accent))" name="Revenue" radius={[4, 4, 0, 0]} />
-                <Bar dataKey="expenses" fill="hsl(var(--primary))" name="Expenses" radius={[4, 4, 0, 0]} />
+                <Bar dataKey="revenue" fill="hsl(var(--chart-2))" name="Revenue" radius={[4, 4, 0, 0]} />
+                <Bar dataKey="expenses" fill="hsl(var(--chart-1))" name="Expenses" radius={[4, 4, 0, 0]} />
               </BarChart>
             </ResponsiveContainer>
           </CardContent>
