@@ -1,4 +1,3 @@
-
 'use client';
 
 import React, { useState, useCallback } from 'react';
@@ -55,7 +54,7 @@ export default function ReportsPage() {
   
 
   const handleExport = useCallback(async (
-    format: 'csv' | 'pdf',
+    exportFormat: 'csv' | 'pdf',
     reportType: string,
     collectionName: string,
     fromDate: Date | undefined,
@@ -100,7 +99,7 @@ export default function ReportsPage() {
 
       const filenameBase = `ProfitLens_${reportType}_${format(fromDate, 'yyyyMMdd')}_to_${format(toDate, 'yyyyMMdd')}`;
       
-      if (format === 'csv') {
+      if (exportFormat === 'csv') {
         const csvRows = [
           headers.join(','),
           ...dataToExport.map(row => headers.map(header => `"${String(row[header] ?? '').replace(/"/g, '""')}"`).join(','))
@@ -165,7 +164,7 @@ export default function ReportsPage() {
       toDate: Date | undefined,
       setToDate: React.Dispatch<React.SetStateAction<Date | undefined>>,
       isExporting: boolean,
-      onExport: (format: 'csv' | 'pdf') => void,
+      onExport: (exportFormat: 'csv' | 'pdf') => void,
       dateFieldLabel: string
   ) => {
     const IconComponent = icon;
@@ -253,8 +252,8 @@ export default function ReportsPage() {
             employeeToDate,
             setEmployeeToDate,
             isExportingEmployees,
-            (format) => handleExport(
-                format,
+            (exportFormat) => handleExport(
+                exportFormat,
                 'Employees', 'employees', employeeFromDate, employeeToDate, 'createdAt',
                 ['ID', 'Name', 'Position', 'Salary', 'Description', 'Profile Picture URL', 'Associated File Name', 'Associated File URL', 'Created At', 'Updated At'],
                 (doc) => {
@@ -285,8 +284,8 @@ export default function ReportsPage() {
             expenseToDate,
             setExpenseToDate,
             isExportingExpenses,
-            (format) => handleExport(
-                format,
+            (exportFormat) => handleExport(
+                exportFormat,
                 'Expenses', 'expenses', expenseFromDate, expenseToDate, 'date',
                 ['Date', 'Amount', 'Category', 'Vendor', 'Description'],
                 (doc) => {
@@ -309,8 +308,8 @@ export default function ReportsPage() {
             invoiceToDate,
             setInvoiceToDate,
             isExportingInvoices,
-            (format) => handleExport(
-                format,
+            (exportFormat) => handleExport(
+                exportFormat,
                 'Invoices', 'invoices', invoiceFromDate, invoiceToDate, 'issuedDate',
                 ['Invoice Number', 'Invoice Status', 'Issued Date', 'Due Date', 'Client Name', 'Item Description', 'Item Quantity', 'Item Unit Price', 'Item Total'],
                 (doc) => {
@@ -353,8 +352,8 @@ export default function ReportsPage() {
             revenueToDate,
             setRevenueToDate,
             isExportingRevenue,
-            (format) => handleExport(
-                format,
+            (exportFormat) => handleExport(
+                exportFormat,
                 'Revenue', 'revenueEntries', revenueFromDate, revenueToDate, 'date',
                 ['Date', 'Amount', 'Source', 'Description'],
                 (doc) => {
@@ -377,8 +376,8 @@ export default function ReportsPage() {
             bankTransactionToDate,
             setBankTransactionToDate,
             isExportingBankTransactions,
-            (format) => handleExport(
-                format,
+            (exportFormat) => handleExport(
+                exportFormat,
                 'Bank Transactions', 'transactions', bankTransactionFromDate, bankTransactionToDate, 'date',
                 ['Date', 'Account ID', 'Type', 'Amount', 'Category', 'Description'],
                 (doc) => {
