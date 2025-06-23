@@ -1,4 +1,3 @@
-
 'use client';
 
 import React, { useMemo } from 'react';
@@ -27,7 +26,7 @@ import { cn } from '@/lib/utils';
 
 const AppShellLayout = ({ children }: { children: React.ReactNode }) => {
   const pathname = usePathname();
-  const { isMobile, setOpenMobile, setOpen } = useSidebar();
+  const { isMobile, setOpenMobile } = useSidebar();
   const { user, signOut, isLoading: authLoading } = useAuth(); 
   
   const getInitials = (name?: string | null) => {
@@ -44,9 +43,8 @@ const AppShellLayout = ({ children }: { children: React.ReactNode }) => {
   const handleNavigationClick = () => {
     if (isMobile) {
       setOpenMobile(false);
-    } else {
-      setOpen(false);
     }
+    // On desktop, keep the sidebar state as is.
   };
 
   const isAuthPage = pathname.startsWith('/auth/');
@@ -69,6 +67,7 @@ const AppShellLayout = ({ children }: { children: React.ReactNode }) => {
               <LayoutTemplate className="h-8 w-8 text-sidebar-primary" />
               <h1 className="text-2xl font-bold text-sidebar-foreground group-data-[collapsible=icon]:hidden">ProfitLens</h1>
             </Link>
+            <SidebarTrigger variant="ghost" size="icon" className="h-8 w-8 text-foreground/70 hover:text-foreground hidden md:flex" />
           </SidebarHeader>
           <Separator className="bg-sidebar-border" />
           <SidebarContent className="p-2">
