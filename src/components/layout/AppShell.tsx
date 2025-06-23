@@ -27,7 +27,7 @@ import { Button } from '@/components/ui/button';
 
 const AppShellLayout = ({ children }: { children: React.ReactNode }) => {
   const pathname = usePathname();
-  const { isMobile, setOpenMobile, toggleSidebar } = useSidebar();
+  const { isMobile, setOpenMobile } = useSidebar();
   const { user, signOut, isLoading: authLoading } = useAuth(); 
   
   const getInitials = (name?: string | null) => {
@@ -65,8 +65,7 @@ const AppShellLayout = ({ children }: { children: React.ReactNode }) => {
           <SidebarHeader className="p-2">
             <Button
               variant="ghost"
-              className="h-12 w-full justify-start gap-3 px-3 group-data-[collapsible=icon]:justify-center"
-              onClick={toggleSidebar}
+              className="h-12 w-full justify-start gap-3 px-3 group-data-[collapsible=icon]:justify-center cursor-default"
             >
               <LayoutTemplate className="h-7 w-7 shrink-0 text-primary" />
               <h1 className="text-xl font-headline font-bold text-sidebar-foreground group-data-[collapsible=icon]:hidden">
