@@ -39,7 +39,7 @@ import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger, DropdownMenuSeparator } from '@/components/ui/dropdown-menu';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
-import { Users2, PlusCircle, MoreHorizontal, Edit, Trash2, Loader2, Save, Camera, UploadCloud, FileText, XCircle, SwitchCamera, Upload, ArrowUp, ArrowDown, ChevronsUpDown } from 'lucide-react';
+import { Users2, PlusCircle, MoreHorizontal, Edit, Trash2, Loader2, Save, Camera, UploadCloud, FileText, XCircle, SwitchCamera, Upload, ArrowUp, ArrowDown, ChevronsUpDown, Search } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/contexts/AuthContext';
 import { db } from '@/lib/firebaseConfig';
@@ -125,11 +125,25 @@ export default function EmployeesPage() {
   const [isImporting, setIsImporting] = useState(false);
   
   const [sortConfig, setSortConfig] = useState<{ key: keyof EmployeeDisplay; direction: 'ascending' | 'descending' }>({ key: 'createdAt', direction: 'descending' });
+  const [searchTerm, setSearchTerm] = useState('');
+
+
+  const filteredEmployees = useMemo(() => {
+    if (!searchTerm) {
+      return employees;
+    }
+    const lowercasedTerm = searchTerm.toLowerCase();
+    return employees.filter(employee =>
+        employee.name.toLowerCase().includes(lowercasedTerm) ||
+        employee.position.toLowerCase().includes(lowercasedTerm) ||
+        (employee.description && employee.description.toLowerCase().includes(lowercasedTerm))
+    );
+  }, [employees, searchTerm]);
 
 
   // Sorting logic
   const sortedEmployees = useMemo(() => {
-    let sortableItems = [...employees];
+    let sortableItems = [...filteredEmployees];
     if (sortConfig !== null) {
       sortableItems.sort((a, b) => {
         const aValue = a[sortConfig.key];
@@ -146,7 +160,7 @@ export default function EmployeesPage() {
       });
     }
     return sortableItems;
-  }, [employees, sortConfig]);
+  }, [filteredEmployees, sortConfig]);
 
   const requestSort = (key: keyof EmployeeDisplay) => {
     let direction: 'ascending' | 'descending' = 'ascending';
@@ -844,14 +858,29 @@ export default function EmployeesPage() {
 
       <Card>
         <CardHeader>
-          <CardTitle>Team Members</CardTitle>
-          <CardDescription>
-            Manage your employees' information, salaries, and associated files.
-          </CardDescription>
+          <div className="flex flex-col sm:flex-row items-center justify-between gap-2">
+            <div>
+              <CardTitle>Team Members</CardTitle>
+              <CardDescription>
+                Manage your employees' information, salaries, and associated files.
+              </CardDescription>
+            </div>
+            <div className="relative w-full sm:w-auto">
+              <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+              <Input
+                type="search"
+                placeholder="Search by name, position..."
+                className="pl-8 sm:w-[250px] md:w-[300px]"
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                disabled={isLoadingEmployees}
+              />
+            </div>
+          </div>
         </CardHeader>
         <CardContent>
           <Table>
-            <TableCaption>{employees.length === 0 && !isLoadingEmployees ? "No employees found." : "A list of your employees."}</TableCaption>
+            <TableCaption>{!isLoadingEmployees && sortedEmployees.length === 0 ? (searchTerm ? "No employees match your search." : "No employees found.") : "A list of your employees."}</TableCaption>
             <TableHeader>
               <TableRow>
                 <TableHead className="w-[60px]">Avatar</TableHead>
