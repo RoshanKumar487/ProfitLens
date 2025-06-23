@@ -17,18 +17,21 @@ import {
 } from '@/components/ui/sidebar';
 import { NAV_ITEMS } from '@/lib/constants';
 import { Separator } from '@/components/ui/separator';
-import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
+import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { LogOut, Loader2, Building, LayoutTemplate, Bell, Bot } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
+import { AssistantChat } from '@/components/AssistantChat';
 
 const AppShellLayout = ({ children }: { children: React.ReactNode }) => {
   const pathname = usePathname();
   const { isMobile, setOpenMobile } = useSidebar();
   const { user, signOut, isLoading: authLoading } = useAuth(); 
+  const [isAssistantOpen, setIsAssistantOpen] = React.useState(false);
   
   const getInitials = (name?: string | null) => {
     if (!name) return 'U';
@@ -162,18 +165,34 @@ const AppShellLayout = ({ children }: { children: React.ReactNode }) => {
       </SidebarInset>
       
       {!isAuthPage && !authLoading && user && (
-        <Tooltip>
+        <Dialog open={isAssistantOpen} onOpenChange={setIsAssistantOpen}>
+          <Tooltip>
             <TooltipTrigger asChild>
-                <Button asChild className="fixed bottom-6 right-6 h-16 w-16 rounded-full shadow-2xl z-50">
-                    <Link href="/ai-assistant">
-                        <Bot className="h-8 w-8" />
-                    </Link>
+              <DialogTrigger asChild>
+                <Button className="fixed bottom-6 right-6 h-16 w-16 rounded-full shadow-2xl z-50">
+                  <Bot className="h-8 w-8" />
                 </Button>
+              </DialogTrigger>
             </TooltipTrigger>
             <TooltipContent side="left">
-                <p>AI Assistant</p>
+              <p>AI Assistant</p>
             </TooltipContent>
-        </Tooltip>
+          </Tooltip>
+          <DialogContent className="sm:max-w-2xl h-[calc(100vh-8rem)] flex flex-col p-0 gap-0">
+            <DialogHeader className="p-6 pb-4">
+              <DialogTitle className="flex items-center gap-2">
+                <Bot className="h-6 w-6 text-primary"/>
+                AI Assistant
+              </DialogTitle>
+              <DialogDescription>
+                Ask me to add employees, update invoices, or generate financial summaries.
+              </DialogDescription>
+            </DialogHeader>
+            <div className="flex-1 min-h-0">
+              <AssistantChat />
+            </div>
+          </DialogContent>
+        </Dialog>
       )}
     </>
   );
