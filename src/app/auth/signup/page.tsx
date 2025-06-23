@@ -119,7 +119,7 @@ export default function SignUpPage() {
   
   if (pendingApproval) {
     return (
-       <div className="flex flex-col items-center justify-center min-h-[calc(100vh-12rem)] py-8">
+       <div className="flex flex-col items-center justify-center min-h-screen py-8">
             <PageTitle title="Request Sent" icon={CheckCircle} />
             <Card className="w-full max-w-md shadow-xl">
                  <CardHeader>
@@ -138,7 +138,7 @@ export default function SignUpPage() {
   }
 
   return (
-    <div className="flex flex-col items-center justify-center min-h-[calc(100vh-12rem)] py-8">
+    <div className="flex flex-col items-center justify-center min-h-screen py-8">
       <PageTitle title="Sign Up" subtitle="Create your ProfitLens account." icon={UserPlus} />
       <Card className="w-full max-w-lg shadow-xl">
         <CardHeader>

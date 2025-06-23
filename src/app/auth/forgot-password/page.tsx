@@ -49,7 +49,7 @@ export default function ForgotPasswordPage() {
   };
 
   return (
-    <div className="flex flex-col items-center justify-center min-h-[calc(100vh-12rem)] py-8">
+    <div className="flex flex-col items-center justify-center min-h-screen py-8">
       <PageTitle title="Forgot Password" subtitle="Enter your email to receive a reset link." icon={Mail} />
       <Card className="w-full max-w-md shadow-xl">
         <CardHeader>

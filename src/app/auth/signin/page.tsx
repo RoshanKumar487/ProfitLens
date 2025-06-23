@@ -51,7 +51,7 @@ export default function SignInPage() {
   };
 
   return (
-    <div className="flex flex-col items-center justify-center min-h-[calc(100vh-12rem)] py-8">
+    <div className="flex flex-col items-center justify-center min-h-screen py-8">
       <PageTitle title="Sign In" subtitle="Access your ProfitLens dashboard." icon={LogIn} />
       <Card className="w-full max-w-md shadow-xl">
         <CardHeader>
