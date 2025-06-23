@@ -1,3 +1,4 @@
+
 'use client';
 
 import React, { useMemo } from 'react';
@@ -8,7 +9,6 @@ import {
   Sidebar,
   SidebarHeader,
   SidebarContent,
-  SidebarFooter,
   SidebarMenu,
   SidebarMenuItem,
   SidebarMenuButton,
@@ -45,7 +45,6 @@ const AppShellLayout = ({ children }: { children: React.ReactNode }) => {
     if (isMobile) {
       setOpenMobile(false);
     }
-    // On desktop, keep the sidebar state as is.
   };
 
   const isAuthPage = pathname.startsWith('/auth/');
@@ -96,23 +95,32 @@ const AppShellLayout = ({ children }: { children: React.ReactNode }) => {
               ))}
             </SidebarMenu>
           </SidebarContent>
-          <SidebarFooter className="p-2 mt-auto border-t border-sidebar-border">
-            <div className="flex items-center justify-start gap-2 group-data-[collapsible=icon]:justify-center">
-                {user && (
+        </Sidebar>
+      )}
+
+      <SidebarInset className={cn(isAuthPage && "md:!ml-0")}>
+        {!isAuthPage && (
+           <header className="sticky top-0 z-10 flex h-14 items-center gap-4 border-b bg-background/80 px-4 backdrop-blur-sm sm:h-16 sm:px-6">
+              <div className="flex items-center gap-2 md:hidden">
+                <SidebarTrigger variant="outline" size="icon" />
+                <Link href="/" onClick={handleNavigationClick} className="flex items-center gap-2">
+                    <LayoutTemplate className="h-6 w-6 text-primary" />
+                    <span className="font-bold text-lg text-foreground">ProfitLens</span>
+                </Link>
+              </div>
+              <div className="flex-1" />
+              {user && (
                     <DropdownMenu>
                         <DropdownMenuTrigger asChild>
-                            <button className="flex items-center gap-2 p-1 rounded-md hover:bg-sidebar-accent transition-colors">
-                                <Avatar className="h-8 w-8">
-                                    <AvatarFallback className="bg-muted text-muted-foreground font-semibold text-xs">
+                           <Button variant="ghost" className="relative h-10 w-10 rounded-full">
+                                <Avatar className="h-10 w-10">
+                                    <AvatarFallback className="bg-muted text-muted-foreground font-semibold">
                                         {getInitials(user.displayName)}
                                     </AvatarFallback>
                                 </Avatar>
-                                <div className="text-left min-w-0 group-data-[collapsible=icon]:hidden">
-                                    <p className="text-sm font-medium text-sidebar-foreground truncate">{user.displayName}</p>
-                                </div>
-                            </button>
+                           </Button>
                         </DropdownMenuTrigger>
-                        <DropdownMenuContent className="w-56 mb-2" align="end" forceMount>
+                        <DropdownMenuContent className="w-56" align="end" forceMount>
                             <DropdownMenuLabel className="font-normal">
                               <div className="flex flex-col space-y-1">
                                 <p className="text-sm font-medium leading-none">{user.displayName}</p>
@@ -133,19 +141,6 @@ const AppShellLayout = ({ children }: { children: React.ReactNode }) => {
                       </DropdownMenuContent>
                     </DropdownMenu>
                 )}
-            </div>
-          </SidebarFooter>
-        </Sidebar>
-      )}
-
-      <SidebarInset className={cn(isAuthPage && "md:!ml-0")}>
-        {!isAuthPage && (
-           <header className="sticky top-0 z-10 flex h-14 items-center gap-4 border-b bg-background/80 px-4 backdrop-blur-sm sm:h-16 sm:px-6 md:hidden">
-              <SidebarTrigger variant="outline" size="icon" />
-              <Link href="/" onClick={handleNavigationClick} className="flex items-center gap-2 md:hidden">
-                  <LayoutTemplate className="h-6 w-6 text-primary" />
-                  <span className="font-bold text-lg text-foreground">ProfitLens</span>
-              </Link>
           </header>
         )}
         <main className="flex-1">
@@ -162,7 +157,7 @@ const AppShellLayout = ({ children }: { children: React.ReactNode }) => {
 
 const AppShell = ({ children }: { children: React.ReactNode }) => {
   return (
-    <SidebarProvider defaultOpen>
+    <SidebarProvider defaultOpen={false}>
       <AppShellLayout>{children}</AppShellLayout>
     </SidebarProvider>
   );
