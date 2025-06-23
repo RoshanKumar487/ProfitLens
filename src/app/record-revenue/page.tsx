@@ -30,6 +30,8 @@ interface RevenueEntryFirestore {
   source: string;
   description?: string;
   companyId: string;
+  addedById: string;
+  addedBy: string;
   createdAt: Timestamp;
 }
 
@@ -39,6 +41,7 @@ interface RevenueEntryDisplay {
   amount: number;
   source: string;
   description?: string;
+  addedBy: string;
 }
 
 export default function RecordRevenuePage() {
@@ -88,6 +91,7 @@ export default function RecordRevenuePage() {
           amount: data.amount,
           source: data.source,
           description: data.description || '',
+          addedBy: data.addedBy || 'N/A',
         };
       });
       setRecentEntries(fetchedEntries);
@@ -183,6 +187,8 @@ export default function RecordRevenuePage() {
       description: newEntryDescription || '',
       companyId: user.companyId,
       createdAt: serverTimestamp(),
+      addedById: user.uid,
+      addedBy: user.displayName || user.email || 'System'
     };
 
     try {
@@ -307,6 +313,8 @@ export default function RecordRevenuePage() {
                       <TableHead>
                             <Button variant="ghost" onClick={() => requestSort('source')} className="-ml-4 h-auto p-1 text-xs sm:text-sm">Source {getSortIcon('source')}</Button>
                       </TableHead>
+                      <TableHead>Description</TableHead>
+                      <TableHead>Added By</TableHead>
                       <TableHead className="text-right">
                             <Button variant="ghost" onClick={() => requestSort('amount')} className="h-auto p-1 text-xs sm:text-sm">Amount {getSortIcon('amount')}</Button>
                       </TableHead>
@@ -318,7 +326,9 @@ export default function RecordRevenuePage() {
                 [...Array(5)].map((_, i) => (
                   <TableRow key={i}>
                     <TableCell><Skeleton className="h-4 w-[90px]" /></TableCell>
-                    <TableCell><Skeleton className="h-4 w-3/4" /></TableCell>
+                    <TableCell><Skeleton className="h-4 w-[120px]" /></TableCell>
+                    <TableCell><Skeleton className="h-4 w-[200px]" /></TableCell>
+                    <TableCell><Skeleton className="h-4 w-[100px]" /></TableCell>
                     <TableCell className="text-right"><Skeleton className="h-4 w-[70px] ml-auto" /></TableCell>
                     <TableCell className="text-right"><Skeleton className="h-8 w-8 ml-auto" /></TableCell>
                   </TableRow>
@@ -326,10 +336,9 @@ export default function RecordRevenuePage() {
               ) : sortedEntries.map(entry => (
                   <TableRow key={entry.id}>
                       <TableCell>{format(entry.date, 'PP')}</TableCell>
-                      <TableCell>
-                          <div className="font-medium">{entry.source}</div>
-                          {entry.description && <div className="text-xs text-muted-foreground max-w-xs truncate" title={entry.description}>{entry.description}</div>}
-                      </TableCell>
+                      <TableCell className="font-medium">{entry.source}</TableCell>
+                      <TableCell className="max-w-xs truncate" title={entry.description}>{entry.description || '-'}</TableCell>
+                      <TableCell>{entry.addedBy}</TableCell>
                       <TableCell className="text-right font-semibold text-green-600">{currency}{entry.amount.toFixed(2)}</TableCell>
                       <TableCell className="text-right">
                             <DropdownMenu>
