@@ -39,7 +39,7 @@ import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger, DropdownMenuSeparator } from '@/components/ui/dropdown-menu';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
-import { Users2, PlusCircle, MoreHorizontal, Edit, Trash2, Loader2, Save, Camera, UploadCloud, FileText, XCircle, SwitchCamera, Upload, ArrowUp, ArrowDown, ChevronsUpDown, Search } from 'lucide-react';
+import { Users2, PlusCircle, MoreHorizontal, Edit, Trash2, Loader2, Save, Camera, UploadCloud, FileText, XCircle, SwitchCamera, Upload, ArrowUp, ArrowDown, ChevronsUpDown, Search, ScanLine } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/contexts/AuthContext';
 import { db } from '@/lib/firebaseConfig';
@@ -52,6 +52,7 @@ import * as xlsx from 'xlsx';
 import { bulkAddEmployees } from './actions';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
+import { analyzeEmployeeDocument } from '@/ai/flows/analyze-employee-document-flow';
 
 
 interface EmployeeFirestore {
@@ -106,7 +107,7 @@ export default function EmployeesPage() {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const [hasCameraPermission, setHasCameraPermission] = useState<boolean | null>(null);
   const [showProfileWebcam, setShowProfileWebcam] = useState(false);
-  const [showFileWebcam, setShowFileWebcam] = useState(false);
+  
   const [profilePictureFile, setProfilePictureFile] = useState<File | null>(null);
   const [profilePicturePreview, setProfilePicturePreview] = useState<string | null>(null);
   const [associatedFile, setAssociatedFile] = useState<File | null>(null);
@@ -124,6 +125,11 @@ export default function EmployeesPage() {
   const [parsedEmployees, setParsedEmployees] = useState<ParsedEmployee[]>([]);
   const [isImporting, setIsImporting] = useState(false);
   
+  // State for scanning
+  const [isScanDialogOpen, setIsScanDialogOpen] = useState(false);
+  const [isScanning, setIsScanning] = useState(false);
+  const [isInitializingCamera, setIsInitializingCamera] = useState(false);
+
   const [sortConfig, setSortConfig] = useState<{ key: keyof EmployeeDisplay; direction: 'ascending' | 'descending' }>({ key: 'createdAt', direction: 'descending' });
   const [searchTerm, setSearchTerm] = useState('');
 
@@ -247,7 +253,7 @@ export default function EmployeesPage() {
               description: 'Please enable camera permissions in your browser settings.',
            });
            setShowProfileWebcam(false);
-           setShowFileWebcam(false);
+           setIsScanDialogOpen(false);
         }
       } finally {
           setIsSwitchingCamera(false);
@@ -255,15 +261,46 @@ export default function EmployeesPage() {
     }, [cleanupWebcam, toast]);
   
     useEffect(() => {
-      if (showProfileWebcam || showFileWebcam) {
+      if (showProfileWebcam) {
         startWebcam(facingMode);
       } else {
-        cleanupWebcam();
+        if(!isScanDialogOpen) cleanupWebcam();
       }
       return () => {
-          if (showProfileWebcam || showFileWebcam) cleanupWebcam();
+          if (showProfileWebcam) cleanupWebcam();
       };
-    }, [showProfileWebcam, showFileWebcam, facingMode, startWebcam, cleanupWebcam]);
+    }, [showProfileWebcam, facingMode, startWebcam, cleanupWebcam, isScanDialogOpen]);
+
+    useEffect(() => {
+      const getCameraPermission = async () => {
+        if (isScanDialogOpen) {
+          setIsInitializingCamera(true);
+          try {
+            const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } });
+            setHasCameraPermission(true);
+            if (videoRef.current) {
+              videoRef.current.srcObject = stream;
+            }
+          } catch (error) {
+            console.error('Error accessing camera:', error);
+            setHasCameraPermission(false);
+            toast({
+              variant: 'destructive',
+              title: 'Camera Access Denied',
+              description: 'Please enable camera permissions in your browser settings.',
+            });
+            setIsScanDialogOpen(false);
+          } finally {
+              setIsInitializingCamera(false);
+          }
+        } else {
+          if(!showProfileWebcam) cleanupWebcam();
+        }
+      };
+      getCameraPermission();
+
+      return () => { if(isScanDialogOpen) cleanupWebcam()};
+  }, [isScanDialogOpen, cleanupWebcam, toast, showProfileWebcam]);
 
 
   const fetchEmployees = useCallback(async () => {
@@ -321,7 +358,6 @@ export default function EmployeesPage() {
     setProfilePicturePreview(null);
     setAssociatedFile(null);
     setShowProfileWebcam(false);
-    setShowFileWebcam(false);
     setHasCameraPermission(null);
     cleanupWebcam();
   }, [cleanupWebcam]);
@@ -437,7 +473,6 @@ export default function EmployeesPage() {
     setProfilePicturePreview(null);
     setAssociatedFile(null);
     setShowProfileWebcam(false);
-    setShowFileWebcam(false);
     setIsEditing(false);
     setIsFormOpen(true);
   };
@@ -448,7 +483,6 @@ export default function EmployeesPage() {
     setProfilePictureFile(null);
     setAssociatedFile(null);
     setShowProfileWebcam(false);
-    setShowFileWebcam(false);
     setIsEditing(true);
     setIsFormOpen(true);
   };
@@ -652,34 +686,53 @@ export default function EmployeesPage() {
     }
   };
   
-  const handleCaptureFilePhoto = () => {
-    if (videoRef.current && canvasRef.current && videoRef.current.readyState >= videoRef.current.HAVE_METADATA) {
-        const video = videoRef.current;
-        const canvas = canvasRef.current;
-        
-        canvas.width = video.videoWidth;
-        canvas.height = video.videoHeight;
-        const context = canvas.getContext('2d');
-        context?.drawImage(video, 0, 0, video.videoWidth, video.videoHeight);
-        
-        canvas.toBlob((blob) => {
-            if (blob) {
-                const file = new File([blob], `scanned_document_${Date.now()}.jpeg`, { type: 'image/jpeg' });
-                
-                if (file.size > 10 * 1024 * 1024) { // 10MB limit
-                    toast({ title: "File Too Large", description: "Scanned image must be less than 10MB.", variant: "destructive"});
-                } else {
-                    setAssociatedFile(file);
-                    toast({ title: "Document Scanned", description: "The scanned document has been attached." });
-                }
-            }
-        }, 'image/jpeg', 0.95);
+  const handleCaptureAndAnalyzeDocument = async () => {
+    if (!videoRef.current || !canvasRef.current) return;
+    
+    const video = videoRef.current;
+    const canvas = canvasRef.current;
+    
+    canvas.width = video.videoWidth;
+    canvas.height = video.videoHeight;
+    
+    const context = canvas.getContext('2d');
+    context?.drawImage(video, 0, 0, video.videoWidth, video.videoHeight);
+    
+    const imageDataUrl = canvas.toDataURL('image/jpeg', 0.9);
+    
+    setIsScanning(true);
+    cleanupWebcam();
 
-        setShowFileWebcam(false);
-    } else {
-        toast({title: "Webcam Error", description: "Webcam not ready or stream not available.", variant: "destructive"});
+    try {
+        const result = await analyzeEmployeeDocument({ documentImage: imageDataUrl });
+
+        if (!result.employees || result.employees.length === 0) {
+          toast({ title: "No Data Found", description: "The AI could not find any employee data in the image.", variant: "destructive" });
+          setIsScanDialogOpen(false);
+          return;
+        }
+
+        setParsedEmployees(result.employees);
+        setIsScanDialogOpen(false);
+        setIsImportDialogOpen(true);
+
+        toast({
+            title: "Document Scanned",
+            description: "Please review the extracted employee data below.",
+        });
+
+    } catch (error: any) {
+        console.error("Error analyzing employee document:", error);
+        toast({
+            variant: 'destructive',
+            title: 'Scan Failed',
+            description: 'Could not extract data from the document. Please try again or use the Excel import.',
+        });
+    } finally {
+        setIsScanning(false);
     }
   };
+
 
   const handleRemoveProfilePic = () => {
     setProfilePictureFile(null);
@@ -849,6 +902,9 @@ export default function EmployeesPage() {
                 <p>Import from Excel</p>
               </TooltipContent>
             </Tooltip>
+            <Button variant="outline" onClick={() => setIsScanDialogOpen(true)} disabled={isSaving || isLoadingEmployees}>
+                <ScanLine className="mr-2 h-4 w-4"/> Scan Document
+            </Button>
             <Button onClick={handleCreateNew} disabled={isSaving || isLoadingEmployees}>
                 <PlusCircle className="mr-2 h-4 w-4" /> Add Employee
             </Button>
@@ -1023,7 +1079,7 @@ export default function EmployeesPage() {
                         <p className="mt-1 text-xs text-muted-foreground">
                             <span className="font-semibold text-primary">Click or drop image</span>
                         </p>
-                        <Input id="profilePictureFile" type="file" accept="image/*" onChange={handleProfilePictureFileChange} className="absolute inset-0 w-full h-full opacity-0 cursor-pointer" disabled={isSaving || showProfileWebcam || showFileWebcam}/>
+                        <Input id="profilePictureFile" type="file" accept="image/*" onChange={handleProfilePictureFileChange} className="absolute inset-0 w-full h-full opacity-0 cursor-pointer" disabled={isSaving || showProfileWebcam}/>
                     </div>
                     <div className="flex gap-1.5">
                         <Button type="button" variant="outline" size="sm" onClick={() => setShowProfileWebcam(prev => !prev)} disabled={isSaving} className="flex-1 text-xs">
@@ -1080,32 +1136,6 @@ export default function EmployeesPage() {
                     <p className="text-xs text-muted-foreground">PDF, DOCX, etc. (Max 10MB)</p>
                     <Input id="associatedFile" type="file" onChange={handleAssociatedFileChange} className="absolute inset-0 w-full h-full opacity-0 cursor-pointer" disabled={isSaving}/>
                 </div>
-                
-                <Button type="button" variant="outline" size="sm" className="w-full mt-2" onClick={() => setShowFileWebcam(prev => !prev)} disabled={isSaving}>
-                    <Camera className="mr-2 h-4 w-4" /> {showFileWebcam ? 'Close Scanner' : 'Scan Document'}
-                </Button>
-
-                {showFileWebcam && (
-                    <div className="mt-1.5 space-y-1.5 p-2 border rounded-md bg-muted/30">
-                        <video ref={videoRef} className="w-full aspect-[4/3] rounded-md bg-black" autoPlay muted playsInline />
-                        {hasCameraPermission === false && (
-                            <Alert variant="destructive" className="p-2 text-xs"><Camera className="h-3.5 w-3.5"/><AlertTitle className="text-xs">Cam Access Denied</AlertTitle><DialogDescription className="text-xs">Enable in browser.</DialogDescription></Alert>
-                        )}
-                        {hasCameraPermission === true && (
-                            <div className="flex gap-2">
-                                {hasMultipleCameras && (
-                                    <Button type="button" onClick={() => setFacingMode(prev => prev === 'user' ? 'environment' : 'user')} className="flex-1 h-9 text-xs" disabled={isSaving || isSwitchingCamera}>
-                                        {isSwitchingCamera ? <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" /> : <SwitchCamera className="mr-1.5 h-3.5 w-3.5" />}
-                                        {isSwitchingCamera ? 'Switching...' : 'Switch Cam'}
-                                    </Button>
-                                )}
-                                <Button type="button" onClick={handleCaptureFilePhoto} className="flex-1 h-9 text-xs" disabled={isSaving || isSwitchingCamera}>
-                                    <Camera className="mr-1.5 h-3.5 w-3.5" /> Capture Document
-                                </Button>
-                            </div>
-                        )}
-                    </div>
-                )}
 
                 {associatedFile && (
                 <div className="text-xs text-muted-foreground flex items-center justify-between p-2 bg-muted rounded-md">
@@ -1144,8 +1174,7 @@ export default function EmployeesPage() {
             <DialogHeader>
                 <DialogTitle>Review Employee Import</DialogTitle>
                 <DialogDescription>
-                    Review the employees parsed from your file. Required columns are 'name', 'position', and 'salary'.
-                    Rows with missing required data will be skipped. Click 'Confirm Import' to add the valid employees.
+                    Review the employees parsed from your file or scan. Invalid or incomplete data will be skipped. Click 'Confirm Import' to add the valid employees.
                 </DialogDescription>
             </DialogHeader>
             <ScrollArea className="max-h-[60vh]">
@@ -1154,8 +1183,8 @@ export default function EmployeesPage() {
                         <TableRow>
                             <TableHead>Name</TableHead>
                             <TableHead>Position</TableHead>
-                            <TableHead className="text-right">Salary</TableHead>
                             <TableHead>Description</TableHead>
+                            <TableHead className="text-right">Salary</TableHead>
                         </TableRow>
                     </TableHeader>
                     <TableBody>
@@ -1163,8 +1192,8 @@ export default function EmployeesPage() {
                         <TableRow key={index}>
                             <TableCell className="font-medium">{emp.name}</TableCell>
                             <TableCell>{emp.position}</TableCell>
-                            <TableCell className="text-right">{currencySymbol}{emp.salary.toLocaleString()}</TableCell>
                             <TableCell>{emp.description}</TableCell>
+                            <TableCell className="text-right">{currencySymbol}{emp.salary.toLocaleString()}</TableCell>
                         </TableRow>
                     )) : (
                         <TableRow>
@@ -1179,6 +1208,38 @@ export default function EmployeesPage() {
                 <Button onClick={handleConfirmImport} disabled={isImporting || parsedEmployees.length === 0}>
                     {isImporting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
                     Confirm Import ({parsedEmployees.length})
+                </Button>
+            </DialogFooter>
+        </DialogContent>
+      </Dialog>
+      
+      <Dialog open={isScanDialogOpen} onOpenChange={setIsScanDialogOpen}>
+        <DialogContent>
+            <DialogHeader>
+                <DialogTitle>Scan Document</DialogTitle>
+                <DialogDescription>Position the employee list within the frame and click capture.</DialogDescription>
+            </DialogHeader>
+            <div className="relative">
+                {isInitializingCamera && (
+                    <div className="absolute inset-0 flex items-center justify-center bg-background/80 z-10">
+                        <Loader2 className="h-8 w-8 animate-spin" />
+                        <p className="ml-2">Starting camera...</p>
+                    </div>
+                )}
+                {isScanning && (
+                     <div className="absolute inset-0 flex flex-col items-center justify-center bg-background/80 z-10">
+                        <Loader2 className="h-8 w-8 animate-spin" />
+                        <p className="ml-2 mt-2">Analyzing document...</p>
+                    </div>
+                )}
+                <video ref={videoRef} className="w-full aspect-video rounded-md bg-black" autoPlay muted playsInline />
+                <canvas ref={canvasRef} className="hidden" />
+            </div>
+            <DialogFooter>
+                <Button variant="outline" onClick={() => setIsScanDialogOpen(false)} disabled={isScanning}>Cancel</Button>
+                <Button onClick={handleCaptureAndAnalyzeDocument} disabled={isInitializingCamera || isScanning || !hasCameraPermission}>
+                    <Camera className="mr-2 h-4 w-4" />
+                    Capture & Analyze
                 </Button>
             </DialogFooter>
         </DialogContent>
