@@ -1,4 +1,3 @@
-
 'use client'
 
 import * as React from "react"
@@ -32,6 +31,7 @@ const COLORS = [
 export default function TransactionPieChart() {
   const { user, currencySymbol } = useAuth();
   const [data, setData] = React.useState<any[]>([]);
+  const [totalExpenses, setTotalExpenses] = React.useState(0);
   const [isLoading, setIsLoading] = React.useState(true);
 
   React.useEffect(() => {
@@ -68,6 +68,10 @@ export default function TransactionPieChart() {
             .sort((a, b) => b.value - a.value);
 
         setData(chartData);
+
+        const total = chartData.reduce((sum, item) => sum + item.value, 0);
+        setTotalExpenses(total);
+
       } catch (error) {
           console.error("Error fetching transaction data for chart:", error);
       } finally {
@@ -107,7 +111,7 @@ export default function TransactionPieChart() {
             </Button>
         </div>
       </CardHeader>
-      <CardContent className="h-[300px] sm:h-[350px]">
+      <CardContent className="h-[300px] sm:h-[350px] relative">
         {isLoading ? (
           <div className="flex items-center justify-center h-full">
             <Skeleton className="h-48 w-48 rounded-full" />
@@ -121,25 +125,35 @@ export default function TransactionPieChart() {
             </Alert>
           </div>
         ) : (
-          <ResponsiveContainer width="100%" height="100%">
-            <PieChart>
-              <Tooltip content={<CustomTooltip />} />
-              <Pie
-                data={data}
-                cx="50%"
-                cy="50%"
-                innerRadius={70}
-                outerRadius={110}
-                fill="hsl(var(--primary))"
-                dataKey="value"
-                paddingAngle={2}
-              >
-                {data.map((entry, index) => (
-                  <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
-                ))}
-              </Pie>
-            </PieChart>
-          </ResponsiveContainer>
+          <>
+            <ResponsiveContainer width="100%" height="100%">
+              <PieChart>
+                <Tooltip content={<CustomTooltip />} />
+                <Pie
+                  data={data}
+                  cx="50%"
+                  cy="50%"
+                  innerRadius={80}
+                  outerRadius={120}
+                  fill="hsl(var(--primary))"
+                  dataKey="value"
+                  paddingAngle={2}
+                  labelLine={false}
+                  label={false}
+                >
+                  {data.map((entry, index) => (
+                    <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+                  ))}
+                </Pie>
+              </PieChart>
+            </ResponsiveContainer>
+            <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
+                <span className="text-sm text-muted-foreground">Total Expenses</span>
+                <span className="text-2xl font-bold">
+                    {currencySymbol}{totalExpenses.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                </span>
+            </div>
+          </>
         )}
       </CardContent>
     </Card>
