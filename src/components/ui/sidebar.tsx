@@ -1,10 +1,9 @@
-
 "use client"
 
 import * as React from "react"
 import { Slot } from "@radix-ui/react-slot"
 import { VariantProps, cva } from "class-variance-authority"
-import { PanelLeft } from "lucide-react"
+import { ChevronLeft, ChevronRight, PanelLeft } from "lucide-react"
 import { VisuallyHidden } from "@radix-ui/react-visually-hidden"
 
 import { useIsMobile } from "@/hooks/use-mobile"
@@ -281,25 +280,23 @@ const SidebarTrigger = React.forwardRef<
   React.ElementRef<typeof Button>,
   React.ComponentProps<typeof Button>
 >(({ className, onClick, variant = "ghost", size = "icon", ...props }, ref) => {
-  const { toggleSidebar } = useSidebar();
-  // Apply h-10 w-10 if size is "icon", otherwise h-7 w-7.
-  const sizeSpecificClass = size === "icon" ? "h-10 w-10" : "h-7 w-7";
-
+  const { toggleSidebar, state, isMobile } = useSidebar();
+  const Icon = isMobile ? PanelLeft : state === "expanded" ? ChevronLeft : ChevronRight;
 
   return (
     <Button
       ref={ref}
       data-sidebar="trigger"
       variant={variant}
-      size={size} // Pass size to Button, it will handle its own logic for 'icon' size
-      className={cn(sizeSpecificClass, className)} // Explicitly set h-10 w-10 for icon if needed, or rely on Button's 'icon' size.
+      size={size}
+      className={cn("h-8 w-8", className)}
       onClick={(event) => {
         onClick?.(event);
         toggleSidebar();
       }}
       {...props}
     >
-      <PanelLeft />
+      <Icon />
       <span className="sr-only">Toggle Sidebar</span>
     </Button>
   );

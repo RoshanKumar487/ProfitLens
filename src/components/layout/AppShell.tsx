@@ -62,12 +62,11 @@ const AppShellLayout = ({ children }: { children: React.ReactNode }) => {
     <>
       {!isAuthPage && (
         <Sidebar collapsible="icon" variant="sidebar" className="border-r">
-          <SidebarHeader className="p-4 flex items-center justify-between">
+          <SidebarHeader className="p-4 flex items-center">
             <Link href="/" onClick={handleNavigationClick} className="flex items-center gap-2.5">
               <LayoutTemplate className="h-8 w-8 text-sidebar-primary" />
               <h1 className="text-2xl font-bold text-sidebar-foreground group-data-[collapsible=icon]:hidden">ProfitLens</h1>
             </Link>
-            <SidebarTrigger variant="ghost" size="icon" className="h-8 w-8 text-foreground/70 hover:text-foreground hidden md:flex" />
           </SidebarHeader>
           <Separator className="bg-sidebar-border" />
           <SidebarContent className="p-2">
@@ -90,43 +89,45 @@ const AppShellLayout = ({ children }: { children: React.ReactNode }) => {
               ))}
             </SidebarMenu>
           </SidebarContent>
-          <SidebarFooter className="p-4 mt-auto border-t border-sidebar-border flex flex-col gap-2 items-stretch group-data-[collapsible=icon]:items-center">
-             {user && (
-                <DropdownMenu>
-                    <DropdownMenuTrigger asChild>
-                        <button className="flex items-center justify-center w-full gap-2 p-2 rounded-md hover:bg-sidebar-accent transition-colors group-data-[collapsible=icon]:w-10 group-data-[collapsible=icon]:h-10 group-data-[collapsible=icon]:p-0 group-data-[collapsible=icon]:justify-center">
-                            <Avatar className="h-9 w-9">
-                                <AvatarFallback className="bg-muted text-muted-foreground font-semibold">
-                                    {getInitials(user.displayName)}
-                                </AvatarFallback>
-                            </Avatar>
-                            <div className="text-left group-data-[collapsible=icon]:hidden">
-                                <p className="text-sm font-medium text-sidebar-foreground">{user.displayName}</p>
-                                <p className="text-xs text-sidebar-foreground/70">{user.email}</p>
-                            </div>
-                        </button>
-                    </DropdownMenuTrigger>
-                    <DropdownMenuContent className="w-56 mb-2 ml-2" align="end" forceMount>
-                        <DropdownMenuLabel className="font-normal">
-                          <div className="flex flex-col space-y-1">
-                            <p className="text-sm font-medium leading-none">{user.displayName}</p>
-                            <p className="text-xs leading-none text-muted-foreground">{user.email}</p>
-                          </div>
-                        </DropdownMenuLabel>
-                        <DropdownMenuSeparator />
-                        <DropdownMenuItem asChild>
-                            <Link href="/company-details" className="cursor-pointer">
-                                <Building className="mr-2 h-4 w-4" />
-                                <span>Company Details</span>
-                            </Link>
-                        </DropdownMenuItem>
-                        <DropdownMenuSeparator />
-                        <DropdownMenuItem onClick={signOut} className="text-destructive focus:text-destructive cursor-pointer">
-                          <LogOut className="mr-2 h-4 w-4" /> Sign Out
-                        </DropdownMenuItem>
-                  </DropdownMenuContent>
-                </DropdownMenu>
-              )}
+          <SidebarFooter className="p-2 mt-auto border-t border-sidebar-border">
+            <div className="flex items-center justify-start gap-2">
+                <SidebarTrigger variant="ghost" size="icon" className="h-8 w-8 text-foreground/70 hover:text-foreground hidden md:flex shrink-0" />
+                {user && (
+                    <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                            <button className="flex items-center gap-2 p-1 rounded-md flex-grow min-w-0 hover:bg-sidebar-accent transition-colors">
+                                <Avatar className="h-9 w-9">
+                                    <AvatarFallback className="bg-muted text-muted-foreground font-semibold">
+                                        {getInitials(user.displayName)}
+                                    </AvatarFallback>
+                                </Avatar>
+                                <div className="text-left flex-grow min-w-0 group-data-[collapsible=icon]:hidden">
+                                    <p className="text-sm font-medium text-sidebar-foreground truncate">{user.displayName}</p>
+                                </div>
+                            </button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent className="w-56 mb-2" align="end" forceMount>
+                            <DropdownMenuLabel className="font-normal">
+                              <div className="flex flex-col space-y-1">
+                                <p className="text-sm font-medium leading-none">{user.displayName}</p>
+                                <p className="text-xs leading-none text-muted-foreground">{user.email}</p>
+                              </div>
+                            </DropdownMenuLabel>
+                            <DropdownMenuSeparator />
+                            <DropdownMenuItem asChild>
+                                <Link href="/company-details" className="cursor-pointer">
+                                    <Building className="mr-2 h-4 w-4" />
+                                    <span>Company Details</span>
+                                </Link>
+                            </DropdownMenuItem>
+                            <DropdownMenuSeparator />
+                            <DropdownMenuItem onClick={signOut} className="text-destructive focus:text-destructive cursor-pointer">
+                              <LogOut className="mr-2 h-4 w-4" /> Sign Out
+                            </DropdownMenuItem>
+                      </DropdownMenuContent>
+                    </DropdownMenu>
+                )}
+            </div>
           </SidebarFooter>
         </Sidebar>
       )}
