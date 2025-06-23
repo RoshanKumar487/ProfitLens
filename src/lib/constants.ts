@@ -1,5 +1,5 @@
 import type { LucideIcon } from 'lucide-react';
-import { LayoutDashboard, TrendingUp, TrendingDown, Sparkles, Receipt, Users, FileBarChart, Shield, HelpCircle, Banknote, Building } from 'lucide-react';
+import { LayoutDashboard, TrendingUp, TrendingDown, Sparkles, Receipt, Users, FileBarChart, Shield, HelpCircle, Banknote, Building, Bot } from 'lucide-react';
 
 export interface NavItem {
   label: string;
@@ -12,6 +12,11 @@ export const NAV_ITEMS: NavItem[] = [
     label: 'Dashboard',
     href: '/',
     icon: LayoutDashboard,
+  },
+  {
+    label: 'AI Assistant',
+    href: '/ai-assistant',
+    icon: Bot,
   },
   {
     label: 'Record Revenue',

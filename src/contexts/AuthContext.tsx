@@ -16,6 +16,8 @@ import { doc, setDoc, serverTimestamp, getDoc, collection, addDoc } from 'fireba
 import { useRouter, usePathname } from 'next/navigation';
 import { useToast } from '@/hooks/use-toast';
 import { getCurrencySymbol } from '@/lib/countries';
+import { app as adminApp } from '@/lib/firebaseAdminConfig';
+import { getAuth } from 'firebase-admin/auth';
 
 type UserRole = 'admin' | 'member' | 'pending' | 'rejected';
 
@@ -27,6 +29,7 @@ interface User {
   country?: string;
   currencySymbol: string;
   role: UserRole;
+  getIdToken: () => Promise<string>;
 }
 
 interface SignUpCompanyInfo {
@@ -56,6 +59,20 @@ interface AuthContextType {
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
+// Function to set a cookie
+const setCookie = (name: string, value: string, days: number) => {
+  let expires = "";
+  if (days) {
+    const date = new Date();
+    date.setTime(date.getTime() + (days * 24 * 60 * 60 * 1000));
+    expires = "; expires=" + date.toUTCString();
+  }
+  if (typeof window !== 'undefined') {
+    document.cookie = name + "=" + (value || "") + expires + "; path=/; SameSite=Lax";
+  }
+};
+
+
 export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [user, setUser] = useState<User | null>(null);
   const [isLoading, setIsLoading] = useState(true);
@@ -69,6 +86,11 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       if (firebaseUser) {
         const userDocRef = doc(db, 'users', firebaseUser.uid);
         const userDocSnap = await getDoc(userDocRef);
+        
+        // Store ID token in a cookie for server-side verification in actions
+        const idToken = await firebaseUser.getIdToken();
+        setCookie('firebaseIdToken', idToken, 1);
+
 
         if (userDocSnap.exists()) {
           const userData = userDocSnap.data();
@@ -100,6 +122,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
             country: userCountry,
             currencySymbol: currencySymbol,
             role: userRole,
+            getIdToken: () => firebaseUser.getIdToken(),
           };
           setUser(appUser);
           
@@ -115,10 +138,12 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
           }
         } else {
           setUser(null);
+          setCookie('firebaseIdToken', '', -1);
           console.log('AuthContext: Firebase user exists, but no user document found in Firestore. Possibly pending approval.');
         }
       } else {
         setUser(null);
+        setCookie('firebaseIdToken', '', -1);
         console.log('AuthContext: No user signed in.');
       }
       setIsLoading(false);

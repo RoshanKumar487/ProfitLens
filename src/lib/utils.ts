@@ -20,3 +20,7 @@ export function downloadCsv(csvString: string, filename: string) {
     URL.revokeObjectURL(url);
   }
 }
+
+export function formatAmount(amount: number, currencySymbol = '$') {
+  return `${currencySymbol}${amount.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+}
