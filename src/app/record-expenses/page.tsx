@@ -15,7 +15,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, Di
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow, TableCaption } from '@/components/ui/table';
-import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { CalendarIcon, TrendingDown, Save, Loader2, MoreHorizontal, Edit, Trash2, Search, Upload, PlusCircle, ScanLine, Camera, ArrowUp, ArrowDown, ChevronsUpDown } from 'lucide-react';
 import { format } from 'date-fns';
@@ -513,11 +513,18 @@ export default function RecordExpensesPage() {
                 <p>Import from Excel</p>
               </TooltipContent>
             </Tooltip>
-            <Button onClick={() => setIsScanDialogOpen(true)} variant="outline" disabled={isSaving || isLoadingEntries}>
-              <ScanLine className="mr-2 h-4 w-4" />
-              Scan Receipt
-            </Button>
-            <Button onClick={() => setIsAddDialogOpen(true)} disabled={isSaving || isLoadingEntries}>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button onClick={() => setIsScanDialogOpen(true)} variant="outline" size="icon" disabled={isSaving || isLoadingEntries}>
+                  <ScanLine className="h-4 w-4" />
+                  <span className="sr-only">Scan Receipt</span>
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent>
+                 <p>Scan Receipt</p>
+              </TooltipContent>
+            </Tooltip>
+            <Button onClick={() => { resetNewEntryForm(); setIsAddDialogOpen(true); }} disabled={isSaving || isLoadingEntries}>
                 <PlusCircle className="mr-2 h-4 w-4" />
                 Record Expense
             </Button>

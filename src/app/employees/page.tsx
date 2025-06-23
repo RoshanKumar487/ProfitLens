@@ -51,7 +51,7 @@ import { cn } from '@/lib/utils';
 import * as xlsx from 'xlsx';
 import { bulkAddEmployees } from './actions';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { analyzeEmployeeDocument } from '@/ai/flows/analyze-employee-document-flow';
 
 
@@ -122,7 +122,7 @@ export default function EmployeesPage() {
   // State for bulk import
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [isImportDialogOpen, setIsImportDialogOpen] = useState(false);
-  const [parsedEmployees, setParsedEmployees] = useState<ParsedEmployee[]>([]);
+  const [editableParsedEmployees, setEditableParsedEmployees] = useState<ParsedEmployee[]>([]);
   const [isImporting, setIsImporting] = useState(false);
   
   // State for scanning
@@ -712,13 +712,13 @@ export default function EmployeesPage() {
           return;
         }
 
-        setParsedEmployees(result.employees);
+        setEditableParsedEmployees(result.employees);
         setIsScanDialogOpen(false);
         setIsImportDialogOpen(true);
 
         toast({
             title: "Document Scanned",
-            description: "Please review the extracted employee data below.",
+            description: "Please review and edit the extracted employee data below.",
         });
 
     } catch (error: any) {
@@ -831,7 +831,7 @@ export default function EmployeesPage() {
            return;
         }
         
-        setParsedEmployees(employeesToParse);
+        setEditableParsedEmployees(employeesToParse);
         setIsImportDialogOpen(true);
       } catch (error) {
         console.error("Error parsing Excel file:", error);
@@ -847,24 +847,32 @@ export default function EmployeesPage() {
     reader.readAsBinaryString(file);
   };
 
+  const handleParsedEmployeeChange = (index: number, field: keyof ParsedEmployee, value: string | number) => {
+    setEditableParsedEmployees(prev => {
+        const newEmployees = [...prev];
+        (newEmployees[index] as any)[field] = value;
+        return newEmployees;
+    });
+  };
+
   const handleConfirmImport = async () => {
     if (!user || !user.companyId) {
         toast({ title: 'Authentication Error', variant: 'destructive' });
         return;
     }
-    if (parsedEmployees.length === 0) {
+    if (editableParsedEmployees.length === 0) {
         toast({ title: 'No Data', description: 'There are no employees to import.', variant: 'destructive' });
         return;
     }
     setIsImporting(true);
-    const result = await bulkAddEmployees(parsedEmployees, user.companyId, user.uid, user.displayName || user.email || 'System');
+    const result = await bulkAddEmployees(editableParsedEmployees, user.companyId, user.uid, user.displayName || user.email || 'System');
     
     toast({ title: result.success ? 'Import Successful' : 'Import Failed', description: result.message, variant: result.success ? 'default' : 'destructive'});
 
     if (result.success) {
         fetchEmployees();
         setIsImportDialogOpen(false);
-        setParsedEmployees([]);
+        setEditableParsedEmployees([]);
     }
     setIsImporting(false);
   };
@@ -889,7 +897,7 @@ export default function EmployeesPage() {
 
   return (
     <div className="space-y-6 p-4 sm:p-6 lg:p-8">
-      <PageTitle title="Employees View" subtitle="Manage your team members." icon={Users2}>
+      <PageTitle title="Employees" subtitle="Manage your team members." icon={Users2}>
         <div className="flex flex-col sm:flex-row gap-2">
             <Tooltip>
               <TooltipTrigger asChild>
@@ -902,9 +910,17 @@ export default function EmployeesPage() {
                 <p>Import from Excel</p>
               </TooltipContent>
             </Tooltip>
-            <Button variant="outline" onClick={() => setIsScanDialogOpen(true)} disabled={isSaving || isLoadingEmployees}>
-                <ScanLine className="mr-2 h-4 w-4"/> Scan Document
-            </Button>
+             <Tooltip>
+              <TooltipTrigger asChild>
+                 <Button variant="outline" size="icon" onClick={() => setIsScanDialogOpen(true)} disabled={isSaving || isLoadingEmployees}>
+                    <ScanLine className="h-4 w-4"/>
+                    <span className="sr-only">Scan Document</span>
+                 </Button>
+              </TooltipTrigger>
+              <TooltipContent>
+                <p>Scan Document</p>
+              </TooltipContent>
+            </Tooltip>
             <Button onClick={handleCreateNew} disabled={isSaving || isLoadingEmployees}>
                 <PlusCircle className="mr-2 h-4 w-4" /> Add Employee
             </Button>
@@ -1174,10 +1190,10 @@ export default function EmployeesPage() {
             <DialogHeader>
                 <DialogTitle>Review Employee Import</DialogTitle>
                 <DialogDescription>
-                    Review the employees parsed from your file or scan. Invalid or incomplete data will be skipped. Click 'Confirm Import' to add the valid employees.
+                    Review and edit the employees parsed from your file or scan. Invalid or incomplete data will be skipped. Click 'Confirm Import' to add them.
                 </DialogDescription>
             </DialogHeader>
-            <ScrollArea className="max-h-[60vh]">
+            <ScrollArea className="max-h-[60vh] border rounded-md">
                 <Table>
                     <TableHeader>
                         <TableRow>
@@ -1188,12 +1204,20 @@ export default function EmployeesPage() {
                         </TableRow>
                     </TableHeader>
                     <TableBody>
-                    {parsedEmployees.length > 0 ? parsedEmployees.map((emp, index) => (
+                    {editableParsedEmployees.length > 0 ? editableParsedEmployees.map((emp, index) => (
                         <TableRow key={index}>
-                            <TableCell className="font-medium">{emp.name}</TableCell>
-                            <TableCell>{emp.position}</TableCell>
-                            <TableCell>{emp.description}</TableCell>
-                            <TableCell className="text-right">{currencySymbol}{emp.salary.toLocaleString()}</TableCell>
+                            <TableCell>
+                                <Input value={emp.name} onChange={(e) => handleParsedEmployeeChange(index, 'name', e.target.value)} className="h-8" />
+                            </TableCell>
+                            <TableCell>
+                                <Input value={emp.position} onChange={(e) => handleParsedEmployeeChange(index, 'position', e.target.value)} className="h-8" />
+                            </TableCell>
+                            <TableCell>
+                                <Input value={emp.description || ''} onChange={(e) => handleParsedEmployeeChange(index, 'description', e.target.value)} className="h-8" />
+                            </TableCell>
+                            <TableCell className="text-right">
+                                <Input type="number" value={emp.salary} onChange={(e) => handleParsedEmployeeChange(index, 'salary', Number(e.target.value))} className="h-8 text-right" />
+                            </TableCell>
                         </TableRow>
                     )) : (
                         <TableRow>
@@ -1205,9 +1229,9 @@ export default function EmployeesPage() {
             </ScrollArea>
             <DialogFooter>
                 <Button variant="outline" onClick={() => setIsImportDialogOpen(false)} disabled={isImporting}>Cancel</Button>
-                <Button onClick={handleConfirmImport} disabled={isImporting || parsedEmployees.length === 0}>
+                <Button onClick={handleConfirmImport} disabled={isImporting || editableParsedEmployees.length === 0}>
                     {isImporting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
-                    Confirm Import ({parsedEmployees.length})
+                    Confirm Import ({editableParsedEmployees.length})
                 </Button>
             </DialogFooter>
         </DialogContent>
