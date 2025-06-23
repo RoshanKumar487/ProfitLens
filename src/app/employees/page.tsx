@@ -39,7 +39,7 @@ import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger, DropdownMenuSeparator } from '@/components/ui/dropdown-menu';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
-import { Users2, PlusCircle, MoreHorizontal, Edit, Trash2, Loader2, Save, Camera, UploadCloud, FileText, XCircle, SwitchCamera } from 'lucide-react';
+import { Users2, PlusCircle, MoreHorizontal, Edit, Trash2, Loader2, Save, Camera, UploadCloud, FileText, XCircle, SwitchCamera, Upload } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/contexts/AuthContext';
 import { db } from '@/lib/firebaseConfig';
@@ -48,6 +48,10 @@ import { uploadFileToStorage, deleteFileFromStorage } from '@/lib/firebaseStorag
 import { Skeleton } from '@/components/ui/skeleton';
 import { Badge } from '@/components/ui/badge';
 import { cn } from '@/lib/utils';
+import * as xlsx from 'xlsx';
+import { bulkAddEmployees } from './actions';
+import { ScrollArea } from '@/components/ui/scroll-area';
+
 
 interface EmployeeFirestore {
   id?: string;
@@ -71,6 +75,9 @@ interface EmployeeDisplay extends Omit<EmployeeFirestore, 'createdAt' | 'updated
   id: string;
   createdAt: Date;
 }
+
+type ParsedEmployee = Omit<EmployeeFirestore, 'id' | 'createdAt' | 'updatedAt' | 'companyId' | 'addedById' | 'addedBy' | 'profilePictureUrl' | 'profilePictureStoragePath' | 'associatedFileUrl' | 'associatedFileName' | 'associatedFileStoragePath'>;
+
 
 const getInitials = (name: string = "") => {
   const names = name.split(' ');
@@ -108,6 +115,13 @@ export default function EmployeesPage() {
   
   const [isDraggingProfile, setIsDraggingProfile] = useState(false);
   const [isDraggingFile, setIsDraggingFile] = useState(false);
+
+  // State for bulk import
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const [isImportDialogOpen, setIsImportDialogOpen] = useState(false);
+  const [parsedEmployees, setParsedEmployees] = useState<ParsedEmployee[]>([]);
+  const [isImporting, setIsImporting] = useState(false);
+
 
   useEffect(() => {
     // This is to clean up the object URL to avoid memory leaks
@@ -635,6 +649,83 @@ export default function EmployeesPage() {
       e.dataTransfer.clearData();
   };
 
+  // Bulk import handlers
+  const handleImportClick = () => {
+    fileInputRef.current?.click();
+  };
+
+  const handleImportFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      try {
+        const data = event.target?.result;
+        const workbook = xlsx.read(data, { type: 'binary' });
+        const sheetName = workbook.SheetNames[0];
+        const worksheet = workbook.Sheets[sheetName];
+        const json: any[] = xlsx.utils.sheet_to_json(worksheet);
+
+        const requiredHeaders = ['name', 'position', 'salary'];
+        const fileHeaders = Object.keys(json[0] || {});
+        const hasAllHeaders = requiredHeaders.every(h => fileHeaders.includes(h));
+
+        if (!hasAllHeaders) {
+          toast({ title: 'Invalid File Format', description: `Excel file must contain 'name', 'position', and 'salary' columns.`, variant: 'destructive' });
+          return;
+        }
+
+        const employeesToParse: ParsedEmployee[] = json.map(row => ({
+          name: String(row.name || ''),
+          position: String(row.position || ''),
+          salary: Number(row.salary || 0),
+          description: String(row.description || '')
+        })).filter(emp => emp.name && emp.position && !isNaN(emp.salary));
+
+        if (employeesToParse.length === 0) {
+           toast({ title: 'No Valid Data', description: 'No valid employee data could be parsed from the file.', variant: 'destructive' });
+           return;
+        }
+        
+        setParsedEmployees(employeesToParse);
+        setIsImportDialogOpen(true);
+      } catch (error) {
+        console.error("Error parsing Excel file:", error);
+        toast({ title: 'File Read Error', description: 'Could not read or parse the selected file.', variant: 'destructive' });
+      } finally {
+        // Reset file input to allow re-uploading the same file
+        if (e.target) e.target.value = '';
+      }
+    };
+    reader.onerror = () => {
+        toast({ title: 'File Read Error', description: 'Failed to read the file.', variant: 'destructive' });
+    };
+    reader.readAsBinaryString(file);
+  };
+
+  const handleConfirmImport = async () => {
+    if (!user || !user.companyId) {
+        toast({ title: 'Authentication Error', variant: 'destructive' });
+        return;
+    }
+    if (parsedEmployees.length === 0) {
+        toast({ title: 'No Data', description: 'There are no employees to import.', variant: 'destructive' });
+        return;
+    }
+    setIsImporting(true);
+    const result = await bulkAddEmployees(parsedEmployees, user.companyId, user.uid, user.displayName || user.email || 'System');
+    
+    toast({ title: result.success ? 'Import Successful' : 'Import Failed', description: result.message, variant: result.success ? 'default' : 'destructive'});
+
+    if (result.success) {
+        fetchEmployees();
+        setIsImportDialogOpen(false);
+        setParsedEmployees([]);
+    }
+    setIsImporting(false);
+  };
+
 
   if (authIsLoading) {
     return ( <div className="flex items-center justify-center h-[calc(100vh-200px)]"><Loader2 className="h-12 w-12 animate-spin text-primary" /> <p className="ml-2">Loading authentication...</p></div> );
@@ -656,9 +747,15 @@ export default function EmployeesPage() {
   return (
     <div className="space-y-6 p-4 sm:p-6 lg:p-8">
       <PageTitle title="Employees View" subtitle="Manage your team members." icon={Users2}>
-        <Button onClick={handleCreateNew} disabled={isSaving || isLoadingEmployees}>
-            <PlusCircle className="mr-2 h-4 w-4" /> Add Employee
-        </Button>
+        <div className="flex flex-col sm:flex-row gap-2">
+            <Button variant="outline" onClick={handleImportClick} disabled={isSaving || isLoadingEmployees}>
+                <Upload className="mr-2 h-4 w-4" /> Import from Excel
+            </Button>
+            <Button onClick={handleCreateNew} disabled={isSaving || isLoadingEmployees}>
+                <PlusCircle className="mr-2 h-4 w-4" /> Add Employee
+            </Button>
+            <input type="file" ref={fileInputRef} onChange={handleImportFileChange} className="hidden" accept=".xlsx, .xls, .csv" />
+        </div>
       </PageTitle>
 
       <Card>
@@ -891,6 +988,51 @@ export default function EmployeesPage() {
                 {isSaving ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Save className="mr-2 h-4 w-4" />}
                 {isSaving ? 'Saving...' : (isEditing ? 'Save Changes' : 'Add Employee')}
               </Button>
+            </DialogFooter>
+        </DialogContent>
+      </Dialog>
+      
+      <Dialog open={isImportDialogOpen} onOpenChange={setIsImportDialogOpen}>
+        <DialogContent className="sm:max-w-4xl">
+            <DialogHeader>
+                <DialogTitle>Review Employee Import</DialogTitle>
+                <DialogDescription>
+                    Review the employees parsed from your file. Required columns are 'name', 'position', and 'salary'.
+                    Rows with missing required data will be skipped. Click 'Confirm Import' to add the valid employees.
+                </DialogDescription>
+            </DialogHeader>
+            <ScrollArea className="max-h-[60vh]">
+                <Table>
+                    <TableHeader>
+                        <TableRow>
+                            <TableHead>Name</TableHead>
+                            <TableHead>Position</TableHead>
+                            <TableHead className="text-right">Salary</TableHead>
+                            <TableHead>Description</TableHead>
+                        </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                    {parsedEmployees.length > 0 ? parsedEmployees.map((emp, index) => (
+                        <TableRow key={index}>
+                            <TableCell className="font-medium">{emp.name}</TableCell>
+                            <TableCell>{emp.position}</TableCell>
+                            <TableCell className="text-right">{currencySymbol}{emp.salary.toLocaleString()}</TableCell>
+                            <TableCell>{emp.description}</TableCell>
+                        </TableRow>
+                    )) : (
+                        <TableRow>
+                            <TableCell colSpan={4} className="text-center h-24">No valid employees to display.</TableCell>
+                        </TableRow>
+                    )}
+                    </TableBody>
+                </Table>
+            </ScrollArea>
+            <DialogFooter>
+                <Button variant="outline" onClick={() => setIsImportDialogOpen(false)} disabled={isImporting}>Cancel</Button>
+                <Button onClick={handleConfirmImport} disabled={isImporting || parsedEmployees.length === 0}>
+                    {isImporting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
+                    Confirm Import ({parsedEmployees.length})
+                </Button>
             </DialogFooter>
         </DialogContent>
       </Dialog>
