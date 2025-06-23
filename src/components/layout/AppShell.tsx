@@ -19,10 +19,11 @@ import { NAV_ITEMS } from '@/lib/constants';
 import { Separator } from '@/components/ui/separator';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
-import { LogOut, Loader2, Building, LayoutTemplate, Bell } from 'lucide-react';
+import { LogOut, Loader2, Building, LayoutTemplate, Bell, Bot } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
+import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 
 const AppShellLayout = ({ children }: { children: React.ReactNode }) => {
   const pathname = usePathname();
@@ -159,6 +160,21 @@ const AppShellLayout = ({ children }: { children: React.ReactNode }) => {
            ) : children}
         </main>
       </SidebarInset>
+      
+      {!isAuthPage && !authLoading && user && (
+        <Tooltip>
+            <TooltipTrigger asChild>
+                <Button asChild className="fixed bottom-6 right-6 h-16 w-16 rounded-full shadow-2xl z-50">
+                    <Link href="/ai-assistant">
+                        <Bot className="h-8 w-8" />
+                    </Link>
+                </Button>
+            </TooltipTrigger>
+            <TooltipContent side="left">
+                <p>AI Assistant</p>
+            </TooltipContent>
+        </Tooltip>
+      )}
     </>
   );
 };

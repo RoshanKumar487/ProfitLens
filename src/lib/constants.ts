@@ -14,11 +14,6 @@ export const NAV_ITEMS: NavItem[] = [
     icon: LayoutDashboard,
   },
   {
-    label: 'AI Assistant',
-    href: '/ai-assistant',
-    icon: Bot,
-  },
-  {
     label: 'Record Revenue',
     href: '/record-revenue',
     icon: TrendingUp,
