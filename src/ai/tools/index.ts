@@ -1,5 +1,3 @@
-
-'use server';
 /**
  * @fileOverview Tools for the AI Assistant to interact with the application's data.
  */
