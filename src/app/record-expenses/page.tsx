@@ -1,3 +1,4 @@
+
 'use client';
 
 import React, { useState, useEffect, FormEvent, useCallback, useMemo, useRef } from 'react';
@@ -13,10 +14,10 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter, DialogClose } from "@/components/ui/dialog";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow, TableCaption } from '@/components/ui/table';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { CalendarIcon, TrendingDown, Save, Loader2, MoreHorizontal, Edit, Trash2, Search, Upload } from 'lucide-react';
+import { CalendarIcon, TrendingDown, Save, Loader2, MoreHorizontal, Edit, Trash2, Search, Upload, PlusCircle } from 'lucide-react';
 import { format } from 'date-fns';
 import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/contexts/AuthContext';
@@ -24,6 +25,7 @@ import { db } from '@/lib/firebaseConfig';
 import { collection, addDoc, getDocs, query, where, orderBy, Timestamp, serverTimestamp } from 'firebase/firestore';
 import * as xlsx from 'xlsx';
 import { updateExpenseEntry, deleteExpenseEntry, type ExpenseUpdateData, bulkAddExpenses, type ExpenseImportData } from './actions';
+import { Skeleton } from '@/components/ui/skeleton';
 
 const EXPENSE_CATEGORIES = [
   'Software & Subscriptions',
@@ -79,7 +81,8 @@ export default function RecordExpensesPage() {
   
   const [searchTerm, setSearchTerm] = useState<string>('');
 
-  // State for editing and deleting
+  // State for dialogs
+  const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
   const [currentExpense, setCurrentExpense] = useState<ExpenseEntryDisplay | null>(null);
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
@@ -142,6 +145,14 @@ export default function RecordExpensesPage() {
     );
   }, [recentEntries, searchTerm]);
 
+  const resetNewEntryForm = () => {
+    setNewEntryDate(new Date());
+    setNewEntryAmount('');
+    setNewEntryCategory('');
+    setNewEntryDescription('');
+    setNewEntryVendor('');
+  };
+
   const handleNewEntrySubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!user || !user.companyId) {
@@ -176,11 +187,8 @@ export default function RecordExpensesPage() {
       await addDoc(collection(db, 'expenses'), newEntryPayload);
       fetchExpenseEntries();
       toast({ title: 'Expense Recorded', description: `Successfully recorded ${currency}${amountNum.toFixed(2)} for ${newEntryCategory}.` });
-      setNewEntryDate(new Date());
-      setNewEntryAmount('');
-      setNewEntryCategory('');
-      setNewEntryDescription('');
-      setNewEntryVendor('');
+      resetNewEntryForm();
+      setIsAddDialogOpen(false);
     } catch (error: any) {
       toast({ title: 'Save Failed', description: error.message, variant: 'destructive' });
     } finally {
@@ -346,7 +354,7 @@ export default function RecordExpensesPage() {
 
   return (
     <div className="space-y-6 p-4 sm:p-6 lg:p-8">
-      <PageTitle title="Record Expenses" subtitle="Log your business expenditures." icon={TrendingDown}>
+      <PageTitle title="Record Expenses" subtitle="Log and manage your business expenditures." icon={TrendingDown}>
         <div className="flex flex-col sm:flex-row gap-2">
             <Tooltip>
               <TooltipTrigger asChild>
@@ -359,121 +367,135 @@ export default function RecordExpensesPage() {
                 <p>Import from Excel</p>
               </TooltipContent>
             </Tooltip>
-            <Button type="submit" form="new-expense-form" disabled={isSaving || isLoadingEntries}>
-                {isSaving ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Save className="mr-2 h-4 w-4" />}
-                {isSaving ? 'Saving...' : 'Record Expense'}
+            <Button onClick={() => setIsAddDialogOpen(true)} disabled={isSaving || isLoadingEntries}>
+                <PlusCircle className="mr-2 h-4 w-4" />
+                Record Expense
             </Button>
             <input type="file" ref={fileInputRef} onChange={handleImportFileChange} className="hidden" accept=".xlsx, .xls, .csv" />
         </div>
       </PageTitle>
-      <div className="grid gap-6 md:grid-cols-2">
-        <Card className="shadow-lg">
-          <CardHeader>
-            <CardTitle className="font-headline">New Expense Entry</CardTitle>
-            <CardDescription>Enter the details of the expense incurred.</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <form id="new-expense-form" onSubmit={handleNewEntrySubmit} className="space-y-4">
-              <div>
-                <Label htmlFor="date">Date</Label>
-                <Popover>
-                  <PopoverTrigger asChild>
-                    <Button variant="outline" className="w-full justify-start text-left font-normal" disabled={isSaving}>
-                      <CalendarIcon className="mr-2 h-4 w-4" />
-                      {newEntryDate ? format(newEntryDate, 'PPP') : <span>Pick a date</span>}
-                    </Button>
-                  </PopoverTrigger>
-                  <PopoverContent className="w-auto p-0"><Calendar mode="single" selected={newEntryDate} onSelect={setNewEntryDate} initialFocus disabled={isSaving}/></PopoverContent>
-                </Popover>
-              </div>
 
-              <div>
-                <Label htmlFor="amount">Amount ({currency})</Label>
-                <Input id="amount" type="number" value={newEntryAmount} onChange={(e) => setNewEntryAmount(e.target.value)} placeholder="e.g., 75.50" required min="0.01" step="0.01" disabled={isSaving} />
+      <Card className="shadow-lg">
+        <CardHeader>
+          <div className="flex flex-col sm:flex-row items-center gap-2 justify-between">
+              <div className="flex-1">
+                  <CardTitle className="font-headline">Expense History</CardTitle>
+                  <CardDescription>A list of your recorded expense entries.</CardDescription>
               </div>
-
-              <div>
-                <Label htmlFor="category">Category</Label>
-                <Select value={newEntryCategory} onValueChange={setNewEntryCategory} disabled={isSaving}>
-                  <SelectTrigger id="category" required><SelectValue placeholder="Select a category" /></SelectTrigger>
-                  <SelectContent>{EXPENSE_CATEGORIES.map((cat) => (<SelectItem key={cat} value={cat}>{cat}</SelectItem>))}</SelectContent>
-                </Select>
+              <div className="relative w-full sm:w-auto">
+                  <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+                  <Input
+                  type="search"
+                  placeholder="Filter by category, vendor..."
+                  className="pl-8 sm:w-[200px] md:w-[250px]"
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                  disabled={isLoadingEntries && recentEntries.length === 0}
+                  />
               </div>
-              
-              <div>
-                <Label htmlFor="vendor">Vendor (Optional)</Label>
-                <Input id="vendor" value={newEntryVendor} onChange={(e) => setNewEntryVendor(e.target.value)} placeholder="e.g., AWS, Staples" disabled={isSaving}/>
-              </div>
-
-              <div>
-                <Label htmlFor="description">Description (Optional)</Label>
-                <Textarea id="description" value={newEntryDescription} onChange={(e) => setNewEntryDescription(e.target.value)} placeholder="e.g., Monthly server costs, Printer paper" disabled={isSaving}/>
-              </div>
-            </form>
-          </CardContent>
-        </Card>
-
-        <Card className="shadow-lg">
-          <CardHeader>
-            <div className="flex flex-col sm:flex-row items-center gap-2 justify-between">
-                <div className="flex-1">
-                    <CardTitle className="font-headline">Expense Entries</CardTitle>
-                    <CardDescription>A list of your recorded expense entries.</CardDescription>
-                </div>
-                <div className="relative w-full sm:w-auto">
-                    <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
-                    <Input
-                    type="search"
-                    placeholder="Filter by category, vendor..."
-                    className="pl-8 sm:w-[200px] md:w-[250px]"
-                    value={searchTerm}
-                    onChange={(e) => setSearchTerm(e.target.value)}
-                    disabled={isLoadingEntries && recentEntries.length === 0}
-                    />
-                </div>
+          </div>
+        </CardHeader>
+        <CardContent>
+          <Table>
+            <TableCaption>{!isLoadingEntries && filteredEntries.length === 0 && (searchTerm ? "No expenses match your search." : 'No expenses recorded yet. Click "Record Expense" to start.')}</TableCaption>
+            <TableHeader>
+              <TableRow>
+                <TableHead>Date</TableHead>
+                <TableHead>Category/Vendor</TableHead>
+                <TableHead>Description</TableHead>
+                <TableHead>Added By</TableHead>
+                <TableHead className="text-right">Amount</TableHead>
+                <TableHead className="w-[50px] text-right">Actions</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {isLoadingEntries ? (
+                 [...Array(5)].map((_, i) => (
+                  <TableRow key={i}>
+                    <TableCell><Skeleton className="h-4 w-[80px]" /></TableCell>
+                    <TableCell><Skeleton className="h-4 w-[150px]" /></TableCell>
+                    <TableCell><Skeleton className="h-4 w-[200px]" /></TableCell>
+                    <TableCell><Skeleton className="h-4 w-[100px]" /></TableCell>
+                    <TableCell className="text-right"><Skeleton className="h-4 w-[60px] ml-auto" /></TableCell>
+                    <TableCell className="text-right"><Skeleton className="h-8 w-8 ml-auto" /></TableCell>
+                  </TableRow>
+                ))
+              ) : filteredEntries.map(entry => (
+                  <TableRow key={entry.id}>
+                    <TableCell>{format(entry.date, 'PP')}</TableCell>
+                    <TableCell>
+                      <div className="font-medium">{entry.category}</div>
+                      {entry.vendor && <div className="text-xs text-muted-foreground">{entry.vendor}</div>}
+                    </TableCell>
+                    <TableCell className="max-w-xs truncate" title={entry.description}>{entry.description || '-'}</TableCell>
+                    <TableCell>{entry.addedBy}</TableCell>
+                    <TableCell className="text-right font-semibold">{currency}{entry.amount.toFixed(2)}</TableCell>
+                    <TableCell className="text-right">
+                      <DropdownMenu>
+                        <DropdownMenuTrigger asChild><Button variant="ghost" size="icon" className="h-8 w-8"><MoreHorizontal className="h-4 w-4" /></Button></DropdownMenuTrigger>
+                        <DropdownMenuContent align="end">
+                            <DropdownMenuItem onClick={() => handleEditClick(entry)}><Edit className="mr-2 h-4 w-4"/>Edit</DropdownMenuItem>
+                            <DropdownMenuItem onClick={() => handleDeleteClick(entry.id)} className="text-destructive focus:text-destructive"><Trash2 className="mr-2 h-4 w-4"/>Delete</DropdownMenuItem>
+                        </DropdownMenuContent>
+                      </DropdownMenu>
+                    </TableCell>
+                  </TableRow>
+                ))
+              }
+            </TableBody>
+          </Table>
+        </CardContent>
+      </Card>
+      
+       {/* Add Dialog */}
+      <Dialog open={isAddDialogOpen} onOpenChange={setIsAddDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>New Expense Entry</DialogTitle>
+            <DialogDescription>Enter the details of the expense incurred.</DialogDescription>
+          </DialogHeader>
+          <form id="new-expense-form" onSubmit={handleNewEntrySubmit} className="space-y-4 py-2">
+            <div>
+              <Label htmlFor="new-date">Date</Label>
+              <Popover>
+                <PopoverTrigger asChild>
+                  <Button variant="outline" className="w-full justify-start text-left font-normal" disabled={isSaving}>
+                    <CalendarIcon className="mr-2 h-4 w-4" />
+                    {newEntryDate ? format(newEntryDate, 'PPP') : <span>Pick a date</span>}
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-auto p-0"><Calendar mode="single" selected={newEntryDate} onSelect={setNewEntryDate} initialFocus disabled={isSaving}/></PopoverContent>
+              </Popover>
             </div>
-          </CardHeader>
-          <CardContent className="space-y-3">
-            {isLoadingEntries ? (
-               [...Array(5)].map((_, i) => (
-                <div key={i} className="p-3 bg-muted/50 rounded-lg border border-border animate-pulse">
-                  <div className="flex justify-between items-center"><div className="h-5 bg-muted rounded w-1/4"></div><div className="h-4 bg-muted rounded w-1/5"></div></div>
-                  <div className="h-4 bg-muted rounded w-1/2 mt-1"></div><div className="h-3 bg-muted rounded w-3/4 mt-1"></div>
-                </div>
-              ))
-            ) : recentEntries.length > 0 ? (
-                filteredEntries.length > 0 ? (
-                    filteredEntries.map(entry => (
-                        <div key={entry.id} className="group p-3 bg-muted/50 rounded-lg border border-border">
-                        <div className="flex justify-between items-start">
-                            <div>
-                                <div className="flex items-center gap-2">
-                                <span className="font-semibold text-foreground">{currency}{entry.amount.toFixed(2)}</span>
-                                <span className="text-xs text-muted-foreground">{format(entry.date, 'PP')}</span>
-                                </div>
-                                <p className="text-sm text-muted-foreground">{entry.category}{entry.vendor ? ` - ${entry.vendor}` : ''}</p>
-                            </div>
-                            <DropdownMenu>
-                            <DropdownMenuTrigger asChild><Button variant="ghost" size="icon" className="h-8 w-8 opacity-50 group-hover:opacity-100 transition-opacity"><MoreHorizontal className="h-4 w-4" /></Button></DropdownMenuTrigger>
-                            <DropdownMenuContent align="end">
-                                <DropdownMenuItem onClick={() => handleEditClick(entry)}><Edit className="mr-2 h-4 w-4"/>Edit</DropdownMenuItem>
-                                <DropdownMenuItem onClick={() => handleDeleteClick(entry.id)} className="text-destructive focus:text-destructive"><Trash2 className="mr-2 h-4 w-4"/>Delete</DropdownMenuItem>
-                            </DropdownMenuContent>
-                            </DropdownMenu>
-                        </div>
-                        {entry.description && <p className="text-xs text-muted-foreground mt-1">{entry.description}</p>}
-                        <p className="text-xs text-muted-foreground mt-1">Added by: <span className="font-medium">{entry.addedBy}</span></p>
-                        </div>
-                    ))
-                ) : (
-                    <p className="text-sm text-muted-foreground text-center py-4">No expenses match your search.</p>
-                )
-            ) : (
-              <p className="text-sm text-muted-foreground text-center py-4">No expenses recorded yet.</p>
-            )}
-          </CardContent>
-        </Card>
-      </div>
+            <div>
+              <Label htmlFor="new-amount">Amount ({currency})</Label>
+              <Input id="new-amount" type="number" value={newEntryAmount} onChange={(e) => setNewEntryAmount(e.target.value)} placeholder="e.g., 75.50" required min="0.01" step="0.01" disabled={isSaving} />
+            </div>
+            <div>
+              <Label htmlFor="new-category">Category</Label>
+              <Select value={newEntryCategory} onValueChange={setNewEntryCategory} disabled={isSaving}>
+                <SelectTrigger id="new-category" required><SelectValue placeholder="Select a category" /></SelectTrigger>
+                <SelectContent>{EXPENSE_CATEGORIES.map((cat) => (<SelectItem key={cat} value={cat}>{cat}</SelectItem>))}</SelectContent>
+              </Select>
+            </div>
+            <div>
+              <Label htmlFor="new-vendor">Vendor (Optional)</Label>
+              <Input id="new-vendor" value={newEntryVendor} onChange={(e) => setNewEntryVendor(e.target.value)} placeholder="e.g., AWS, Staples" disabled={isSaving}/>
+            </div>
+            <div>
+              <Label htmlFor="new-description">Description (Optional)</Label>
+              <Textarea id="new-description" value={newEntryDescription} onChange={(e) => setNewEntryDescription(e.target.value)} placeholder="e.g., Monthly server costs, Printer paper" disabled={isSaving}/>
+            </div>
+          </form>
+          <DialogFooter>
+            <DialogClose asChild><Button variant="outline" onClick={resetNewEntryForm} disabled={isSaving}>Cancel</Button></DialogClose>
+            <Button type="submit" form="new-expense-form" disabled={isSaving}>
+              {isSaving ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Save className="mr-2 h-4 w-4" />}
+              {isSaving ? 'Saving...' : 'Record Expense'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
        {/* Edit Dialog */}
       <Dialog open={isEditDialogOpen} onOpenChange={setIsEditDialogOpen}>
