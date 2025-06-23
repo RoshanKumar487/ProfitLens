@@ -417,7 +417,7 @@ export default function InvoicingPage() {
         issuedDate: new Date(),
         dueDate: new Date(new Date().setDate(new Date().getDate() + 30)),
         status: 'Draft',
-        items: [],
+        items: [{ id: crypto.randomUUID(), description: '', quantity: 1, unitPrice: 0 }],
         invoiceNumber: `INV${(Date.now()).toString().slice(-6)}`,
         clientName: '',
         clientEmail: '',
