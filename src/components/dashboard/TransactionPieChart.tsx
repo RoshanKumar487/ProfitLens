@@ -21,8 +21,12 @@ interface Transaction {
 }
 
 const COLORS = [
+  "hsl(var(--chart-1))", 
+  "hsl(var(--chart-2))", 
+  "hsl(var(--chart-3))", 
+  "hsl(var(--chart-4))", 
+  "hsl(var(--chart-5))",
   "#0088FE", "#00C49F", "#FFBB28", "#FF8042", "#8884d8",
-  "#ff4d4d", "#3498db", "#f1c40f", "#e74c3c", "#9b59b6"
 ];
 
 export default function TransactionPieChart() {
@@ -124,21 +128,11 @@ export default function TransactionPieChart() {
                 data={data}
                 cx="50%"
                 cy="50%"
-                labelLine={false}
-                label={({ cx, cy, midAngle, innerRadius, outerRadius, percent, index }) => {
-                    const RADIAN = Math.PI / 180;
-                    const radius = innerRadius + (outerRadius - innerRadius) * 0.5;
-                    const x = cx + radius * Math.cos(-midAngle * RADIAN);
-                    const y = cy + radius * Math.sin(-midAngle * RADIAN);
-                    return percent > 0.05 ? (
-                         <text x={x} y={y} fill="white" textAnchor="middle" dominantBaseline="central" className="text-[10px] font-medium">
-                            {`${(percent * 100).toFixed(0)}%`}
-                        </text>
-                    ) : null;
-                }}
-                outerRadius={120}
-                fill="#8884d8"
+                innerRadius={70}
+                outerRadius={110}
+                fill="hsl(var(--primary))"
                 dataKey="value"
+                paddingAngle={2}
               >
                 {data.map((entry, index) => (
                   <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
