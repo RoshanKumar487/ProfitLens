@@ -23,10 +23,11 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel,
 import { LogOut, Loader2, Building, LayoutTemplate } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { cn } from '@/lib/utils';
+import { Button } from '@/components/ui/button';
 
 const AppShellLayout = ({ children }: { children: React.ReactNode }) => {
   const pathname = usePathname();
-  const { isMobile, setOpenMobile } = useSidebar();
+  const { isMobile, setOpenMobile, toggleSidebar } = useSidebar();
   const { user, signOut, isLoading: authLoading } = useAuth(); 
   
   const getInitials = (name?: string | null) => {
@@ -62,10 +63,19 @@ const AppShellLayout = ({ children }: { children: React.ReactNode }) => {
     <>
       {!isAuthPage && (
         <Sidebar collapsible="icon" variant="sidebar" className="border-r">
-          <SidebarHeader className="p-4 flex items-center">
-            <Link href="/" onClick={handleNavigationClick} className="flex items-center gap-2.5">
-              <LayoutTemplate className="h-8 w-8 text-sidebar-primary" />
-              <h1 className="text-2xl font-bold text-sidebar-foreground group-data-[collapsible=icon]:hidden">ProfitLens</h1>
+          <SidebarHeader className="p-4 flex items-center gap-2.5">
+            <Button
+              variant="ghost"
+              size="icon"
+              className="h-8 w-8 text-sidebar-primary"
+              onClick={toggleSidebar}
+            >
+              <LayoutTemplate className="h-8 w-8" />
+            </Button>
+            <Link href="/" onClick={handleNavigationClick}>
+              <h1 className="text-2xl font-bold text-sidebar-foreground group-data-[collapsible=icon]:hidden">
+                ProfitLens
+              </h1>
             </Link>
           </SidebarHeader>
           <Separator className="bg-sidebar-border" />
@@ -91,7 +101,6 @@ const AppShellLayout = ({ children }: { children: React.ReactNode }) => {
           </SidebarContent>
           <SidebarFooter className="p-2 mt-auto border-t border-sidebar-border">
             <div className="flex items-center justify-start gap-2">
-                <SidebarTrigger variant="ghost" size="icon" className="h-8 w-8 text-foreground/70 hover:text-foreground hidden md:flex shrink-0" />
                 {user && (
                     <DropdownMenu>
                         <DropdownMenuTrigger asChild>
