@@ -169,8 +169,8 @@ const AppShellLayout = ({ children }: { children: React.ReactNode }) => {
           <Tooltip>
             <TooltipTrigger asChild>
               <DialogTrigger asChild>
-                <Button className="fixed bottom-6 right-6 h-16 w-16 rounded-full shadow-2xl z-50">
-                  <Bot className="h-8 w-8" />
+                <Button className="fixed bottom-6 right-6 h-12 w-12 rounded-full shadow-2xl z-50">
+                  <Bot className="h-6 w-6" />
                 </Button>
               </DialogTrigger>
             </TooltipTrigger>
