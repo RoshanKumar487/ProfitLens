@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect, FormEvent, useCallback, useMemo } from 'react';
+import React, { useState, useEffect, FormEvent, useCallback, useMemo, useRef } from 'react';
 import PageTitle from '@/components/PageTitle';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -13,13 +13,17 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter, DialogClose } from "@/components/ui/dialog";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
-import { CalendarIcon, TrendingDown, Save, Loader2, MoreHorizontal, Edit, Trash2, Search } from 'lucide-react';
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
+import { ScrollArea } from '@/components/ui/scroll-area';
+import { CalendarIcon, TrendingDown, Save, Loader2, MoreHorizontal, Edit, Trash2, Search, Upload } from 'lucide-react';
 import { format } from 'date-fns';
 import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/contexts/AuthContext';
 import { db } from '@/lib/firebaseConfig';
 import { collection, addDoc, getDocs, query, where, orderBy, Timestamp, serverTimestamp } from 'firebase/firestore';
-import { updateExpenseEntry, deleteExpenseEntry, type ExpenseUpdateData } from './actions';
+import * as xlsx from 'xlsx';
+import { updateExpenseEntry, deleteExpenseEntry, type ExpenseUpdateData, bulkAddExpenses, type ExpenseImportData } from './actions';
 
 const EXPENSE_CATEGORIES = [
   'Software & Subscriptions',
@@ -80,6 +84,12 @@ export default function RecordExpensesPage() {
   const [currentExpense, setCurrentExpense] = useState<ExpenseEntryDisplay | null>(null);
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
   const [expenseToDeleteId, setExpenseToDeleteId] = useState<string | null>(null);
+
+  // State for bulk import
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const [isImportDialogOpen, setIsImportDialogOpen] = useState(false);
+  const [parsedExpenses, setParsedExpenses] = useState<ExpenseImportData[]>([]);
+  const [isImporting, setIsImporting] = useState(false);
 
   const fetchExpenseEntries = useCallback(async () => {
     if (authIsLoading) return;
@@ -235,6 +245,82 @@ export default function RecordExpensesPage() {
     setIsSaving(false);
   };
 
+  const handleImportClick = () => {
+    fileInputRef.current?.click();
+  };
+
+  const handleImportFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      try {
+        const data = event.target?.result;
+        const workbook = xlsx.read(data, { type: 'binary', cellDates: true });
+        const sheetName = workbook.SheetNames[0];
+        const worksheet = workbook.Sheets[sheetName];
+        const json: any[] = xlsx.utils.sheet_to_json(worksheet);
+        
+        const requiredHeaders = ['date', 'amount', 'category'];
+        const fileHeaders = Object.keys(json[0] || {});
+        const hasAllHeaders = requiredHeaders.every(h => fileHeaders.includes(h));
+
+        if (!hasAllHeaders) {
+          toast({ title: 'Invalid File Format', description: `Excel file must contain 'date', 'amount', and 'category' columns.`, variant: 'destructive' });
+          return;
+        }
+
+        const expensesToParse: ExpenseImportData[] = json.map(row => ({
+          date: new Date(row.date),
+          amount: Number(row.amount || 0),
+          category: String(row.category || ''),
+          description: String(row.description || ''),
+          vendor: String(row.vendor || '')
+        })).filter(exp => exp.date instanceof Date && !isNaN(exp.date.valueOf()) && exp.category && !isNaN(exp.amount) && exp.amount > 0);
+
+        if (expensesToParse.length === 0) {
+           toast({ title: 'No Valid Data', description: 'No valid expense data could be parsed from the file.', variant: 'destructive' });
+           return;
+        }
+        
+        setParsedExpenses(expensesToParse);
+        setIsImportDialogOpen(true);
+      } catch (error) {
+        console.error("Error parsing Excel file:", error);
+        toast({ title: 'File Read Error', description: 'Could not read or parse the selected file.', variant: 'destructive' });
+      } finally {
+        if (e.target) e.target.value = '';
+      }
+    };
+    reader.onerror = () => {
+        toast({ title: 'File Read Error', description: 'Failed to read the file.', variant: 'destructive' });
+    };
+    reader.readAsBinaryString(file);
+  };
+
+  const handleConfirmImport = async () => {
+    if (!user || !user.companyId) {
+        toast({ title: 'Authentication Error', variant: 'destructive' });
+        return;
+    }
+    if (parsedExpenses.length === 0) {
+        toast({ title: 'No Data', description: 'There are no expenses to import.', variant: 'destructive' });
+        return;
+    }
+    setIsImporting(true);
+    const result = await bulkAddExpenses(parsedExpenses, user.companyId, user.uid, user.displayName || user.email || 'System');
+    
+    toast({ title: result.success ? 'Import Successful' : 'Import Failed', description: result.message, variant: result.success ? 'default' : 'destructive'});
+
+    if (result.success) {
+        fetchExpenseEntries();
+        setIsImportDialogOpen(false);
+        setParsedExpenses([]);
+    }
+    setIsImporting(false);
+  };
+
 
   if (authIsLoading) {
     return (
@@ -260,7 +346,26 @@ export default function RecordExpensesPage() {
 
   return (
     <div className="space-y-6 p-4 sm:p-6 lg:p-8">
-      <PageTitle title="Record Expenses" subtitle="Log your business expenditures." icon={TrendingDown} />
+      <PageTitle title="Record Expenses" subtitle="Log your business expenditures." icon={TrendingDown}>
+        <div className="flex flex-col sm:flex-row gap-2">
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button variant="outline" size="icon" onClick={handleImportClick} disabled={isSaving || isLoadingEntries}>
+                    <Upload className="h-4 w-4" />
+                    <span className="sr-only">Import from Excel</span>
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent>
+                <p>Import from Excel</p>
+              </TooltipContent>
+            </Tooltip>
+            <Button type="submit" form="new-expense-form" disabled={isSaving || isLoadingEntries}>
+                {isSaving ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Save className="mr-2 h-4 w-4" />}
+                {isSaving ? 'Saving...' : 'Record Expense'}
+            </Button>
+            <input type="file" ref={fileInputRef} onChange={handleImportFileChange} className="hidden" accept=".xlsx, .xls, .csv" />
+        </div>
+      </PageTitle>
       <div className="grid gap-6 md:grid-cols-2">
         <Card className="shadow-lg">
           <CardHeader>
@@ -268,7 +373,7 @@ export default function RecordExpensesPage() {
             <CardDescription>Enter the details of the expense incurred.</CardDescription>
           </CardHeader>
           <CardContent>
-            <form onSubmit={handleNewEntrySubmit} className="space-y-4">
+            <form id="new-expense-form" onSubmit={handleNewEntrySubmit} className="space-y-4">
               <div>
                 <Label htmlFor="date">Date</Label>
                 <Popover>
@@ -304,11 +409,6 @@ export default function RecordExpensesPage() {
                 <Label htmlFor="description">Description (Optional)</Label>
                 <Textarea id="description" value={newEntryDescription} onChange={(e) => setNewEntryDescription(e.target.value)} placeholder="e.g., Monthly server costs, Printer paper" disabled={isSaving}/>
               </div>
-
-              <Button type="submit" className="w-full" disabled={isSaving || isLoadingEntries}>
-                {isSaving ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Save className="mr-2 h-4 w-4" />}
-                {isSaving ? 'Saving...' : 'Record Expense'}
-              </Button>
             </form>
           </CardContent>
         </Card>
@@ -440,6 +540,54 @@ export default function RecordExpensesPage() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      {/* Import Review Dialog */}
+      <Dialog open={isImportDialogOpen} onOpenChange={setIsImportDialogOpen}>
+        <DialogContent className="sm:max-w-4xl">
+            <DialogHeader>
+                <DialogTitle>Review Expense Import</DialogTitle>
+                <DialogDescription>
+                    Review the expenses parsed from your file. Required columns are 'date', 'amount', and 'category'.
+                    Rows with invalid data will be skipped. Click 'Confirm Import' to add the valid expenses.
+                </DialogDescription>
+            </DialogHeader>
+            <ScrollArea className="max-h-[60vh]">
+                <Table>
+                    <TableHeader>
+                        <TableRow>
+                            <TableHead>Date</TableHead>
+                            <TableHead>Category</TableHead>
+                            <TableHead>Vendor</TableHead>
+                            <TableHead>Description</TableHead>
+                            <TableHead className="text-right">Amount</TableHead>
+                        </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                    {parsedExpenses.length > 0 ? parsedExpenses.map((exp, index) => (
+                        <TableRow key={index}>
+                            <TableCell>{format(exp.date, 'PP')}</TableCell>
+                            <TableCell>{exp.category}</TableCell>
+                            <TableCell>{exp.vendor}</TableCell>
+                            <TableCell className="max-w-[200px] truncate">{exp.description}</TableCell>
+                            <TableCell className="text-right font-medium">{currency}{exp.amount.toLocaleString(undefined, {minimumFractionDigits: 2})}</TableCell>
+                        </TableRow>
+                    )) : (
+                        <TableRow>
+                            <TableCell colSpan={5} className="text-center h-24">No valid expenses to display.</TableCell>
+                        </TableRow>
+                    )}
+                    </TableBody>
+                </Table>
+            </ScrollArea>
+            <DialogFooter>
+                <Button variant="outline" onClick={() => setIsImportDialogOpen(false)} disabled={isImporting}>Cancel</Button>
+                <Button onClick={handleConfirmImport} disabled={isImporting || parsedExpenses.length === 0}>
+                    {isImporting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
+                    Confirm Import ({parsedExpenses.length})
+                </Button>
+            </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

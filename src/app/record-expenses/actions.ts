@@ -1,7 +1,7 @@
 'use server';
 
 import { db } from '@/lib/firebaseConfig';
-import { doc, updateDoc, deleteDoc, Timestamp, serverTimestamp } from 'firebase/firestore';
+import { collection, doc, updateDoc, deleteDoc, Timestamp, serverTimestamp, writeBatch } from 'firebase/firestore';
 
 export interface ExpenseUpdateData {
   date: Date;
@@ -9,6 +9,60 @@ export interface ExpenseUpdateData {
   category: string;
   description: string;
   vendor: string;
+}
+
+export interface ExpenseImportData {
+  date: Date;
+  amount: number;
+  category: string;
+  description?: string;
+  vendor?: string;
+}
+
+export async function bulkAddExpenses(
+  expenses: ExpenseImportData[],
+  companyId: string,
+  addedById: string,
+  addedBy: string
+): Promise<{ success: boolean; message: string; count: number }> {
+  if (!companyId || !addedById) {
+    return { success: false, message: 'User or company information is missing.', count: 0 };
+  }
+  if (!expenses || expenses.length === 0) {
+    return { success: false, message: 'No expense data provided.', count: 0 };
+  }
+
+  const batch = writeBatch(db);
+  let processedCount = 0;
+
+  try {
+    expenses.forEach(expense => {
+      // Basic validation for each expense record
+      if (expense.date && expense.category && typeof expense.amount === 'number' && expense.amount > 0) {
+        const newExpenseRef = doc(collection(db, 'expenses'));
+        batch.set(newExpenseRef, {
+          ...expense,
+          date: Timestamp.fromDate(expense.date), // Convert JS Date to Firestore Timestamp
+          companyId,
+          addedById,
+          addedBy,
+          createdAt: serverTimestamp(),
+          updatedAt: serverTimestamp(),
+        });
+        processedCount++;
+      }
+    });
+    
+    if (processedCount === 0) {
+        return { success: false, message: "No valid expense records found to import.", count: 0 };
+    }
+
+    await batch.commit();
+    return { success: true, message: `Successfully imported ${processedCount} expenses.`, count: processedCount };
+  } catch (error: any) {
+    console.error("Error bulk adding expenses:", error);
+    return { success: false, message: `Failed to import expenses: ${error.message}`, count: 0 };
+  }
 }
 
 export async function updateExpenseEntry(id: string, updates: ExpenseUpdateData): Promise<{ success: boolean; message: string }> {
