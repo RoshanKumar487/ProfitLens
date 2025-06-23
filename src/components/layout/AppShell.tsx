@@ -1,4 +1,3 @@
-
 'use client';
 
 import React, { useMemo } from 'react';
@@ -20,7 +19,7 @@ import { NAV_ITEMS } from '@/lib/constants';
 import { Separator } from '@/components/ui/separator';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
-import { LogOut, Loader2, Building, LayoutTemplate } from 'lucide-react';
+import { LogOut, Loader2, Building, LayoutTemplate, Bell } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
@@ -100,46 +99,56 @@ const AppShellLayout = ({ children }: { children: React.ReactNode }) => {
       <SidebarInset className={cn(isAuthPage && "md:!ml-0")}>
         {!isAuthPage && (
            <header className="sticky top-0 z-10 flex h-14 items-center gap-4 border-b bg-background/80 px-4 backdrop-blur-sm sm:h-16 sm:px-6">
-              <div className="flex items-center gap-2 md:hidden">
-                <SidebarTrigger variant="outline" size="icon" />
-                <Link href="/" onClick={handleNavigationClick} className="flex items-center gap-2">
-                    <LayoutTemplate className="h-6 w-6 text-primary" />
-                    <span className="font-bold text-lg text-foreground">ProfitLens</span>
-                </Link>
+              <div className="flex items-center gap-4">
+                  {/* Mobile trigger */}
+                  <SidebarTrigger variant="outline" size="icon" className="md:hidden" />
+                  
+                  {/* Brand logo/name */}
+                  <Link href="/" onClick={handleNavigationClick} className="flex items-center gap-2">
+                      <LayoutTemplate className="h-6 w-6 text-primary" />
+                      <span className="font-bold text-lg text-foreground">ProfitLens</span>
+                  </Link>
               </div>
+
               <div className="flex-1" />
+
               {user && (
-                    <DropdownMenu>
-                        <DropdownMenuTrigger asChild>
-                           <Button variant="ghost" className="relative h-10 w-10 rounded-full">
-                                <Avatar className="h-10 w-10">
-                                    <AvatarFallback className="bg-muted text-muted-foreground font-semibold">
-                                        {getInitials(user.displayName)}
-                                    </AvatarFallback>
-                                </Avatar>
-                           </Button>
-                        </DropdownMenuTrigger>
-                        <DropdownMenuContent className="w-56" align="end" forceMount>
-                            <DropdownMenuLabel className="font-normal">
-                              <div className="flex flex-col space-y-1">
-                                <p className="text-sm font-medium leading-none">{user.displayName}</p>
-                                <p className="text-xs leading-none text-muted-foreground">{user.email}</p>
-                              </div>
-                            </DropdownMenuLabel>
-                            <DropdownMenuSeparator />
-                            <DropdownMenuItem asChild>
-                                <Link href="/company-details" className="cursor-pointer">
-                                    <Building className="mr-2 h-4 w-4" />
-                                    <span>Company Details</span>
-                                </Link>
-                            </DropdownMenuItem>
-                            <DropdownMenuSeparator />
-                            <DropdownMenuItem onClick={signOut} className="text-destructive focus:text-destructive cursor-pointer">
-                              <LogOut className="mr-2 h-4 w-4" /> Sign Out
-                            </DropdownMenuItem>
-                      </DropdownMenuContent>
-                    </DropdownMenu>
-                )}
+                  <div className="flex items-center gap-2">
+                      <Button variant="ghost" size="icon" className="h-10 w-10 rounded-full">
+                          <Bell className="h-5 w-5" />
+                      </Button>
+                      <DropdownMenu>
+                          <DropdownMenuTrigger asChild>
+                            <Button variant="ghost" className="relative h-10 w-10 rounded-full">
+                                  <Avatar className="h-10 w-10">
+                                      <AvatarFallback className="bg-muted text-muted-foreground font-semibold">
+                                          {getInitials(user.displayName)}
+                                      </AvatarFallback>
+                                  </Avatar>
+                            </Button>
+                          </DropdownMenuTrigger>
+                          <DropdownMenuContent className="w-56" align="end" forceMount>
+                              <DropdownMenuLabel className="font-normal">
+                                <div className="flex flex-col space-y-1">
+                                  <p className="text-sm font-medium leading-none">{user.displayName}</p>
+                                  <p className="text-xs leading-none text-muted-foreground">{user.email}</p>
+                                </div>
+                              </DropdownMenuLabel>
+                              <DropdownMenuSeparator />
+                              <DropdownMenuItem asChild>
+                                  <Link href="/company-details" className="cursor-pointer">
+                                      <Building className="mr-2 h-4 w-4" />
+                                      <span>Company Details</span>
+                                  </Link>
+                              </DropdownMenuItem>
+                              <DropdownMenuSeparator />
+                              <DropdownMenuItem onClick={signOut} className="text-destructive focus:text-destructive cursor-pointer">
+                                <LogOut className="mr-2 h-4 w-4" /> Sign Out
+                              </DropdownMenuItem>
+                        </DropdownMenuContent>
+                      </DropdownMenu>
+                  </div>
+              )}
           </header>
         )}
         <main className="flex-1">
