@@ -66,7 +66,7 @@ const AppShellLayout = ({ children }: { children: React.ReactNode }) => {
           <SidebarHeader className="p-2">
             <Button
               variant="ghost"
-              className="h-12 w-full justify-start gap-3 px-3"
+              className="h-12 w-full justify-start gap-3 px-3 group-data-[collapsible=icon]:justify-center"
               onClick={toggleSidebar}
             >
               <LayoutTemplate className="h-7 w-7 shrink-0 text-primary" />
@@ -84,7 +84,7 @@ const AppShellLayout = ({ children }: { children: React.ReactNode }) => {
                     asChild
                     isActive={pathname === item.href || (item.href !== '/' && pathname.startsWith(item.href))}
                     tooltip={{ children: item.label, side: 'right', className: 'bg-card text-card-foreground' }}
-                    className="justify-start"
+                    className="justify-start group-data-[collapsible=icon]:justify-center"
                     disabled={authLoading} 
                   >
                     <Link href={item.href} onClick={handleNavigationClick}>
@@ -97,11 +97,11 @@ const AppShellLayout = ({ children }: { children: React.ReactNode }) => {
             </SidebarMenu>
           </SidebarContent>
           <SidebarFooter className="p-2 mt-auto border-t border-sidebar-border">
-            <div className="flex items-center justify-start gap-2">
+            <div className="flex items-center justify-start gap-2 group-data-[collapsible=icon]:justify-center">
                 {user && (
                     <DropdownMenu>
                         <DropdownMenuTrigger asChild>
-                            <button className="flex items-center gap-2 p-1 rounded-md flex-grow min-w-0 hover:bg-sidebar-accent transition-colors">
+                            <button className="flex items-center gap-2 p-1 rounded-md flex-grow min-w-0 hover:bg-sidebar-accent transition-colors group-data-[collapsible=icon]:flex-grow-0">
                                 <Avatar className="h-9 w-9">
                                     <AvatarFallback className="bg-muted text-muted-foreground font-semibold">
                                         {getInitials(user.displayName)}
