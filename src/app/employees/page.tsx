@@ -51,6 +51,7 @@ import { cn } from '@/lib/utils';
 import * as xlsx from 'xlsx';
 import { bulkAddEmployees } from './actions';
 import { ScrollArea } from '@/components/ui/scroll-area';
+import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 
 
 interface EmployeeFirestore {
@@ -82,7 +83,7 @@ type ParsedEmployee = Omit<EmployeeFirestore, 'id' | 'createdAt' | 'updatedAt' |
 const getInitials = (name: string = "") => {
   const names = name.split(' ');
   let initials = names[0] ? names[0][0] : '';
-  if (names.length > 1 && names[names.length -1]) {
+  if (names.length > 1 && names[names.length - 1]) {
     initials += names[names.length - 1][0];
   }
   return initials.toUpperCase();
@@ -748,9 +749,17 @@ export default function EmployeesPage() {
     <div className="space-y-6 p-4 sm:p-6 lg:p-8">
       <PageTitle title="Employees View" subtitle="Manage your team members." icon={Users2}>
         <div className="flex flex-col sm:flex-row gap-2">
-            <Button variant="outline" onClick={handleImportClick} disabled={isSaving || isLoadingEmployees}>
-                <Upload className="mr-2 h-4 w-4" /> Import from Excel
-            </Button>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button variant="outline" size="icon" onClick={handleImportClick} disabled={isSaving || isLoadingEmployees}>
+                    <Upload className="h-4 w-4" />
+                    <span className="sr-only">Import from Excel</span>
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent>
+                <p>Import from Excel</p>
+              </TooltipContent>
+            </Tooltip>
             <Button onClick={handleCreateNew} disabled={isSaving || isLoadingEmployees}>
                 <PlusCircle className="mr-2 h-4 w-4" /> Add Employee
             </Button>
