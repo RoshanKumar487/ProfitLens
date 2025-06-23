@@ -1,7 +1,7 @@
 
 'use client';
 
-import React, { useState, useEffect, FormEvent, useCallback, useRef } from 'react';
+import React, { useState, useEffect, FormEvent, useCallback, useRef, useMemo } from 'react';
 import PageTitle from '@/components/PageTitle';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -39,7 +39,7 @@ import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger, DropdownMenuSeparator } from '@/components/ui/dropdown-menu';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
-import { Users2, PlusCircle, MoreHorizontal, Edit, Trash2, Loader2, Save, Camera, UploadCloud, FileText, XCircle, SwitchCamera, Upload } from 'lucide-react';
+import { Users2, PlusCircle, MoreHorizontal, Edit, Trash2, Loader2, Save, Camera, UploadCloud, FileText, XCircle, SwitchCamera, Upload, ArrowUp, ArrowDown, ChevronsUpDown } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/contexts/AuthContext';
 import { db } from '@/lib/firebaseConfig';
@@ -123,7 +123,48 @@ export default function EmployeesPage() {
   const [isImportDialogOpen, setIsImportDialogOpen] = useState(false);
   const [parsedEmployees, setParsedEmployees] = useState<ParsedEmployee[]>([]);
   const [isImporting, setIsImporting] = useState(false);
+  
+  const [sortConfig, setSortConfig] = useState<{ key: keyof EmployeeDisplay; direction: 'ascending' | 'descending' }>({ key: 'createdAt', direction: 'descending' });
 
+
+  // Sorting logic
+  const sortedEmployees = useMemo(() => {
+    let sortableItems = [...employees];
+    if (sortConfig !== null) {
+      sortableItems.sort((a, b) => {
+        const aValue = a[sortConfig.key];
+        const bValue = b[sortConfig.key];
+        if (aValue === null || aValue === undefined) return 1;
+        if (bValue === null || bValue === undefined) return -1;
+        if (aValue < bValue) {
+          return sortConfig.direction === 'ascending' ? -1 : 1;
+        }
+        if (aValue > bValue) {
+          return sortConfig.direction === 'ascending' ? 1 : -1;
+        }
+        return 0;
+      });
+    }
+    return sortableItems;
+  }, [employees, sortConfig]);
+
+  const requestSort = (key: keyof EmployeeDisplay) => {
+    let direction: 'ascending' | 'descending' = 'ascending';
+    if (sortConfig.key === key && sortConfig.direction === 'ascending') {
+      direction = 'descending';
+    }
+    setSortConfig({ key, direction });
+  };
+  
+  const getSortIcon = (key: keyof EmployeeDisplay) => {
+    if (sortConfig.key !== key) {
+        return <ChevronsUpDown className="ml-2 h-4 w-4 text-muted-foreground/50" />;
+    }
+    if (sortConfig.direction === 'ascending') {
+        return <ArrowUp className="ml-2 h-4 w-4" />;
+    }
+    return <ArrowDown className="ml-2 h-4 w-4" />;
+  };
 
   useEffect(() => {
     // This is to clean up the object URL to avoid memory leaks
@@ -814,11 +855,19 @@ export default function EmployeesPage() {
             <TableHeader>
               <TableRow>
                 <TableHead className="w-[60px]">Avatar</TableHead>
-                <TableHead>Name</TableHead>
-                <TableHead>Position</TableHead>
+                <TableHead>
+                   <Button variant="ghost" onClick={() => requestSort('name')} className="-ml-4 h-auto p-1 text-xs sm:text-sm">Name {getSortIcon('name')}</Button>
+                </TableHead>
+                <TableHead>
+                  <Button variant="ghost" onClick={() => requestSort('position')} className="-ml-4 h-auto p-1 text-xs sm:text-sm">Position {getSortIcon('position')}</Button>
+                </TableHead>
                 <TableHead>Description</TableHead>
-                <TableHead>Added By</TableHead>
-                <TableHead className="text-right">Salary</TableHead>
+                <TableHead>
+                  <Button variant="ghost" onClick={() => requestSort('addedBy')} className="-ml-4 h-auto p-1 text-xs sm:text-sm">Added By {getSortIcon('addedBy')}</Button>
+                </TableHead>
+                <TableHead className="text-right">
+                  <Button variant="ghost" onClick={() => requestSort('salary')} className="h-auto p-1 text-xs sm:text-sm">Salary {getSortIcon('salary')}</Button>
+                </TableHead>
                 <TableHead>File</TableHead>
                 <TableHead className="text-right w-[100px]">Actions</TableHead>
               </TableRow>
@@ -860,7 +909,7 @@ export default function EmployeesPage() {
                   </TableRow>
               )}
 
-              {!isLoadingEmployees && employees.map((employee) => (
+              {!isLoadingEmployees && sortedEmployees.map((employee) => (
                 <TableRow key={employee.id}>
                   <TableCell>
                     <Avatar className="h-10 w-10">

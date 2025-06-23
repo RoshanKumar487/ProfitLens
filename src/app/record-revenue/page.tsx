@@ -1,3 +1,4 @@
+
 'use client';
 
 import React, { useState, useEffect, FormEvent, useCallback, useMemo } from 'react';
@@ -12,13 +13,15 @@ import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter, DialogClose } from "@/components/ui/dialog";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
-import { CalendarIcon, TrendingUp, Save, Loader2, MoreHorizontal, Edit, Trash2, Search } from 'lucide-react';
+import { CalendarIcon, TrendingUp, Save, Loader2, MoreHorizontal, Edit, Trash2, Search, ArrowUp, ArrowDown, ChevronsUpDown } from 'lucide-react';
 import { format } from 'date-fns';
 import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/contexts/AuthContext';
 import { db } from '@/lib/firebaseConfig';
 import { collection, addDoc, getDocs, query, where, orderBy, Timestamp, serverTimestamp } from 'firebase/firestore';
 import { updateRevenueEntry, deleteRevenueEntry, type RevenueUpdateData } from './actions';
+import { Skeleton } from '@/components/ui/skeleton';
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow, TableCaption } from '@/components/ui/table';
 
 interface RevenueEntryFirestore {
   id?: string; 
@@ -54,6 +57,7 @@ export default function RecordRevenuePage() {
   const { toast } = useToast();
 
   const [searchTerm, setSearchTerm] = useState<string>('');
+  const [sortConfig, setSortConfig] = useState<{ key: keyof RevenueEntryDisplay; direction: 'ascending' | 'descending' }>({ key: 'date', direction: 'descending' });
 
   // State for editing and deleting
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
@@ -107,6 +111,44 @@ export default function RecordRevenuePage() {
       (entry.description && entry.description.toLowerCase().includes(lowercasedTerm))
     );
   }, [recentEntries, searchTerm]);
+
+  const sortedEntries = useMemo(() => {
+    let sortableItems = [...filteredEntries];
+    if (sortConfig !== null) {
+      sortableItems.sort((a, b) => {
+        const aValue = a[sortConfig.key];
+        const bValue = b[sortConfig.key];
+        if (aValue === null || aValue === undefined) return 1;
+        if (bValue === null || bValue === undefined) return -1;
+        if (aValue < bValue) {
+          return sortConfig.direction === 'ascending' ? -1 : 1;
+        }
+        if (aValue > bValue) {
+          return sortConfig.direction === 'ascending' ? 1 : -1;
+        }
+        return 0;
+      });
+    }
+    return sortableItems;
+  }, [filteredEntries, sortConfig]);
+
+  const requestSort = (key: keyof RevenueEntryDisplay) => {
+    let direction: 'ascending' | 'descending' = 'ascending';
+    if (sortConfig.key === key && sortConfig.direction === 'ascending') {
+      direction = 'descending';
+    }
+    setSortConfig({ key, direction });
+  };
+  
+  const getSortIcon = (key: keyof RevenueEntryDisplay) => {
+    if (sortConfig.key !== key) {
+        return <ChevronsUpDown className="ml-2 h-4 w-4 text-muted-foreground/50" />;
+    }
+    if (sortConfig.direction === 'ascending') {
+        return <ArrowUp className="ml-2 h-4 w-4" />;
+    }
+    return <ArrowDown className="ml-2 h-4 w-4" />;
+  };
 
   const handleNewEntrySubmit = async (e: FormEvent) => {
     e.preventDefault();
@@ -287,43 +329,54 @@ export default function RecordRevenuePage() {
                 </div>
             </div>
           </CardHeader>
-          <CardContent className="space-y-3">
-            {isLoadingEntries ? (
-              [...Array(5)].map((_, i) => (
-                <div key={i} className="p-3 bg-muted/50 rounded-lg border border-border animate-pulse">
-                  <div className="flex justify-between items-center"><div className="h-5 bg-muted rounded w-1/4"></div><div className="h-4 bg-muted rounded w-1/5"></div></div>
-                  <div className="h-4 bg-muted rounded w-1/2 mt-1"></div><div className="h-3 bg-muted rounded w-3/4 mt-1"></div>
-                </div>
-              ))
-            ) : recentEntries.length > 0 ? (
-                filteredEntries.length > 0 ? (
-                    filteredEntries.map(entry => (
-                        <div key={entry.id} className="group p-3 bg-muted/50 rounded-lg border border-border">
-                        <div className="flex justify-between items-start">
-                            <div>
-                                <div className="flex items-center gap-2">
-                                <span className="font-semibold text-foreground">{currency}{entry.amount.toFixed(2)}</span>
-                                <span className="text-xs text-muted-foreground">{format(entry.date, 'PP')}</span>
-                                </div>
-                                <p className="text-sm text-muted-foreground">{entry.source}</p>
-                            </div>
-                            <DropdownMenu>
-                            <DropdownMenuTrigger asChild><Button variant="ghost" size="icon" className="h-8 w-8 opacity-50 group-hover:opacity-100 transition-opacity"><MoreHorizontal className="h-4 w-4" /></Button></DropdownMenuTrigger>
-                            <DropdownMenuContent align="end">
-                                <DropdownMenuItem onClick={() => handleEditClick(entry)}><Edit className="mr-2 h-4 w-4"/>Edit</DropdownMenuItem>
-                                <DropdownMenuItem onClick={() => handleDeleteClick(entry.id)} className="text-destructive focus:text-destructive"><Trash2 className="mr-2 h-4 w-4"/>Delete</DropdownMenuItem>
-                            </DropdownMenuContent>
+          <CardContent>
+            <Table>
+                <TableCaption>{!isLoadingEntries && sortedEntries.length === 0 ? "No revenue recorded yet." : "A list of your revenue entries."}</TableCaption>
+                <TableHeader>
+                    <TableRow>
+                        <TableHead>
+                            <Button variant="ghost" onClick={() => requestSort('date')} className="-ml-4 h-auto p-1 text-xs sm:text-sm">Date {getSortIcon('date')}</Button>
+                        </TableHead>
+                        <TableHead>
+                             <Button variant="ghost" onClick={() => requestSort('source')} className="-ml-4 h-auto p-1 text-xs sm:text-sm">Source {getSortIcon('source')}</Button>
+                        </TableHead>
+                        <TableHead className="text-right">
+                             <Button variant="ghost" onClick={() => requestSort('amount')} className="h-auto p-1 text-xs sm:text-sm">Amount {getSortIcon('amount')}</Button>
+                        </TableHead>
+                        <TableHead className="w-[50px] text-right">Actions</TableHead>
+                    </TableRow>
+                </TableHeader>
+                <TableBody>
+                {isLoadingEntries ? (
+                  [...Array(5)].map((_, i) => (
+                    <TableRow key={i}>
+                      <TableCell><Skeleton className="h-4 w-[90px]" /></TableCell>
+                      <TableCell><Skeleton className="h-4 w-3/4" /></TableCell>
+                      <TableCell className="text-right"><Skeleton className="h-4 w-[70px] ml-auto" /></TableCell>
+                      <TableCell className="text-right"><Skeleton className="h-8 w-8 ml-auto" /></TableCell>
+                    </TableRow>
+                  ))
+                ) : sortedEntries.map(entry => (
+                    <TableRow key={entry.id}>
+                        <TableCell>{format(entry.date, 'PP')}</TableCell>
+                        <TableCell>
+                            <div className="font-medium">{entry.source}</div>
+                            {entry.description && <div className="text-xs text-muted-foreground max-w-xs truncate" title={entry.description}>{entry.description}</div>}
+                        </TableCell>
+                        <TableCell className="text-right font-semibold text-green-600">{currency}{entry.amount.toFixed(2)}</TableCell>
+                        <TableCell className="text-right">
+                             <DropdownMenu>
+                                <DropdownMenuTrigger asChild><Button variant="ghost" size="icon" className="h-8 w-8"><MoreHorizontal className="h-4 w-4" /></Button></DropdownMenuTrigger>
+                                <DropdownMenuContent align="end">
+                                    <DropdownMenuItem onClick={() => handleEditClick(entry)}><Edit className="mr-2 h-4 w-4"/>Edit</DropdownMenuItem>
+                                    <DropdownMenuItem onClick={() => handleDeleteClick(entry.id)} className="text-destructive focus:text-destructive"><Trash2 className="mr-2 h-4 w-4"/>Delete</DropdownMenuItem>
+                                </DropdownMenuContent>
                             </DropdownMenu>
-                        </div>
-                        {entry.description && <p className="text-xs text-muted-foreground mt-1">{entry.description}</p>}
-                        </div>
-                    ))
-                ) : (
-                    <p className="text-sm text-muted-foreground text-center py-4">No revenue entries match your search.</p>
-                )
-            ) : (
-              <p className="text-sm text-muted-foreground text-center py-4">No revenue recorded yet.</p>
-            )}
+                        </TableCell>
+                    </TableRow>
+                ))}
+                </TableBody>
+            </Table>
           </CardContent>
         </Card>
       </div>

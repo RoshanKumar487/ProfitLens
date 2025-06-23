@@ -17,7 +17,7 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigge
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow, TableCaption } from '@/components/ui/table';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { CalendarIcon, TrendingDown, Save, Loader2, MoreHorizontal, Edit, Trash2, Search, Upload, PlusCircle, ScanLine, Camera } from 'lucide-react';
+import { CalendarIcon, TrendingDown, Save, Loader2, MoreHorizontal, Edit, Trash2, Search, Upload, PlusCircle, ScanLine, Camera, ArrowUp, ArrowDown, ChevronsUpDown } from 'lucide-react';
 import { format } from 'date-fns';
 import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/contexts/AuthContext';
@@ -81,6 +81,8 @@ export default function RecordExpensesPage() {
   const { toast } = useToast();
   
   const [searchTerm, setSearchTerm] = useState<string>('');
+  const [sortConfig, setSortConfig] = useState<{ key: keyof ExpenseEntryDisplay; direction: 'ascending' | 'descending' }>({ key: 'date', direction: 'descending' });
+
 
   // State for dialogs
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
@@ -155,6 +157,44 @@ export default function RecordExpensesPage() {
       (entry.description && entry.description.toLowerCase().includes(lowercasedTerm))
     );
   }, [recentEntries, searchTerm]);
+
+  const sortedEntries = useMemo(() => {
+    let sortableItems = [...filteredEntries];
+    if (sortConfig !== null) {
+        sortableItems.sort((a, b) => {
+            const aValue = a[sortConfig.key];
+            const bValue = b[sortConfig.key];
+            if (aValue === null || aValue === undefined) return 1;
+            if (bValue === null || bValue === undefined) return -1;
+            if (aValue < bValue) {
+                return sortConfig.direction === 'ascending' ? -1 : 1;
+            }
+            if (aValue > bValue) {
+                return sortConfig.direction === 'ascending' ? 1 : -1;
+            }
+            return 0;
+        });
+    }
+    return sortableItems;
+  }, [filteredEntries, sortConfig]);
+
+  const requestSort = (key: keyof ExpenseEntryDisplay) => {
+      let direction: 'ascending' | 'descending' = 'ascending';
+      if (sortConfig.key === key && sortConfig.direction === 'ascending') {
+          direction = 'descending';
+      }
+      setSortConfig({ key, direction });
+  };
+  
+  const getSortIcon = (key: keyof ExpenseEntryDisplay) => {
+      if (sortConfig.key !== key) {
+          return <ChevronsUpDown className="ml-2 h-4 w-4 text-muted-foreground/50" />;
+      }
+      if (sortConfig.direction === 'ascending') {
+          return <ArrowUp className="ml-2 h-4 w-4" />;
+      }
+      return <ArrowDown className="ml-2 h-4 w-4" />;
+  };
 
   const resetNewEntryForm = () => {
     setNewEntryDate(new Date());
@@ -507,14 +547,20 @@ export default function RecordExpensesPage() {
         </CardHeader>
         <CardContent>
           <Table>
-            <TableCaption>{!isLoadingEntries && filteredEntries.length === 0 && (searchTerm ? "No expenses match your search." : 'No expenses recorded yet. Click "Record Expense" to start.')}</TableCaption>
+            <TableCaption>{!isLoadingEntries && sortedEntries.length === 0 && (searchTerm ? "No expenses match your search." : 'No expenses recorded yet. Click "Record Expense" to start.')}</TableCaption>
             <TableHeader>
               <TableRow>
-                <TableHead>Date</TableHead>
-                <TableHead>Category/Vendor</TableHead>
+                <TableHead>
+                    <Button variant="ghost" onClick={() => requestSort('date')} className="-ml-4 h-auto p-1 text-xs sm:text-sm">Date {getSortIcon('date')}</Button>
+                </TableHead>
+                <TableHead>
+                    <Button variant="ghost" onClick={() => requestSort('category')} className="-ml-4 h-auto p-1 text-xs sm:text-sm">Category/Vendor {getSortIcon('category')}</Button>
+                </TableHead>
                 <TableHead>Description</TableHead>
                 <TableHead>Added By</TableHead>
-                <TableHead className="text-right">Amount</TableHead>
+                <TableHead className="text-right">
+                    <Button variant="ghost" onClick={() => requestSort('amount')} className="h-auto p-1 text-xs sm:text-sm">Amount {getSortIcon('amount')}</Button>
+                </TableHead>
                 <TableHead className="w-[50px] text-right">Actions</TableHead>
               </TableRow>
             </TableHeader>
@@ -530,7 +576,7 @@ export default function RecordExpensesPage() {
                     <TableCell className="text-right"><Skeleton className="h-8 w-8 ml-auto" /></TableCell>
                   </TableRow>
                 ))
-              ) : filteredEntries.map(entry => (
+              ) : sortedEntries.map(entry => (
                   <TableRow key={entry.id}>
                     <TableCell>{format(entry.date, 'PP')}</TableCell>
                     <TableCell>
