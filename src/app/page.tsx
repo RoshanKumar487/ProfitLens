@@ -186,7 +186,7 @@ export default function DashboardPage() {
 
       <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-4">
         <DataCard title="Total Revenue" value={`${currencySymbol}${(financialData?.totalRevenue ?? 0).toLocaleString()}`} icon={TrendingUp} trend="up" trendValue="+20.1% from last month" className="bg-success-card" />
-        <DataCard title="Total Expenses" value={`${currencySymbol}${(financialData?.totalExpenses ?? 0).toLocaleString()}`} icon={TrendingDown} trend="neutral" trendValue="+12% from last month" className="bg-danger-card" />
+        <DataCard title="Total Expenses" value={`${currencySymbol}${(financialData?.totalExpenses ?? 0).toLocaleString()}`} icon={TrendingDown} trend="down" trendValue="+12% from last month" className="bg-danger-card" />
         <DataCard title="Net Profit" value={`${currencySymbol}${(financialData?.netProfit ?? 0).toLocaleString()}`} icon={Wallet} trend="up" trendValue="+15% from last month" className="bg-success-card" />
         <DataCard title="Employees" value={`${(financialData?.employeeCount ?? 0).toLocaleString()}`} icon={Users} className="bg-card" />
       </div>
@@ -232,7 +232,7 @@ export default function DashboardPage() {
                                     {activity.status}
                                 </Badge>
                             </TableCell>
-                            <TableCell className={`text-right font-semibold ${activity.type === 'invoice' ? 'text-accent' : 'text-destructive'}`}>
+                            <TableCell className={`text-right font-semibold ${activity.type === 'invoice' ? 'text-chart-2' : 'text-destructive'}`}>
                                 {activity.type === 'invoice' ? '+' : '-'}{currencySymbol}{activity.amount.toLocaleString(undefined, { minimumFractionDigits: 2 })}
                             </TableCell>
                             </TableRow>

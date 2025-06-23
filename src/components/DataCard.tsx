@@ -15,7 +15,8 @@ interface DataCardProps {
 }
 
 const DataCard: React.FC<DataCardProps> = ({ title, value, icon: Icon, description, trend, trendValue, className }) => {
-  const trendColor = trend === 'up' ? 'text-accent' : trend === 'down' ? 'text-destructive' : 'text-muted-foreground';
+  const valueColor = trend === 'up' ? 'text-chart-2' : trend === 'down' ? 'text-destructive' : 'text-foreground';
+  const trendColor = trend === 'up' ? 'text-chart-2' : trend === 'down' ? 'text-destructive' : 'text-muted-foreground';
 
   return (
     <Card className={cn(
@@ -30,7 +31,7 @@ const DataCard: React.FC<DataCardProps> = ({ title, value, icon: Icon, descripti
         <Icon className="h-5 w-5 text-muted-foreground" />
       </CardHeader>
       <CardContent>
-        <div className="text-3xl font-bold text-foreground">{value}</div>
+        <div className={cn("text-3xl font-bold", valueColor)}>{value}</div>
         {description && (
           <p className="text-xs text-muted-foreground pt-1">{description}</p>
         )}
