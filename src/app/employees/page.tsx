@@ -105,7 +105,8 @@ export default function EmployeesPage() {
   const videoRef = useRef<HTMLVideoElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const [hasCameraPermission, setHasCameraPermission] = useState<boolean | null>(null);
-  const [showWebcam, setShowWebcam] = useState(false);
+  const [showProfileWebcam, setShowProfileWebcam] = useState(false);
+  const [showFileWebcam, setShowFileWebcam] = useState(false);
   const [profilePictureFile, setProfilePictureFile] = useState<File | null>(null);
   const [profilePicturePreview, setProfilePicturePreview] = useState<string | null>(null);
   const [associatedFile, setAssociatedFile] = useState<File | null>(null);
@@ -190,7 +191,8 @@ export default function EmployeesPage() {
               title: 'Camera Access Denied',
               description: 'Please enable camera permissions in your browser settings.',
            });
-           setShowWebcam(false);
+           setShowProfileWebcam(false);
+           setShowFileWebcam(false);
         }
       } finally {
           setIsSwitchingCamera(false);
@@ -198,15 +200,15 @@ export default function EmployeesPage() {
     }, [cleanupWebcam, toast]);
   
     useEffect(() => {
-      if (showWebcam) {
+      if (showProfileWebcam || showFileWebcam) {
         startWebcam(facingMode);
       } else {
         cleanupWebcam();
       }
       return () => {
-          if (showWebcam) cleanupWebcam();
+          if (showProfileWebcam || showFileWebcam) cleanupWebcam();
       };
-    }, [showWebcam, facingMode, startWebcam, cleanupWebcam]);
+    }, [showProfileWebcam, showFileWebcam, facingMode, startWebcam, cleanupWebcam]);
 
 
   const fetchEmployees = useCallback(async () => {
@@ -263,7 +265,8 @@ export default function EmployeesPage() {
     setProfilePictureFile(null);
     setProfilePicturePreview(null);
     setAssociatedFile(null);
-    setShowWebcam(false);
+    setShowProfileWebcam(false);
+    setShowFileWebcam(false);
     setHasCameraPermission(null);
     cleanupWebcam();
   }, [cleanupWebcam]);
@@ -378,7 +381,8 @@ export default function EmployeesPage() {
     setProfilePictureFile(null);
     setProfilePicturePreview(null);
     setAssociatedFile(null);
-    setShowWebcam(false);
+    setShowProfileWebcam(false);
+    setShowFileWebcam(false);
     setIsEditing(false);
     setIsFormOpen(true);
   };
@@ -388,7 +392,8 @@ export default function EmployeesPage() {
     setProfilePicturePreview(employee.profilePictureUrl || null);
     setProfilePictureFile(null);
     setAssociatedFile(null);
-    setShowWebcam(false);
+    setShowProfileWebcam(false);
+    setShowFileWebcam(false);
     setIsEditing(true);
     setIsFormOpen(true);
   };
@@ -520,7 +525,7 @@ export default function EmployeesPage() {
         setProfilePictureFile(file); // Fallback
       }
 
-      if(showWebcam) setShowWebcam(false); 
+      if(showProfileWebcam) setShowProfileWebcam(false); 
 
     } else { // associated file
        if (file.size > 10 * 1024 * 1024) { // 10MB limit
@@ -544,7 +549,7 @@ export default function EmployeesPage() {
   };
 
 
-  const handleCapturePhoto = () => {
+  const handleCaptureProfilePhoto = () => {
     if (videoRef.current && canvasRef.current && videoRef.current.readyState >= videoRef.current.HAVE_METADATA) {
       const video = videoRef.current;
       const canvas = canvasRef.current;
@@ -586,9 +591,38 @@ export default function EmployeesPage() {
         }
       }, 'image/jpeg', 0.9);
 
-      setShowWebcam(false);
+      setShowProfileWebcam(false);
     } else {
       toast({title: "Webcam Error", description: "Webcam not ready or stream not available.", variant: "destructive"});
+    }
+  };
+  
+  const handleCaptureFilePhoto = () => {
+    if (videoRef.current && canvasRef.current && videoRef.current.readyState >= videoRef.current.HAVE_METADATA) {
+        const video = videoRef.current;
+        const canvas = canvasRef.current;
+        
+        canvas.width = video.videoWidth;
+        canvas.height = video.videoHeight;
+        const context = canvas.getContext('2d');
+        context?.drawImage(video, 0, 0, video.videoWidth, video.videoHeight);
+        
+        canvas.toBlob((blob) => {
+            if (blob) {
+                const file = new File([blob], `scanned_document_${Date.now()}.jpeg`, { type: 'image/jpeg' });
+                
+                if (file.size > 10 * 1024 * 1024) { // 10MB limit
+                    toast({ title: "File Too Large", description: "Scanned image must be less than 10MB.", variant: "destructive"});
+                } else {
+                    setAssociatedFile(file);
+                    toast({ title: "Document Scanned", description: "The scanned document has been attached." });
+                }
+            }
+        }, 'image/jpeg', 0.95);
+
+        setShowFileWebcam(false);
+    } else {
+        toast({title: "Webcam Error", description: "Webcam not ready or stream not available.", variant: "destructive"});
     }
   };
 
@@ -911,11 +945,11 @@ export default function EmployeesPage() {
                         <p className="mt-1 text-xs text-muted-foreground">
                             <span className="font-semibold text-primary">Click or drop image</span>
                         </p>
-                        <Input id="profilePictureFile" type="file" accept="image/*" onChange={handleProfilePictureFileChange} className="absolute inset-0 w-full h-full opacity-0 cursor-pointer" disabled={isSaving || showWebcam}/>
+                        <Input id="profilePictureFile" type="file" accept="image/*" onChange={handleProfilePictureFileChange} className="absolute inset-0 w-full h-full opacity-0 cursor-pointer" disabled={isSaving || showProfileWebcam || showFileWebcam}/>
                     </div>
                     <div className="flex gap-1.5">
-                        <Button type="button" variant="outline" size="sm" onClick={() => setShowWebcam(prev => !prev)} disabled={isSaving} className="flex-1 text-xs">
-                        <Camera className="mr-1.5 h-3.5 w-3.5" /> {showWebcam ? 'Close Cam' : 'Webcam'}
+                        <Button type="button" variant="outline" size="sm" onClick={() => setShowProfileWebcam(prev => !prev)} disabled={isSaving} className="flex-1 text-xs">
+                        <Camera className="mr-1.5 h-3.5 w-3.5" /> {showProfileWebcam ? 'Close Cam' : 'Webcam'}
                         </Button>
                         {(profilePicturePreview || (isEditing && currentEmployee.profilePictureUrl)) && (
                         <Button type="button" variant="ghost" size="sm" onClick={handleRemoveProfilePic} className="text-destructive hover:text-destructive-foreground hover:bg-destructive/90 flex-1 text-xs">
@@ -925,7 +959,7 @@ export default function EmployeesPage() {
                     </div>
                     </div>
                 </div>
-                {showWebcam && (
+                {showProfileWebcam && (
                     <div className="mt-1.5 space-y-1.5 p-2 border rounded-md bg-muted/30">
                     <video ref={videoRef} className="w-full aspect-[4/3] rounded-md bg-black" autoPlay muted playsInline />
                     {hasCameraPermission === false && (
@@ -939,7 +973,7 @@ export default function EmployeesPage() {
                             {isSwitchingCamera ? 'Switching...' : 'Switch Cam'}
                             </Button>
                         )}
-                        <Button type="button" onClick={handleCapturePhoto} className="flex-1 h-9 text-xs" disabled={isSaving || isSwitchingCamera}>
+                        <Button type="button" onClick={handleCaptureProfilePhoto} className="flex-1 h-9 text-xs" disabled={isSaving || isSwitchingCamera}>
                             <Camera className="mr-1.5 h-3.5 w-3.5" /> Capture
                         </Button>
                         </div>
@@ -968,6 +1002,32 @@ export default function EmployeesPage() {
                     <p className="text-xs text-muted-foreground">PDF, DOCX, etc. (Max 10MB)</p>
                     <Input id="associatedFile" type="file" onChange={handleAssociatedFileChange} className="absolute inset-0 w-full h-full opacity-0 cursor-pointer" disabled={isSaving}/>
                 </div>
+                
+                <Button type="button" variant="outline" size="sm" className="w-full mt-2" onClick={() => setShowFileWebcam(prev => !prev)} disabled={isSaving}>
+                    <Camera className="mr-2 h-4 w-4" /> {showFileWebcam ? 'Close Scanner' : 'Scan Document'}
+                </Button>
+
+                {showFileWebcam && (
+                    <div className="mt-1.5 space-y-1.5 p-2 border rounded-md bg-muted/30">
+                        <video ref={videoRef} className="w-full aspect-[4/3] rounded-md bg-black" autoPlay muted playsInline />
+                        {hasCameraPermission === false && (
+                            <Alert variant="destructive" className="p-2 text-xs"><Camera className="h-3.5 w-3.5"/><AlertTitle className="text-xs">Cam Access Denied</AlertTitle><DialogDescription className="text-xs">Enable in browser.</DialogDescription></Alert>
+                        )}
+                        {hasCameraPermission === true && (
+                            <div className="flex gap-2">
+                                {hasMultipleCameras && (
+                                    <Button type="button" onClick={() => setFacingMode(prev => prev === 'user' ? 'environment' : 'user')} className="flex-1 h-9 text-xs" disabled={isSaving || isSwitchingCamera}>
+                                        {isSwitchingCamera ? <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" /> : <SwitchCamera className="mr-1.5 h-3.5 w-3.5" />}
+                                        {isSwitchingCamera ? 'Switching...' : 'Switch Cam'}
+                                    </Button>
+                                )}
+                                <Button type="button" onClick={handleCaptureFilePhoto} className="flex-1 h-9 text-xs" disabled={isSaving || isSwitchingCamera}>
+                                    <Camera className="mr-1.5 h-3.5 w-3.5" /> Capture Document
+                                </Button>
+                            </div>
+                        )}
+                    </div>
+                )}
 
                 {associatedFile && (
                 <div className="text-xs text-muted-foreground flex items-center justify-between p-2 bg-muted rounded-md">
