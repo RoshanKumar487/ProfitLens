@@ -17,7 +17,7 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigge
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow, TableCaption } from '@/components/ui/table';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { CalendarIcon, TrendingDown, Save, Loader2, MoreHorizontal, Edit, Trash2, Search, Upload, PlusCircle } from 'lucide-react';
+import { CalendarIcon, TrendingDown, Save, Loader2, MoreHorizontal, Edit, Trash2, Search, Upload, PlusCircle, ScanLine, Camera } from 'lucide-react';
 import { format } from 'date-fns';
 import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/contexts/AuthContext';
@@ -25,6 +25,7 @@ import { db } from '@/lib/firebaseConfig';
 import { collection, addDoc, getDocs, query, where, orderBy, Timestamp, serverTimestamp } from 'firebase/firestore';
 import * as xlsx from 'xlsx';
 import { updateExpenseEntry, deleteExpenseEntry, type ExpenseUpdateData, bulkAddExpenses, type ExpenseImportData } from './actions';
+import { analyzeReceipt } from '@/ai/flows/analyze-receipt-flow';
 import { Skeleton } from '@/components/ui/skeleton';
 
 const EXPENSE_CATEGORIES = [
@@ -93,6 +94,16 @@ export default function RecordExpensesPage() {
   const [isImportDialogOpen, setIsImportDialogOpen] = useState(false);
   const [parsedExpenses, setParsedExpenses] = useState<ExpenseImportData[]>([]);
   const [isImporting, setIsImporting] = useState(false);
+
+  // State for scanning
+  const [isScanDialogOpen, setIsScanDialogOpen] = useState(false);
+  const [isInitializingCamera, setIsInitializingCamera] = useState(false);
+  const [isScanning, setIsScanning] = useState(false); // For AI analysis loading
+  const [hasCameraPermission, setHasCameraPermission] = useState<boolean | null>(null);
+
+  const videoRef = useRef<HTMLVideoElement>(null);
+  const canvasRef = useRef<HTMLCanvasElement>(null);
+
 
   const fetchExpenseEntries = useCallback(async () => {
     if (authIsLoading) return;
@@ -329,6 +340,101 @@ export default function RecordExpensesPage() {
     setIsImporting(false);
   };
 
+  const cleanupWebcam = useCallback(() => {
+    if (videoRef.current && videoRef.current.srcObject) {
+      const stream = videoRef.current.srcObject as MediaStream;
+      stream.getTracks().forEach(track => track.stop());
+      videoRef.current.srcObject = null;
+    }
+  }, []);
+
+  useEffect(() => {
+      const getCameraPermission = async () => {
+        if (isScanDialogOpen) {
+          setIsInitializingCamera(true);
+          try {
+            const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } });
+            setHasCameraPermission(true);
+            if (videoRef.current) {
+              videoRef.current.srcObject = stream;
+            }
+          } catch (error) {
+            console.error('Error accessing camera:', error);
+            setHasCameraPermission(false);
+            toast({
+              variant: 'destructive',
+              title: 'Camera Access Denied',
+              description: 'Please enable camera permissions in your browser settings.',
+            });
+            setIsScanDialogOpen(false);
+          } finally {
+              setIsInitializingCamera(false);
+          }
+        } else {
+          cleanupWebcam();
+        }
+      };
+      getCameraPermission();
+
+      return () => cleanupWebcam();
+  }, [isScanDialogOpen, cleanupWebcam, toast]);
+
+
+  const handleCaptureAndAnalyze = async () => {
+      if (!videoRef.current || !canvasRef.current) return;
+      
+      const video = videoRef.current;
+      const canvas = canvasRef.current;
+      
+      canvas.width = video.videoWidth;
+      canvas.height = video.videoHeight;
+      
+      const context = canvas.getContext('2d');
+      context?.drawImage(video, 0, 0, video.videoWidth, video.videoHeight);
+      
+      const imageDataUrl = canvas.toDataURL('image/jpeg', 0.9);
+      
+      setIsScanning(true);
+      cleanupWebcam();
+
+      try {
+          const result = await analyzeReceipt({ receiptImage: imageDataUrl });
+
+          setNewEntryAmount(result.amount?.toString() || '');
+          setNewEntryVendor(result.vendor || '');
+          setNewEntryDescription(result.description || '');
+          setNewEntryCategory(result.category || '');
+          if (result.date) {
+              const parsedDate = new Date(result.date + 'T00:00:00');
+              if (!isNaN(parsedDate.getTime())) {
+                  setNewEntryDate(parsedDate);
+              } else {
+                  setNewEntryDate(new Date());
+              }
+          } else {
+              setNewEntryDate(new Date());
+          }
+
+          toast({
+              title: "Receipt Scanned",
+              description: "Please review the extracted information below.",
+          });
+
+          setIsScanDialogOpen(false);
+          setIsAddDialogOpen(true);
+
+      } catch (error: any) {
+          console.error("Error analyzing receipt:", error);
+          toast({
+              variant: 'destructive',
+              title: 'Scan Failed',
+              description: 'Could not extract data from the receipt. Please enter it manually.',
+          });
+      } finally {
+          setIsScanning(false);
+      }
+  };
+
 
   if (authIsLoading) {
     return (
@@ -367,6 +473,10 @@ export default function RecordExpensesPage() {
                 <p>Import from Excel</p>
               </TooltipContent>
             </Tooltip>
+            <Button onClick={() => setIsScanDialogOpen(true)} variant="outline" disabled={isSaving || isLoadingEntries}>
+              <ScanLine className="mr-2 h-4 w-4" />
+              Scan Receipt
+            </Button>
             <Button onClick={() => setIsAddDialogOpen(true)} disabled={isSaving || isLoadingEntries}>
                 <PlusCircle className="mr-2 h-4 w-4" />
                 Record Expense
@@ -606,6 +716,39 @@ export default function RecordExpensesPage() {
                 <Button onClick={handleConfirmImport} disabled={isImporting || parsedExpenses.length === 0}>
                     {isImporting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
                     Confirm Import ({parsedExpenses.length})
+                </Button>
+            </DialogFooter>
+        </DialogContent>
+      </Dialog>
+      
+      {/* Scan Receipt Dialog */}
+      <Dialog open={isScanDialogOpen} onOpenChange={setIsScanDialogOpen}>
+        <DialogContent>
+            <DialogHeader>
+                <DialogTitle>Scan Receipt</DialogTitle>
+                <DialogDescription>Position your receipt within the frame and click capture.</DialogDescription>
+            </DialogHeader>
+            <div className="relative">
+                {isInitializingCamera && (
+                    <div className="absolute inset-0 flex items-center justify-center bg-background/80 z-10">
+                        <Loader2 className="h-8 w-8 animate-spin" />
+                        <p className="ml-2">Starting camera...</p>
+                    </div>
+                )}
+                {isScanning && (
+                     <div className="absolute inset-0 flex flex-col items-center justify-center bg-background/80 z-10">
+                        <Loader2 className="h-8 w-8 animate-spin" />
+                        <p className="ml-2 mt-2">Analyzing receipt...</p>
+                    </div>
+                )}
+                <video ref={videoRef} className="w-full aspect-video rounded-md bg-black" autoPlay muted playsInline />
+                <canvas ref={canvasRef} className="hidden" />
+            </div>
+            <DialogFooter>
+                <Button variant="outline" onClick={() => setIsScanDialogOpen(false)} disabled={isScanning}>Cancel</Button>
+                <Button onClick={handleCaptureAndAnalyze} disabled={isInitializingCamera || isScanning || !hasCameraPermission}>
+                    <Camera className="mr-2 h-4 w-4" />
+                    Capture & Analyze
                 </Button>
             </DialogFooter>
         </DialogContent>
