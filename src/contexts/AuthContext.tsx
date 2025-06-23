@@ -16,8 +16,6 @@ import { doc, setDoc, serverTimestamp, getDoc, collection, addDoc } from 'fireba
 import { useRouter, usePathname } from 'next/navigation';
 import { useToast } from '@/hooks/use-toast';
 import { getCurrencySymbol } from '@/lib/countries';
-import { app as adminApp } from '@/lib/firebaseAdminConfig';
-import { getAuth } from 'firebase-admin/auth';
 
 type UserRole = 'admin' | 'member' | 'pending' | 'rejected';
 
