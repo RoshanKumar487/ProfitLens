@@ -5,6 +5,7 @@ import { Toaster } from '@/components/ui/toaster';
 import BackgroundAnimation from '@/components/BackgroundAnimation';
 import AppShell from '@/components/layout/AppShell';
 import { AuthProvider } from '@/contexts/AuthContext'; // Import AuthProvider
+import { ThemeProvider } from 'next-themes';
 
 export const metadata: Metadata = {
   title: 'ProfitLens',
@@ -24,13 +25,15 @@ export default function RootLayout({
         <link href="https://fonts.googleapis.com/css2?family=PT+Sans:ital,wght@0,400;0,700;1,400;1,700&display=swap" rel="stylesheet" />
       </head>
       <body className="font-body antialiased">
-        <AuthProvider> {/* Wrap AppShell and children with AuthProvider */}
-          <BackgroundAnimation />
-          <AppShell>
-            {children}
-          </AppShell>
-          <Toaster />
-        </AuthProvider>
+        <ThemeProvider attribute="class" defaultTheme="system" enableSystem>
+            <AuthProvider>
+            <BackgroundAnimation />
+            <AppShell>
+                {children}
+            </AppShell>
+            <Toaster />
+            </AuthProvider>
+        </ThemeProvider>
       </body>
     </html>
   );

@@ -8,6 +8,7 @@ export const COUNTRIES = [
   { code: 'DE', name: 'Germany', currency: '€' },
   { code: 'FR', name: 'France', currency: '€' },
   { code: 'JP', name: 'Japan', currency: '¥' },
+  { code: 'PH', name: 'Philippines', currency: '₱' },
   // Add more countries as needed
 ];
 
