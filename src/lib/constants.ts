@@ -52,10 +52,5 @@ export const NAV_ITEMS: NavItem[] = [
     label: 'Administration',
     href: '/admin',
     icon: Shield,
-  },
-  {
-    label: 'Guide',
-    href: '/guide',
-    icon: HelpCircle,
   }
 ];

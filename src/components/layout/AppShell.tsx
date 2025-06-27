@@ -19,19 +19,45 @@ import { NAV_ITEMS } from '@/lib/constants';
 import { Separator } from '@/components/ui/separator';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
-import { LogOut, Loader2, Building, LayoutTemplate, Bell, Bot } from 'lucide-react';
+import { LogOut, Loader2, Building, LayoutTemplate, Bell, Bot, HelpCircle } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { AssistantChat } from '@/components/AssistantChat';
+import { collection, query, where, onSnapshot } from 'firebase/firestore';
+import { db } from '@/lib/firebaseConfig';
+import { Badge } from '@/components/ui/badge';
 
 const AppShellLayout = ({ children }: { children: React.ReactNode }) => {
   const pathname = usePathname();
   const { isMobile, setOpenMobile } = useSidebar();
   const { user, signOut, isLoading: authLoading } = useAuth(); 
   const [isAssistantOpen, setIsAssistantOpen] = React.useState(false);
+  const [pendingRequestCount, setPendingRequestCount] = React.useState(0);
+  
+  React.useEffect(() => {
+    if (user?.role !== 'admin' || !user?.companyId) {
+      setPendingRequestCount(0);
+      return;
+    }
+
+    const requestsRef = collection(db, 'accessRequests');
+    const q = query(
+      requestsRef,
+      where('companyId', '==', user.companyId),
+      where('status', '==', 'pending')
+    );
+
+    const unsubscribe = onSnapshot(q, (snapshot) => {
+      setPendingRequestCount(snapshot.size);
+    }, (error) => {
+      console.error("Error fetching pending request count:", error);
+    });
+
+    return () => unsubscribe();
+  }, [user]);
   
   const getInitials = (name?: string | null) => {
     if (!name) return 'U';
@@ -118,8 +144,18 @@ const AppShellLayout = ({ children }: { children: React.ReactNode }) => {
 
               {user && (
                   <div className="flex items-center gap-2">
-                      <Button variant="ghost" size="icon" className="h-10 w-10 rounded-full">
+                      <Button asChild variant="ghost" size="icon" className="h-10 w-10 rounded-full">
+                         <Link href="/guide">
+                            <HelpCircle className="h-5 w-5" />
+                         </Link>
+                      </Button>
+                      <Button variant="ghost" size="icon" className="relative h-10 w-10 rounded-full">
                           <Bell className="h-5 w-5" />
+                           {pendingRequestCount > 0 && (
+                            <Badge variant="destructive" className="absolute top-1 right-1 h-5 w-5 p-0 flex items-center justify-center text-xs rounded-full">
+                                {pendingRequestCount}
+                            </Badge>
+                          )}
                       </Button>
                       <DropdownMenu>
                           <DropdownMenuTrigger asChild>
