@@ -64,7 +64,7 @@ const InvoiceTemplate = React.forwardRef<HTMLDivElement, InvoiceTemplateProps>(
     ].filter(Boolean).join(', ');
 
     return (
-      <div ref={ref} className="invoice-view-container bg-white text-black p-8 mx-auto w-[210mm] min-h-[297mm] font-sans text-[10px] leading-tight flex flex-col">
+      <div ref={ref} className="invoice-view-container bg-white text-black py-12 px-8 mx-auto w-[210mm] min-h-[297mm] font-sans text-[10px] leading-tight flex flex-col">
         <div className="border-2 border-black p-1 h-full flex flex-col">
           <div className="border-2 border-black flex-grow flex flex-col">
             {/* Header */}
