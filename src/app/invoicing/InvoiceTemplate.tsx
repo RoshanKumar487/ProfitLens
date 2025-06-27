@@ -1,3 +1,4 @@
+
 'use client';
 
 import React from 'react';
@@ -96,18 +97,18 @@ const InvoiceTemplate = React.forwardRef<HTMLDivElement, InvoiceTemplateProps>(
                     <th className="p-1 border-r-2 border-black font-bold w-8">#</th>
                     <th className="p-1 border-r-2 border-black font-bold">Item</th>
                     <th className="p-1 border-r-2 border-black font-bold w-16">HSN/SAC</th>
-                    <th className="p-1 border-r-2 border-black font-bold w-20">Rate/Item</th>
-                    <th className="p-1 border-r-2 border-black font-bold w-10">Qty</th>
-                    <th className="p-1 border-r-2 border-black font-bold w-20">Taxable Val</th>
-                    <th className="p-1 border-r-2 border-black font-bold w-20">Tax Amount</th>
-                    <th className="p-1 font-bold w-24">Amount</th>
+                    <th className="p-1 border-r-2 border-black font-bold w-20 text-right">Rate/Item</th>
+                    <th className="p-1 border-r-2 border-black font-bold w-10 text-center">Qty</th>
+                    <th className="p-1 border-r-2 border-black font-bold w-20 text-right">Taxable Val</th>
+                    <th className="p-1 border-r-2 border-black font-bold w-20 text-right">Tax Amount</th>
+                    <th className="p-1 font-bold w-24 text-right">Amount</th>
                   </tr>
                 </thead>
                 <tbody className="border-b-2 border-black">
                   {(invoiceToView.items || []).map((item, index) => {
                     const taxableValue = item.quantity * item.unitPrice;
                     const taxAmount = taxableValue * (invoiceToView.taxRate / 100);
-                    const totalAmount = taxableValue + taxAmount;
+                    const totalAmount = taxableValue; // The final amount in the row should be without tax as per image
                     return (
                       <tr key={item.id} className="border-b border-black align-top">
                         <td className="p-1 border-r-2 border-black text-center">{index + 1}</td>
@@ -121,6 +122,7 @@ const InvoiceTemplate = React.forwardRef<HTMLDivElement, InvoiceTemplateProps>(
                       </tr>
                     );
                   })}
+                   {/* This is a spacer to push the footer down if there are few items */}
                   <tr className="align-top"><td colSpan={8} className="p-1 min-h-[100px]"></td></tr>
                 </tbody>
               </table>
@@ -136,6 +138,12 @@ const InvoiceTemplate = React.forwardRef<HTMLDivElement, InvoiceTemplateProps>(
                   <span>Taxable Amount</span>
                   <span className="font-bold">{currencySymbol}{invoiceToView.subtotal.toFixed(2)}</span>
                 </div>
+                 {invoiceToView.discountAmount > 0 && (
+                    <div className="grid grid-cols-2 p-1 border-b-2 border-black">
+                        <span>Discount</span>
+                        <span className="font-bold text-red-600">-{currencySymbol}{invoiceToView.discountAmount.toFixed(2)}</span>
+                    </div>
+                )}
                 <div className="grid grid-cols-2 p-1 border-b-2 border-black">
                   <span>IGST {invoiceToView.taxRate}%</span>
                   <span className="font-bold">{currencySymbol}{invoiceToView.taxAmount.toFixed(2)}</span>
@@ -148,14 +156,14 @@ const InvoiceTemplate = React.forwardRef<HTMLDivElement, InvoiceTemplateProps>(
             </div>
 
             <div className="border-y-2 border-black mt-2 text-xs">
-              <div className="p-1 border-b-2 border-black">Total amount (in words): {/* Placeholder */}</div>
+              <div className="p-1 border-b-2 border-black">Total amount (in words): {/* Placeholder for amount in words */}</div>
               <table className="w-full">
                 <thead>
                   <tr className="border-b-2 border-black text-left font-bold">
                     <th className="p-1 border-r-2 border-black w-1/4">HSN/SAC</th>
-                    <th className="p-1 border-r-2 border-black w-1/4">Taxable Value</th>
-                    <th className="p-1 border-r-2 border-black w-1/4">Rate</th>
-                    <th className="p-1 w-1/4">Tax Amount</th>
+                    <th className="p-1 border-r-2 border-black w-1/4 text-right">Taxable Value</th>
+                    <th className="p-1 border-r-2 border-black w-1/4 text-right">Rate</th>
+                    <th className="p-1 w-1/4 text-right">Tax Amount</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -221,3 +229,5 @@ const InvoiceTemplate = React.forwardRef<HTMLDivElement, InvoiceTemplateProps>(
 );
 InvoiceTemplate.displayName = 'InvoiceTemplate';
 export default InvoiceTemplate;
+
+    
