@@ -64,7 +64,7 @@ const InvoiceTemplate = React.forwardRef<HTMLDivElement, InvoiceTemplateProps>(
     ].filter(Boolean).join(', ');
 
     return (
-      <div ref={ref} className="invoice-view-container bg-white text-black py-12 px-8 mx-auto w-[210mm] min-h-[297mm] font-sans text-[10px] leading-tight flex flex-col">
+      <div ref={ref} className="invoice-view-container bg-white text-black py-8 px-8 mx-auto w-[210mm] min-h-[297mm] font-sans text-[10px] leading-tight flex flex-col">
         <div className="border-2 border-black p-1 h-full flex flex-col">
           <div className="border-2 border-black flex-grow flex flex-col">
             {/* Header */}
@@ -101,7 +101,7 @@ const InvoiceTemplate = React.forwardRef<HTMLDivElement, InvoiceTemplateProps>(
             </div>
 
             {/* Items Table */}
-            <div className="flex-grow">
+            <div className="flex-grow flex flex-col">
               <table className="w-full text-[10px] table-fixed">
                 <thead>
                   <tr className="border-b-2 border-black text-left">
@@ -119,7 +119,7 @@ const InvoiceTemplate = React.forwardRef<HTMLDivElement, InvoiceTemplateProps>(
                   {(invoiceToView.items || []).map((item, index) => {
                     const taxableValue = item.quantity * item.unitPrice;
                     const taxAmount = taxableValue * (invoiceToView.taxRate / 100);
-                    const totalAmount = taxableValue; // The final amount in the row should be without tax
+                    const totalAmount = taxableValue + taxAmount;
                     return (
                       <tr key={item.id} className="border-b border-black align-top">
                         <td className="p-1 border-r-2 border-black text-center">{index + 1}</td>
@@ -133,8 +133,8 @@ const InvoiceTemplate = React.forwardRef<HTMLDivElement, InvoiceTemplateProps>(
                       </tr>
                     );
                   })}
-                   {/* This empty row will fill remaining space to push footer down */}
-                  <tr className="align-top"><td colSpan={8} className="p-1"></td></tr>
+                  {/* This empty row will fill remaining space to push footer down */}
+                  <tr className="h-full"><td colSpan={8} className="p-1"></td></tr>
                 </tbody>
               </table>
             </div>
@@ -160,8 +160,8 @@ const InvoiceTemplate = React.forwardRef<HTMLDivElement, InvoiceTemplateProps>(
                   <span className="font-bold">{currencySymbol}{invoiceToView.taxAmount.toFixed(2)}</span>
                 </div>
                 <div className="grid grid-cols-2 p-1 bg-gray-200">
-                  <span className="font-bold">Total</span>
-                  <span className="font-bold">{currencySymbol}{invoiceToView.amount.toFixed(2)}</span>
+                  <span className="font-bold text-base">Total</span>
+                  <span className="font-bold text-base">{currencySymbol}{invoiceToView.amount.toFixed(2)}</span>
                 </div>
               </div>
             </div>
@@ -170,21 +170,49 @@ const InvoiceTemplate = React.forwardRef<HTMLDivElement, InvoiceTemplateProps>(
               <div className="p-1">Total amount (in words): {/* Placeholder for amount in words */}</div>
             </div>
 
+            <div className="border-b-2 border-black text-xs">
+                <table className="w-full">
+                    <thead>
+                        <tr>
+                            <th className="p-1 font-bold text-left border-r-2 border-black">HSN/SAC</th>
+                            <th className="p-1 font-bold text-left border-r-2 border-black">Taxable Value</th>
+                            <th className="p-1 font-bold text-left border-r-2 border-black">Rate</th>
+                            <th className="p-1 font-bold text-left border-r-2 border-black">Amount</th>
+                            <th className="p-1 font-bold text-left">Total Tax Amount</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr className="border-t-2 border-black">
+                            <td className="p-1 border-r-2 border-black"></td>
+                            <td className="p-1 border-r-2 border-black">{currencySymbol}{invoiceToView.subtotal.toFixed(2)}</td>
+                            <td className="p-1 border-r-2 border-black"></td>
+                            <td className="p-1 border-r-2 border-black">{currencySymbol}{invoiceToView.taxAmount.toFixed(2)}</td>
+                            <td className="p-1">{currencySymbol}{invoiceToView.taxAmount.toFixed(2)}</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+            
+            <div className="border-b-2 border-black text-right p-1">
+                {invoiceToView.status === 'Paid' && <span className="font-bold text-green-600">&#10004; Amount Paid</span>}
+            </div>
+
             {/* Footer */}
-            <footer className="mt-auto pt-4 text-xs">
-              <div className="flex justify-between items-start border-b-2 border-black pb-2">
+            <footer className="mt-auto pt-2 text-xs">
+              <div className="flex justify-between items-start pb-2">
                 <div>
                   <p className="font-bold">Bank Details:</p>
                   <p><span className="font-bold">Bank:</span> {companyProfileDetails.bankName || 'N/A'}</p>
                   <p><span className="font-bold">Account #:</span> {companyProfileDetails.accountNumber || 'N/A'}</p>
                   <p><span className="font-bold">IFSC:</span> {companyProfileDetails.ifscCode || 'N/A'}</p>
                 </div>
-                <div className="flex flex-col items-center justify-between h-24">
-                  <p className="font-bold text-center">For {companyProfileDetails.name}</p>
-                  <p className="mt-auto">Authorized Signatory</p>
+                <div className="flex flex-col items-center justify-between h-20 w-40 text-center">
+                  <p className="font-bold">For {companyProfileDetails.name}</p>
+                  <div className="flex-grow"></div>
+                  <p>Authorized Signatory</p>
                 </div>
               </div>
-              <div className="grid grid-cols-2 gap-4 pt-2">
+              <div className="grid grid-cols-2 gap-4 pt-2 border-t-2 border-black">
                 <div>
                   <p className="font-bold">Notes:</p>
                   <p className="whitespace-pre-line">{invoiceToView.notes}</p>
@@ -201,6 +229,9 @@ const InvoiceTemplate = React.forwardRef<HTMLDivElement, InvoiceTemplateProps>(
               </div>
             </footer>
           </div>
+        </div>
+        <div className="text-center text-[9px] pt-1">
+            Page 1/1
         </div>
       </div>
     );
