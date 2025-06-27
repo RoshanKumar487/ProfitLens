@@ -1,3 +1,4 @@
+
 'use client';
 
 import React, { useMemo } from 'react';
@@ -144,11 +145,6 @@ const AppShellLayout = ({ children }: { children: React.ReactNode }) => {
 
               {user && (
                   <div className="flex items-center gap-2">
-                      <Button asChild variant="ghost" size="icon" className="h-10 w-10 rounded-full">
-                         <Link href="/guide">
-                            <HelpCircle className="h-5 w-5" />
-                         </Link>
-                      </Button>
                       <Button variant="ghost" size="icon" className="relative h-10 w-10 rounded-full">
                           <Bell className="h-5 w-5" />
                            {pendingRequestCount > 0 && (
@@ -180,6 +176,12 @@ const AppShellLayout = ({ children }: { children: React.ReactNode }) => {
                                       <Building className="mr-2 h-4 w-4" />
                                       <span>Company Details</span>
                                   </Link>
+                              </DropdownMenuItem>
+                              <DropdownMenuItem asChild>
+                                <Link href="/guide" className="cursor-pointer">
+                                  <HelpCircle className="mr-2 h-4 w-4" />
+                                  <span>Guide</span>
+                                </Link>
                               </DropdownMenuItem>
                               <DropdownMenuSeparator />
                               <DropdownMenuItem onClick={signOut} className="text-destructive focus:text-destructive cursor-pointer">
