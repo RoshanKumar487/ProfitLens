@@ -133,8 +133,8 @@ const InvoiceTemplate = React.forwardRef<HTMLDivElement, InvoiceTemplateProps>(
                       </tr>
                     );
                   })}
-                   {/* This is a spacer to push the footer down if there are few items */}
-                  <tr className="align-top"><td colSpan={8} className="p-1 min-h-[100px]"></td></tr>
+                   {/* This empty row will fill remaining space to push footer down */}
+                  <tr className="align-top"><td colSpan={8} className="p-1"></td></tr>
                 </tbody>
               </table>
             </div>
@@ -166,7 +166,7 @@ const InvoiceTemplate = React.forwardRef<HTMLDivElement, InvoiceTemplateProps>(
               </div>
             </div>
 
-            <div className="border-y-2 border-black mt-2 text-xs">
+            <div className="border-y-2 border-black text-xs">
               <div className="p-1">Total amount (in words): {/* Placeholder for amount in words */}</div>
             </div>
 
@@ -179,12 +179,9 @@ const InvoiceTemplate = React.forwardRef<HTMLDivElement, InvoiceTemplateProps>(
                   <p><span className="font-bold">Account #:</span> {companyProfileDetails.accountNumber || 'N/A'}</p>
                   <p><span className="font-bold">IFSC:</span> {companyProfileDetails.ifscCode || 'N/A'}</p>
                 </div>
-                <div className="flex flex-col items-center justify-between">
+                <div className="flex flex-col items-center justify-between h-24">
                   <p className="font-bold text-center">For {companyProfileDetails.name}</p>
-                  <div className="relative h-16 w-32 bg-gray-100 mt-2">
-                    <Image src="https://placehold.co/128x64.png" layout="fill" objectFit="contain" alt="Signature Stamp" data-ai-hint="signature stamp" />
-                  </div>
-                  <p className="mt-2">Authorized Signatory</p>
+                  <p className="mt-auto">Authorized Signatory</p>
                 </div>
               </div>
               <div className="grid grid-cols-2 gap-4 pt-2">
