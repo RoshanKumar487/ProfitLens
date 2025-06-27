@@ -165,7 +165,6 @@ export default function InvoicingPage() {
   const [isSaving, setIsSaving] = useState(false);
 
   const [existingClients, setExistingClients] = useState<ExistingClient[]>([]);
-  const [isClientSuggestionsVisible, setIsClientSuggestionsVisible] = useState(false);
   const invoicePrintRef = useRef<HTMLDivElement>(null);
 
   const [isViewInvoiceDialogOpen, setIsViewInvoiceDialogOpen] = useState(false);
@@ -575,9 +574,6 @@ export default function InvoicingPage() {
       const { default: html2canvas } = await import('html2canvas');
       
       const elementToCapture = invoicePrintRef.current;
-      // Temporarily remove max-w to capture full width if needed for canvas
-      elementToCapture.classList.add('w-[210mm]');
-      elementToCapture.classList.remove('max-w-4xl');
 
       const canvas = await html2canvas(elementToCapture, {
         scale: 2, 
@@ -585,10 +581,6 @@ export default function InvoicingPage() {
         logging: false, 
       });
       
-      // Restore original classes
-      elementToCapture.classList.remove('w-[210mm]');
-      elementToCapture.classList.add('max-w-4xl');
-
       const imgData = canvas.toDataURL('image/png');
       const pdf = new jsPDF('p', 'mm', 'a4');
       const pdfWidth = pdf.internal.pageSize.getWidth();
@@ -1284,12 +1276,12 @@ export default function InvoicingPage() {
               <ScrollArea className="flex-grow bg-gray-100 dark:bg-background">
                   {isFetchingCompanyProfile && <div className="text-center p-10"><Loader2 className="h-8 w-8 animate-spin text-primary mx-auto" /> <p>Loading company details...</p></div>}
                   {!isFetchingCompanyProfile && invoiceToView && companyProfileDetails && (
-                      <div ref={invoicePrintRef} className="invoice-view-container bg-white text-black p-8 mx-auto my-4 max-w-4xl font-sans text-sm">
-                        <div className="border-2 border-black p-1">
-                          <div className="border-2 border-black p-6">
+                      <div ref={invoicePrintRef} className="invoice-view-container bg-white text-black p-4 mx-auto my-4 w-[210mm] min-h-[297mm] font-sans text-sm">
+                        <div className="border-2 border-black p-1 h-full flex flex-col">
+                          <div className="border-2 border-black p-6 flex-grow flex flex-col">
                             {/* Header */}
                             <header className="flex justify-between items-start pb-4 border-b-2 border-black">
-                              <div className="text-xs">
+                              <div className="text-xs w-1/2">
                                 <h2 className="font-bold text-lg uppercase">{companyProfileDetails.name}</h2>
                                 <p>GSTIN: {companyProfileDetails.gstin}</p>
                                 <p className="whitespace-pre-line">{companyProfileDetails.address}</p>
@@ -1297,7 +1289,7 @@ export default function InvoicingPage() {
                                 <p>Email: {companyProfileDetails.email}</p>
                               </div>
                               <div className="text-center">
-                                <h1 className="font-bold text-lg">TAX INVOICE</h1>
+                                <h1 className="font-bold text-lg text-blue-600">TAX INVOICE</h1>
                                 <p className="text-xs">ORIGINAL FOR RECIPIENT</p>
                               </div>
                             </header>
@@ -1308,70 +1300,66 @@ export default function InvoicingPage() {
                                     <p className="font-bold">Customer Details:</p>
                                     <p className="font-bold">{invoiceToView.clientName}</p>
                                     <p className="font-bold">Billing Address:</p>
-                                    <p className="whitespace-pre-line">{invoiceToView.clientAddress}</p>
+                                    <p className="whitespace-pre-line text-xs">{invoiceToView.clientAddress}</p>
                                     <p>Ph: {/* Placeholder */}</p>
                                 </div>
-                                <div className="grid grid-rows-4">
-                                    <div className="p-2 border-b-2 border-black grid grid-cols-2"><span>Invoice #:</span><span>{invoiceToView.invoiceNumber}</span></div>
-                                    <div className="p-2 border-b-2 border-black grid grid-cols-2"><span>Invoice Date:</span><span>{format(invoiceToView.issuedDate, 'dd MMM yyyy')}</span></div>
+                                <div className="grid grid-rows-4 text-xs">
+                                    <div className="p-2 border-b-2 border-black grid grid-cols-2"><span>Invoice #:</span><span className="font-bold">{invoiceToView.invoiceNumber}</span></div>
+                                    <div className="p-2 border-b-2 border-black grid grid-cols-2"><span>Invoice Date:</span><span className="font-bold">{format(invoiceToView.issuedDate, 'dd MMM yyyy')}</span></div>
                                     <div className="p-2 border-b-2 border-black grid grid-cols-2"><span>Place of Supply:</span><span>{/* Placeholder */}</span></div>
-                                    <div className="p-2 grid grid-cols-2"><span>Due Date:</span><span>{format(invoiceToView.dueDate, 'dd MMM yyyy')}</span></div>
+                                    <div className="p-2 grid grid-cols-2"><span>Due Date:</span><span className="font-bold">{format(invoiceToView.dueDate, 'dd MMM yyyy')}</span></div>
                                 </div>
                             </div>
                             <div className="p-2 border-b-2 border-black">
                                 <p className="font-bold">Shipping Address:</p>
-                                <p className="whitespace-pre-line">{invoiceToView.clientAddress}</p>
+                                <p className="whitespace-pre-line text-xs">{invoiceToView.clientAddress}</p>
                             </div>
 
                             {/* Items Table */}
-                            <table className="w-full text-xs">
+                            <table className="w-full text-xs table-fixed">
                                 <thead>
                                     <tr className="border-b-2 border-black text-left">
                                         <th className="p-1 border-r-2 border-black font-bold w-8">#</th>
-                                        <th className="p-1 border-r-2 border-black font-bold">Item</th>
-                                        <th className="p-1 border-r-2 border-black font-bold w-20">HSN/SAC</th>
-                                        <th className="p-1 border-r-2 border-black font-bold w-24">Rate/ Item</th>
-                                        <th className="p-1 border-r-2 border-black font-bold w-12">Qty</th>
-                                        <th className="p-1 border-r-2 border-black font-bold w-24">Taxable Value</th>
-                                        <th className="p-1 border-r-2 border-black font-bold w-24">Tax Amount</th>
-                                        <th className="p-1 font-bold w-28">Amount</th>
+                                        <th className="p-1 border-r-2 border-black font-bold w-auto">Item</th>
+                                        <th className="p-1 border-r-2 border-black font-bold w-[80px]">HSN/SAC</th>
+                                        <th className="p-1 border-r-2 border-black font-bold w-[90px]">Rate/ Item</th>
+                                        <th className="p-1 border-r-2 border-black font-bold w-[40px]">Qty</th>
+                                        <th className="p-1 border-r-2 border-black font-bold w-[90px]">Taxable Value</th>
+                                        <th className="p-1 border-r-2 border-black font-bold w-[90px]">Tax Amount</th>
+                                        <th className="p-1 font-bold w-[100px]">Amount</th>
                                     </tr>
                                 </thead>
                                 <tbody className="border-b-2 border-black">
                                     {(invoiceToView.items || []).map((item, index) => (
-                                        <tr key={item.id} className="border-b-2 border-black align-top">
+                                        <tr key={item.id} className="border-b border-black align-top">
                                             <td className="p-1 border-r-2 border-black text-center">{index + 1}</td>
                                             <td className="p-1 border-r-2 border-black font-bold">{item.description}</td>
                                             <td className="p-1 border-r-2 border-black"></td>
-                                            <td className="p-1 border-r-2 border-black text-right">{item.unitPrice.toFixed(2)}</td>
+                                            <td className="p-1 border-r-2 border-black text-right">{currency}{item.unitPrice.toFixed(2)}</td>
                                             <td className="p-1 border-r-2 border-black text-center">{item.quantity}</td>
-                                            <td className="p-1 border-r-2 border-black text-right">{(item.quantity * item.unitPrice).toFixed(2)}</td>
-                                            <td className="p-1 border-r-2 border-black text-right">{((item.quantity * item.unitPrice) * (invoiceToView.taxRate / 100)).toFixed(2)} ({invoiceToView.taxRate}%)</td>
-                                            <td className="p-1 text-right font-bold">{((item.quantity * item.unitPrice) * (1 + invoiceToView.taxRate / 100)).toFixed(2)}</td>
+                                            <td className="p-1 border-r-2 border-black text-right">{currency}{(item.quantity * item.unitPrice).toFixed(2)}</td>
+                                            <td className="p-1 border-r-2 border-black text-right">{currency}{((item.quantity * item.unitPrice) * (invoiceToView.taxRate / 100)).toFixed(2)} <br /> ({invoiceToView.taxRate}%)</td>
+                                            <td className="p-1 text-right font-bold">{currency}{((item.quantity * item.unitPrice) * (1 + invoiceToView.taxRate / 100)).toFixed(2)}</td>
                                         </tr>
                                     ))}
-                                    {(!invoiceToView.items || invoiceToView.items.length === 0) && (
-                                        <tr><td colSpan={8} className="p-2 text-center">No line items for this invoice.</td></tr>
-                                    )}
                                      <tr className="align-top">
-                                        <td colSpan={8} className="p-1 h-32"></td>
+                                        <td colSpan={8} className="p-1 min-h-[100px]"></td>
                                     </tr>
                                 </tbody>
                             </table>
                             
-                            {/* Totals */}
-                            <div className="grid grid-cols-[60%_40%]">
-                                <div className="p-1">
+                             <div className="grid grid-cols-[60%_40%] mt-auto">
+                                <div className="p-1 text-xs">
                                     Total Items / Qty: {(invoiceToView.items || []).length} / {(invoiceToView.items || []).reduce((acc, i) => acc + i.quantity, 0)}
                                 </div>
-                                <div className="text-right">
+                                <div className="text-right text-xs">
                                     <div className="grid grid-cols-2 p-1 border-b-2 border-black">
-                                        <span className="font-bold">Taxable Amount</span>
+                                        <span>Taxable Amount</span>
                                         <span className="font-bold">{currency}{invoiceToView.subtotal.toFixed(2)}</span>
                                     </div>
                                     <div className="grid grid-cols-2 p-1 border-b-2 border-black">
-                                        <span className="font-bold">IGST {invoiceToView.taxRate}%</span>
-                                        <span>{currency}{invoiceToView.taxAmount.toFixed(2)}</span>
+                                        <span>IGST {invoiceToView.taxRate}%</span>
+                                        <span className="font-bold">{currency}{invoiceToView.taxAmount.toFixed(2)}</span>
                                     </div>
                                     <div className="grid grid-cols-2 p-1 bg-gray-200">
                                         <span className="font-bold">Total</span>
@@ -1379,39 +1367,35 @@ export default function InvoicingPage() {
                                     </div>
                                 </div>
                             </div>
-
-                             {/* Words and Tax Summary */}
-                            <div className="border-y-2 border-black mt-2">
+                            
+                            <div className="border-y-2 border-black mt-2 text-xs">
                                 <div className="p-1 border-b-2 border-black">Total amount (in words): {/* Placeholder */}</div>
-                                <table className="w-full text-xs">
+                                <table className="w-full">
                                   <thead>
-                                    <tr className="border-b-2 border-black text-left">
-                                      <th className="p-1 border-r-2 border-black font-bold">HSN/SAC</th>
-                                      <th className="p-1 border-r-2 border-black font-bold">Taxable Value</th>
-                                      <th className="p-1 border-r-2 border-black font-bold">Rate</th>
-                                      <th className="p-1 border-r-2 border-black font-bold">Amount</th>
-                                      <th className="p-1 font-bold">Total Tax Amount</th>
+                                    <tr className="border-b-2 border-black text-left font-bold">
+                                      <th className="p-1 border-r-2 border-black w-1/4">HSN/SAC</th>
+                                      <th className="p-1 border-r-2 border-black w-1/4">Taxable Value</th>
+                                      <th className="p-1 border-r-2 border-black w-1/4">Rate</th>
+                                      <th className="p-1 w-1/4">Tax Amount</th>
                                     </tr>
                                   </thead>
                                   <tbody>
                                     <tr className="border-b-2 border-black">
-                                      <td className="p-1 border-r-2 border-black"></td>
-                                      <td className="p-1 border-r-2 border-black"></td>
-                                      <td className="p-1 border-r-2 border-black"></td>
-                                      <td className="p-1 border-r-2 border-black"></td>
-                                      <td className="p-1"></td>
+                                        <td className="p-1 border-r-2 border-black"></td>
+                                        <td className="p-1 border-r-2 border-black"></td>
+                                        <td className="p-1 border-r-2 border-black"></td>
+                                        <td className="p-1"></td>
                                     </tr>
                                     <tr className="font-bold">
-                                      <td colSpan={1} className="p-1 border-r-2 border-black">TOTAL</td>
+                                      <td className="p-1 border-r-2 border-black">TOTAL</td>
                                       <td className="p-1 text-right border-r-2 border-black">{currency}{invoiceToView.subtotal.toFixed(2)}</td>
                                       <td className="p-1 border-r-2 border-black"></td>
-                                      <td className="p-1 text-right border-r-2 border-black">{currency}{invoiceToView.taxAmount.toFixed(2)}</td>
                                       <td className="p-1 text-right">{currency}{invoiceToView.taxAmount.toFixed(2)}</td>
                                     </tr>
                                   </tbody>
                                 </table>
                             </div>
-                            {invoiceToView.status === 'Paid' && <div className="text-right text-green-600 font-bold mt-1">✓ Amount Paid</div>}
+                            {invoiceToView.status === 'Paid' && <div className="text-right text-green-600 font-bold mt-1 text-xs">✓ Amount Paid</div>}
                             
                             {/* Footer */}
                             <footer className="mt-4 text-xs">
