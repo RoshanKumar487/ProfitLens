@@ -172,6 +172,7 @@ export default function InvoicingPage() {
   const [isDownloadingPDF, setIsDownloadingPDF] = useState(false);
   
   const [sortConfig, setSortConfig] = useState<{ key: keyof InvoiceDisplay; direction: 'ascending' | 'descending' }>({ key: 'issuedDate', direction: 'descending' });
+  const [isClientSuggestionsVisible, setIsClientSuggestionsVisible] = useState(false);
 
 
   useEffect(() => {
