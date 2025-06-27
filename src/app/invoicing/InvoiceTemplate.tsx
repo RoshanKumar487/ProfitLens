@@ -172,18 +172,12 @@ const InvoiceTemplate = React.forwardRef<HTMLDivElement, InvoiceTemplateProps>(
 
             {/* Footer */}
             <footer className="mt-auto pt-4 text-xs">
-              <div className="grid grid-cols-3 gap-2 border-b-2 border-black pb-2">
+              <div className="flex justify-between items-start border-b-2 border-black pb-2">
                 <div>
                   <p className="font-bold">Bank Details:</p>
                   <p><span className="font-bold">Bank:</span> {companyProfileDetails.bankName || 'N/A'}</p>
                   <p><span className="font-bold">Account #:</span> {companyProfileDetails.accountNumber || 'N/A'}</p>
                   <p><span className="font-bold">IFSC:</span> {companyProfileDetails.ifscCode || 'N/A'}</p>
-                </div>
-                <div className="flex flex-col items-center">
-                  <p className="font-bold">Pay using UPI:</p>
-                  <div className="relative h-20 w-20 bg-gray-100 mt-1">
-                    <Image src="https://placehold.co/100x100.png" fill sizes="80px" alt="UPI QR Code" data-ai-hint="qr code" />
-                  </div>
                 </div>
                 <div className="flex flex-col items-center justify-between">
                   <p className="font-bold text-center">For {companyProfileDetails.name}</p>
