@@ -1,4 +1,3 @@
-
 'use client';
 
 import React, { useState, useMemo, useEffect, type FormEvent, useCallback, useRef } from 'react';
@@ -16,7 +15,7 @@ import {
 } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger, DropdownMenuSeparator } from '@/components/ui/dropdown-menu';
-import { Receipt, PlusCircle, Search, MoreHorizontal, Edit, Trash2, Eye, Mail, FileDown, Calendar as CalendarIconLucide, Save, Loader2, UserPlus, Printer, Percent, ArrowUp, ArrowDown, ChevronsUpDown } from 'lucide-react';
+import { Receipt, PlusCircle, Search, MoreHorizontal, Edit, Trash2, Mail, Calendar as CalendarIconLucide, Save, Loader2, UserPlus, Printer, Percent, ArrowUp, ArrowDown, ChevronsUpDown } from 'lucide-react';
 import { format } from 'date-fns';
 import { useToast } from '@/hooks/use-toast';
 import {
@@ -169,7 +168,6 @@ export default function InvoicingPage() {
 
   const [isViewInvoiceDialogOpen, setIsViewInvoiceDialogOpen] = useState(false);
   const [invoiceToView, setInvoiceToView] = useState<InvoiceDisplay | null>(null);
-  const [isDownloadingPDF, setIsDownloadingPDF] = useState(false);
   
   const [sortConfig, setSortConfig] = useState<{ key: keyof InvoiceDisplay; direction: 'ascending' | 'descending' }>({ key: 'issuedDate', direction: 'descending' });
   const [isClientSuggestionsVisible, setIsClientSuggestionsVisible] = useState(false);
@@ -564,36 +562,6 @@ export default function InvoicingPage() {
         description: "Could not open print window. Please check your pop-up blocker settings.",
         variant: "destructive"
       });
-    }
-  };
-
-  const handleDownloadPDF = async () => {
-    if (!invoicePrintRef.current || !invoiceToView) return;
-    setIsDownloadingPDF(true);
-    try {
-      const { default: jsPDF } = await import('jspdf');
-      const { default: html2canvas } = await import('html2canvas');
-      
-      const elementToCapture = invoicePrintRef.current;
-
-      const canvas = await html2canvas(elementToCapture, {
-        scale: 2, 
-        useCORS: true,
-        logging: false, 
-      });
-      
-      const imgData = canvas.toDataURL('image/png');
-      const pdf = new jsPDF('p', 'mm', 'a4');
-      const pdfWidth = pdf.internal.pageSize.getWidth();
-      const pdfHeight = (canvas.height * pdfWidth) / canvas.width;
-      pdf.addImage(imgData, 'PNG', 0, 0, pdfWidth, pdfHeight);
-      pdf.save(`Invoice-${invoiceToView.invoiceNumber}.pdf`);
-      toast({ title: "PDF Downloaded", description: `Invoice ${invoiceToView.invoiceNumber}.pdf downloaded.`});
-    } catch (error) {
-      console.error("Error generating PDF:", error);
-      toast({ title: "PDF Generation Failed", description: "Could not generate PDF.", variant: "destructive"});
-    } finally {
-      setIsDownloadingPDF(false);
     }
   };
 
@@ -1024,7 +992,7 @@ export default function InvoicingPage() {
                         </Button>
                       </DropdownMenuTrigger>
                       <DropdownMenuContent align="end">
-                        <DropdownMenuItem onClick={() => handleOpenViewInvoiceDialog(invoice)}><Eye className="mr-2 h-4 w-4" /> View / Print / Download</DropdownMenuItem>
+                        <DropdownMenuItem onClick={() => handleOpenViewInvoiceDialog(invoice)}><Printer className="mr-2 h-4 w-4" /> Print</DropdownMenuItem>
                         <DropdownMenuItem onClick={() => handleEditInvoice(invoice)}><Edit className="mr-2 h-4 w-4" /> Edit</DropdownMenuItem>
                         <DropdownMenuItem onClick={() => handleOpenEmailDialog(invoice)} disabled={!invoice.clientEmail || isSendingEmail}><Mail className="mr-2 h-4 w-4" /> Email</DropdownMenuItem>
                         <DropdownMenuSeparator />
@@ -1270,7 +1238,7 @@ export default function InvoicingPage() {
                       Invoice {invoiceToView?.invoiceNumber}
                   </DialogTitle>
                    <DialogDescription>
-                        View, print, or download the invoice.
+                        Preview of the invoice to be printed.
                     </DialogDescription>
               </DialogHeader>
             
@@ -1287,15 +1255,11 @@ export default function InvoicingPage() {
               </ScrollArea>
             
             <DialogFooter className="p-4 sm:p-6 border-t bg-background no-print">
-               <Button type="button" variant="outline" onClick={handlePrintInvoice} disabled={isDownloadingPDF}>
+               <Button type="button" variant="default" onClick={handlePrintInvoice}>
                   <Printer className="mr-2 h-4 w-4" /> Print Invoice
                </Button>
-               <Button type="button" onClick={handleDownloadPDF} disabled={isDownloadingPDF}>
-                  {isDownloadingPDF ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <FileDown className="mr-2 h-4 w-4" />}
-                  {isDownloadingPDF ? "Downloading..." : "Download PDF"}
-               </Button>
               <DialogClose asChild>
-                <Button type="button" variant="ghost" disabled={isDownloadingPDF}>Close</Button>
+                <Button type="button" variant="outline">Close</Button>
               </DialogClose>
             </DialogFooter>
           </DialogContent>

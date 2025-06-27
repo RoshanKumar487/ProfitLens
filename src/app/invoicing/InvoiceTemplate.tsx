@@ -1,4 +1,3 @@
-
 'use client';
 
 import React from 'react';
@@ -64,7 +63,7 @@ const InvoiceTemplate = React.forwardRef<HTMLDivElement, InvoiceTemplateProps>(
     ].filter(Boolean).join(', ');
 
     return (
-      <div ref={ref} className="invoice-view-container bg-white text-black py-8 px-8 mx-auto w-[210mm] min-h-[297mm] font-sans text-[10px] leading-tight flex flex-col">
+      <div ref={ref} className="invoice-view-container bg-white text-black py-10 px-8 mx-auto w-[210mm] min-h-[297mm] font-sans text-[10px] leading-tight flex flex-col">
         <div className="border-2 border-black p-1 h-full flex flex-col">
           <div className="border-2 border-black flex-grow flex flex-col">
             {/* Header */}
@@ -169,29 +168,6 @@ const InvoiceTemplate = React.forwardRef<HTMLDivElement, InvoiceTemplateProps>(
             <div className="border-y-2 border-black text-xs">
               <div className="p-1">Total amount (in words): {/* Placeholder for amount in words */}</div>
             </div>
-
-            <div className="border-b-2 border-black text-xs">
-                <table className="w-full">
-                    <thead>
-                        <tr>
-                            <th className="p-1 font-bold text-left border-r-2 border-black">HSN/SAC</th>
-                            <th className="p-1 font-bold text-left border-r-2 border-black">Taxable Value</th>
-                            <th className="p-1 font-bold text-left border-r-2 border-black">Rate</th>
-                            <th className="p-1 font-bold text-left border-r-2 border-black">Amount</th>
-                            <th className="p-1 font-bold text-left">Total Tax Amount</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        <tr className="border-t-2 border-black">
-                            <td className="p-1 border-r-2 border-black"></td>
-                            <td className="p-1 border-r-2 border-black">{currencySymbol}{invoiceToView.subtotal.toFixed(2)}</td>
-                            <td className="p-1 border-r-2 border-black"></td>
-                            <td className="p-1 border-r-2 border-black">{currencySymbol}{invoiceToView.taxAmount.toFixed(2)}</td>
-                            <td className="p-1">{currencySymbol}{invoiceToView.taxAmount.toFixed(2)}</td>
-                        </tr>
-                    </tbody>
-                </table>
-            </div>
             
             <div className="border-b-2 border-black text-right p-1">
                 {invoiceToView.status === 'Paid' && <span className="font-bold text-green-600">&#10004; Amount Paid</span>}
@@ -229,9 +205,6 @@ const InvoiceTemplate = React.forwardRef<HTMLDivElement, InvoiceTemplateProps>(
               </div>
             </footer>
           </div>
-        </div>
-        <div className="text-center text-[9px] pt-1">
-            Page 1/1
         </div>
       </div>
     );
