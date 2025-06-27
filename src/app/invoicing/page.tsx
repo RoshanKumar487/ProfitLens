@@ -1234,7 +1234,7 @@ export default function InvoicingPage() {
                     </div>
                 </div>
 
-                <div className="space-y-2 p-4 bg-muted/50 rounded-lg">
+                <div className="space-y-2 p-4 bg-primary/10 border border-primary/20 rounded-lg">
                     <h4 className="font-medium text-center mb-2">Summary</h4>
                     <div className="flex justify-between text-sm">
                         <span className="text-muted-foreground">Subtotal:</span>
@@ -1246,7 +1246,7 @@ export default function InvoicingPage() {
                     </div>
                     <div className="flex justify-between text-sm">
                         <span className="text-muted-foreground">Tax ({currentInvoice.taxRate || 0}%):</span>
-                        <span className="font-medium text-green-600">+ {currency}{(currentInvoice.taxAmount || 0).toFixed(2)}</span>
+                        <span className="font-medium text-chart-2">+ {currency}{(currentInvoice.taxAmount || 0).toFixed(2)}</span>
                     </div>
                     <Separator className="my-2" />
                     <div className="flex justify-between text-lg font-bold">
