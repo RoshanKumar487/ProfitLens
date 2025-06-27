@@ -137,7 +137,7 @@ Sincerely,
 const DEFAULT_EMAIL_SUBJECT_TEMPLATE = "Invoice {{invoiceNumber}} from {{companyName}}";
 
 const TopRightArt = () => (
-  <svg width="200" height="100" viewBox="0 0 200 100" className="absolute top-0 right-0 h-auto">
+  <svg width="200" height="100" viewBox="0 0 200 100" className="absolute top-0 right-0 h-auto print:hidden">
     <path d="M100 0 L200 0 L200 100 Z" fill="#e3f2fd" />
     <path d="M125 0 L200 0 L200 75 Z" fill="#bbdefb" />
     <path d="M150 0 L200 0 L200 50 Z" fill="#90caf9" />
@@ -146,7 +146,7 @@ const TopRightArt = () => (
 );
 
 const BottomLeftArt = () => (
-   <svg width="200" height="100" viewBox="0 0 200 100" className="absolute bottom-0 left-0 h-auto">
+   <svg width="200" height="100" viewBox="0 0 200 100" className="absolute bottom-0 left-0 h-auto print:hidden">
     <path d="M0 0 L100 100 L0 100 Z" fill="#e3f2fd" />
     <path d="M0 25 L75 100 L0 100 Z" fill="#bbdefb" />
     <path d="M0 50 L50 100 L0 100 Z" fill="#90caf9" />
@@ -1006,10 +1006,10 @@ export default function InvoicingPage() {
                 <TableHead className="text-right">
                   <Button variant="ghost" onClick={() => requestSort('amount')} className="h-auto p-1 text-xs sm:text-sm">Amount {getSortIcon('amount')}</Button>
                 </TableHead>
-                <TableHead>
+                <TableHead className="hidden md:table-cell">
                   <Button variant="ghost" onClick={() => requestSort('issuedDate')} className="-ml-4 h-auto p-1 text-xs sm:text-sm">Issued Date {getSortIcon('issuedDate')}</Button>
                 </TableHead>
-                <TableHead>
+                <TableHead className="hidden md:table-cell">
                    <Button variant="ghost" onClick={() => requestSort('dueDate')} className="-ml-4 h-auto p-1 text-xs sm:text-sm">Due Date {getSortIcon('dueDate')}</Button>
                 </TableHead>
                 <TableHead>
@@ -1024,8 +1024,8 @@ export default function InvoicingPage() {
                   <TableCell className="font-medium">{invoice.invoiceNumber}</TableCell>
                   <TableCell>{invoice.clientName}</TableCell>
                   <TableCell className="text-right">{currency}{invoice.amount.toFixed(2)}</TableCell>
-                  <TableCell>{format(invoice.issuedDate, 'PP')}</TableCell>
-                  <TableCell>{format(invoice.dueDate, 'PP')}</TableCell>
+                  <TableCell className="hidden md:table-cell">{format(invoice.issuedDate, 'PP')}</TableCell>
+                  <TableCell className="hidden md:table-cell">{format(invoice.dueDate, 'PP')}</TableCell>
                   <TableCell>
                     <Badge variant={getStatusBadgeVariant(invoice.status)}>
                       {invoice.status}
@@ -1138,7 +1138,7 @@ export default function InvoicingPage() {
                 />
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
                  <div>
                     <Label htmlFor="invoiceNumber">Invoice Number</Label>
                     <Input id="invoiceNumber" value={currentInvoice.invoiceNumber || ''} onChange={(e) => setCurrentInvoice({ ...currentInvoice, invoiceNumber: e.target.value })} required disabled={isSaving || isEditing} />
@@ -1189,16 +1189,16 @@ export default function InvoicingPage() {
                 <Button type="button" variant="outline" size="sm" onClick={handleAddItem} disabled={isSaving}><PlusCircle className="mr-2 h-4 w-4" /> Add Item</Button>
               </div>
               {(currentInvoice.items || []).map((item) => (
-                <div key={item.id} className="grid grid-cols-[1fr_auto_auto_auto] gap-2 items-end p-2 border rounded-md bg-muted/30">
-                  <div className="space-y-1">
+                <div key={item.id} className="flex flex-wrap items-end gap-2 p-2 border rounded-md bg-muted/30">
+                  <div className="flex-grow min-w-[200px] space-y-1">
                     <Label htmlFor={`item-desc-${item.id}`} className="text-xs">Description</Label>
                     <Input id={`item-desc-${item.id}`} value={item.description} onChange={e => handleItemChange(item.id, 'description', e.target.value)} placeholder="Service or Product" disabled={isSaving} />
                   </div>
-                  <div className="w-20 space-y-1">
+                  <div className="flex-1 min-w-[60px] space-y-1">
                      <Label htmlFor={`item-qty-${item.id}`} className="text-xs">Qty</Label>
                     <Input id={`item-qty-${item.id}`} type="number" value={item.quantity} onChange={e => handleItemChange(item.id, 'quantity', e.target.value)} min="0" disabled={isSaving} />
                   </div>
-                   <div className="w-24 space-y-1">
+                   <div className="flex-1 min-w-[80px] space-y-1">
                     <Label htmlFor={`item-price-${item.id}`} className="text-xs">Unit Price</Label>
                     <Input id={`item-price-${item.id}`} type="number" value={item.unitPrice} onChange={e => handleItemChange(item.id, 'unitPrice', e.target.value)} min="0" step="0.01" disabled={isSaving} />
                   </div>
@@ -1289,7 +1289,7 @@ export default function InvoicingPage() {
             <ScrollArea className="flex-grow overflow-y-auto bg-gray-100 dark:bg-background">
                 {isFetchingCompanyProfile && <div className="text-center p-10"><Loader2 className="h-8 w-8 animate-spin text-primary mx-auto" /> <p>Loading company details...</p></div>}
                 {!isFetchingCompanyProfile && invoiceToView && companyProfileDetails && (
-                    <div ref={invoicePrintRef} className="invoice-view-container relative p-12 sm:p-16 text-[#333] font-sans bg-white min-h-[1123px] w-[794px] mx-auto my-4 shadow-lg overflow-hidden border border-gray-200">
+                    <div ref={invoicePrintRef} className="invoice-view-container relative p-6 sm:p-12 text-[#333] font-sans bg-white w-full max-w-[794px] mx-auto my-4 shadow-lg overflow-hidden border border-gray-200 print:shadow-none print:border-none print:my-0">
                         <TopRightArt />
                         <BottomLeftArt />
                         <div className="relative z-10">
