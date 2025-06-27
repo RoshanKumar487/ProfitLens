@@ -110,6 +110,8 @@ interface CompanyDetailsFirestore {
   website: string;
   accountNumber?: string;
   ifscCode?: string;
+  branch?: string;
+  bankName?: string;
 }
 
 const LOCAL_STORAGE_EMAIL_TEMPLATE_KEY = 'profitlens-invoice-email-template-v2';
@@ -135,24 +137,6 @@ Sincerely,
 `;
 
 const DEFAULT_EMAIL_SUBJECT_TEMPLATE = "Invoice {{invoiceNumber}} from {{companyName}}";
-
-const TopRightArt = () => (
-  <svg width="200" height="100" viewBox="0 0 200 100" className="absolute top-0 right-0 h-auto print:hidden">
-    <path d="M100 0 L200 0 L200 100 Z" fill="#e3f2fd" />
-    <path d="M125 0 L200 0 L200 75 Z" fill="#bbdefb" />
-    <path d="M150 0 L200 0 L200 50 Z" fill="#90caf9" />
-    <path d="M175 0 L200 0 L200 25 Z" fill="#64b5f6" />
-  </svg>
-);
-
-const BottomLeftArt = () => (
-   <svg width="200" height="100" viewBox="0 0 200 100" className="absolute bottom-0 left-0 h-auto print:hidden">
-    <path d="M0 0 L100 100 L0 100 Z" fill="#e3f2fd" />
-    <path d="M0 25 L75 100 L0 100 Z" fill="#bbdefb" />
-    <path d="M0 50 L50 100 L0 100 Z" fill="#90caf9" />
-    <path d="M0 75 L25 100 L0 100 Z" fill="#64b5f6" />
-  </svg>
-);
 
 
 export default function InvoicingPage() {
@@ -531,7 +515,7 @@ export default function InvoicingPage() {
       .join('');
 
     // Get the HTML content of the invoice
-    const printContents = invoicePrintRef.current.outerHTML;
+    const printContents = invoicePrintRef.current.innerHTML;
     
     const printWindow = window.open('', '_blank');
 
@@ -549,6 +533,9 @@ export default function InvoicingPage() {
                   -webkit-print-color-adjust: exact !important; 
                   print-color-adjust: exact !important;
                 }
+                .no-print {
+                    display: none !important;
+                }
               }
             </style>
           </head>
@@ -560,7 +547,6 @@ export default function InvoicingPage() {
 
       printWindow.document.close();
       
-      // Use a timeout to ensure rendering is complete before printing
       setTimeout(() => {
         try {
           printWindow.focus();
@@ -568,7 +554,7 @@ export default function InvoicingPage() {
         } catch (e) {
           console.error("Print failed:", e);
           toast({ title: "Print Failed", description: "There was an error opening the print dialog.", variant: "destructive"});
-          printWindow.close(); // Close only if printing fails
+          printWindow.close();
         }
       }, 500);
 
@@ -587,21 +573,27 @@ export default function InvoicingPage() {
     try {
       const { default: jsPDF } = await import('jspdf');
       const { default: html2canvas } = await import('html2canvas');
-      const canvas = await html2canvas(invoicePrintRef.current, {
+      
+      const elementToCapture = invoicePrintRef.current;
+      // Temporarily remove max-w to capture full width if needed for canvas
+      elementToCapture.classList.add('w-[210mm]');
+      elementToCapture.classList.remove('max-w-4xl');
+
+      const canvas = await html2canvas(elementToCapture, {
         scale: 2, 
         useCORS: true,
         logging: false, 
-        width: 794,
-        windowWidth: 794,
       });
-      const imgData = canvas.toDataURL('image/png');
-      const pdf = new jsPDF({
-        orientation: 'portrait',
-        unit: 'px', 
-        format: [794, 1123] // A4 size in pixels at 96 DPI
-      });
+      
+      // Restore original classes
+      elementToCapture.classList.remove('w-[210mm]');
+      elementToCapture.classList.add('max-w-4xl');
 
-      pdf.addImage(imgData, 'PNG', 0, 0, 794, 1123);
+      const imgData = canvas.toDataURL('image/png');
+      const pdf = new jsPDF('p', 'mm', 'a4');
+      const pdfWidth = pdf.internal.pageSize.getWidth();
+      const pdfHeight = (canvas.height * pdfWidth) / canvas.width;
+      pdf.addImage(imgData, 'PNG', 0, 0, pdfWidth, pdfHeight);
       pdf.save(`Invoice-${invoiceToView.invoiceNumber}.pdf`);
       toast({ title: "PDF Downloaded", description: `Invoice ${invoiceToView.invoiceNumber}.pdf downloaded.`});
     } catch (error) {
@@ -1189,18 +1181,18 @@ export default function InvoicingPage() {
                 <Button type="button" variant="outline" size="sm" onClick={handleAddItem} disabled={isSaving}><PlusCircle className="mr-2 h-4 w-4" /> Add Item</Button>
               </div>
               {(currentInvoice.items || []).map((item) => (
-                <div key={item.id} className="flex flex-wrap items-end gap-2 p-2 border rounded-md bg-muted/30">
-                  <div className="flex-grow min-w-[200px] space-y-1">
+                <div key={item.id} className="grid grid-cols-[1fr,auto,auto,auto] sm:grid-cols-[2fr_1fr_1fr_auto] items-end gap-2 p-2 border rounded-md bg-muted/30">
+                  <div className="space-y-1">
                     <Label htmlFor={`item-desc-${item.id}`} className="text-xs">Description</Label>
                     <Input id={`item-desc-${item.id}`} value={item.description} onChange={e => handleItemChange(item.id, 'description', e.target.value)} placeholder="Service or Product" disabled={isSaving} />
                   </div>
-                  <div className="flex-1 min-w-[60px] space-y-1">
+                  <div className="space-y-1">
                      <Label htmlFor={`item-qty-${item.id}`} className="text-xs">Qty</Label>
-                    <Input id={`item-qty-${item.id}`} type="number" value={item.quantity} onChange={e => handleItemChange(item.id, 'quantity', e.target.value)} min="0" disabled={isSaving} />
+                    <Input id={`item-qty-${item.id}`} type="number" value={item.quantity} onChange={e => handleItemChange(item.id, 'quantity', e.target.value)} min="0" disabled={isSaving} className="w-20" />
                   </div>
-                   <div className="flex-1 min-w-[80px] space-y-1">
+                   <div className="space-y-1">
                     <Label htmlFor={`item-price-${item.id}`} className="text-xs">Unit Price</Label>
-                    <Input id={`item-price-${item.id}`} type="number" value={item.unitPrice} onChange={e => handleItemChange(item.id, 'unitPrice', e.target.value)} min="0" step="0.01" disabled={isSaving} />
+                    <Input id={`item-price-${item.id}`} type="number" value={item.unitPrice} onChange={e => handleItemChange(item.id, 'unitPrice', e.target.value)} min="0" step="0.01" disabled={isSaving} className="w-24"/>
                   </div>
                   <Button type="button" variant="ghost" size="icon" className="text-destructive h-8 w-8" onClick={() => handleRemoveItem(item.id)} disabled={isSaving}><Trash2 className="h-4 w-4" /></Button>
                 </div>
@@ -1279,153 +1271,208 @@ export default function InvoicingPage() {
       </Dialog>
 
       <Dialog open={isViewInvoiceDialogOpen} onOpenChange={(open) => { setIsViewInvoiceDialogOpen(open); if (!open) setInvoiceToView(null); }}>
-        <DialogContent className="sm:max-w-5xl max-h-[90vh] flex flex-col p-0 bg-gray-100 dark:bg-background">
-            <DialogHeader className="p-4 sm:p-6 pb-2 border-b bg-background no-print">
-                <DialogTitle className="font-headline text-xl">
-                    Invoice {invoiceToView?.invoiceNumber}
-                </DialogTitle>
-            </DialogHeader>
-          
-            <ScrollArea className="flex-grow overflow-y-auto bg-gray-100 dark:bg-background">
-                {isFetchingCompanyProfile && <div className="text-center p-10"><Loader2 className="h-8 w-8 animate-spin text-primary mx-auto" /> <p>Loading company details...</p></div>}
-                {!isFetchingCompanyProfile && invoiceToView && companyProfileDetails && (
-                    <div ref={invoicePrintRef} className="invoice-view-container relative p-6 sm:p-12 text-[#333] font-sans bg-white w-full max-w-[794px] mx-auto my-4 shadow-lg overflow-hidden border border-gray-200 print:shadow-none print:border-none print:my-0">
-                        <TopRightArt />
-                        <BottomLeftArt />
-                        <div className="relative z-10">
-                            <header className="flex justify-between items-start mb-8">
-                                <div>
-                                <h2 className="text-2xl font-bold text-gray-800">{companyProfileDetails.name}</h2>
-                                <p className="text-sm text-gray-500 whitespace-pre-line">{companyProfileDetails.address}</p>
-                                </div>
-                                <div className="text-right">
-                                <h1 className="text-5xl font-light text-[#2962ff] tracking-wider">INVOICE</h1>
-                                </div>
+          <DialogContent className="max-w-4xl max-h-[90vh] flex flex-col p-0 bg-gray-100 dark:bg-background">
+              <DialogHeader className="p-4 sm:p-6 pb-2 border-b bg-background no-print">
+                  <DialogTitle className="font-headline text-xl">
+                      Invoice {invoiceToView?.invoiceNumber}
+                  </DialogTitle>
+                   <DialogDescription>
+                        View, print, or download the invoice.
+                    </DialogDescription>
+              </DialogHeader>
+            
+              <ScrollArea className="flex-grow bg-gray-100 dark:bg-background">
+                  {isFetchingCompanyProfile && <div className="text-center p-10"><Loader2 className="h-8 w-8 animate-spin text-primary mx-auto" /> <p>Loading company details...</p></div>}
+                  {!isFetchingCompanyProfile && invoiceToView && companyProfileDetails && (
+                      <div ref={invoicePrintRef} className="invoice-view-container bg-white text-black p-8 mx-auto my-4 max-w-4xl font-sans text-sm">
+                        <div className="border-2 border-black p-1">
+                          <div className="border-2 border-black p-6">
+                            {/* Header */}
+                            <header className="flex justify-between items-start pb-4 border-b-2 border-black">
+                              <div className="text-xs">
+                                <h2 className="font-bold text-lg uppercase">{companyProfileDetails.name}</h2>
+                                <p>GSTIN: {companyProfileDetails.gstin}</p>
+                                <p className="whitespace-pre-line">{companyProfileDetails.address}</p>
+                                <p>Mobile: {companyProfileDetails.phone}</p>
+                                <p>Email: {companyProfileDetails.email}</p>
+                              </div>
+                              <div className="text-center">
+                                <h1 className="font-bold text-lg">TAX INVOICE</h1>
+                                <p className="text-xs">ORIGINAL FOR RECIPIENT</p>
+                              </div>
                             </header>
 
-                            <section className="flex justify-between border-y border-gray-200 py-4 mb-8">
-                                <div className="grid grid-cols-[max-content,1fr] gap-x-6 gap-y-1 text-sm">
-                                <span className="font-semibold text-gray-500">Invoice#</span>
-                                <span className="font-bold">{invoiceToView.invoiceNumber}</span>
-                                <span className="font-semibold text-gray-500">Invoice Date</span>
-                                <span>{format(invoiceToView.issuedDate, 'dd MMM yyyy')}</span>
-                                <span className="font-semibold text-gray-500">Terms</span>
-                                <span>Due on Receipt</span>
-                                <span className="font-semibold text-gray-500">Due Date</span>
-                                <span>{format(invoiceToView.dueDate, 'dd MMM yyyy')}</span>
-                                </div>
-                            </section>
-
-                            <section className="grid grid-cols-2 gap-8 mb-8">
-                                <div>
-                                    <div className="border-b border-gray-200 pb-1 mb-2">
-                                        <h3 className="text-sm font-semibold text-gray-600">Bill To</h3>
-                                    </div>
+                            {/* Details Grid */}
+                            <div className="grid grid-cols-[60%_40%] border-b-2 border-black">
+                                <div className="p-2 border-r-2 border-black">
+                                    <p className="font-bold">Customer Details:</p>
                                     <p className="font-bold">{invoiceToView.clientName}</p>
-                                    <p className="text-sm text-gray-600 whitespace-pre-line">{invoiceToView.clientAddress}</p>
+                                    <p className="font-bold">Billing Address:</p>
+                                    <p className="whitespace-pre-line">{invoiceToView.clientAddress}</p>
+                                    <p>Ph: {/* Placeholder */}</p>
                                 </div>
-                                <div>
-                                    <div className="border-b border-gray-200 pb-1 mb-2">
-                                        <h3 className="text-sm font-semibold text-gray-600">Ship To</h3>
-                                    </div>
-                                    <p className="font-bold">{invoiceToView.clientName}</p>
-                                    <p className="text-sm text-gray-600 whitespace-pre-line">{invoiceToView.clientAddress}</p>
+                                <div className="grid grid-rows-4">
+                                    <div className="p-2 border-b-2 border-black grid grid-cols-2"><span>Invoice #:</span><span>{invoiceToView.invoiceNumber}</span></div>
+                                    <div className="p-2 border-b-2 border-black grid grid-cols-2"><span>Invoice Date:</span><span>{format(invoiceToView.issuedDate, 'dd MMM yyyy')}</span></div>
+                                    <div className="p-2 border-b-2 border-black grid grid-cols-2"><span>Place of Supply:</span><span>{/* Placeholder */}</span></div>
+                                    <div className="p-2 grid grid-cols-2"><span>Due Date:</span><span>{format(invoiceToView.dueDate, 'dd MMM yyyy')}</span></div>
                                 </div>
-                            </section>
+                            </div>
+                            <div className="p-2 border-b-2 border-black">
+                                <p className="font-bold">Shipping Address:</p>
+                                <p className="whitespace-pre-line">{invoiceToView.clientAddress}</p>
+                            </div>
 
-                            <section>
-                                <table className="w-full text-left border-collapse">
-                                    <thead>
-                                        <tr style={{ backgroundColor: '#1e4e8c', color: 'white' }}>
-                                            <th className="p-3 w-12 text-center font-normal">#</th>
-                                            <th className="p-3 font-normal">Item &amp; Description</th>
-                                            <th className="p-3 w-24 text-right font-normal">Qty</th>
-                                            <th className="p-3 w-32 text-right font-normal">Rate</th>
-                                            <th className="p-3 w-32 text-right font-normal">Amount</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody>
+                            {/* Items Table */}
+                            <table className="w-full text-xs">
+                                <thead>
+                                    <tr className="border-b-2 border-black text-left">
+                                        <th className="p-1 border-r-2 border-black font-bold w-8">#</th>
+                                        <th className="p-1 border-r-2 border-black font-bold">Item</th>
+                                        <th className="p-1 border-r-2 border-black font-bold w-20">HSN/SAC</th>
+                                        <th className="p-1 border-r-2 border-black font-bold w-24">Rate/ Item</th>
+                                        <th className="p-1 border-r-2 border-black font-bold w-12">Qty</th>
+                                        <th className="p-1 border-r-2 border-black font-bold w-24">Taxable Value</th>
+                                        <th className="p-1 border-r-2 border-black font-bold w-24">Tax Amount</th>
+                                        <th className="p-1 font-bold w-28">Amount</th>
+                                    </tr>
+                                </thead>
+                                <tbody className="border-b-2 border-black">
                                     {(invoiceToView.items || []).map((item, index) => (
-                                        <tr key={item.id} className="border-b border-gray-200">
-                                            <td className="p-3 text-center text-gray-600">{index + 1}</td>
-                                            <td className="p-3">
-                                                <p className="font-semibold text-gray-800">{item.description}</p>
-                                            </td>
-                                            <td className="p-3 text-right text-gray-600">{item.quantity.toFixed(2)}</td>
-                                            <td className="p-3 text-right text-gray-600">{currency}{item.unitPrice.toFixed(2)}</td>
-                                            <td className="p-3 text-right font-semibold text-gray-800">{currency}{(item.quantity * item.unitPrice).toFixed(2)}</td>
+                                        <tr key={item.id} className="border-b-2 border-black align-top">
+                                            <td className="p-1 border-r-2 border-black text-center">{index + 1}</td>
+                                            <td className="p-1 border-r-2 border-black font-bold">{item.description}</td>
+                                            <td className="p-1 border-r-2 border-black"></td>
+                                            <td className="p-1 border-r-2 border-black text-right">{item.unitPrice.toFixed(2)}</td>
+                                            <td className="p-1 border-r-2 border-black text-center">{item.quantity}</td>
+                                            <td className="p-1 border-r-2 border-black text-right">{(item.quantity * item.unitPrice).toFixed(2)}</td>
+                                            <td className="p-1 border-r-2 border-black text-right">{((item.quantity * item.unitPrice) * (invoiceToView.taxRate / 100)).toFixed(2)} ({invoiceToView.taxRate}%)</td>
+                                            <td className="p-1 text-right font-bold">{((item.quantity * item.unitPrice) * (1 + invoiceToView.taxRate / 100)).toFixed(2)}</td>
                                         </tr>
                                     ))}
                                     {(!invoiceToView.items || invoiceToView.items.length === 0) && (
-                                        <TableRow><TableCell colSpan={5} className="text-center text-gray-500 py-4">No line items for this invoice.</TableCell></TableRow>
+                                        <tr><td colSpan={8} className="p-2 text-center">No line items for this invoice.</td></tr>
                                     )}
-                                    </tbody>
+                                     <tr className="align-top">
+                                        <td colSpan={8} className="p-1 h-32"></td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                            
+                            {/* Totals */}
+                            <div className="grid grid-cols-[60%_40%]">
+                                <div className="p-1">
+                                    Total Items / Qty: {(invoiceToView.items || []).length} / {(invoiceToView.items || []).reduce((acc, i) => acc + i.quantity, 0)}
+                                </div>
+                                <div className="text-right">
+                                    <div className="grid grid-cols-2 p-1 border-b-2 border-black">
+                                        <span className="font-bold">Taxable Amount</span>
+                                        <span className="font-bold">{currency}{invoiceToView.subtotal.toFixed(2)}</span>
+                                    </div>
+                                    <div className="grid grid-cols-2 p-1 border-b-2 border-black">
+                                        <span className="font-bold">IGST {invoiceToView.taxRate}%</span>
+                                        <span>{currency}{invoiceToView.taxAmount.toFixed(2)}</span>
+                                    </div>
+                                    <div className="grid grid-cols-2 p-1 bg-gray-200">
+                                        <span className="font-bold">Total</span>
+                                        <span className="font-bold">{currency}{invoiceToView.amount.toFixed(2)}</span>
+                                    </div>
+                                </div>
+                            </div>
+
+                             {/* Words and Tax Summary */}
+                            <div className="border-y-2 border-black mt-2">
+                                <div className="p-1 border-b-2 border-black">Total amount (in words): {/* Placeholder */}</div>
+                                <table className="w-full text-xs">
+                                  <thead>
+                                    <tr className="border-b-2 border-black text-left">
+                                      <th className="p-1 border-r-2 border-black font-bold">HSN/SAC</th>
+                                      <th className="p-1 border-r-2 border-black font-bold">Taxable Value</th>
+                                      <th className="p-1 border-r-2 border-black font-bold">Rate</th>
+                                      <th className="p-1 border-r-2 border-black font-bold">Amount</th>
+                                      <th className="p-1 font-bold">Total Tax Amount</th>
+                                    </tr>
+                                  </thead>
+                                  <tbody>
+                                    <tr className="border-b-2 border-black">
+                                      <td className="p-1 border-r-2 border-black"></td>
+                                      <td className="p-1 border-r-2 border-black"></td>
+                                      <td className="p-1 border-r-2 border-black"></td>
+                                      <td className="p-1 border-r-2 border-black"></td>
+                                      <td className="p-1"></td>
+                                    </tr>
+                                    <tr className="font-bold">
+                                      <td colSpan={1} className="p-1 border-r-2 border-black">TOTAL</td>
+                                      <td className="p-1 text-right border-r-2 border-black">{currency}{invoiceToView.subtotal.toFixed(2)}</td>
+                                      <td className="p-1 border-r-2 border-black"></td>
+                                      <td className="p-1 text-right border-r-2 border-black">{currency}{invoiceToView.taxAmount.toFixed(2)}</td>
+                                      <td className="p-1 text-right">{currency}{invoiceToView.taxAmount.toFixed(2)}</td>
+                                    </tr>
+                                  </tbody>
                                 </table>
-                            </section>
-
-                            <footer className="mt-8">
-                                <div className="text-right mb-4 border-t border-gray-200 pt-2">
-                                    <span className="font-semibold text-gray-600 mr-4">Sub Total</span>
-                                    <span className="font-semibold text-gray-800">{currency}{invoiceToView.subtotal.toFixed(2)}</span>
-                                </div>
-                                <div className="grid grid-cols-2 gap-8">
-                                    <div className="text-sm text-gray-600">
-                                        <p className="font-semibold text-gray-700">Thanks for shopping with us.</p>
-                                        {invoiceToView.notes && <p className="mt-1">{invoiceToView.notes}</p>}
-
-                                        {companyProfileDetails.accountNumber && (
-                                            <div className="mt-4">
-                                                <p className="font-bold text-gray-800">Payment Details</p>
-                                                <p className="text-xs">Account Name: {companyProfileDetails.name}</p>
-                                                <p className="text-xs">Account Number: {companyProfileDetails.accountNumber}</p>
-                                                {companyProfileDetails.ifscCode && <p className="text-xs">IFSC/SWIFT: {companyProfileDetails.ifscCode}</p>}
-                                            </div>
-                                        )}
-                                        
-                                        <p className="font-bold mt-4 text-gray-800">Terms &amp; Conditions</p>
-                                        <p className="text-xs">Full payment is due upon receipt of this invoice. Late payments may incur additional charges or interest as per the applicable laws.</p>
-                                    </div>
-                                    <div className="self-end">
-                                        <table className="w-full text-right" style={{ backgroundColor: '#e3f2fd' }}>
-                                            <tbody>
-                                                <tr>
-                                                    <td className="p-3 font-semibold text-gray-700">Tax Rate</td>
-                                                    <td className="p-3 font-semibold text-gray-800">{invoiceToView.taxRate.toFixed(2)}%</td>
-                                                </tr>
-                                                <tr className="font-bold text-lg">
-                                                    <td className="p-3 text-gray-800">Total</td>
-                                                    <td className="p-3 text-gray-900">{currency}{invoiceToView.amount.toFixed(2)}</td>
-                                                </tr>
-                                                <tr className="font-bold text-lg">
-                                                    <td className="p-3 text-gray-800">Balance Due</td>
-                                                    <td className="p-3 text-gray-900">{currency}{invoiceToView.amount.toFixed(2)}</td>
-                                                </tr>
-                                            </tbody>
-                                        </table>
-                                    </div>
-                                </div>
-                                <div className="text-center text-xs text-gray-400 pt-12 mt-8 border-t border-gray-100">
-                                    <p>Invoice created by ProfitLens. Please visit <a href="https://www.profitlens.com" target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:underline">www.profitlens.com</a>.</p>
-                                </div>
+                            </div>
+                            {invoiceToView.status === 'Paid' && <div className="text-right text-green-600 font-bold mt-1">✓ Amount Paid</div>}
+                            
+                            {/* Footer */}
+                            <footer className="mt-4 text-xs">
+                               <div className="grid grid-cols-3 gap-2 border-b-2 border-black pb-2">
+                                 <div>
+                                    <p className="font-bold">Bank Details:</p>
+                                    <p><span className="font-bold">Bank:</span> {companyProfileDetails.bankName || 'N/A'}</p>
+                                    <p><span className="font-bold">Account #:</span> {companyProfileDetails.accountNumber || 'N/A'}</p>
+                                    <p><span className="font-bold">IFSC:</span> {companyProfileDetails.ifscCode || 'N/A'}</p>
+                                    <p><span className="font-bold">Branch:</span> {companyProfileDetails.branch || 'N/A'}</p>
+                                 </div>
+                                  <div className="flex flex-col items-center">
+                                    <p className="font-bold">Pay using UPI:</p>
+                                    <Image src="https://placehold.co/100x100.png" width={100} height={100} alt="UPI QR Code" data-ai-hint="qr code" />
+                                  </div>
+                                  <div className="flex flex-col items-center justify-between">
+                                      <p className="font-bold text-center">For {companyProfileDetails.name}</p>
+                                      <div className="relative h-20 w-20">
+                                        <Image src="https://placehold.co/100x100.png" width={100} height={100} alt="Signature Stamp" data-ai-hint="signature stamp" />
+                                      </div>
+                                      <p>Authorized Signatory</p>
+                                  </div>
+                               </div>
+                               <div className="grid grid-cols-2 gap-4 pt-2">
+                                  <div>
+                                      <p className="font-bold">Notes:</p>
+                                      <p className="whitespace-pre-line">{invoiceToView.notes}</p>
+                                  </div>
+                                  <div>
+                                      <p className="font-bold">Terms and Conditions:</p>
+                                      <ol className="list-decimal list-inside text-xs">
+                                          <li>Goods once sold cannot be taken back or exchanged.</li>
+                                          <li>We are not the manufacturers, company will stand for warranty as per their terms and conditions.</li>
+                                          <li>Interest @24% p.a. will be charged for uncleared bills beyond 15 days.</li>
+                                          <li>Subject to local Jurisdiction.</li>
+                                      </ol>
+                                  </div>
+                               </div>
                             </footer>
-                        </div>
-                    </div>
-                )}
-            </ScrollArea>
-          
-          <DialogFooter className="p-4 sm:p-6 border-t bg-background no-print">
-             <Button type="button" variant="outline" onClick={handlePrintInvoice} disabled={isDownloadingPDF}>
-                <Printer className="mr-2 h-4 w-4" /> Print Invoice
-             </Button>
-             <Button type="button" onClick={handleDownloadPDF} disabled={isDownloadingPDF}>
-                {isDownloadingPDF ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <FileDown className="mr-2 h-4 w-4" />}
-                {isDownloadingPDF ? "Downloading..." : "Download PDF"}
-             </Button>
-            <DialogClose asChild>
-              <Button type="button" variant="ghost" disabled={isDownloadingPDF}>Close</Button>
-            </DialogClose>
-          </DialogFooter>
-        </DialogContent>
+                          </div>
+                          </div>
+                           <div className="text-center text-xs mt-2 text-gray-500">
+                                Page 1 / 1 This is a digitally signed document.
+                            </div>
+                      </div>
+                  )}
+              </ScrollArea>
+            
+            <DialogFooter className="p-4 sm:p-6 border-t bg-background no-print">
+               <Button type="button" variant="outline" onClick={handlePrintInvoice} disabled={isDownloadingPDF}>
+                  <Printer className="mr-2 h-4 w-4" /> Print Invoice
+               </Button>
+               <Button type="button" onClick={handleDownloadPDF} disabled={isDownloadingPDF}>
+                  {isDownloadingPDF ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <FileDown className="mr-2 h-4 w-4" />}
+                  {isDownloadingPDF ? "Downloading..." : "Download PDF"}
+               </Button>
+              <DialogClose asChild>
+                <Button type="button" variant="ghost" disabled={isDownloadingPDF}>Close</Button>
+              </DialogClose>
+            </DialogFooter>
+          </DialogContent>
       </Dialog>
 
       <Dialog open={isEmailPreviewDialogOpen} onOpenChange={(open) => { setIsEmailPreviewDialogOpen(open); if (!open) setInvoiceForEmail(null); }}>
