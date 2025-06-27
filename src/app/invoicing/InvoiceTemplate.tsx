@@ -64,7 +64,7 @@ const InvoiceTemplate = React.forwardRef<HTMLDivElement, InvoiceTemplateProps>(
     ].filter(Boolean).join(', ');
 
     return (
-      <div ref={ref} className="invoice-view-container bg-white text-black p-4 mx-auto w-[210mm] min-h-[297mm] font-sans text-[10px] leading-tight flex flex-col">
+      <div ref={ref} className="invoice-view-container bg-white text-black p-8 mx-auto w-[210mm] min-h-[297mm] font-sans text-[10px] leading-tight flex flex-col">
         <div className="border-2 border-black p-1 h-full flex flex-col">
           <div className="border-2 border-black flex-grow flex flex-col">
             {/* Header */}
@@ -181,10 +181,10 @@ const InvoiceTemplate = React.forwardRef<HTMLDivElement, InvoiceTemplateProps>(
                 </div>
                 <div className="flex flex-col items-center justify-between">
                   <p className="font-bold text-center">For {companyProfileDetails.name}</p>
-                  <div className="relative h-16 w-32 bg-gray-100">
+                  <div className="relative h-16 w-32 bg-gray-100 mt-2">
                     <Image src="https://placehold.co/128x64.png" layout="fill" objectFit="contain" alt="Signature Stamp" data-ai-hint="signature stamp" />
                   </div>
-                  <p>Authorized Signatory</p>
+                  <p className="mt-2">Authorized Signatory</p>
                 </div>
               </div>
               <div className="grid grid-cols-2 gap-4 pt-2">
@@ -205,14 +205,9 @@ const InvoiceTemplate = React.forwardRef<HTMLDivElement, InvoiceTemplateProps>(
             </footer>
           </div>
         </div>
-        <div className="text-center text-xs mt-2 text-gray-500">
-          This is a digitally signed document.
-        </div>
       </div>
     );
   }
 );
 InvoiceTemplate.displayName = 'InvoiceTemplate';
 export default InvoiceTemplate;
-
-    
