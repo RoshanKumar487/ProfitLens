@@ -1,4 +1,3 @@
-
 'use client';
 
 import React from 'react';
@@ -156,26 +155,7 @@ const InvoiceTemplate = React.forwardRef<HTMLDivElement, InvoiceTemplateProps>(
             </div>
 
             <div className="border-y-2 border-black mt-2 text-xs">
-              <div className="p-1 border-b-2 border-black">Total amount (in words): {/* Placeholder for amount in words */}</div>
-              <table className="w-full">
-                <thead>
-                  <tr className="border-b-2 border-black text-left font-bold">
-                    <th className="p-1 border-r-2 border-black w-1/4">HSN/SAC</th>
-                    <th className="p-1 border-r-2 border-black w-1/4 text-right">Taxable Value</th>
-                    <th className="p-1 border-r-2 border-black w-1/4 text-right">Rate</th>
-                    <th className="p-1 w-1/4 text-right">Tax Amount</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  <tr className="border-b-2 border-black h-6"><td className="p-1 border-r-2 border-black"></td><td className="p-1 border-r-2 border-black"></td><td className="p-1 border-r-2 border-black"></td><td className="p-1"></td></tr>
-                  <tr className="font-bold">
-                    <td className="p-1 border-r-2 border-black">TOTAL</td>
-                    <td className="p-1 text-right border-r-2 border-black">{currencySymbol}{invoiceToView.subtotal.toFixed(2)}</td>
-                    <td className="p-1 border-r-2 border-black"></td>
-                    <td className="p-1 text-right">{currencySymbol}{invoiceToView.taxAmount.toFixed(2)}</td>
-                  </tr>
-                </tbody>
-              </table>
+              <div className="p-1">Total amount (in words): {/* Placeholder for amount in words */}</div>
             </div>
 
             {/* Footer */}
@@ -229,5 +209,3 @@ const InvoiceTemplate = React.forwardRef<HTMLDivElement, InvoiceTemplateProps>(
 );
 InvoiceTemplate.displayName = 'InvoiceTemplate';
 export default InvoiceTemplate;
-
-    
