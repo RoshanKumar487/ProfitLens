@@ -1,3 +1,4 @@
+
 'use client';
 
 import React from 'react';
@@ -32,13 +33,15 @@ interface InvoiceDisplay {
 interface CompanyDetailsFirestore {
   name: string;
   address: string;
+  city: string;
+  state: string;
+  country: string;
   gstin: string;
   phone: string;
   email: string;
   website: string;
   accountNumber?: string;
   ifscCode?: string;
-  branch?: string;
   bankName?: string;
 }
 
@@ -51,8 +54,17 @@ interface InvoiceTemplateProps {
 // Using React.forwardRef to pass the ref down to the DOM element for PDF capture
 const InvoiceTemplate = React.forwardRef<HTMLDivElement, InvoiceTemplateProps>(
   ({ invoiceToView, companyProfileDetails, currencySymbol }, ref) => {
+    
+    // Combine address parts for display
+    const fullCompanyAddress = [
+        companyProfileDetails.address,
+        companyProfileDetails.city,
+        companyProfileDetails.state,
+        companyProfileDetails.country
+    ].filter(Boolean).join(', ');
+
     return (
-      <div ref={ref} className="invoice-view-container bg-white text-black p-6 mx-auto w-[210mm] min-h-[297mm] font-sans text-[10px] leading-tight flex flex-col">
+      <div ref={ref} className="invoice-view-container bg-white text-black p-4 mx-auto w-[210mm] min-h-[297mm] font-sans text-[10px] leading-tight flex flex-col">
         <div className="border-2 border-black p-1 h-full flex flex-col">
           <div className="border-2 border-black flex-grow flex flex-col">
             {/* Header */}
@@ -60,7 +72,7 @@ const InvoiceTemplate = React.forwardRef<HTMLDivElement, InvoiceTemplateProps>(
               <div className="text-xs w-1/2">
                 <h2 className="font-bold text-lg uppercase">{companyProfileDetails.name}</h2>
                 <p>GSTIN: {companyProfileDetails.gstin}</p>
-                <p className="whitespace-pre-line">{companyProfileDetails.address}</p>
+                <p className="whitespace-pre-line">{fullCompanyAddress}</p>
                 {companyProfileDetails.phone && <p>Mobile: {companyProfileDetails.phone}</p>}
                 {companyProfileDetails.email && <p>Email: {companyProfileDetails.email}</p>}
               </div>
@@ -74,7 +86,7 @@ const InvoiceTemplate = React.forwardRef<HTMLDivElement, InvoiceTemplateProps>(
             <div className="grid grid-cols-[60%_40%] border-b-2 border-black">
               <div className="p-2 border-r-2 border-black">
                 <p className="font-bold">Customer Details:</p>
-                <p className="font-bold">{invoiceToView.clientName}</p>
+                <p className="font-bold text-base">{invoiceToView.clientName}</p>
                 <p className="font-bold mt-1">Billing Address:</p>
                 <p className="whitespace-pre-line">{invoiceToView.clientAddress}</p>
                 <p className="font-bold mt-1">Shipping Address:</p>
@@ -83,7 +95,7 @@ const InvoiceTemplate = React.forwardRef<HTMLDivElement, InvoiceTemplateProps>(
               <div className="grid grid-rows-4 text-xs">
                 <div className="p-2 border-b-2 border-black grid grid-cols-2"><span>Invoice #:</span><span className="font-bold">{invoiceToView.invoiceNumber}</span></div>
                 <div className="p-2 border-b-2 border-black grid grid-cols-2"><span>Invoice Date:</span><span className="font-bold">{format(invoiceToView.issuedDate, 'dd MMM yyyy')}</span></div>
-                <div className="p-2 border-b-2 border-black grid grid-cols-2"><span>Place of Supply:</span><span>{/* Placeholder */}</span></div>
+                <div className="p-2 border-b-2 border-black grid grid-cols-2"><span>Place of Supply:</span><span>{companyProfileDetails.state}</span></div>
                 <div className="p-2 grid grid-cols-2"><span>Due Date:</span><span className="font-bold">{format(invoiceToView.dueDate, 'dd MMM yyyy')}</span></div>
               </div>
             </div>
@@ -107,7 +119,7 @@ const InvoiceTemplate = React.forwardRef<HTMLDivElement, InvoiceTemplateProps>(
                   {(invoiceToView.items || []).map((item, index) => {
                     const taxableValue = item.quantity * item.unitPrice;
                     const taxAmount = taxableValue * (invoiceToView.taxRate / 100);
-                    const totalAmount = taxableValue; // The final amount in the row should be without tax as per image
+                    const totalAmount = taxableValue; // The final amount in the row should be without tax
                     return (
                       <tr key={item.id} className="border-b border-black align-top">
                         <td className="p-1 border-r-2 border-black text-center">{index + 1}</td>
@@ -166,11 +178,10 @@ const InvoiceTemplate = React.forwardRef<HTMLDivElement, InvoiceTemplateProps>(
                   <p><span className="font-bold">Bank:</span> {companyProfileDetails.bankName || 'N/A'}</p>
                   <p><span className="font-bold">Account #:</span> {companyProfileDetails.accountNumber || 'N/A'}</p>
                   <p><span className="font-bold">IFSC:</span> {companyProfileDetails.ifscCode || 'N/A'}</p>
-                  <p><span className="font-bold">Branch:</span> {companyProfileDetails.branch || 'N/A'}</p>
                 </div>
                 <div className="flex flex-col items-center">
                   <p className="font-bold">Pay using UPI:</p>
-                  <div className="relative h-20 w-20 bg-gray-100">
+                  <div className="relative h-20 w-20 bg-gray-100 mt-1">
                     <Image src="https://placehold.co/100x100.png" fill sizes="80px" alt="UPI QR Code" data-ai-hint="qr code" />
                   </div>
                 </div>
@@ -209,3 +220,5 @@ const InvoiceTemplate = React.forwardRef<HTMLDivElement, InvoiceTemplateProps>(
 );
 InvoiceTemplate.displayName = 'InvoiceTemplate';
 export default InvoiceTemplate;
+
+    
