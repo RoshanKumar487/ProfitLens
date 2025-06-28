@@ -758,7 +758,7 @@ export default function InvoicingPage() {
   const handleSaveNotesAsDefault = useCallback(() => {
     if (currentInvoice.notes && currentInvoice.notes.trim().length > 0) {
         localStorage.setItem(LOCAL_STORAGE_NOTES_TEMPLATE_KEY, currentInvoice.notes);
-        toast({ title: "Default Notes Saved" });
+        toast({ title: "Default Notes Saved", description: "Your notes will be used for new invoices." });
     } else {
         toast({ title: "Cannot Save Empty Notes", variant: "destructive" });
     }
@@ -782,7 +782,7 @@ export default function InvoicingPage() {
           <CardContent><p>Please sign in to manage invoices.</p></CardContent>
         </Card>
       </div>
-    );
+    )
   }
 
   return (
