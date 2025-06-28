@@ -18,7 +18,7 @@ import { Users2, PlusCircle, MoreHorizontal, Edit, Trash2, Loader2, Save, Camera
 import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/contexts/AuthContext';
 import { db } from '@/lib/firebaseConfig';
-import { collection, doc, getDoc, updateDoc, deleteDoc, query, where, orderBy, Timestamp, serverTimestamp } from 'firebase/firestore';
+import { collection, doc, getDoc, getDocs, updateDoc, deleteDoc, query, where, orderBy, Timestamp, serverTimestamp } from 'firebase/firestore';
 import { uploadFileToStorage, deleteFileFromStorage } from '@/lib/firebaseStorageUtils';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Badge } from '@/components/ui/badge';
