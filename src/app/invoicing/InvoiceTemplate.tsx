@@ -1,3 +1,4 @@
+
 'use client';
 
 import React from 'react';
@@ -176,7 +177,7 @@ const InvoiceTemplate = React.forwardRef<HTMLDivElement, InvoiceTemplateProps>(
             {/* Footer */}
             <footer className="mt-auto pt-2 text-xs">
               <div className="flex justify-between items-start pb-2">
-                <div>
+                <div className="p-1">
                   <p className="font-bold">Bank Details:</p>
                   <p><span className="font-bold">Bank:</span> {companyProfileDetails.bankName || 'N/A'}</p>
                   <p><span className="font-bold">Account #:</span> {companyProfileDetails.accountNumber || 'N/A'}</p>
@@ -191,11 +192,11 @@ const InvoiceTemplate = React.forwardRef<HTMLDivElement, InvoiceTemplateProps>(
               <div className="grid grid-cols-2 gap-4 pt-2 border-t-2 border-black">
                 <div>
                   <p className="font-bold">Notes:</p>
-                  <p className="whitespace-pre-line">{invoiceToView.notes}</p>
+                  <p className="whitespace-pre-line p-1">{invoiceToView.notes}</p>
                 </div>
                 <div>
                   <p className="font-bold">Terms and Conditions:</p>
-                  <ol className="list-decimal list-inside text-[9px] space-y-px">
+                  <ol className="list-decimal list-inside text-[9px] space-y-px p-1">
                     <li>Goods once sold cannot be taken back or exchanged.</li>
                     <li>We are not the manufacturers; company will stand for warranty as per their terms and conditions.</li>
                     <li>Interest @24% p.a. will be charged for uncleared bills beyond 15 days.</li>
@@ -212,3 +213,5 @@ const InvoiceTemplate = React.forwardRef<HTMLDivElement, InvoiceTemplateProps>(
 );
 InvoiceTemplate.displayName = 'InvoiceTemplate';
 export default InvoiceTemplate;
+
+    
