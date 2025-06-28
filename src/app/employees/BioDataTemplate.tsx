@@ -3,7 +3,6 @@
 
 import React from 'react';
 import { format } from 'date-fns';
-import Image from 'next/image';
 import type { EmployeeDisplay } from './page';
 
 interface BioDataTemplateProps {
@@ -77,7 +76,8 @@ const BioDataTemplate = React.forwardRef<HTMLDivElement, BioDataTemplateProps>(
                 <div className="flex justify-center">
                     <div className="w-40 h-48 border-2 border-gray-300 bg-gray-50 flex items-center justify-center text-gray-400 p-1">
                         {employee.profilePictureUrl ? (
-                            <Image src={employee.profilePictureUrl} alt="Profile Photo" width={160} height={192} className="object-cover w-full h-full" />
+                            // eslint-disable-next-line @next/next/no-img-element
+                            <img src={employee.profilePictureUrl} alt="Profile Photo" width={160} height={192} className="object-cover w-full h-full" crossOrigin="anonymous"/>
                         ) : (
                             <span>Passport Photo</span>
                         )}
@@ -102,7 +102,8 @@ const BioDataTemplate = React.forwardRef<HTMLDivElement, BioDataTemplateProps>(
                 <p className="font-semibold text-gray-700">Left Thumb Impression</p>
                 <div className="w-24 h-24 mt-2 border border-gray-300 bg-gray-50 flex items-center justify-center">
                     {employee.leftThumbImpressionUrl ? (
-                         <Image src={employee.leftThumbImpressionUrl} alt="Thumb Impression" width={96} height={96} className="object-contain" />
+                         // eslint-disable-next-line @next/next/no-img-element
+                         <img src={employee.leftThumbImpressionUrl} alt="Thumb Impression" width={96} height={96} className="object-contain" crossOrigin="anonymous"/>
                     ) : (
                         <span className="text-xs text-gray-400">Thumb</span>
                     )}
@@ -112,7 +113,8 @@ const BioDataTemplate = React.forwardRef<HTMLDivElement, BioDataTemplateProps>(
                 <p className="font-semibold text-gray-700">Employee Signature</p>
                  <div className="w-48 h-24 mt-2 border border-gray-300 bg-gray-50 flex items-center justify-center p-2">
                      {employee.signatureUrl ? (
-                         <Image src={employee.signatureUrl} alt="Signature" width={192} height={96} className="object-contain h-full w-full" />
+                         // eslint-disable-next-line @next/next/no-img-element
+                         <img src={employee.signatureUrl} alt="Signature" width={192} height={96} className="object-contain h-full w-full" crossOrigin="anonymous"/>
                     ) : (
                         <span className="text-xs text-gray-400">Signature</span>
                     )}

@@ -194,8 +194,25 @@ export default function EditInvoicePage() {
         if (!printRef.current) return;
         setIsPrinting(true);
         try {
-            const canvas = await html2canvas(printRef.current, { scale: 2, useCORS: true, backgroundColor: '#ffffff' });
+            const elementToPrint = printRef.current;
+            const images = Array.from(elementToPrint.getElementsByTagName('img'));
+            const imagePromises = images.map(img => {
+                if (img.complete) return Promise.resolve();
+                return new Promise<void>((resolve, reject) => {
+                    img.onload = () => resolve();
+                    img.onerror = () => reject(new Error(`Failed to load image: ${img.src}`));
+                });
+            });
+
+            await Promise.all(imagePromises);
+
+            const canvas = await html2canvas(elementToPrint, { scale: 2, useCORS: true, backgroundColor: '#ffffff' });
             const imgData = canvas.toDataURL('image/png');
+            
+            if (!imgData || imgData === 'data:,') {
+                throw new Error("html2canvas produced an empty image. This can be caused by cross-origin issues with images.");
+            }
+
             const pdf = new jsPDF({ orientation: 'p', unit: 'mm', format: 'a4' });
             const pdfWidth = pdf.internal.pageSize.getWidth();
             const pdfHeight = pdf.internal.pageSize.getHeight();
@@ -226,9 +243,9 @@ export default function EditInvoicePage() {
             } else {
                  toast({ title: "Print Error", description: "Could not open print window. Please check your pop-up blocker.", variant: "destructive"});
             }
-        } catch (error) {
+        } catch (error: any) {
             console.error("Error generating PDF:", error);
-            toast({ title: "Print Failed", description: "Could not generate document for printing.", variant: "destructive" });
+            toast({ title: "Print Failed", description: `Could not generate document for printing. ${error.message}`, variant: "destructive" });
         } finally {
             setIsPrinting(false);
         }
@@ -386,8 +403,10 @@ export default function EditInvoicePage() {
                 </form>
             </Card>
 
-            <div className="hidden print:block">
-                 {companyProfile && <InvoiceTemplateIndian ref={printRef} invoiceToView={invoice} companyProfileDetails={companyProfile} currencySymbol={currencySymbol} />}
+            <div className="hidden">
+                 <div ref={printRef}>
+                    {companyProfile && <InvoiceTemplateIndian invoiceToView={invoice} companyProfileDetails={companyProfile} currencySymbol={currencySymbol} />}
+                 </div>
             </div>
         </div>
     );

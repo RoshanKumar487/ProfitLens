@@ -598,16 +598,33 @@ export default function EmployeesPage() {
     setIsPrinting(true);
 
     try {
-        const canvas = await html2canvas(bioDataPrintRef.current, { scale: 2, useCORS: true, backgroundColor: '#ffffff' });
+        const elementToPrint = bioDataPrintRef.current;
+        const images = Array.from(elementToPrint.getElementsByTagName('img'));
+        const imagePromises = images.map(img => {
+            if (img.complete) return Promise.resolve();
+            return new Promise<void>((resolve, reject) => {
+                img.onload = () => resolve();
+                img.onerror = () => reject(new Error(`Failed to load image: ${img.src}`));
+            });
+        });
+        
+        await Promise.all(imagePromises);
+
+        const canvas = await html2canvas(elementToPrint, { scale: 2, useCORS: true, backgroundColor: '#ffffff' });
         const imgData = canvas.toDataURL('image/png');
+        if (!imgData || imgData === 'data:,') {
+            throw new Error("html2canvas produced an empty image.");
+        }
+        
         const pdf = new jsPDF({ orientation: 'p', unit: 'mm', format: 'a4' });
         const pdfWidth = pdf.internal.pageSize.getWidth();
         const pdfHeight = pdf.internal.pageSize.getHeight();
         const imgProps = pdf.getImageProperties(imgData);
         const imgAspectRatio = imgProps.width / imgProps.height;
+        const pdfAspectRatio = pdfWidth / pdfHeight;
 
         let finalWidth, finalHeight;
-        if (imgAspectRatio > pdfWidth / pdfHeight) {
+        if (imgAspectRatio > pdfAspectRatio) {
           finalWidth = pdfWidth;
           finalHeight = pdfWidth / imgAspectRatio;
         } else {
@@ -627,12 +644,13 @@ export default function EmployeesPage() {
         if (printWindow) {
             printWindow.onload = () => {
                 printWindow.print();
+                URL.revokeObjectURL(pdfUrl);
             };
         } else {
              toast({ title: "Print Error", description: "Could not open print window. Please check your pop-up blocker.", variant: "destructive"});
         }
-    } catch (error) {
-        toast({ title: "Print Failed", description: "Could not generate document for printing.", variant: "destructive" });
+    } catch (error: any) {
+        toast({ title: "Print Failed", description: `Could not generate document for printing: ${error.message}`, variant: "destructive" });
     } finally {
         setIsPrinting(false);
     }
@@ -722,9 +740,9 @@ export default function EmployeesPage() {
                     {/* Profile Picture */}
                     <div><Label>Profile Picture</Label><div className="flex items-start gap-4"><Avatar className="h-24 w-24"><AvatarImage src={profilePicturePreview || currentEmployee.profilePictureUrl || `https://placehold.co/96x96.png?text=${getInitials(currentEmployee.name)}`} /><AvatarFallback>{getInitials(currentEmployee.name)}</AvatarFallback></Avatar><div className="flex-grow space-y-2"><Input type="file" accept="image/*" onChange={(e) => handleFileChange(e, setProfilePictureFile, setProfilePicturePreview)} disabled={isSaving} /><Button type="button" variant="ghost" size="sm" onClick={() => handleRemoveImage('profile')} className="text-destructive w-full">Remove Image</Button></div></div></div>
                     {/* Signature */}
-                    <div><Label>Signature</Label><div className="flex items-start gap-4"><div className="h-24 w-24 border rounded-md flex items-center justify-center p-1 bg-white">{signaturePreview || currentEmployee.signatureUrl ? <Image src={signaturePreview || currentEmployee.signatureUrl!} alt="Signature" width={96} height={96} className="object-contain"/> : <PenSquare className="h-8 w-8 text-muted-foreground"/>}</div><div className="flex-grow space-y-2"><Input type="file" accept="image/*" onChange={(e) => handleFileChange(e, setSignatureFile, setSignaturePreview)} disabled={isSaving} /><Button type="button" variant="ghost" size="sm" onClick={() => handleRemoveImage('signature')} className="text-destructive w-full">Remove Signature</Button></div></div></div>
+                    <div><Label>Signature</Label><div className="flex items-start gap-4"><div className="h-24 w-24 border rounded-md flex items-center justify-center p-1 bg-white">{signaturePreview || currentEmployee.signatureUrl ? <img src={signaturePreview || currentEmployee.signatureUrl!} alt="Signature" className="object-contain max-h-full max-w-full" crossOrigin="anonymous"/> : <PenSquare className="h-8 w-8 text-muted-foreground"/>}</div><div className="flex-grow space-y-2"><Input type="file" accept="image/*" onChange={(e) => handleFileChange(e, setSignatureFile, setSignaturePreview)} disabled={isSaving} /><Button type="button" variant="ghost" size="sm" onClick={() => handleRemoveImage('signature')} className="text-destructive w-full">Remove Signature</Button></div></div></div>
                     {/* Thumb Impression */}
-                    <div><Label>Left Thumb Impression</Label><div className="flex items-start gap-4"><div className="h-24 w-24 border rounded-md flex items-center justify-center p-1 bg-white">{leftThumbImpressionPreview || currentEmployee.leftThumbImpressionUrl ? <Image src={leftThumbImpressionPreview || currentEmployee.leftThumbImpressionUrl!} alt="Thumb" width={96} height={96} className="object-contain"/> : <Fingerprint className="h-8 w-8 text-muted-foreground"/>}</div><div className="flex-grow space-y-2"><Input type="file" accept="image/*" onChange={(e) => handleFileChange(e, setLeftThumbImpressionFile, setLeftThumbImpressionPreview)} disabled={isSaving} /><Button type="button" variant="ghost" size="sm" onClick={() => handleRemoveImage('thumb')} className="text-destructive w-full">Remove Thumb</Button></div></div></div>
+                    <div><Label>Left Thumb Impression</Label><div className="flex items-start gap-4"><div className="h-24 w-24 border rounded-md flex items-center justify-center p-1 bg-white">{leftThumbImpressionPreview || currentEmployee.leftThumbImpressionUrl ? <img src={leftThumbImpressionPreview || currentEmployee.leftThumbImpressionUrl!} alt="Thumb" className="object-contain max-h-full max-w-full" crossOrigin="anonymous"/> : <Fingerprint className="h-8 w-8 text-muted-foreground"/>}</div><div className="flex-grow space-y-2"><Input type="file" accept="image/*" onChange={(e) => handleFileChange(e, setLeftThumbImpressionFile, setLeftThumbImpressionPreview)} disabled={isSaving} /><Button type="button" variant="ghost" size="sm" onClick={() => handleRemoveImage('thumb')} className="text-destructive w-full">Remove Thumb</Button></div></div></div>
                     {/* Associated File */}
                     <div><Label>Associated File</Label><div className="flex items-start gap-4"><div className="flex-grow space-y-2"><Input type="file" onChange={(e) => handleFileChange(e, setAssociatedFile)} disabled={isSaving} />{currentEmployee.associatedFileName && <div className="text-xs">Current: <a href={currentEmployee.associatedFileUrl} className="text-primary hover:underline" target="_blank" rel="noopener noreferrer">{currentEmployee.associatedFileName}</a></div>}{associatedFile && <div className="text-xs">New: <span className="font-medium">{associatedFile.name}</span></div>}<Button type="button" variant="ghost" size="sm" onClick={handleRemoveAssociatedFile} className="text-destructive w-full">Remove Associated File</Button></div></div></div>
                 </div>
