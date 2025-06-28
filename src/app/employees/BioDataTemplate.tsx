@@ -5,6 +5,7 @@ import React from 'react';
 import { format } from 'date-fns';
 import Image from 'next/image';
 import type { EmployeeDisplay } from './page';
+import { cn } from '@/lib/utils';
 
 interface BioDataTemplateProps {
   employee: EmployeeDisplay;
