@@ -22,7 +22,7 @@ import { collection, doc, getDoc, getDocs, updateDoc, deleteDoc, query, where, o
 import { uploadFileToStorage, deleteFileFromStorage } from '@/lib/firebaseStorageUtils';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Badge } from '@/components/ui/badge';
-import { cn } from '@/lib/utils';
+import { cn, urlToDataUri } from '@/lib/utils';
 import * as xlsx from 'xlsx';
 import { bulkAddEmployees } from './actions';
 import { ScrollArea } from '@/components/ui/scroll-area';
@@ -149,6 +149,7 @@ export default function EmployeesPage() {
   const bioDataPrintRef = useRef<HTMLDivElement>(null);
   const [isBioDataDialogOpen, setIsBioDataDialogOpen] = useState(false);
   const [employeeToPrint, setEmployeeToPrint] = useState<EmployeeDisplay | null>(null);
+  const [bioDataImageUris, setBioDataImageUris] = useState<Record<string, string | undefined>>({});
   const [companyDetails, setCompanyDetails] = useState<{name: string, address: string} | null>(null);
   const [isPrinting, setIsPrinting] = useState(false);
 
@@ -580,8 +581,8 @@ export default function EmployeesPage() {
 
    const handleOpenBioDataDialog = async (employee: EmployeeDisplay) => {
     setEmployeeToPrint(employee);
-    if (!user?.companyId) return;
-    if (!companyDetails) {
+    // Fetch company details if not already fetched
+    if (!companyDetails && user?.companyId) {
         const companyRef = doc(db, 'companyProfiles', user.companyId);
         const companySnap = await getDoc(companyRef);
         if (companySnap.exists()) {
@@ -590,7 +591,24 @@ export default function EmployeesPage() {
             setCompanyDetails({ name: data.name, address: fullAddress });
         }
     }
+    
+    // Convert all image URLs to data URIs for reliable printing
+    setIsPrinting(true); // Use isPrinting to show a loading state
     setIsBioDataDialogOpen(true);
+    const uris: Record<string, string | undefined> = {};
+    const urlMap = {
+        profile: employee.profilePictureUrl,
+        thumb: employee.leftThumbImpressionUrl,
+        signature: employee.signatureUrl,
+    };
+
+    for (const [key, url] of Object.entries(urlMap)) {
+        if (url) {
+            uris[key] = await urlToDataUri(url);
+        }
+    }
+    setBioDataImageUris(uris);
+    setIsPrinting(false); // Done fetching, ready for user to click print
   };
 
   const handlePrint = async () => {
@@ -758,7 +776,15 @@ export default function EmployeesPage() {
           <DialogContent className="max-w-4xl w-full h-[95vh] flex flex-col p-0 bg-gray-100 dark:bg-background">
               <DialogHeader className="p-4 sm:p-6 pb-2 border-b bg-background no-print"><DialogTitle className="font-headline text-xl">Bio-Data: {employeeToPrint?.name}</DialogTitle></DialogHeader>
               <ScrollArea className="flex-grow bg-gray-200 dark:bg-zinc-800 p-4 sm:p-8">
-                  {employeeToPrint && <BioDataTemplate ref={bioDataPrintRef} employee={employeeToPrint} companyName={companyDetails?.name} companyAddress={companyDetails?.address} />}
+                  {employeeToPrint && <BioDataTemplate 
+                    ref={bioDataPrintRef} 
+                    employee={employeeToPrint} 
+                    companyName={companyDetails?.name} 
+                    companyAddress={companyDetails?.address}
+                    profilePictureDataUri={bioDataImageUris.profile}
+                    leftThumbImpressionDataUri={bioDataImageUris.thumb}
+                    signatureDataUri={bioDataImageUris.signature}
+                   />}
               </ScrollArea>
               <DialogFooter className="p-4 sm:p-6 border-t bg-background no-print justify-end flex-wrap gap-2">
                  <Button type="button" variant="default" onClick={handlePrint} disabled={isPrinting}>

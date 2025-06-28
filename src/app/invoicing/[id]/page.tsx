@@ -25,6 +25,7 @@ import InvoiceTemplateIndian from '../InvoiceTemplateIndian';
 import jsPDF from 'jspdf';
 import html2canvas from 'html2canvas';
 import { Skeleton } from '@/components/ui/skeleton';
+import { urlToDataUri } from '@/lib/utils';
 
 interface InvoiceItem {
   id: string;
@@ -82,6 +83,7 @@ export default function EditInvoicePage() {
 
     const [invoice, setInvoice] = useState<InvoiceDisplay | null>(null);
     const [companyProfile, setCompanyProfile] = useState<CompanyDetailsFirestore | null>(null);
+    const [imageDataUris, setImageDataUris] = useState<{ signature?: string; stamp?: string }>({});
     const [isLoading, setIsLoading] = useState(true);
     const [isSaving, setIsSaving] = useState(false);
     const [isPrinting, setIsPrinting] = useState(false);
@@ -113,7 +115,18 @@ export default function EditInvoicePage() {
                 const companyRef = doc(db, 'companyProfiles', user.companyId);
                 const companySnap = await getDoc(companyRef);
                 if (companySnap.exists()) {
-                    setCompanyProfile(companySnap.data() as CompanyDetailsFirestore);
+                    const companyData = companySnap.data() as CompanyDetailsFirestore;
+                    setCompanyProfile(companyData);
+
+                    // Fetch images as data URIs for printing
+                    const uris: { signature?: string; stamp?: string } = {};
+                    if (companyData.signatureUrl) {
+                        uris.signature = await urlToDataUri(companyData.signatureUrl);
+                    }
+                    if (companyData.stampUrl) {
+                        uris.stamp = await urlToDataUri(companyData.stampUrl);
+                    }
+                    setImageDataUris(uris);
                 }
 
             } catch (error) {
@@ -405,7 +418,13 @@ export default function EditInvoicePage() {
 
             <div className="hidden">
                  <div ref={printRef}>
-                    {companyProfile && <InvoiceTemplateIndian invoiceToView={invoice} companyProfileDetails={companyProfile} currencySymbol={currencySymbol} />}
+                    {companyProfile && <InvoiceTemplateIndian 
+                        invoiceToView={invoice} 
+                        companyProfileDetails={companyProfile} 
+                        currencySymbol={currencySymbol} 
+                        signatureDataUri={imageDataUris.signature}
+                        stampDataUri={imageDataUris.stamp}
+                    />}
                  </div>
             </div>
         </div>

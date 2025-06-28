@@ -9,6 +9,9 @@ interface BioDataTemplateProps {
   employee: EmployeeDisplay;
   companyName?: string;
   companyAddress?: string;
+  profilePictureDataUri?: string;
+  leftThumbImpressionDataUri?: string;
+  signatureDataUri?: string;
 }
 
 const DataRow: React.FC<{ label: string; value?: string | number | null }> = ({ label, value }) => (
@@ -29,7 +32,7 @@ const Section: React.FC<{ title: string; children: React.ReactNode; className?: 
 
 
 const BioDataTemplate = React.forwardRef<HTMLDivElement, BioDataTemplateProps>(
-  ({ employee, companyName, companyAddress }, ref) => {
+  ({ employee, companyName, companyAddress, profilePictureDataUri, leftThumbImpressionDataUri, signatureDataUri }, ref) => {
     
     const fullPermanentAddress = [
         employee.permanentAddressHNo,
@@ -75,9 +78,9 @@ const BioDataTemplate = React.forwardRef<HTMLDivElement, BioDataTemplateProps>(
             <div className="col-span-1 space-y-6">
                 <div className="flex justify-center">
                     <div className="w-40 h-48 border-2 border-gray-300 bg-gray-50 flex items-center justify-center text-gray-400 p-1">
-                        {employee.profilePictureUrl ? (
+                        {(profilePictureDataUri || employee.profilePictureUrl) ? (
                             // eslint-disable-next-line @next/next/no-img-element
-                            <img src={employee.profilePictureUrl} alt="Profile Photo" width={160} height={192} className="object-cover w-full h-full" crossOrigin="anonymous"/>
+                            <img src={profilePictureDataUri || employee.profilePictureUrl} alt="Profile Photo" width={160} height={192} className="object-cover w-full h-full" crossOrigin="anonymous"/>
                         ) : (
                             <span>Passport Photo</span>
                         )}
@@ -101,9 +104,9 @@ const BioDataTemplate = React.forwardRef<HTMLDivElement, BioDataTemplateProps>(
             <div>
                 <p className="font-semibold text-gray-700">Left Thumb Impression</p>
                 <div className="w-24 h-24 mt-2 border border-gray-300 bg-gray-50 flex items-center justify-center">
-                    {employee.leftThumbImpressionUrl ? (
+                    {(leftThumbImpressionDataUri || employee.leftThumbImpressionUrl) ? (
                          // eslint-disable-next-line @next/next/no-img-element
-                         <img src={employee.leftThumbImpressionUrl} alt="Thumb Impression" width={96} height={96} className="object-contain" crossOrigin="anonymous"/>
+                         <img src={leftThumbImpressionDataUri || employee.leftThumbImpressionUrl} alt="Thumb Impression" width={96} height={96} className="object-contain" crossOrigin="anonymous"/>
                     ) : (
                         <span className="text-xs text-gray-400">Thumb</span>
                     )}
@@ -112,9 +115,9 @@ const BioDataTemplate = React.forwardRef<HTMLDivElement, BioDataTemplateProps>(
              <div className="text-left">
                 <p className="font-semibold text-gray-700">Employee Signature</p>
                  <div className="w-48 h-24 mt-2 border border-gray-300 bg-gray-50 flex items-center justify-center p-2">
-                     {employee.signatureUrl ? (
+                     {(signatureDataUri || employee.signatureUrl) ? (
                          // eslint-disable-next-line @next/next/no-img-element
-                         <img src={employee.signatureUrl} alt="Signature" width={192} height={96} className="object-contain h-full w-full" crossOrigin="anonymous"/>
+                         <img src={signatureDataUri || employee.signatureUrl} alt="Signature" width={192} height={96} className="object-contain h-full w-full" crossOrigin="anonymous"/>
                     ) : (
                         <span className="text-xs text-gray-400">Signature</span>
                     )}
