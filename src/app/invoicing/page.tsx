@@ -265,11 +265,11 @@ export default function InvoicingPage() {
             stampUrl: data.stampUrl || '',
           });
         } else {
-          setCompanyProfileDetails({ name: 'Your Company Name', address: 'Your Address', city: '', state: '', country: '', gstin: 'Your GSTIN', phone: '', email: '', website: '', accountNumber: '', ifscCode: '', bankName: '' });
+          setCompanyProfileDetails({ name: 'Your Company Name', address: 'Your Address', city: '', state: '', country: '', gstin: 'Your GSTIN', pan: '', phone: '', email: '', website: '', accountNumber: '', ifscCode: '', bankName: '', branch: '' });
         }
       } catch (error) {
         console.error("[InvoicingPage fetchCompanyProfile] Failed to fetch company details from Firestore:", error);
-        setCompanyProfileDetails({ name: 'Your Company Name', address: 'Your Address', city: '', state: '', country: '', gstin: 'Your GSTIN', phone: '', email: '', website: '', accountNumber: '', ifscCode: '', bankName: '' });
+        setCompanyProfileDetails({ name: 'Your Company Name', address: 'Your Address', city: '', state: '', country: '', gstin: 'Your GSTIN', pan: '', phone: '', email: '', website: '', accountNumber: '', ifscCode: '', bankName: '', branch: '' });
         toast({ title: "Error Fetching Company Info", description: "Could not load company details for invoices.", variant: "destructive" });
       } finally {
         setIsFetchingCompanyProfile(false);
@@ -782,7 +782,7 @@ export default function InvoicingPage() {
           <CardContent><p>Please sign in to manage invoices.</p></CardContent>
         </Card>
       </div>
-    )
+    );
   }
 
   return (
