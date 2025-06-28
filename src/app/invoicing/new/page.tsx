@@ -1,13 +1,12 @@
 
 'use client';
 
-import React, { useState, useMemo, useEffect, type FormEvent, useCallback } from 'react';
+import React, { useState, useMemo, useEffect, type FormEvent } from 'react';
 import { useRouter } from 'next/navigation';
 import PageTitle from '@/components/PageTitle';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Badge } from '@/components/ui/badge';
-import { Receipt, PlusCircle, UserPlus, Save, Loader2, Calendar as CalendarIconLucide, Percent, Trash2 } from 'lucide-react';
+import { Receipt, PlusCircle, UserPlus, Save, Loader2, Calendar as CalendarIconLucide, Trash2 } from 'lucide-react';
 import { format } from 'date-fns';
 import { useToast } from '@/hooks/use-toast';
 import { Label } from '@/components/ui/label';
@@ -18,12 +17,11 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { useAuth } from '@/contexts/AuthContext';
-import { collection, addDoc, getDocs, doc, query, where, orderBy, Timestamp, serverTimestamp } from 'firebase/firestore';
+import { collection, getDocs, query, where, orderBy, Timestamp } from 'firebase/firestore';
 import { db } from '@/lib/firebaseConfig';
-import { cn } from '@/lib/utils';
 import { Separator } from '@/components/ui/separator';
 import Link from 'next/link';
-
+import { createInvoice } from '../actions';
 
 interface InvoiceItem {
   id: string;
@@ -73,14 +71,13 @@ export default function NewInvoicePage() {
     const { toast } = useToast();
     const router = useRouter();
 
-    const [currentInvoice, setCurrentInvoice] = useState<Partial<InvoiceDisplay & {invoiceNumber?: string}>>({});
+    const [currentInvoice, setCurrentInvoice] = useState<Partial<InvoiceDisplay>>({});
     const [isSaving, setIsSaving] = useState(false);
     const [existingClients, setExistingClients] = useState<ExistingClient[]>([]);
     const [isClientSuggestionsVisible, setIsClientSuggestionsVisible] = useState(false);
     const [invoices, setInvoices] = useState<InvoiceDisplay[]>([]);
 
 
-    // Initialize form with defaults on mount
     useEffect(() => {
         const savedNotes = localStorage.getItem(LOCAL_STORAGE_NOTES_TEMPLATE_KEY) || 'Full payment is due upon receipt. Late payments may incur additional charges.';
         const savedTaxRate = parseFloat(localStorage.getItem(LOCAL_STORAGE_TAX_RATE_KEY) || '0');
@@ -108,7 +105,6 @@ export default function NewInvoicePage() {
         });
     }, []);
     
-    // Fetch existing clients to provide suggestions
     useEffect(() => {
         if (!user || !user.companyId) return;
 
@@ -146,7 +142,6 @@ export default function NewInvoicePage() {
         fetchExistingClientsData();
     }, [user]);
 
-    // Recalculate totals whenever items or discounts/taxes change
     useEffect(() => {
         const subtotal = (currentInvoice.items || []).reduce((sum, item) => sum + (Number(item.quantity || 0) * Number(item.unitPrice || 0)), 0);
         const discountValue = parseFloat(String(currentInvoice.discountValue) || '0');
@@ -174,7 +169,7 @@ export default function NewInvoicePage() {
     const handleFormSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
         if (!user || !user.companyId) {
-            toast({ title: "Authentication Error", description: "User not authenticated.", variant: "destructive" });
+            toast({ title: "Authentication Error", variant: "destructive" });
             return;
         }
         if (!currentInvoice.clientName || currentInvoice.amount === undefined || !currentInvoice.issuedDate || !currentInvoice.dueDate) {
@@ -187,7 +182,8 @@ export default function NewInvoicePage() {
         }
 
         setIsSaving(true);
-        const invoiceDataToSave = {
+        
+        const invoiceDataForAction = {
             clientName: currentInvoice.clientName!,
             clientEmail: currentInvoice.clientEmail || '', 
             clientAddress: currentInvoice.clientAddress || '',
@@ -199,31 +195,26 @@ export default function NewInvoicePage() {
             taxRate: Number(currentInvoice.taxRate) || 0,
             taxAmount: currentInvoice.taxAmount || 0,
             amount: Number(currentInvoice.amount) || 0,
-            issuedDate: Timestamp.fromDate(currentInvoice.issuedDate),
-            dueDate: Timestamp.fromDate(currentInvoice.dueDate),
+            issuedDate: currentInvoice.issuedDate,
+            dueDate: currentInvoice.dueDate,
             status: currentInvoice.status || 'Draft',
             items: currentInvoice.items || [],
             notes: currentInvoice.notes || '',
-            companyId: user.companyId,
             invoiceNumber: currentInvoice.invoiceNumber || `INV${(Date.now()).toString().slice(-6)}`,
-            createdAt: serverTimestamp(),
         };
 
-        try {
-            await addDoc(collection(db, 'invoices'), invoiceDataToSave);
-            toast({ title: "Invoice Created", description: `Invoice ${invoiceDataToSave.invoiceNumber} created successfully.` });
+        const result = await createInvoice(invoiceDataForAction, user.companyId, user.uid, user.displayName || user.email!);
 
-            // Save settings as default
+        if (result.success) {
+            toast({ title: "Invoice Created", description: result.message });
             localStorage.setItem(LOCAL_STORAGE_TAX_RATE_KEY, String(currentInvoice.taxRate || '0'));
             localStorage.setItem(LOCAL_STORAGE_DISCOUNT_TYPE_KEY, currentInvoice.discountType || 'fixed');
             localStorage.setItem(LOCAL_STORAGE_DISCOUNT_VALUE_KEY, String(currentInvoice.discountValue || '0'));
-            
             router.push('/invoicing');
-        } catch (error: any) {
-            toast({ title: "Save Failed", description: `Could not save invoice: ${error.message}`, variant: "destructive" });
-        } finally {
-            setIsSaving(false);
+        } else {
+            toast({ title: "Save Failed", description: result.message, variant: "destructive" });
         }
+        setIsSaving(false);
     };
     
     const handleAddItem = () => {
@@ -270,15 +261,6 @@ export default function NewInvoicePage() {
         setIsClientSuggestionsVisible(false);
     };
     
-    const handleSaveNotesAsDefault = useCallback(() => {
-        if (currentInvoice.notes && currentInvoice.notes.trim().length > 0) {
-            localStorage.setItem(LOCAL_STORAGE_NOTES_TEMPLATE_KEY, currentInvoice.notes);
-            toast({ title: "Default Notes Saved", description: "Your notes will be used for new invoices." });
-        } else {
-            toast({ title: "Cannot Save Empty Notes", variant: "destructive" });
-        }
-    }, [currentInvoice.notes, toast]);
-
     const filteredClientSuggestions = useMemo(() => {
         const currentName = currentInvoice.clientName?.toLowerCase() || '';
         if (!currentName) return [];
@@ -452,10 +434,7 @@ export default function NewInvoicePage() {
                         </div>
 
                         <div>
-                            <div className="flex justify-between items-center mb-1">
-                                <Label htmlFor="notes">Notes / Terms (Optional)</Label>
-                                <Button type="button" variant="link" size="sm" className="h-auto p-0 text-xs" onClick={handleSaveNotesAsDefault} disabled={isSaving}>Save as Default</Button>
-                            </div>
+                            <Label htmlFor="notes">Notes / Terms (Optional)</Label>
                             <Textarea id="notes" value={currentInvoice.notes || ''} onChange={(e) => setCurrentInvoice({ ...currentInvoice, notes: e.target.value })} placeholder="e.g., Payment terms, thank you message" disabled={isSaving} />
                         </div>
                     </CardContent>

@@ -1,12 +1,11 @@
 
 'use client';
 
-import React, { useState, useMemo, useEffect, type FormEvent, useCallback, useRef } from 'react';
+import React, { useState, useEffect, type FormEvent, useRef } from 'react';
 import { useRouter, useParams } from 'next/navigation';
 import PageTitle from '@/components/PageTitle';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Badge } from '@/components/ui/badge';
 import { Receipt, PlusCircle, Save, Loader2, Calendar as CalendarIconLucide, Trash2, Mail, Printer } from 'lucide-react';
 import { format } from 'date-fns';
 import { useToast } from '@/hooks/use-toast';
@@ -19,7 +18,6 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/com
 import { useAuth } from '@/contexts/AuthContext';
 import { doc, getDoc, Timestamp } from 'firebase/firestore';
 import { db } from '@/lib/firebaseConfig';
-import { cn } from '@/lib/utils';
 import { Separator } from '@/components/ui/separator';
 import Link from 'next/link';
 import { updateInvoice, sendInvoiceEmailAction } from '../actions';
@@ -28,7 +26,6 @@ import jsPDF from 'jspdf';
 import html2canvas from 'html2canvas';
 import { Skeleton } from '@/components/ui/skeleton';
 
-// Interfaces for data structures
 interface InvoiceItem {
   id: string;
   description: string;
@@ -36,6 +33,7 @@ interface InvoiceItem {
   unitPrice: number;
 }
 type DiscountType = 'fixed' | 'percentage';
+
 interface InvoiceDisplay {
   id: string;
   invoiceNumber: string;
@@ -90,15 +88,12 @@ export default function EditInvoicePage() {
     const [isSendingEmail, setIsSendingEmail] = useState(false);
     const printRef = useRef<HTMLDivElement>(null);
 
-
-    // Fetch Data
     useEffect(() => {
         if (!user || !invoiceId) return;
 
         const fetchInvoiceAndCompany = async () => {
             setIsLoading(true);
             try {
-                // Fetch invoice
                 const invoiceRef = doc(db, 'invoices', invoiceId);
                 const invoiceSnap = await getDoc(invoiceRef);
 
@@ -115,7 +110,6 @@ export default function EditInvoicePage() {
                     dueDate: (data.dueDate as Timestamp).toDate(),
                 } as InvoiceDisplay);
 
-                // Fetch company profile
                 const companyRef = doc(db, 'companyProfiles', user.companyId);
                 const companySnap = await getDoc(companyRef);
                 if (companySnap.exists()) {
@@ -132,7 +126,6 @@ export default function EditInvoicePage() {
         fetchInvoiceAndCompany();
     }, [invoiceId, user, router, toast]);
 
-    // Recalculate totals
     useEffect(() => {
         if (!invoice) return;
 
@@ -159,7 +152,6 @@ export default function EditInvoicePage() {
     }, [invoice?.items, invoice?.discountType, invoice?.discountValue, invoice?.taxRate]);
 
 
-    // Handlers
     const handleFormSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
         if (!invoice) return;
@@ -202,12 +194,26 @@ export default function EditInvoicePage() {
         if (!printRef.current) return;
         setIsPrinting(true);
         try {
-            const canvas = await html2canvas(printRef.current, { scale: 3, useCORS: true, backgroundColor: '#ffffff' });
-            const imgData = canvas.toDataURL('image/png', 1.0);
-            const pdf = new jsPDF({ orientation: 'p', unit: 'mm', format: 'a4', putOnlyUsedFonts: true });
+            const canvas = await html2canvas(printRef.current, { scale: 2, useCORS: true, backgroundColor: '#ffffff' });
+            const imgData = canvas.toDataURL('image/png');
+            const pdf = new jsPDF({ orientation: 'p', unit: 'mm', format: 'a4' });
             const pdfWidth = pdf.internal.pageSize.getWidth();
             const pdfHeight = pdf.internal.pageSize.getHeight();
-            pdf.addImage(imgData, 'PNG', 0, 0, pdfWidth, pdfHeight, undefined, 'FAST');
+            const imgProps = pdf.getImageProperties(imgData);
+            const imgHeight = (imgProps.height * pdfWidth) / imgProps.width;
+
+            let heightLeft = imgHeight;
+            let position = 0;
+
+            pdf.addImage(imgData, 'PNG', 0, position, pdfWidth, imgHeight);
+            heightLeft -= pdfHeight;
+
+            while (heightLeft > 0) {
+                position = heightLeft - imgHeight;
+                pdf.addPage();
+                pdf.addImage(imgData, 'PNG', 0, position, pdfWidth, imgHeight);
+                heightLeft -= pdfHeight;
+            }
             
             const pdfBlob = pdf.output('blob');
             const pdfUrl = URL.createObjectURL(pdfBlob);
@@ -217,8 +223,11 @@ export default function EditInvoicePage() {
                     printWindow.print();
                     URL.revokeObjectURL(pdfUrl);
                 };
+            } else {
+                 toast({ title: "Print Error", description: "Could not open print window. Please check your pop-up blocker.", variant: "destructive"});
             }
         } catch (error) {
+            console.error("Error generating PDF:", error);
             toast({ title: "Print Failed", description: "Could not generate document for printing.", variant: "destructive" });
         } finally {
             setIsPrinting(false);
@@ -267,10 +276,10 @@ export default function EditInvoicePage() {
         <div className="space-y-6 p-4 sm:p-6 lg:p-8">
             <PageTitle title={`Invoice ${invoice.invoiceNumber}`} subtitle={`Manage invoice for ${invoice.clientName}`} icon={Receipt}>
                 <div className="flex gap-2">
-                    <Button variant="outline" onClick={handlePrint} disabled={isPrinting}>
+                    <Button variant="outline" onClick={handlePrint} disabled={isPrinting || !companyProfile}>
                         {isPrinting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Printer className="mr-2 h-4 w-4" />} Print
                     </Button>
-                    <Button variant="outline" onClick={handleEmail} disabled={isSendingEmail}>
+                    <Button variant="outline" onClick={handleEmail} disabled={isSendingEmail || !companyProfile}>
                         {isSendingEmail ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Mail className="mr-2 h-4 w-4" />} Email
                     </Button>
                 </div>
@@ -279,7 +288,6 @@ export default function EditInvoicePage() {
             <Card className="max-w-4xl mx-auto shadow-lg">
                 <form onSubmit={handleFormSubmit}>
                     <CardContent className="p-6 space-y-4">
-                        {/* Client & Dates */}
                         <div>
                             <Label htmlFor="clientName">Client Name</Label>
                             <Input id="clientName" value={invoice.clientName} onChange={(e) => handleValueChange('clientName', e.target.value)} required disabled={isSaving}/>
@@ -326,7 +334,6 @@ export default function EditInvoicePage() {
                         </div>
 
                         <Separator/>
-                        {/* Invoice Items */}
                         <div className="space-y-2 pt-2">
                              <div className="flex justify-between items-center">
                                 <Label className="text-base font-medium">Invoice Items</Label>
@@ -343,13 +350,12 @@ export default function EditInvoicePage() {
                         </div>
                         
                         <Separator/>
-                         {/* Totals */}
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-4">
                             <div className="space-y-4">
                                 <div className="grid grid-cols-2 gap-2">
                                     <div>
                                         <Label>Discount Type</Label>
-                                        <Select value={invoice.discountType} onValueChange={(v) => handleValueChange('discountType', v)}><SelectTrigger><SelectValue/></SelectTrigger><SelectContent><SelectItem value="fixed">Fixed ({currencySymbol})</SelectItem><SelectItem value="percentage">Percentage (%)</SelectItem></SelectContent></Select>
+                                        <Select value={invoice.discountType} onValueChange={(v: DiscountType) => handleValueChange('discountType', v)}><SelectTrigger><SelectValue/></SelectTrigger><SelectContent><SelectItem value="fixed">Fixed ({currencySymbol})</SelectItem><SelectItem value="percentage">Percentage (%)</SelectItem></SelectContent></Select>
                                     </div>
                                     <div><Label>Discount Value</Label><Input type="number" value={invoice.discountValue} onChange={(e) => handleValueChange('discountValue', e.target.value)} /></div>
                                 </div>
@@ -380,8 +386,7 @@ export default function EditInvoicePage() {
                 </form>
             </Card>
 
-            {/* Hidden printable component */}
-            <div className="hidden">
+            <div className="hidden print:block">
                  {companyProfile && <InvoiceTemplateIndian ref={printRef} invoiceToView={invoice} companyProfileDetails={companyProfile} currencySymbol={currencySymbol} />}
             </div>
         </div>

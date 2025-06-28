@@ -49,7 +49,6 @@ export default function InvoicingPage() {
   
   const [sortConfig, setSortConfig] = useState<{ key: keyof InvoiceDisplay; direction: 'ascending' | 'descending' }>({ key: 'issuedDate', direction: 'descending' });
 
-  // Delete Dialog State
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
   const [invoiceToDeleteId, setInvoiceToDeleteId] = useState<string | null>(null);
 
@@ -80,7 +79,6 @@ export default function InvoicingPage() {
     } catch (error: any) {
       console.error('[InvoicingPage fetchInvoices] Error fetching invoices:', error);
       toast({ title: 'Error Fetching Invoices', description: `Could not load invoices. ${error.message || 'An unknown error occurred.'}`, variant: 'destructive' });
-      setInvoices([]);
     } finally {
       setIsLoading(false);
     }
@@ -176,7 +174,6 @@ export default function InvoicingPage() {
     setIsDeleteDialogOpen(false);
     setInvoiceToDeleteId(null);
   };
-
 
   if (authIsLoading) {
     return (
