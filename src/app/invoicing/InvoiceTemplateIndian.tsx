@@ -99,7 +99,7 @@ const InvoiceTemplateIndian = React.forwardRef<HTMLDivElement, InvoiceTemplatePr
     const sgstAmount = invoiceToView.taxAmount / 2;
 
     return (
-      <div ref={ref} className="bg-white text-black p-4 font-sans text-xs w-[210mm] min-h-[297mm] mx-auto flex flex-col justify-center">
+      <div ref={ref} className="bg-white text-black p-8 font-sans text-xs w-[210mm] min-h-[297mm] mx-auto flex flex-col justify-center">
           <div>
             {/* Header */}
             <header className="grid grid-cols-3 mb-1">
@@ -116,15 +116,15 @@ const InvoiceTemplateIndian = React.forwardRef<HTMLDivElement, InvoiceTemplatePr
                 </div>
             </header>
 
-            <div className="text-center font-bold border-y-2 border-black py-1">
+            <div className="text-center font-bold border-y border-black py-1">
                 Bill for The Month of {format(invoiceToView.issuedDate, 'MMMM yyyy').toUpperCase()}
             </div>
 
             {/* Details Table */}
-            <table className="w-full border-collapse border-2 border-black mt-1">
+            <table className="w-full border-collapse border border-black mt-1">
                 <tbody>
                     <tr>
-                        <td className="w-1/2 border-r-2 border-black p-1 align-top">
+                        <td className="w-1/2 border-r border-black p-1 align-top">
                             <p>To,</p>
                             <p className="font-bold">{invoiceToView.clientName}</p>
                             <p className="whitespace-pre-line">{invoiceToView.clientAddress}</p>
@@ -146,23 +146,23 @@ const InvoiceTemplateIndian = React.forwardRef<HTMLDivElement, InvoiceTemplatePr
             </table>
 
             {/* Items Table */}
-            <table className="w-full border-collapse border-x-2 border-b-2 border-black text-center">
+            <table className="w-full border-collapse border-x border-b border-black text-center">
                 <thead>
-                    <tr className="border-b-2 border-black">
-                        <th className="p-1 border-r-2 border-black">Description</th>
-                        <th className="p-1 border-r-2 border-black w-24">Per Head</th>
-                        <th className="p-1 border-r-2 border-black w-20">No. Of<br/>person</th>
-                        <th className="p-1 border-r-2 border-black w-20">No. Of Duties</th>
+                    <tr className="border-b border-black">
+                        <th className="p-1 border-r border-black">Description</th>
+                        <th className="p-1 border-r border-black w-24">Per Head</th>
+                        <th className="p-1 border-r border-black w-20">No. Of<br/>person</th>
+                        <th className="p-1 border-r border-black w-20">No. Of Duties</th>
                         <th className="p-1 w-28">Total Amount</th>
                     </tr>
                 </thead>
                 <tbody>
                     {(invoiceToView.items || []).map((item, index) => (
                         <tr key={item.id}>
-                            <td className="p-1 border-r-2 border-black text-left">{index + 1}. {item.description}</td>
-                            <td className="p-1 border-r-2 border-black">{item.unitPrice.toFixed(2)}</td>
-                            <td className="p-1 border-r-2 border-black">{item.quantity}</td>
-                            <td className="p-1 border-r-2 border-black">-</td>
+                            <td className="p-1 border-r border-black text-left">{index + 1}. {item.description}</td>
+                            <td className="p-1 border-r border-black">{item.unitPrice.toFixed(2)}</td>
+                            <td className="p-1 border-r border-black">{item.quantity}</td>
+                            <td className="p-1 border-r border-black">-</td>
                             <td className="p-1 text-right">{(item.quantity * item.unitPrice).toFixed(2)}</td>
                         </tr>
                     ))}
@@ -170,10 +170,10 @@ const InvoiceTemplateIndian = React.forwardRef<HTMLDivElement, InvoiceTemplatePr
             </table>
 
             {/* Footer */}
-            <table className="w-full border-collapse border-2 border-black mt-[-2px]">
+            <table className="w-full border-collapse border border-black mt-[-1px]">
                 <tbody>
                     <tr>
-                        <td className="w-2/3 p-1 border-r-2 border-black align-top">
+                        <td className="w-2/3 p-1 border-r border-black align-top">
                             <p>In Words: {amountInWords} rupees only.</p>
                             <div className="mt-16">
                                 <p>Checked by:</p>
@@ -182,15 +182,15 @@ const InvoiceTemplateIndian = React.forwardRef<HTMLDivElement, InvoiceTemplatePr
                         <td className="w-1/3 p-0 align-top">
                             <table className="w-full border-collapse">
                                 <tbody>
-                                    <tr className="border-b-2 border-black">
+                                    <tr className="border-b border-black">
                                         <td className="p-1">Total</td>
                                         <td className="p-1 text-right">{subtotal.toFixed(2)}</td>
                                     </tr>
-                                    <tr className="border-b-2 border-black">
+                                    <tr className="border-b border-black">
                                         <td className="p-1">RCM CGST {invoiceToView.taxRate / 2}%</td>
                                         <td className="p-1 text-right">{cgstAmount > 0 ? cgstAmount.toFixed(2) : '-'}</td>
                                     </tr>
-                                    <tr className="border-b-2 border-black">
+                                    <tr className="border-b border-black">
                                         <td className="p-1">RCM SGST {invoiceToView.taxRate / 2}%</td>
                                         <td className="p-1 text-right">{sgstAmount > 0 ? sgstAmount.toFixed(2) : '-'}</td>
                                     </tr>

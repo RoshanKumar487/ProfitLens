@@ -102,10 +102,10 @@ const InvoiceTemplateModern = React.forwardRef<HTMLDivElement, InvoiceTemplatePr
 
     return (
       <div ref={ref} className="invoice-view-container bg-white text-black p-10 mx-auto w-[210mm] min-h-[297mm] font-sans text-[10px] leading-tight flex flex-col">
-        <div className="border-2 border-black p-1 h-full flex flex-col">
-          <div className="border-2 border-black flex-grow flex flex-col">
+        <div className="border border-black p-1 h-full flex flex-col">
+          <div className="border border-black flex-grow flex flex-col">
             {/* Header */}
-            <header className="flex justify-between items-start pt-4 px-4 pb-2 border-b-2 border-black">
+            <header className="flex justify-between items-start pt-4 px-4 pb-2 border-b border-black">
               <div className="text-xs w-1/2">
                 <h2 className="font-bold text-lg uppercase">{companyProfileDetails.name}</h2>
                 <p>GSTIN: {companyProfileDetails.gstin}</p>
@@ -120,8 +120,8 @@ const InvoiceTemplateModern = React.forwardRef<HTMLDivElement, InvoiceTemplatePr
             </header>
 
             {/* Details Grid */}
-            <div className="grid grid-cols-[60%_40%] border-b-2 border-black">
-              <div className="p-2 border-r-2 border-black">
+            <div className="grid grid-cols-[60%_40%] border-b border-black">
+              <div className="p-2 border-r border-black">
                 <p className="font-bold">Customer Details:</p>
                 <p className="font-bold text-base">{invoiceToView.clientName}</p>
                 <p className="font-bold mt-1">Billing Address:</p>
@@ -130,9 +130,9 @@ const InvoiceTemplateModern = React.forwardRef<HTMLDivElement, InvoiceTemplatePr
                 <p className="whitespace-pre-line">{invoiceToView.clientAddress}</p>
               </div>
               <div className="grid grid-rows-4 text-xs">
-                <div className="p-2 border-b-2 border-black grid grid-cols-2"><span>Invoice #:</span><span className="font-bold">{invoiceToView.invoiceNumber}</span></div>
-                <div className="p-2 border-b-2 border-black grid grid-cols-2"><span>Invoice Date:</span><span className="font-bold">{format(invoiceToView.issuedDate, 'dd MMM yyyy')}</span></div>
-                <div className="p-2 border-b-2 border-black grid grid-cols-2"><span>Place of Supply:</span><span>{companyProfileDetails.state}</span></div>
+                <div className="p-2 border-b border-black grid grid-cols-2"><span>Invoice #:</span><span className="font-bold">{invoiceToView.invoiceNumber}</span></div>
+                <div className="p-2 border-b border-black grid grid-cols-2"><span>Invoice Date:</span><span className="font-bold">{format(invoiceToView.issuedDate, 'dd MMM yyyy')}</span></div>
+                <div className="p-2 border-b border-black grid grid-cols-2"><span>Place of Supply:</span><span>{companyProfileDetails.state}</span></div>
                 <div className="p-2 grid grid-cols-2"><span>Due Date:</span><span className="font-bold">{format(invoiceToView.dueDate, 'dd MMM yyyy')}</span></div>
               </div>
             </div>
@@ -141,31 +141,31 @@ const InvoiceTemplateModern = React.forwardRef<HTMLDivElement, InvoiceTemplatePr
             <div className="flex-grow flex flex-col">
               <table className="w-full text-[10px] table-fixed">
                 <thead>
-                  <tr className="border-b-2 border-black text-left">
-                    <th className="p-1 border-r-2 border-black font-bold w-8">#</th>
-                    <th className="p-1 border-r-2 border-black font-bold">Item</th>
-                    <th className="p-1 border-r-2 border-black font-bold w-16">HSN/SAC</th>
-                    <th className="p-1 border-r-2 border-black font-bold w-20 text-right">Rate/Item</th>
-                    <th className="p-1 border-r-2 border-black font-bold w-10 text-center">Qty</th>
-                    <th className="p-1 border-r-2 border-black font-bold w-20 text-right">Taxable Val</th>
-                    <th className="p-1 border-r-2 border-black font-bold w-20 text-right">Tax Amount</th>
+                  <tr className="border-b border-black text-left">
+                    <th className="p-1 border-r border-black font-bold w-8">#</th>
+                    <th className="p-1 border-r border-black font-bold">Item</th>
+                    <th className="p-1 border-r border-black font-bold w-16">HSN/SAC</th>
+                    <th className="p-1 border-r border-black font-bold w-20 text-right">Rate/Item</th>
+                    <th className="p-1 border-r border-black font-bold w-10 text-center">Qty</th>
+                    <th className="p-1 border-r border-black font-bold w-20 text-right">Taxable Val</th>
+                    <th className="p-1 border-r border-black font-bold w-20 text-right">Tax Amount</th>
                     <th className="p-1 font-bold w-24 text-right">Amount</th>
                   </tr>
                 </thead>
-                <tbody className="border-b-2 border-black">
+                <tbody className="border-b border-black">
                   {(invoiceToView.items || []).map((item, index) => {
                     const taxableValue = item.quantity * item.unitPrice;
                     const taxAmount = taxableValue * (invoiceToView.taxRate / 100);
                     const totalAmount = taxableValue + taxAmount;
                     return (
                       <tr key={item.id} className="border-b border-black align-top">
-                        <td className="p-1 border-r-2 border-black text-center">{index + 1}</td>
-                        <td className="p-1 border-r-2 border-black font-bold">{item.description}</td>
-                        <td className="p-1 border-r-2 border-black"></td>
-                        <td className="p-1 border-r-2 border-black text-right">{currencySymbol}{item.unitPrice.toFixed(2)}</td>
-                        <td className="p-1 border-r-2 border-black text-center">{item.quantity}</td>
-                        <td className="p-1 border-r-2 border-black text-right">{currencySymbol}{taxableValue.toFixed(2)}</td>
-                        <td className="p-1 border-r-2 border-black text-right">{currencySymbol}{taxAmount.toFixed(2)} <br /> ({invoiceToView.taxRate}%)</td>
+                        <td className="p-1 border-r border-black text-center">{index + 1}</td>
+                        <td className="p-1 border-r border-black font-bold">{item.description}</td>
+                        <td className="p-1 border-r border-black"></td>
+                        <td className="p-1 border-r border-black text-right">{currencySymbol}{item.unitPrice.toFixed(2)}</td>
+                        <td className="p-1 border-r border-black text-center">{item.quantity}</td>
+                        <td className="p-1 border-r border-black text-right">{currencySymbol}{taxableValue.toFixed(2)}</td>
+                        <td className="p-1 border-r border-black text-right">{currencySymbol}{taxAmount.toFixed(2)} <br /> ({invoiceToView.taxRate}%)</td>
                         <td className="p-1 text-right font-bold">{currencySymbol}{totalAmount.toFixed(2)}</td>
                       </tr>
                     );
@@ -177,21 +177,21 @@ const InvoiceTemplateModern = React.forwardRef<HTMLDivElement, InvoiceTemplatePr
 
             {/* Calculation Section */}
             <div className="grid grid-cols-[60%_40%]">
-                <div className="text-xs p-1 border-t-2 border-black">
+                <div className="text-xs p-1 border-t border-black">
                     Total Items / Qty: {(invoiceToView.items || []).length} / {(invoiceToView.items || []).reduce((acc, i) => acc + i.quantity, 0)}
                 </div>
                 <div className="text-right text-xs">
-                    <div className="grid grid-cols-2 p-1 border-t-2 border-b-2 border-black">
+                    <div className="grid grid-cols-2 p-1 border-t border-b border-black">
                     <span>Taxable Amount</span>
                     <span className="font-bold">{currencySymbol}{invoiceToView.subtotal.toFixed(2)}</span>
                     </div>
                     {invoiceToView.discountAmount > 0 && (
-                        <div className="grid grid-cols-2 p-1 border-b-2 border-black">
+                        <div className="grid grid-cols-2 p-1 border-b border-black">
                             <span>Discount</span>
                             <span className="font-bold text-red-600">-{currencySymbol}{invoiceToView.discountAmount.toFixed(2)}</span>
                         </div>
                     )}
-                    <div className="grid grid-cols-2 p-1 border-b-2 border-black">
+                    <div className="grid grid-cols-2 p-1 border-b border-black">
                     <span>IGST {invoiceToView.taxRate}%</span>
                     <span className="font-bold">{currencySymbol}{invoiceToView.taxAmount.toFixed(2)}</span>
                     </div>
@@ -202,11 +202,11 @@ const InvoiceTemplateModern = React.forwardRef<HTMLDivElement, InvoiceTemplatePr
                 </div>
             </div>
 
-            <div className="border-y-2 border-black text-xs">
+            <div className="border-y border-black text-xs">
                 <div className="p-1">Total amount (in words): {amountInWords}</div>
             </div>
             
-            <div className="border-b-2 border-black text-right p-1">
+            <div className="border-b border-black text-right p-1">
                 {invoiceToView.status === 'Paid' && <span className="font-bold text-green-600">&#10004; Amount Paid</span>}
             </div>
 
@@ -231,10 +231,10 @@ const InvoiceTemplateModern = React.forwardRef<HTMLDivElement, InvoiceTemplatePr
                           <Image src={companyProfileDetails.signatureUrl} layout="fill" objectFit="contain" alt="Signature" />
                       )}
                   </div>
-                  <p className="border-t-2 border-black w-full pt-1">Authorized Signatory</p>
+                  <p className="border-t border-black w-full pt-1">Authorized Signatory</p>
                 </div>
               </div>
-              <div className="grid grid-cols-2 gap-4 pt-2 border-t-2 border-black">
+              <div className="grid grid-cols-2 gap-4 pt-2 border-t border-black">
                 <div>
                   <p className="font-bold">Notes:</p>
                   <p className="whitespace-pre-line p-1">{invoiceToView.notes}</p>
