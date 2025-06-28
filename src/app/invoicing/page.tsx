@@ -55,6 +55,7 @@ import InvoiceTemplateModern from './InvoiceTemplateModern';
 import InvoiceTemplateIndian from './InvoiceTemplateIndian';
 import html2canvas from 'html2canvas';
 import jsPDF from 'jspdf';
+import Link from 'next/link';
 
 
 interface InvoiceItem {
@@ -153,9 +154,8 @@ export default function InvoicingPage() {
   const currency = user?.currencySymbol || '$';
   const [invoices, setInvoices] = useState<InvoiceDisplay[]>([]);
   const [searchTerm, setSearchTerm] = useState<string>('');
-  const [isFormOpen, setIsFormOpen] = useState(false);
+  const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
   const [currentInvoice, setCurrentInvoice] = useState<Partial<InvoiceDisplay & {invoiceNumber?: string}>>({});
-  const [isEditing, setIsEditing] = useState(false);
   const { toast } = useToast();
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
   const [invoiceToDeleteId, setInvoiceToDeleteId] = useState<string | null>(null);
@@ -203,7 +203,7 @@ export default function InvoicingPage() {
   };
 
   useEffect(() => {
-    if (!isFormOpen) return;
+    if (!isEditDialogOpen) return;
 
     const subtotal = (currentInvoice.items || []).reduce((sum, item) => sum + (Number(item.quantity || 0) * Number(item.unitPrice || 0)), 0);
 
@@ -228,7 +228,7 @@ export default function InvoicingPage() {
         taxAmount: isNaN(taxAmount) ? 0 : taxAmount,
         amount: isNaN(total) ? 0 : total,
     }));
-  }, [currentInvoice.items, currentInvoice.discountType, currentInvoice.discountValue, currentInvoice.taxRate, isFormOpen]);
+  }, [currentInvoice.items, currentInvoice.discountType, currentInvoice.discountValue, currentInvoice.taxRate, isEditDialogOpen]);
 
 
   const fetchCompanyProfile = useCallback(async () => {
@@ -401,108 +401,54 @@ export default function InvoicingPage() {
 
   const handleFormSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!user || !user.companyId) {
-      toast({ title: "Authentication Error", description: "User not authenticated. Please sign in.", variant: "destructive" });
+    if (!user || !user.companyId || !currentInvoice.id) {
+      toast({ title: "Authentication or Data Error", variant: "destructive" });
       return;
     }
     if (!currentInvoice.clientName || currentInvoice.amount === undefined || !currentInvoice.issuedDate || !currentInvoice.dueDate) {
-        toast({ title: "Missing Fields", description: "Please fill all required invoice details (Client Name, Amount, Issued Date, Due Date).", variant: "destructive" });
-        return;
-    }
-     if (currentInvoice.amount < 0) {
-        toast({ title: "Invalid Amount", description: "Amount cannot be negative.", variant: "destructive" });
+        toast({ title: "Missing Fields", description: "Please fill all required invoice details.", variant: "destructive" });
         return;
     }
 
     setIsSaving(true);
+    const issuedDateForFirestore = Timestamp.fromDate(currentInvoice.issuedDate);
+    const dueDateForFirestore = Timestamp.fromDate(currentInvoice.dueDate);
 
-    const issuedDateForFirestore = currentInvoice.issuedDate instanceof Date ? Timestamp.fromDate(currentInvoice.issuedDate) : Timestamp.fromDate(new Date(currentInvoice.issuedDate!));
-    const dueDateForFirestore = currentInvoice.dueDate instanceof Date ? Timestamp.fromDate(currentInvoice.dueDate) : Timestamp.fromDate(new Date(currentInvoice.dueDate!));
-
-    const invoiceDataToSaveCore = {
+    const invoiceDataToUpdate = {
       clientName: currentInvoice.clientName!,
       clientEmail: currentInvoice.clientEmail || '', 
       clientAddress: currentInvoice.clientAddress || '',
-      
       subtotal: currentInvoice.subtotal || 0,
       discountType: currentInvoice.discountType || 'fixed',
       discountValue: Number(currentInvoice.discountValue) || 0,
       discountAmount: currentInvoice.discountAmount || 0,
       taxRate: Number(currentInvoice.taxRate) || 0,
       taxAmount: currentInvoice.taxAmount || 0,
-      amount: Number(currentInvoice.amount) || 0, // This is the total
-
+      amount: Number(currentInvoice.amount) || 0,
       issuedDate: issuedDateForFirestore,
       dueDate: dueDateForFirestore,
       status: currentInvoice.status || 'Draft',
       items: currentInvoice.items || [],
       notes: currentInvoice.notes || '',
-      companyId: user.companyId,
     };
 
     try {
-      if (isEditing && currentInvoice.id) {
-        const invoiceRef = doc(db, 'invoices', currentInvoice.id);
-        await updateDoc(invoiceRef, {
-            ...invoiceDataToSaveCore,
-            invoiceNumber: currentInvoice.invoiceNumber!, 
-        });
-        toast({ title: "Invoice Updated", description: `Invoice ${currentInvoice.invoiceNumber} updated successfully.` });
-      } else {
-        const newInvoiceNumber = currentInvoice.invoiceNumber || `INV${(Date.now()).toString().slice(-6)}`;
-        const invoicesColRef = collection(db, 'invoices');
-        await addDoc(invoicesColRef, {
-            ...invoiceDataToSaveCore,
-            invoiceNumber: newInvoiceNumber,
-            createdAt: serverTimestamp(),
-        });
-        toast({ title: "Invoice Created", description: `Invoice ${newInvoiceNumber} created successfully.` });
-      }
+      const invoiceRef = doc(db, 'invoices', currentInvoice.id);
+      await updateDoc(invoiceRef, invoiceDataToUpdate);
+      toast({ title: "Invoice Updated", description: `Invoice ${currentInvoice.invoiceNumber} updated successfully.` });
       
-      // Save settings as default
       localStorage.setItem(LOCAL_STORAGE_TAX_RATE_KEY, String(currentInvoice.taxRate || '0'));
       localStorage.setItem(LOCAL_STORAGE_DISCOUNT_TYPE_KEY, currentInvoice.discountType || 'fixed');
       localStorage.setItem(LOCAL_STORAGE_DISCOUNT_VALUE_KEY, String(currentInvoice.discountValue || '0'));
 
       fetchInvoices();
-      setIsFormOpen(false);
+      setIsEditDialogOpen(false);
       setCurrentInvoice({});
-      setIsEditing(false);
     } catch (error: any) {
-      console.error("Error saving invoice: ", error);
-      toast({ title: "Save Failed", description: `Could not save invoice. ${error.message}`, variant: "destructive" });
+      toast({ title: "Update Failed", description: `Could not update invoice. ${error.message}`, variant: "destructive" });
     } finally {
       setIsSaving(false);
     }
-  };
-
-  const handleCreateNew = () => {
-    const savedNotes = localStorage.getItem(LOCAL_STORAGE_NOTES_TEMPLATE_KEY) || 'Full payment is due upon receipt. Late payments may incur additional charges.';
-    const savedTaxRate = parseFloat(localStorage.getItem(LOCAL_STORAGE_TAX_RATE_KEY) || '0');
-    const savedDiscountType = (localStorage.getItem(LOCAL_STORAGE_DISCOUNT_TYPE_KEY) as DiscountType) || 'fixed';
-    const savedDiscountValue = parseFloat(localStorage.getItem(LOCAL_STORAGE_DISCOUNT_VALUE_KEY) || '0');
-
-
-    setCurrentInvoice({
-        issuedDate: new Date(),
-        dueDate: new Date(new Date().setDate(new Date().getDate() + 30)),
-        status: 'Draft',
-        items: [{ id: crypto.randomUUID(), description: '', quantity: 1, unitPrice: 0 }],
-        invoiceNumber: `INV${(Date.now()).toString().slice(-6)}`,
-        clientName: '',
-        clientEmail: '',
-        clientAddress: '',
-        notes: savedNotes,
-        subtotal: 0,
-        discountType: savedDiscountType,
-        discountValue: savedDiscountValue,
-        discountAmount: 0,
-        taxRate: savedTaxRate,
-        taxAmount: 0,
-        amount: 0,
-    });
-    setIsEditing(false);
-    setIsFormOpen(true);
   };
 
   const handleEditInvoice = (invoice: InvoiceDisplay) => {
@@ -511,8 +457,7 @@ export default function InvoicingPage() {
       notes: invoice.notes || '',
       clientAddress: invoice.clientAddress || '',
     });
-    setIsEditing(true);
-    setIsFormOpen(true);
+    setIsEditDialogOpen(true);
   };
 
   const promptDeleteInvoice = (id: string) => {
@@ -530,7 +475,6 @@ export default function InvoicingPage() {
             fetchInvoices();
             setInvoiceToDeleteId(null);
         } catch (error: any) {
-            console.error("Error deleting invoice: ", error);
             toast({ title: "Delete Failed", description: `Could not delete invoice. ${error.message}`, variant: "destructive"});
         } finally {
             setIsSaving(false);
@@ -563,7 +507,6 @@ export default function InvoicingPage() {
           printWindow.focus();
           printWindow.print();
         } catch (e) {
-          console.error("Print failed:", e);
           toast({ title: "Print Failed", description: "Error opening print dialog.", variant: "destructive"});
           printWindow.close();
         }
@@ -599,7 +542,6 @@ export default function InvoicingPage() {
         pdf.save(`Invoice_${invoiceToView.invoiceNumber}.pdf`);
         toast({ title: "PDF Downloaded", description: `Invoice ${invoiceToView.invoiceNumber}.pdf has been saved.` });
     } catch (error) {
-        console.error("PDF generation failed", error);
         toast({ title: "PDF Download Failed", description: "Could not generate PDF.", variant: "destructive" });
     } finally {
         setIsDownloadingPdf(false);
@@ -626,13 +568,6 @@ export default function InvoicingPage() {
   
     const companyName = company?.name || 'Your Company';
     const companyAddress = company?.address?.replace(/\n/g, '<br>') || 'Your Address';
-    const companyEmail = company?.email || '';
-    const companyPhone = company?.phone || '';
-    const companyWebsite = company?.website || '';
-    const companyGstin = company?.gstin || '';
-    const companyAccountNumber = company?.accountNumber || '';
-    const companyIfscCode = company?.ifscCode || '';
-
     const clientAddressHtml = invoice.clientAddress ? `<p style="margin:2px 0; font-size: 0.9em; white-space: pre-wrap;">${invoice.clientAddress.replace(/\n/g, '<br>')}</p>` : '';
     const statusBadgeStyle = `display: inline-block; padding: 4px 8px; font-size: 0.8em; border-radius: 4px; color: white; background-color: ${invoice.status === 'Paid' ? '#28a745' : invoice.status === 'Overdue' ? '#dc3545' : '#6c757d'};`;
   
@@ -643,28 +578,21 @@ export default function InvoicingPage() {
             <td style="vertical-align: top;">
               ${company?.name ? `<h1 style="color: #007bff; margin:0 0 10px 0;">${company.name}</h1>` : ''}
               <p style="margin:0; font-size: 0.9em;">${companyAddress}</p>
-              ${companyEmail ? `<p style="margin:2px 0; font-size: 0.9em;">Email: ${companyEmail}</p>` : ''}
-              ${companyPhone ? `<p style="margin:2px 0; font-size: 0.9em;">Phone: ${companyPhone}</p>` : ''}
-              ${companyWebsite ? `<p style="margin:2px 0; font-size: 0.9em;">Website: <a href="${companyWebsite}" target="_blank">${companyWebsite}</a></p>` : ''}
-              ${companyGstin ? `<p style="margin:2px 0; font-size: 0.9em;">GSTIN/Tax ID: ${companyGstin}</p>` : ''}
             </td>
             <td style="text-align: right; vertical-align: top;">
               <h2 style="text-transform: uppercase; margin:0 0 10px 0; font-size: 1.8em;">Invoice</h2>
               <p style="margin:2px 0;"><strong>Invoice #:</strong> ${invoice.invoiceNumber}</p>
               <p style="margin:2px 0;"><strong>Date Issued:</strong> ${format(invoice.issuedDate, 'PPP')}</p>
-              <p style="margin:2px 0;"><strong>Date Due:</strong> ${format(invoice.dueDate, 'PPP')}</p>
               <p style="margin-top: 5px;"><span style="${statusBadgeStyle}">${invoice.status}</span></p>
             </td>
           </tr>
         </table>
-  
         <div style="margin-bottom: 20px; padding: 10px; background-color: #f8f9fa; border-radius: 5px;">
           <h3 style="margin:0 0 5px 0; font-size: 1.1em;">Bill To:</h3>
           <p style="margin:0; font-weight: bold;">${invoice.clientName}</p>
           ${invoice.clientEmail ? `<p style="margin:2px 0; font-size: 0.9em;">${invoice.clientEmail}</p>` : ''}
           ${clientAddressHtml}
         </div>
-  
         <table style="width: 100%; border-collapse: collapse; margin-bottom: 20px;">
           <thead style="background-color: #f0f0f0;">
             <tr>
@@ -675,37 +603,13 @@ export default function InvoicingPage() {
               <th style="border: 1px solid #ddd; padding: 8px; text-align: right;">Amount</th>
             </tr>
           </thead>
-          <tbody>
-            ${itemsHtml}
-          </tbody>
+          <tbody>${itemsHtml}</tbody>
         </table>
-  
         <div style="text-align: right; margin-bottom: 20px; padding-top: 10px; border-top: 1px solid #eee;">
-          <p style="margin: 2px 0;"><strong>Subtotal:</strong> ${currency}${invoice.subtotal.toFixed(2)}</p>
-          ${invoice.discountAmount > 0 ? `<p style="margin: 2px 0;"><strong>Discount:</strong> -${currency}${invoice.discountAmount.toFixed(2)}</p>` : ''}
-          ${invoice.taxAmount > 0 ? `<p style="margin: 2px 0;"><strong>Tax (${invoice.taxRate}%):</strong> +${currency}${invoice.taxAmount.toFixed(2)}</p>` : ''}
           <p style="font-size: 1.2em; font-weight: bold; margin:5px 0 0 0; padding-top: 5px; border-top: 1px solid #333;"><strong>Grand Total:</strong> ${currency}${invoice.amount.toFixed(2)}</p>
         </div>
-  
-        ${invoice.notes ? `
-          <div style="margin-bottom: 20px; padding: 10px; background-color: #f8f9fa; border-radius: 5px;">
-            <h4 style="margin:0 0 5px 0; font-size: 1em;">Notes:</h4>
-            <p style="margin:0; font-size: 0.9em; white-space: pre-wrap;">${invoice.notes}</p>
-          </div>
-        ` : ''}
-
-        ${companyAccountNumber ? `
-          <div style="margin-bottom: 20px; padding: 10px; background-color: #f8f9fa; border-radius: 5px;">
-            <h4 style="margin:0 0 5px 0; font-size: 1em;">Payment Details:</h4>
-            <p style="margin:0; font-size: 0.9em;"><strong>Account Name:</strong> ${companyName}</p>
-            <p style="margin:0; font-size: 0.9em;"><strong>Account Number:</strong> ${companyAccountNumber}</p>
-            ${companyIfscCode ? `<p style="margin:0; font-size: 0.9em;"><strong>IFSC/SWIFT Code:</strong> ${companyIfscCode}</p>` : ''}
-          </div>
-        ` : ''}
-  
         <div style="text-align: center; font-size: 0.8em; color: #777; margin-top: 30px; border-top: 1px solid #eee; padding-top: 10px;">
-          <p>Thank you for your business!</p>
-          <p>${companyName} - Payment is due by ${format(invoice.dueDate, 'PPP')}.</p>
+          <p>Thank you for your business! Payment is due by ${format(invoice.dueDate, 'PPP')}.</p>
         </div>
       </div>
     `;
@@ -752,7 +656,7 @@ export default function InvoicingPage() {
 
   const handleOpenEmailDialog = (invoice: InvoiceDisplay) => {
     if (!invoice.clientEmail) {
-        toast({ title: "Missing Client Email", description: "Cannot send email without client's email address. Please edit the invoice to add an email.", variant: "destructive"});
+        toast({ title: "Missing Client Email", description: "Please edit the invoice to add an email address.", variant: "destructive"});
         return;
     }
     setInvoiceForEmail(invoice);
@@ -771,37 +675,18 @@ export default function InvoicingPage() {
     const invoiceDetailsHtml = generateInvoiceHTMLForEmail(invoiceForEmail, companyProfileDetails);
 
     const fullEmailHtmlBody = `
-      <html>
-        <head>
-          <style>
-            body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; }
-            .email-container { max-width: 800px; margin: 0 auto; padding: 20px; }
-            .invoice-section { margin-top: 20px; padding-top: 20px; border-top: 1px solid #eee; }
-          </style>
-        </head>
-        <body>
-          <div class="email-container">
+      <html><body><div style="font-family: Arial, sans-serif; line-height: 1.6; color: #333;">
             ${userTextHtml}
-            <div class="invoice-section">
+            <div style="margin-top: 20px; padding-top: 20px; border-top: 1px solid #eee;">
               ${invoiceDetailsHtml}
             </div>
-          </div>
-        </body>
-      </html>
-    `;
+      </div></body></html>`;
 
     try {
-      const result = await sendInvoiceEmailAction({
-        to: emailRecipient,
-        subject: emailSubject,
-        htmlBody: fullEmailHtmlBody,
-        invoiceNumber: invoiceForEmail.invoiceNumber,
-      });
-
+      const result = await sendInvoiceEmailAction({ to: emailRecipient, subject: emailSubject, htmlBody: fullEmailHtmlBody, invoiceNumber: invoiceForEmail.invoiceNumber });
       if (result.success) {
         toast({ title: "Email Sent", description: result.message });
         setIsEmailPreviewDialogOpen(false);
-        setInvoiceForEmail(null);
       } else {
         toast({ title: "Email Failed", description: result.message, variant: "destructive" });
       }
@@ -813,118 +698,41 @@ export default function InvoicingPage() {
   };
 
   const handleSaveTemplate = () => {
-    localStorage.setItem(LOCAL_STORAGE_EMAIL_TEMPLATE_KEY, JSON.stringify({ 
-        subject: emailSubject, 
-        bodyUserText: emailBodyUserText
-    }));
-    toast({ title: "Template Saved", description: "Your current email subject and plain text body are saved as default."});
+    localStorage.setItem(LOCAL_STORAGE_EMAIL_TEMPLATE_KEY, JSON.stringify({ subject: emailSubject, bodyUserText: emailBodyUserText }));
+    toast({ title: "Template Saved" });
   };
 
   const handleRevertToDefaultTemplate = () => {
     if (invoiceForEmail) {
         loadAndPrepareEmailTemplate(invoiceForEmail, true);
-        toast({ title: "Template Reset", description: "Email content reset to the original default."});
+        toast({ title: "Template Reset" });
     }
   };
 
   const handleAddItem = () => {
     const newItem: InvoiceItem = { id: crypto.randomUUID(), description: '', quantity: 1, unitPrice: 0 };
-    setCurrentInvoice(prev => ({
-      ...prev,
-      items: [...(prev.items || []), newItem]
-    }));
+    setCurrentInvoice(prev => ({ ...prev, items: [...(prev.items || []), newItem] }));
   };
 
   const handleItemChange = (itemId: string, field: keyof InvoiceItem, value: string | number) => {
-    setCurrentInvoice(prev => {
-        const updatedItems = (prev.items || []).map(item =>
+    setCurrentInvoice(prev => ({
+        ...prev,
+        items: (prev.items || []).map(item =>
             item.id === itemId ? { ...item, [field]: typeof value === 'string' && (field === 'quantity' || field === 'unitPrice') ? parseFloat(value) || 0 : value } : item
-        );
-        return { ...prev, items: updatedItems };
-    });
+        )
+    }));
   };
 
   const handleRemoveItem = (itemId: string) => {
-     setCurrentInvoice(prev => ({
-      ...prev,
-      items: (prev.items || []).filter(item => item.id !== itemId)
-    }));
+     setCurrentInvoice(prev => ({ ...prev, items: (prev.items || []).filter(item => item.id !== itemId) }));
   };
-
-  const handleClientNameInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const typedValue = e.target.value;
-    setCurrentInvoice(prev => ({
-      ...prev,
-      clientName: typedValue,
-    }));
-    if (typedValue.length > 0) {
-      setIsClientSuggestionsVisible(true);
-    } else {
-      setIsClientSuggestionsVisible(false);
-    }
-  };
-
-  const handleClientSuggestionClick = (client: ExistingClient) => {
-    const mostRecentInvoice = invoices
-      .filter(inv => inv.clientName === client.name)
-      .sort((a, b) => b.issuedDate.getTime() - a.issuedDate.getTime())[0];
-
-
-    if (mostRecentInvoice) {
-      // Create a new invoice draft based on the most recent one
-      setCurrentInvoice({
-        ...mostRecentInvoice,
-        id: undefined, // This is a new invoice, so no ID yet
-        invoiceNumber: `INV${(Date.now()).toString().slice(-6)}`, // Generate a new invoice number
-        issuedDate: new Date(),
-        dueDate: new Date(new Date().setDate(new Date().getDate() + 30)),
-        status: 'Draft',
-        // The rest of the fields (items, notes, tax, discount) are carried over
-      });
-    } else {
-      // Fallback for safety, though every existing client should have at least one invoice.
-      // This will just fill in client details if no past invoice is found for some reason.
-      setCurrentInvoice(prev => ({
-        ...prev,
-        clientName: client.name,
-        clientEmail: client.email || '',
-        clientAddress: client.address || '',
-      }));
-    }
-    
-    setIsClientSuggestionsVisible(false);
-  };
-
-
-  const filteredClientSuggestions = useMemo(() => {
-    const currentName = currentInvoice.clientName?.toLowerCase() || '';
-    if (!currentName) {
-        return [];
-    }
-    return existingClients.filter(client =>
-      client.name.toLowerCase().includes(currentName)
-    );
-  }, [currentInvoice.clientName, existingClients]);
-
-  const isNewClient = useMemo(() => {
-    if (!currentInvoice.clientName || currentInvoice.clientName.trim() === '') return false;
-    return !existingClients.some(c => c.name.toLowerCase() === currentInvoice.clientName!.toLowerCase());
-  }, [currentInvoice.clientName, existingClients]);
-
+  
   const handleSaveNotesAsDefault = useCallback(() => {
-    const notesToSave = currentInvoice.notes;
-    if (notesToSave && notesToSave.trim().length > 0) {
-        localStorage.setItem(LOCAL_STORAGE_NOTES_TEMPLATE_KEY, notesToSave);
-        toast({
-            title: "Default Notes Saved",
-            description: "Your notes will be used for new invoices.",
-        });
+    if (currentInvoice.notes && currentInvoice.notes.trim().length > 0) {
+        localStorage.setItem(LOCAL_STORAGE_NOTES_TEMPLATE_KEY, currentInvoice.notes);
+        toast({ title: "Default Notes Saved" });
     } else {
-        toast({
-            title: "Cannot Save Empty Notes",
-            description: "Please enter some text to save as a default.",
-            variant: "destructive",
-        });
+        toast({ title: "Cannot Save Empty Notes", variant: "destructive" });
     }
   }, [currentInvoice.notes, toast]);
 
@@ -952,8 +760,10 @@ export default function InvoicingPage() {
   return (
     <div className="space-y-6 p-4 sm:p-6 lg:p-8">
       <PageTitle title="Invoicing" subtitle="Manage your customer invoices efficiently." icon={Receipt}>
-        <Button onClick={handleCreateNew} disabled={isSaving || isLoading || isFetchingCompanyProfile}>
-          <PlusCircle className="mr-2 h-4 w-4" /> Create New Invoice
+        <Button asChild disabled={isSaving || isLoading || isFetchingCompanyProfile}>
+          <Link href="/invoicing/new">
+            <PlusCircle className="mr-2 h-4 w-4" /> Create New Invoice
+          </Link>
         </Button>
       </PageTitle>
 
@@ -988,27 +798,15 @@ export default function InvoicingPage() {
             </div>
           )}
           <Table>
-            <TableCaption>{sortedInvoices.length === 0 && !isLoading ? "No invoices found." : sortedInvoices.length > 0 ? "A list of your recent invoices." : isLoading ? "Loading invoices..." : "No invoices match your search."}</TableCaption>
+            <TableCaption>{sortedInvoices.length === 0 && !isLoading ? "No invoices found." : "A list of your recent invoices."}</TableCaption>
             <TableHeader>
               <TableRow>
-                <TableHead>
-                  <Button variant="ghost" onClick={() => requestSort('invoiceNumber')} className="-ml-4 h-auto p-1 text-xs sm:text-sm">Number {getSortIcon('invoiceNumber')}</Button>
-                </TableHead>
-                <TableHead>
-                   <Button variant="ghost" onClick={() => requestSort('clientName')} className="-ml-4 h-auto p-1 text-xs sm:text-sm">Client {getSortIcon('clientName')}</Button>
-                </TableHead>
-                <TableHead className="text-right">
-                  <Button variant="ghost" onClick={() => requestSort('amount')} className="h-auto p-1 text-xs sm:text-sm">Amount {getSortIcon('amount')}</Button>
-                </TableHead>
-                <TableHead className="hidden md:table-cell">
-                  <Button variant="ghost" onClick={() => requestSort('issuedDate')} className="-ml-4 h-auto p-1 text-xs sm:text-sm">Issued Date {getSortIcon('issuedDate')}</Button>
-                </TableHead>
-                <TableHead className="hidden md:table-cell">
-                   <Button variant="ghost" onClick={() => requestSort('dueDate')} className="-ml-4 h-auto p-1 text-xs sm:text-sm">Due Date {getSortIcon('dueDate')}</Button>
-                </TableHead>
-                <TableHead>
-                  <Button variant="ghost" onClick={() => requestSort('status')} className="-ml-4 h-auto p-1 text-xs sm:text-sm">Status {getSortIcon('status')}</Button>
-                </TableHead>
+                <TableHead><Button variant="ghost" onClick={() => requestSort('invoiceNumber')} className="-ml-4 h-auto p-1 text-xs sm:text-sm">Number {getSortIcon('invoiceNumber')}</Button></TableHead>
+                <TableHead><Button variant="ghost" onClick={() => requestSort('clientName')} className="-ml-4 h-auto p-1 text-xs sm:text-sm">Client {getSortIcon('clientName')}</Button></TableHead>
+                <TableHead className="text-right"><Button variant="ghost" onClick={() => requestSort('amount')} className="h-auto p-1 text-xs sm:text-sm">Amount {getSortIcon('amount')}</Button></TableHead>
+                <TableHead className="hidden md:table-cell"><Button variant="ghost" onClick={() => requestSort('issuedDate')} className="-ml-4 h-auto p-1 text-xs sm:text-sm">Issued Date {getSortIcon('issuedDate')}</Button></TableHead>
+                <TableHead className="hidden md:table-cell"><Button variant="ghost" onClick={() => requestSort('dueDate')} className="-ml-4 h-auto p-1 text-xs sm:text-sm">Due Date {getSortIcon('dueDate')}</Button></TableHead>
+                <TableHead><Button variant="ghost" onClick={() => requestSort('status')} className="-ml-4 h-auto p-1 text-xs sm:text-sm">Status {getSortIcon('status')}</Button></TableHead>
                 <TableHead className="text-right">Actions</TableHead>
               </TableRow>
             </TableHeader>
@@ -1020,26 +818,16 @@ export default function InvoicingPage() {
                   <TableCell className="text-right">{currency}{invoice.amount.toFixed(2)}</TableCell>
                   <TableCell className="hidden md:table-cell">{format(invoice.issuedDate, 'PP')}</TableCell>
                   <TableCell className="hidden md:table-cell">{format(invoice.dueDate, 'PP')}</TableCell>
-                  <TableCell>
-                    <Badge variant={getStatusBadgeVariant(invoice.status)}>
-                      {invoice.status}
-                    </Badge>
-                  </TableCell>
+                  <TableCell><Badge variant={getStatusBadgeVariant(invoice.status)}>{invoice.status}</Badge></TableCell>
                   <TableCell className="text-right">
                     <DropdownMenu>
-                      <DropdownMenuTrigger asChild>
-                        <Button variant="ghost" size="icon" className="h-8 w-8" disabled={isSaving}>
-                          <MoreHorizontal className="h-4 w-4" />
-                        </Button>
-                      </DropdownMenuTrigger>
+                      <DropdownMenuTrigger asChild><Button variant="ghost" size="icon" className="h-8 w-8" disabled={isSaving}><MoreHorizontal className="h-4 w-4" /></Button></DropdownMenuTrigger>
                       <DropdownMenuContent align="end">
                         <DropdownMenuItem onClick={() => handleOpenViewInvoiceDialog(invoice)}><Printer className="mr-2 h-4 w-4" /> Print / View</DropdownMenuItem>
                         <DropdownMenuItem onClick={() => handleEditInvoice(invoice)}><Edit className="mr-2 h-4 w-4" /> Edit</DropdownMenuItem>
-                        <DropdownMenuItem onClick={() => handleOpenEmailDialog(invoice)} disabled={!invoice.clientEmail || isSendingEmail}><Mail className="mr-2 h-4 w-4" /> Email</DropdownMenuItem>
+                        <DropdownMenuItem onClick={() => handleOpenEmailDialog(invoice)} disabled={!invoice.clientEmail}><Mail className="mr-2 h-4 w-4" /> Email</DropdownMenuItem>
                         <DropdownMenuSeparator />
-                        <DropdownMenuItem onClick={() => promptDeleteInvoice(invoice.id)} className="text-destructive focus:text-destructive focus:bg-destructive/10">
-                          <Trash2 className="mr-2 h-4 w-4" /> Delete
-                        </DropdownMenuItem>
+                        <DropdownMenuItem onClick={() => promptDeleteInvoice(invoice.id)} className="text-destructive focus:text-destructive focus:bg-destructive/10"><Trash2 className="mr-2 h-4 w-4" /> Delete</DropdownMenuItem>
                       </DropdownMenuContent>
                     </DropdownMenu>
                   </TableCell>
@@ -1050,284 +838,118 @@ export default function InvoicingPage() {
         </CardContent>
       </Card>
 
-      <Dialog open={isFormOpen} onOpenChange={(open) => { setIsFormOpen(open); if (!open) { setCurrentInvoice({}); setIsEditing(false); setIsClientSuggestionsVisible(false); } }}>
+      <Dialog open={isEditDialogOpen} onOpenChange={(open) => { setIsEditDialogOpen(open); if (!open) setCurrentInvoice({}); }}>
         <DialogContent className="sm:max-w-3xl max-h-[90vh] flex flex-col">
           <DialogHeader>
-            <DialogTitle className="font-headline">{isEditing ? 'Edit Invoice' : 'Create New Invoice'}</DialogTitle>
-            <DialogDescription>
-              {isEditing ? `Update details for invoice ${currentInvoice.invoiceNumber || ''}.` : 'Fill in the details for the new invoice.'}
-            </DialogDescription>
+            <DialogTitle className="font-headline">Edit Invoice</DialogTitle>
+            <DialogDescription>Update details for invoice {currentInvoice.invoiceNumber || ''}.</DialogDescription>
           </DialogHeader>
           <form onSubmit={handleFormSubmit} id="invoice-form-explicit" className="space-y-4 overflow-y-auto flex-grow p-1 pr-3">
-            
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div>
-                    <Label htmlFor="clientName">Client Name</Label>
-                    <div className="relative">
-                        <Input
-                            id="clientName"
-                            value={currentInvoice.clientName || ''}
-                            onChange={handleClientNameInputChange}
-                            onFocus={() => { if ((currentInvoice.clientName || '').length > 0) setIsClientSuggestionsVisible(true); }}
-                            onBlur={() => {
-                                setTimeout(() => {
-                                    setIsClientSuggestionsVisible(false);
-                                }, 150);
-                            }}
-                            placeholder="Enter client name"
-                            required
-                            autoComplete="off"
-                            disabled={isSaving}
-                            className="w-full"
-                        />
-                        {isClientSuggestionsVisible && filteredClientSuggestions.length > 0 && (
-                             <Card className="absolute z-10 w-full mt-1 shadow-lg max-h-60 overflow-y-auto p-0">
-                                <CardContent className="p-0">
-                                    <ScrollArea className="max-h-56">
-                                        {filteredClientSuggestions.map((client) => (
-                                        <div
-                                            key={client.name}
-                                            className="px-3 py-2 text-sm hover:bg-accent cursor-pointer"
-                                            onMouseDown={() => handleClientSuggestionClick(client)}
-                                        >
-                                            {client.name}
-                                            {client.email && <span className="text-xs text-muted-foreground ml-2">({client.email})</span>}
-                                        </div>
-                                        ))}
-                                    </ScrollArea>
-                                </CardContent>
-                            </Card>
-                        )}
-                    </div>
-                    {isNewClient && currentInvoice.clientName && currentInvoice.clientName.trim() !== '' && (
-                        <p className="text-xs text-muted-foreground mt-1 flex items-center">
-                        <UserPlus className="h-3 w-3 mr-1 text-chart-2" />
-                        New client: '{currentInvoice.clientName}' will be added.
-                        </p>
-                    )}
-                </div>
-
-                <div>
-                    <Label htmlFor="clientEmail">Client Email</Label>
-                    <Input
-                        id="clientEmail"
-                        type="email"
-                        value={currentInvoice.clientEmail || ''}
-                        onChange={(e) => setCurrentInvoice({ ...currentInvoice, clientEmail: e.target.value })}
-                        placeholder="Enter client email"
-                        disabled={isSaving}
-                    />
-                </div>
-            </div>
-
-            <div>
-                <Label htmlFor="clientAddress">Client Address</Label>
-                <Textarea
-                    id="clientAddress"
-                    value={currentInvoice.clientAddress || ''}
-                    onChange={(e) => setCurrentInvoice({ ...currentInvoice, clientAddress: e.target.value })}
-                    placeholder="Enter client's billing address"
-                    disabled={isSaving}
-                    rows={3}
-                />
-            </div>
-
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-                 <div>
-                    <Label htmlFor="invoiceNumber">Invoice Number</Label>
-                    <Input id="invoiceNumber" value={currentInvoice.invoiceNumber || ''} onChange={(e) => setCurrentInvoice({ ...currentInvoice, invoiceNumber: e.target.value })} required disabled={isSaving || isEditing} />
-                </div>
-                <div>
-                    <Label htmlFor="issuedDate">Issued Date</Label>
-                    <Popover>
-                        <PopoverTrigger asChild>
-                        <Button variant="outline" className="w-full justify-start text-left font-normal" disabled={isSaving}>
-                            <CalendarIconLucide className="mr-2 h-4 w-4" />
-                            {currentInvoice.issuedDate ? format(currentInvoice.issuedDate, 'PPP') : <span>Pick a date</span>}
-                        </Button>
-                        </PopoverTrigger>
-                        <PopoverContent className="w-auto p-0"><Calendar mode="single" selected={currentInvoice.issuedDate} onSelect={(date) => setCurrentInvoice({...currentInvoice, issuedDate: date})} initialFocus disabled={isSaving}/></PopoverContent>
-                    </Popover>
-                </div>
-                 <div>
-                    <Label htmlFor="dueDate">Due Date</Label>
-                    <Popover>
-                        <PopoverTrigger asChild>
-                        <Button variant="outline" className="w-full justify-start text-left font-normal" disabled={isSaving}>
-                            <CalendarIconLucide className="mr-2 h-4 w-4" />
-                            {currentInvoice.dueDate ? format(currentInvoice.dueDate, 'PPP') : <span>Pick a date</span>}
-                        </Button>
-                        </PopoverTrigger>
-                        <PopoverContent className="w-auto p-0"><Calendar mode="single" selected={currentInvoice.dueDate} onSelect={(date) => setCurrentInvoice({...currentInvoice, dueDate: date})} initialFocus disabled={isSaving} /></PopoverContent>
-                    </Popover>
-                </div>
-                 <div>
-                  <Label htmlFor="status">Status</Label>
-                  <Select value={currentInvoice.status || 'Draft'} onValueChange={(value: InvoiceDisplay['status']) => setCurrentInvoice({ ...currentInvoice, status: value })} disabled={isSaving}>
-                    <SelectTrigger id="status"><SelectValue placeholder="Select status" /></SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="Draft">Draft</SelectItem>
-                      <SelectItem value="Pending">Pending</SelectItem>
-                      <SelectItem value="Paid">Paid</SelectItem>
-                      <SelectItem value="Overdue">Overdue</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-            </div>
-
-            <Separator/>
-
-            <div className="space-y-2 pt-2">
-              <div className="flex justify-between items-center">
-                <Label className="text-base font-medium">Invoice Items</Label>
-                <Button type="button" variant="outline" size="sm" onClick={handleAddItem} disabled={isSaving}><PlusCircle className="mr-2 h-4 w-4" /> Add Item</Button>
-              </div>
-              {(currentInvoice.items || []).map((item) => (
-                <div key={item.id} className="grid grid-cols-[1fr,auto,auto,auto] sm:grid-cols-[2fr_1fr_1fr_auto] items-end gap-2 p-2 border rounded-md bg-muted/30">
-                  <div className="space-y-1">
-                    <Label htmlFor={`item-desc-${item.id}`} className="text-xs">Description</Label>
-                    <Input id={`item-desc-${item.id}`} value={item.description} onChange={e => handleItemChange(item.id, 'description', e.target.value)} placeholder="Service or Product" disabled={isSaving} />
-                  </div>
-                  <div className="space-y-1">
-                     <Label htmlFor={`item-qty-${item.id}`} className="text-xs">Qty</Label>
-                    <Input id={`item-qty-${item.id}`} type="number" value={item.quantity} onChange={e => handleItemChange(item.id, 'quantity', e.target.value)} min="0" disabled={isSaving} className="w-20" />
-                  </div>
-                   <div className="space-y-1">
-                    <Label htmlFor={`item-price-${item.id}`} className="text-xs">Unit Price</Label>
-                    <Input id={`item-price-${item.id}`} type="number" value={item.unitPrice} onChange={e => handleItemChange(item.id, 'unitPrice', e.target.value)} min="0" step="0.01" disabled={isSaving} className="w-24"/>
-                  </div>
-                  <Button type="button" variant="ghost" size="icon" className="text-destructive h-8 w-8" onClick={() => handleRemoveItem(item.id)} disabled={isSaving}><Trash2 className="h-4 w-4" /></Button>
-                </div>
-              ))}
-               { (currentInvoice.items || []).length === 0 && <p className="text-xs text-muted-foreground text-center py-2">No items added. Total amount can be set manually.</p>}
-            </div>
-
-            <Separator/>
-
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-4">
-                <div className="space-y-4">
-                    <div className="grid grid-cols-2 gap-2">
-                        <div>
-                            <Label htmlFor="discountType">Discount Type</Label>
-                             <Select value={currentInvoice.discountType || 'fixed'} onValueChange={(value: DiscountType) => setCurrentInvoice(prev => ({ ...prev, discountType: value }))} disabled={isSaving}>
-                                <SelectTrigger><SelectValue/></SelectTrigger>
-                                <SelectContent>
-                                    <SelectItem value="fixed">Fixed ({currency})</SelectItem>
-                                    <SelectItem value="percentage">Percentage (%)</SelectItem>
-                                </SelectContent>
-                            </Select>
-                        </div>
-                        <div>
-                            <Label htmlFor="discountValue">Discount Value</Label>
-                            <Input id="discountValue" type="number" value={currentInvoice.discountValue || ''} onChange={(e) => setCurrentInvoice(prev => ({...prev, discountValue: e.target.value}))} min="0" step="0.01" disabled={isSaving} />
-                        </div>
+            {/* Form content is the same as the new page, but we only render it when a currentInvoice is set */}
+            {currentInvoice.id && (
+                <>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                        <Label htmlFor="clientName">Client Name</Label>
+                        <Input id="clientName" value={currentInvoice.clientName || ''} onChange={(e) => setCurrentInvoice({...currentInvoice, clientName: e.target.value})} required disabled={isSaving} />
                     </div>
                     <div>
-                        <Label htmlFor="taxRate">Tax Rate (%)</Label>
-                        <Input id="taxRate" type="number" value={currentInvoice.taxRate || ''} onChange={(e) => setCurrentInvoice(prev => ({...prev, taxRate: e.target.value}))} min="0" step="0.01" placeholder="e.g. 5 or 12.5" disabled={isSaving} />
+                        <Label htmlFor="clientEmail">Client Email</Label>
+                        <Input id="clientEmail" type="email" value={currentInvoice.clientEmail || ''} onChange={(e) => setCurrentInvoice({ ...currentInvoice, clientEmail: e.target.value })} disabled={isSaving} />
                     </div>
                 </div>
 
-                <div className="space-y-2 p-4 bg-primary/10 border border-primary/20 rounded-lg">
-                    <h4 className="font-medium text-center mb-2">Summary</h4>
-                    <div className="flex justify-between text-sm">
-                        <span className="text-muted-foreground">Subtotal:</span>
-                        <span className="font-medium">{currency}{(currentInvoice.subtotal || 0).toFixed(2)}</span>
+                <div>
+                    <Label htmlFor="clientAddress">Client Address</Label>
+                    <Textarea id="clientAddress" value={currentInvoice.clientAddress || ''} onChange={(e) => setCurrentInvoice({ ...currentInvoice, clientAddress: e.target.value })} disabled={isSaving} rows={3}/>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                    <div>
+                        <Label htmlFor="invoiceNumber">Invoice Number</Label>
+                        <Input id="invoiceNumber" value={currentInvoice.invoiceNumber || ''} disabled />
                     </div>
-                    <div className="flex justify-between text-sm">
-                        <span className="text-muted-foreground">Discount:</span>
-                        <span className="font-medium text-destructive">- {currency}{(currentInvoice.discountAmount || 0).toFixed(2)}</span>
+                    <div>
+                        <Label htmlFor="issuedDate">Issued Date</Label>
+                        <Popover><PopoverTrigger asChild><Button variant="outline" className="w-full justify-start text-left font-normal" disabled={isSaving}><CalendarIconLucide className="mr-2 h-4 w-4" />{currentInvoice.issuedDate ? format(currentInvoice.issuedDate, 'PPP') : <span>Pick a date</span>}</Button></PopoverTrigger><PopoverContent className="w-auto p-0"><Calendar mode="single" selected={currentInvoice.issuedDate} onSelect={(date) => setCurrentInvoice({...currentInvoice, issuedDate: date})} initialFocus disabled={isSaving}/></PopoverContent></Popover>
                     </div>
-                    <div className="flex justify-between text-sm">
-                        <span className="text-muted-foreground">Tax ({currentInvoice.taxRate || 0}%):</span>
-                        <span className="font-medium text-chart-2">+ {currency}{(currentInvoice.taxAmount || 0).toFixed(2)}</span>
+                    <div>
+                        <Label htmlFor="dueDate">Due Date</Label>
+                        <Popover><PopoverTrigger asChild><Button variant="outline" className="w-full justify-start text-left font-normal" disabled={isSaving}><CalendarIconLucide className="mr-2 h-4 w-4" />{currentInvoice.dueDate ? format(currentInvoice.dueDate, 'PPP') : <span>Pick a date</span>}</Button></PopoverTrigger><PopoverContent className="w-auto p-0"><Calendar mode="single" selected={currentInvoice.dueDate} onSelect={(date) => setCurrentInvoice({...currentInvoice, dueDate: date})} initialFocus disabled={isSaving} /></PopoverContent></Popover>
                     </div>
-                    <Separator className="my-2" />
-                    <div className="flex justify-between text-lg font-bold">
-                        <span>Grand Total:</span>
-                        <span>{currency}{(currentInvoice.amount || 0).toFixed(2)}</span>
+                    <div>
+                    <Label htmlFor="status">Status</Label>
+                    <Select value={currentInvoice.status || 'Draft'} onValueChange={(value: InvoiceDisplay['status']) => setCurrentInvoice({ ...currentInvoice, status: value })} disabled={isSaving}><SelectTrigger id="status"><SelectValue placeholder="Select status" /></SelectTrigger><SelectContent><SelectItem value="Draft">Draft</SelectItem><SelectItem value="Pending">Pending</SelectItem><SelectItem value="Paid">Paid</SelectItem><SelectItem value="Overdue">Overdue</SelectItem></SelectContent></Select>
                     </div>
                 </div>
-            </div>
 
-            <div>
-              <div className="flex justify-between items-center mb-1">
-                <Label htmlFor="notes">Notes / Terms &amp; Conditions (Optional)</Label>
-                <Button type="button" variant="link" size="sm" className="h-auto p-0 text-xs" onClick={handleSaveNotesAsDefault} disabled={isSaving}>
-                    Save as Default
-                </Button>
-              </div>
-              <Textarea id="notes" value={currentInvoice.notes || ''} onChange={(e) => setCurrentInvoice({ ...currentInvoice, notes: e.target.value })} placeholder="e.g., Payment terms, thank you message" disabled={isSaving} />
-            </div>
+                <Separator/>
 
+                <div className="space-y-2 pt-2">
+                <div className="flex justify-between items-center"><Label className="text-base font-medium">Invoice Items</Label><Button type="button" variant="outline" size="sm" onClick={handleAddItem} disabled={isSaving}><PlusCircle className="mr-2 h-4 w-4" /> Add Item</Button></div>
+                {(currentInvoice.items || []).map((item) => (
+                    <div key={item.id} className="grid grid-cols-[1fr,auto,auto,auto] sm:grid-cols-[2fr_1fr_1fr_auto] items-end gap-2 p-2 border rounded-md bg-muted/30">
+                    <div className="space-y-1"><Label htmlFor={`item-desc-${item.id}`} className="text-xs">Description</Label><Input id={`item-desc-${item.id}`} value={item.description} onChange={e => handleItemChange(item.id, 'description', e.target.value)} placeholder="Service or Product" disabled={isSaving} /></div>
+                    <div className="space-y-1"><Label htmlFor={`item-qty-${item.id}`} className="text-xs">Qty</Label><Input id={`item-qty-${item.id}`} type="number" value={item.quantity} onChange={e => handleItemChange(item.id, 'quantity', e.target.value)} min="0" disabled={isSaving} className="w-20" /></div>
+                    <div className="space-y-1"><Label htmlFor={`item-price-${item.id}`} className="text-xs">Unit Price</Label><Input id={`item-price-${item.id}`} type="number" value={item.unitPrice} onChange={e => handleItemChange(item.id, 'unitPrice', e.target.value)} min="0" step="0.01" disabled={isSaving} className="w-24"/></div>
+                    <Button type="button" variant="ghost" size="icon" className="text-destructive h-8 w-8" onClick={() => handleRemoveItem(item.id)} disabled={isSaving}><Trash2 className="h-4 w-4" /></Button>
+                    </div>
+                ))}
+                </div>
+
+                <Separator/>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-4">
+                    <div className="space-y-4">
+                        <div className="grid grid-cols-2 gap-2">
+                            <div><Label htmlFor="discountType">Discount Type</Label><Select value={currentInvoice.discountType || 'fixed'} onValueChange={(value: DiscountType) => setCurrentInvoice(prev => ({ ...prev, discountType: value }))} disabled={isSaving}><SelectTrigger><SelectValue/></SelectTrigger><SelectContent><SelectItem value="fixed">Fixed ({currency})</SelectItem><SelectItem value="percentage">Percentage (%)</SelectItem></SelectContent></Select></div>
+                            <div><Label htmlFor="discountValue">Discount Value</Label><Input id="discountValue" type="number" value={currentInvoice.discountValue || ''} onChange={(e) => setCurrentInvoice(prev => ({...prev, discountValue: e.target.value}))} min="0" step="0.01" disabled={isSaving} /></div>
+                        </div>
+                        <div><Label htmlFor="taxRate">Tax Rate (%)</Label><Input id="taxRate" type="number" value={currentInvoice.taxRate || ''} onChange={(e) => setCurrentInvoice(prev => ({...prev, taxRate: e.target.value}))} min="0" step="0.01" placeholder="e.g. 5 or 12.5" disabled={isSaving} /></div>
+                    </div>
+                    <div className="space-y-2 p-4 bg-primary/10 border border-primary/20 rounded-lg">
+                        <h4 className="font-medium text-center mb-2">Summary</h4>
+                        <div className="flex justify-between text-sm"><span className="text-muted-foreground">Subtotal:</span><span className="font-medium">{currency}{(currentInvoice.subtotal || 0).toFixed(2)}</span></div>
+                        <div className="flex justify-between text-sm"><span className="text-muted-foreground">Discount:</span><span className="font-medium text-destructive">- {currency}{(currentInvoice.discountAmount || 0).toFixed(2)}</span></div>
+                        <div className="flex justify-between text-sm"><span className="text-muted-foreground">Tax ({currentInvoice.taxRate || 0}%):</span><span className="font-medium text-chart-2">+ {currency}{(currentInvoice.taxAmount || 0).toFixed(2)}</span></div>
+                        <Separator className="my-2" /><div className="flex justify-between text-lg font-bold"><span>Grand Total:</span><span>{currency}{(currentInvoice.amount || 0).toFixed(2)}</span></div>
+                    </div>
+                </div>
+
+                <div>
+                <div className="flex justify-between items-center mb-1"><Label htmlFor="notes">Notes / Terms</Label><Button type="button" variant="link" size="sm" className="h-auto p-0 text-xs" onClick={handleSaveNotesAsDefault} disabled={isSaving}>Save as Default</Button></div>
+                <Textarea id="notes" value={currentInvoice.notes || ''} onChange={(e) => setCurrentInvoice({ ...currentInvoice, notes: e.target.value })} disabled={isSaving} />
+                </div>
+                </>
+            )}
           </form>
           <DialogFooter className="mt-auto pt-4 border-t">
-            <DialogClose asChild>
-              <Button type="button" variant="outline" onClick={() => { setIsFormOpen(false); setCurrentInvoice({}); setIsEditing(false); setIsClientSuggestionsVisible(false); }} disabled={isSaving}>Cancel</Button>
-            </DialogClose>
-            <Button type="submit" form="invoice-form-explicit" disabled={isSaving}>
-                {isSaving ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : (isEditing ? 'Save Changes' : 'Create Invoice')}
-            </Button>
+            <DialogClose asChild><Button type="button" variant="outline" disabled={isSaving}>Cancel</Button></DialogClose>
+            <Button type="submit" form="invoice-form-explicit" disabled={isSaving}>{isSaving ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Save className="mr-2 h-4 w-4" />} Save Changes</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
 
       <Dialog open={isViewInvoiceDialogOpen} onOpenChange={(open) => { setIsViewInvoiceDialogOpen(open); if (!open) setInvoiceToView(null); }}>
           <DialogContent className="max-w-4xl w-full h-[95vh] flex flex-col p-0 bg-gray-100 dark:bg-background">
-              <DialogHeader className="p-4 sm:p-6 pb-2 border-b bg-background no-print">
-                  <DialogTitle className="font-headline text-xl">
-                      Invoice {invoiceToView?.invoiceNumber}
-                  </DialogTitle>
-                   <DialogDescription>
-                        Preview of the invoice. You can print or download it.
-                    </DialogDescription>
-              </DialogHeader>
-            
+              <DialogHeader className="p-4 sm:p-6 pb-2 border-b bg-background no-print"><DialogTitle className="font-headline text-xl">Invoice {invoiceToView?.invoiceNumber}</DialogTitle><DialogDescription>Preview of the invoice. You can print or download it.</DialogDescription></DialogHeader>
               <ScrollArea className="flex-grow bg-gray-200 dark:bg-zinc-800 p-4 sm:p-8">
                   {isFetchingCompanyProfile && <div className="text-center p-10"><Loader2 className="h-8 w-8 animate-spin text-primary mx-auto" /> <p>Loading company details...</p></div>}
                   {!isFetchingCompanyProfile && invoiceToView && companyProfileDetails && (
                       <>
-                        {template === 'modern' ? (
-                            <InvoiceTemplateModern
-                                ref={invoicePrintRef}
-                                invoiceToView={invoiceToView}
-                                companyProfileDetails={companyProfileDetails}
-                                currencySymbol={currency}
-                            />
-                        ) : (
-                            <InvoiceTemplateIndian
-                                ref={invoicePrintRef}
-                                invoiceToView={invoiceToView}
-                                companyProfileDetails={companyProfileDetails}
-                                currencySymbol={currency}
-                            />
-                        )}
+                        {template === 'modern' ? (<InvoiceTemplateModern ref={invoicePrintRef} invoiceToView={invoiceToView} companyProfileDetails={companyProfileDetails} currencySymbol={currency} />) : (<InvoiceTemplateIndian ref={invoicePrintRef} invoiceToView={invoiceToView} companyProfileDetails={companyProfileDetails} currencySymbol={currency} />)}
                       </>
                   )}
               </ScrollArea>
-            
             <DialogFooter className="p-4 sm:p-6 border-t bg-background no-print justify-between flex-wrap gap-2">
                 <div className="flex-grow flex items-center gap-2">
                     <Label htmlFor="template-select">Template:</Label>
-                     <Select value={template} onValueChange={(value) => setTemplate(value as TemplateName)}>
-                        <SelectTrigger id="template-select" className="w-[180px]">
-                            <SelectValue placeholder="Select template" />
-                        </SelectTrigger>
-                        <SelectContent>
-                            <SelectItem value="modern">Modern</SelectItem>
-                            <SelectItem value="indian">Indian GST</SelectItem>
-                        </SelectContent>
-                    </Select>
+                     <Select value={template} onValueChange={(value) => setTemplate(value as TemplateName)}><SelectTrigger id="template-select" className="w-[180px]"><SelectValue placeholder="Select template" /></SelectTrigger><SelectContent><SelectItem value="modern">Modern</SelectItem><SelectItem value="indian">Indian GST</SelectItem></SelectContent></Select>
                     <Button variant="outline" size="sm" onClick={() => handleSetDefaultTemplate(template)}>Set as Default</Button>
                 </div>
                 <div className="flex gap-2">
-                    <Button type="button" variant="secondary" onClick={handleDownloadPdf} disabled={isDownloadingPdf}>
-                        {isDownloadingPdf ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Download className="mr-2 h-4 w-4" />}
-                        Download PDF
-                    </Button>
-                    <Button type="button" variant="default" onClick={handlePrintInvoice} disabled={isDownloadingPdf}>
-                      <Printer className="mr-2 h-4 w-4" /> Print Invoice
-                    </Button>
+                    <Button type="button" variant="secondary" onClick={handleDownloadPdf} disabled={isDownloadingPdf}>{isDownloadingPdf ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Download className="mr-2 h-4 w-4" />}Download PDF</Button>
+                    <Button type="button" variant="default" onClick={handlePrintInvoice} disabled={isDownloadingPdf}><Printer className="mr-2 h-4 w-4" /> Print Invoice</Button>
                 </div>
             </DialogFooter>
           </DialogContent>
@@ -1335,68 +957,25 @@ export default function InvoicingPage() {
 
       <Dialog open={isEmailPreviewDialogOpen} onOpenChange={(open) => { setIsEmailPreviewDialogOpen(open); if (!open) setInvoiceForEmail(null); }}>
         <DialogContent className="sm:max-w-2xl max-h-[90vh] flex flex-col">
-          <DialogHeader>
-            <DialogTitle className="font-headline">Compose Email</DialogTitle>
-            <DialogDescription>
-              Preview and edit the email for invoice {invoiceForEmail?.invoiceNumber} to {invoiceForEmail?.clientName}.
-              <br/>The body below is plain text. It will be formatted into an HTML email upon sending.
-            </DialogDescription>
-          </DialogHeader>
+          <DialogHeader><DialogTitle className="font-headline">Compose Email</DialogTitle><DialogDescription>Preview and edit the email for invoice {invoiceForEmail?.invoiceNumber} to {invoiceForEmail?.clientName}.<br/>The body below is plain text. It will be formatted into an HTML email upon sending.</DialogDescription></DialogHeader>
           <div className="space-y-4 py-2 flex-grow overflow-y-auto pr-2">
-            <div>
-              <Label htmlFor="emailTo">To:</Label>
-              <Input id="emailTo" value={emailRecipient} onChange={(e) => setEmailRecipient(e.target.value)} placeholder="recipient@example.com" required disabled={isSendingEmail}/>
-            </div>
-            <div>
-              <Label htmlFor="emailSubject">Subject:</Label>
-              <Input id="emailSubject" value={emailSubject} onChange={(e) => setEmailSubject(e.target.value)} disabled={isSendingEmail}/>
-            </div>
-            <div>
-              <Label htmlFor="emailBodyUserText">Body (Plain Text):</Label>
-              <Textarea 
-                id="emailBodyUserText" 
-                value={emailBodyUserText} 
-                onChange={(e) => setEmailBodyUserText(e.target.value)} 
-                rows={10} 
-                disabled={isSendingEmail} 
-                placeholder="Your plain text message here... Newlines will be preserved."
-              />
-            </div>
+            <div><Label htmlFor="emailTo">To:</Label><Input id="emailTo" value={emailRecipient} onChange={(e) => setEmailRecipient(e.target.value)} placeholder="recipient@example.com" required disabled={isSendingEmail}/></div>
+            <div><Label htmlFor="emailSubject">Subject:</Label><Input id="emailSubject" value={emailSubject} onChange={(e) => setEmailSubject(e.target.value)} disabled={isSendingEmail}/></div>
+            <div><Label htmlFor="emailBodyUserText">Body (Plain Text):</Label><Textarea id="emailBodyUserText" value={emailBodyUserText} onChange={(e) => setEmailBodyUserText(e.target.value)} rows={10} disabled={isSendingEmail} placeholder="Your plain text message here..."/></div>
           </div>
           <DialogFooter className="justify-between flex-wrap gap-2 mt-auto pt-4 border-t">
-            <div className="flex gap-2 flex-wrap">
-                 <Button type="button" variant="outline" onClick={handleRevertToDefaultTemplate} disabled={isSendingEmail}>Use Original Default</Button>
-                 <Button type="button" variant="secondary" onClick={handleSaveTemplate} disabled={isSendingEmail}>
-                    <Save className="mr-2 h-4 w-4" /> Save Current as My Default
-                 </Button>
-            </div>
-            <div className="flex gap-2 flex-wrap">
-                <DialogClose asChild>
-                    <Button type="button" variant="ghost" disabled={isSendingEmail}>Cancel</Button>
-                </DialogClose>
-                <Button type="button" onClick={handleSendEmail} disabled={isSendingEmail || !emailRecipient || !emailSubject || !emailBodyUserText}>
-                    {isSendingEmail ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Mail className="mr-2 h-4 w-4" />}
-                    {isSendingEmail ? "Sending..." : "Send Email"}
-                </Button>
-            </div>
+            <div className="flex gap-2 flex-wrap"><Button type="button" variant="outline" onClick={handleRevertToDefaultTemplate} disabled={isSendingEmail}>Use Original Default</Button><Button type="button" variant="secondary" onClick={handleSaveTemplate} disabled={isSendingEmail}><Save className="mr-2 h-4 w-4" /> Save Current as My Default</Button></div>
+            <div className="flex gap-2 flex-wrap"><DialogClose asChild><Button type="button" variant="ghost" disabled={isSendingEmail}>Cancel</Button></DialogClose><Button type="button" onClick={handleSendEmail} disabled={isSendingEmail || !emailRecipient}>{isSendingEmail ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Mail className="mr-2 h-4 w-4" />}{isSendingEmail ? "Sending..." : "Send Email"}</Button></div>
           </DialogFooter>
         </DialogContent>
       </Dialog>
       
       <AlertDialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>
         <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>Are you absolutely sure?</AlertDialogTitle>
-            <AlertDialogDescription>
-              This action cannot be undone. This will permanently delete the invoice
-              and remove its data from Firestore.
-            </AlertDialogDescription>
-          </AlertDialogHeader>
+          <AlertDialogHeader><AlertDialogTitle>Are you absolutely sure?</AlertDialogTitle><AlertDialogDescription>This action cannot be undone. This will permanently delete the invoice.</AlertDialogDescription></AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel onClick={() => setInvoiceToDeleteId(null)} disabled={isSaving}>Cancel</AlertDialogCancel>
-            <AlertDialogAction onClick={confirmDeleteInvoice} className="bg-destructive text-destructive-foreground hover:bg-destructive/90" disabled={isSaving}>
-              {isSaving ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : 'Delete'}
-            </AlertDialogAction>
+            <AlertDialogAction onClick={confirmDeleteInvoice} className="bg-destructive hover:bg-destructive/90" disabled={isSaving}>{isSaving ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : 'Delete'}</AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
