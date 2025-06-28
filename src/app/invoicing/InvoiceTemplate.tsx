@@ -199,8 +199,6 @@ const InvoiceTemplate = React.forwardRef<HTMLDivElement, InvoiceTemplateProps>(
                   <ol className="list-decimal list-inside text-[9px] space-y-px p-1">
                     <li>Goods once sold cannot be taken back or exchanged.</li>
                     <li>We are not the manufacturers; company will stand for warranty as per their terms and conditions.</li>
-                    <li>Interest @24% p.a. will be charged for uncleared bills beyond 15 days.</li>
-                    <li>Subject to local Jurisdiction.</li>
                   </ol>
                 </div>
               </div>
@@ -213,5 +211,3 @@ const InvoiceTemplate = React.forwardRef<HTMLDivElement, InvoiceTemplateProps>(
 );
 InvoiceTemplate.displayName = 'InvoiceTemplate';
 export default InvoiceTemplate;
-
-    

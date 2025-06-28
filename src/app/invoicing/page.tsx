@@ -1,3 +1,4 @@
+
 'use client';
 
 import React, { useState, useMemo, useEffect, type FormEvent, useCallback, useRef } from 'react';
@@ -15,7 +16,7 @@ import {
 } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger, DropdownMenuSeparator } from '@/components/ui/dropdown-menu';
-import { Receipt, PlusCircle, Search, MoreHorizontal, Edit, Trash2, Mail, Calendar as CalendarIconLucide, Save, Loader2, UserPlus, Printer, Percent, ArrowUp, ArrowDown, ChevronsUpDown } from 'lucide-react';
+import { Receipt, PlusCircle, Search, MoreHorizontal, Edit, Trash2, Mail, Calendar as CalendarIconLucide, Save, Loader2, UserPlus, Printer, Percent, ArrowUp, ArrowDown, ChevronsUpDown, Download } from 'lucide-react';
 import { format } from 'date-fns';
 import { useToast } from '@/hooks/use-toast';
 import {
@@ -50,7 +51,10 @@ import { db } from '@/lib/firebaseConfig';
 import { sendInvoiceEmailAction } from './actions'; 
 import { cn } from '@/lib/utils';
 import { Separator } from '@/components/ui/separator';
-import InvoiceTemplate from './InvoiceTemplate'; // Import the new template component
+import InvoiceTemplate from './InvoiceTemplate';
+import html2canvas from 'html2canvas';
+import jsPDF from 'jspdf';
+
 
 interface InvoiceItem {
   id: string;
@@ -103,13 +107,15 @@ interface ExistingClient {
 interface CompanyDetailsFirestore {
   name: string;
   address: string;
+  city: string;
+  state: string;
+  country: string;
   gstin: string;
   phone: string;
   email: string;
   website: string;
   accountNumber?: string;
   ifscCode?: string;
-  branch?: string;
   bankName?: string;
 }
 
@@ -162,6 +168,7 @@ export default function InvoicingPage() {
 
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
+  const [isDownloadingPdf, setIsDownloadingPdf] = useState(false);
 
   const [existingClients, setExistingClients] = useState<ExistingClient[]>([]);
   const invoicePrintRef = useRef<HTMLDivElement>(null);
@@ -209,13 +216,27 @@ export default function InvoicingPage() {
         const docRef = doc(db, 'companyProfiles', user.companyId);
         const docSnap = await getDoc(docRef);
         if (docSnap.exists()) {
-          setCompanyProfileDetails(docSnap.data() as CompanyDetailsFirestore);
+          const data = docSnap.data();
+          setCompanyProfileDetails({
+            name: data.name || 'Your Company',
+            address: data.address || '',
+            city: data.city || '',
+            state: data.state || '',
+            country: data.country || '',
+            gstin: data.gstin || '',
+            phone: data.phone || '',
+            email: data.email || '',
+            website: data.website || '',
+            accountNumber: data.accountNumber || '',
+            ifscCode: data.ifscCode || '',
+            bankName: data.bankName || '',
+          });
         } else {
-          setCompanyProfileDetails({ name: 'Your Company Name', address: 'Your Address', gstin: 'Your GSTIN', phone: '', email: '', website: '', accountNumber: '', ifscCode: '' });
+          setCompanyProfileDetails({ name: 'Your Company Name', address: 'Your Address', city: '', state: '', country: '', gstin: 'Your GSTIN', phone: '', email: '', website: '', accountNumber: '', ifscCode: '', bankName: '' });
         }
       } catch (error) {
         console.error("[InvoicingPage fetchCompanyProfile] Failed to fetch company details from Firestore:", error);
-        setCompanyProfileDetails({ name: 'Your Company Name', address: 'Your Address', gstin: 'Your GSTIN', phone: '', email: '', website: '', accountNumber: '', ifscCode: '' });
+        setCompanyProfileDetails({ name: 'Your Company Name', address: 'Your Address', city: '', state: '', country: '', gstin: 'Your GSTIN', phone: '', email: '', website: '', accountNumber: '', ifscCode: '', bankName: '' });
         toast({ title: "Error Fetching Company Info", description: "Could not load company details for invoices.", variant: "destructive" });
       } finally {
         setIsFetchingCompanyProfile(false);
@@ -563,6 +584,57 @@ export default function InvoicingPage() {
         variant: "destructive"
       });
     }
+  };
+  
+  const handleDownloadPdf = async () => {
+    if (!invoicePrintRef.current || !invoiceToView) return;
+
+    setIsDownloadingPdf(true);
+
+    const canvas = await html2canvas(invoicePrintRef.current, {
+      scale: 2, // Use a higher scale for better resolution
+      useCORS: true,
+      backgroundColor: '#ffffff',
+    });
+
+    const imgData = canvas.toDataURL('image/png');
+    
+    // A4 dimensions in mm: 210w x 297h
+    const pdf = new jsPDF({
+      orientation: 'p',
+      unit: 'mm',
+      format: 'a4',
+    });
+
+    const pdfWidth = pdf.internal.pageSize.getWidth();
+    const pdfHeight = pdf.internal.pageSize.getHeight();
+    
+    // Calculate the aspect ratio of the image
+    const imgProps = pdf.getImageProperties(imgData);
+    const imgAspectRatio = imgProps.width / imgProps.height;
+    
+    let finalWidth, finalHeight;
+    // Check if the image is wider or taller in proportion to the page
+    if (imgAspectRatio > pdfWidth / pdfHeight) {
+      finalWidth = pdfWidth;
+      finalHeight = pdfWidth / imgAspectRatio;
+    } else {
+      finalHeight = pdfHeight;
+      finalWidth = pdfHeight * imgAspectRatio;
+    }
+    
+    // Center the image on the page
+    const x = (pdfWidth - finalWidth) / 2;
+    const y = (pdfHeight - finalHeight) / 2;
+
+    pdf.addImage(imgData, 'PNG', x, y, finalWidth, finalHeight);
+    pdf.save(`Invoice_${invoiceToView.invoiceNumber}.pdf`);
+
+    setIsDownloadingPdf(false);
+    toast({
+      title: "PDF Downloaded",
+      description: `Invoice ${invoiceToView.invoiceNumber}.pdf has been saved.`,
+    });
   };
 
   const generateInvoiceHTMLForEmail = (invoice: InvoiceDisplay, company: CompanyDetailsFirestore | null): string => {
@@ -992,7 +1064,7 @@ export default function InvoicingPage() {
                         </Button>
                       </DropdownMenuTrigger>
                       <DropdownMenuContent align="end">
-                        <DropdownMenuItem onClick={() => handleOpenViewInvoiceDialog(invoice)}><Printer className="mr-2 h-4 w-4" /> Print</DropdownMenuItem>
+                        <DropdownMenuItem onClick={() => handleOpenViewInvoiceDialog(invoice)}><Printer className="mr-2 h-4 w-4" /> Print / View</DropdownMenuItem>
                         <DropdownMenuItem onClick={() => handleEditInvoice(invoice)}><Edit className="mr-2 h-4 w-4" /> Edit</DropdownMenuItem>
                         <DropdownMenuItem onClick={() => handleOpenEmailDialog(invoice)} disabled={!invoice.clientEmail || isSendingEmail}><Mail className="mr-2 h-4 w-4" /> Email</DropdownMenuItem>
                         <DropdownMenuSeparator />
@@ -1238,7 +1310,7 @@ export default function InvoicingPage() {
                       Invoice {invoiceToView?.invoiceNumber}
                   </DialogTitle>
                    <DialogDescription>
-                        Preview of the invoice to be printed.
+                        Preview of the invoice. You can print or download it.
                     </DialogDescription>
               </DialogHeader>
             
@@ -1254,12 +1326,16 @@ export default function InvoicingPage() {
                   )}
               </ScrollArea>
             
-            <DialogFooter className="p-4 sm:p-6 border-t bg-background no-print">
-               <Button type="button" variant="default" onClick={handlePrintInvoice}>
+            <DialogFooter className="p-4 sm:p-6 border-t bg-background no-print justify-end gap-2">
+                <Button type="button" variant="secondary" onClick={handleDownloadPdf} disabled={isDownloadingPdf}>
+                    {isDownloadingPdf ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Download className="mr-2 h-4 w-4" />}
+                    Download PDF
+                </Button>
+                <Button type="button" variant="default" onClick={handlePrintInvoice} disabled={isDownloadingPdf}>
                   <Printer className="mr-2 h-4 w-4" /> Print Invoice
-               </Button>
+                </Button>
               <DialogClose asChild>
-                <Button type="button" variant="outline">Close</Button>
+                <Button type="button" variant="outline" disabled={isDownloadingPdf}>Close</Button>
               </DialogClose>
             </DialogFooter>
           </DialogContent>
