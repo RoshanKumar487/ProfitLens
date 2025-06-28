@@ -11,7 +11,7 @@ const firebaseConfig = {
   authDomain: "bizsight-k0icr.firebaseapp.com",
   databaseURL: "https://bizsight-k0icr-default-rtdb.firebaseio.com",
   projectId: "bizsight-k0icr",
-  storageBucket: "bizsight-k0icr.firebasestorage.app",
+  storageBucket: "bizsight-k0icr.appspot.com",
   messagingSenderId: "859842469189",
   appId: "1:859842469189:web:a3487310704050729cb22c"
 };
