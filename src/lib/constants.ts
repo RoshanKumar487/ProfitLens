@@ -1,5 +1,5 @@
 import type { LucideIcon } from 'lucide-react';
-import { LayoutDashboard, TrendingUp, TrendingDown, Sparkles, Receipt, Users, FileBarChart, Shield, HelpCircle, Banknote, Building, Bot } from 'lucide-react';
+import { LayoutDashboard, TrendingUp, TrendingDown, Sparkles, Receipt, Users, FileBarChart, Shield, HelpCircle, Banknote, Building, Bot, Settings } from 'lucide-react';
 
 export interface NavItem {
   label: string;
@@ -47,6 +47,11 @@ export const NAV_ITEMS: NavItem[] = [
     label: 'Reports',
     href: '/reports',
     icon: FileBarChart,
+  },
+  {
+    label: 'Settings',
+    href: '/settings',
+    icon: Settings,
   },
   {
     label: 'Administration',
