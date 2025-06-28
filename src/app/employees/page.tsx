@@ -53,6 +53,7 @@ import { bulkAddEmployees } from './actions';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { analyzeEmployeeDocument } from '@/ai/flows/analyze-employee-document-flow';
+import Link from 'next/link';
 
 
 interface EmployeeFirestore {
@@ -94,9 +95,8 @@ const getInitials = (name: string = "") => {
 export default function EmployeesPage() {
   const { user, isLoading: authIsLoading, currencySymbol } = useAuth();
   const [employees, setEmployees] = useState<EmployeeDisplay[]>([]);
-  const [isFormOpen, setIsFormOpen] = useState(false);
+  const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
   const [currentEmployee, setCurrentEmployee] = useState<Partial<EmployeeDisplay & { salary?: string | number }>>({});
-  const [isEditing, setIsEditing] = useState(false);
   const { toast } = useToast();
   const [isLoadingEmployees, setIsLoadingEmployees] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
@@ -350,10 +350,9 @@ export default function EmployeesPage() {
     fetchEmployees();
   }, [fetchEmployees]);
   
-  const resetFormState = useCallback(() => {
-    setIsFormOpen(false);
+  const resetEditFormState = useCallback(() => {
+    setIsEditDialogOpen(false);
     setCurrentEmployee({});
-    setIsEditing(false);
     setProfilePictureFile(null);
     setProfilePicturePreview(null);
     setAssociatedFile(null);
@@ -362,10 +361,10 @@ export default function EmployeesPage() {
     cleanupWebcam();
   }, [cleanupWebcam]);
 
-  const handleFormSubmit = async (e: React.FormEvent) => {
+  const handleUpdateSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!user || !user.companyId) {
-        toast({ title: "Authentication Error", description: "User not authenticated.", variant: "destructive" });
+    if (!user || !user.companyId || !currentEmployee.id) {
+        toast({ title: "Authentication Error", description: "User or employee data missing.", variant: "destructive" });
         return;
     }
     if (!currentEmployee.name || !currentEmployee.position || currentEmployee.salary === undefined) {
@@ -382,14 +381,15 @@ export default function EmployeesPage() {
     setIsSaving(true);
     
     try {
-        const employeeDocId = currentEmployee.id || doc(collection(db, 'employees')).id;
+        const employeeDocId = currentEmployee.id;
+        const employeeRef = doc(db, 'employees', employeeDocId);
 
         // Clone current employee to avoid mutating state directly
         const updatedEmployeeData: any = { ...currentEmployee };
 
         // Handle Profile Picture
         if (profilePictureFile) { 
-            const oldPath = isEditing ? currentEmployee.profilePictureStoragePath : undefined;
+            const oldPath = currentEmployee.profilePictureStoragePath;
             if (oldPath) {
                 await deleteFileFromStorage(oldPath).catch(e => console.warn("Old profile pic deletion failed, continuing...", e));
             }
@@ -398,7 +398,7 @@ export default function EmployeesPage() {
             const newUrl = await uploadFileToStorage(profilePictureFile, newPath);
             updatedEmployeeData.profilePictureUrl = newUrl;
             updatedEmployeeData.profilePictureStoragePath = newPath;
-        } else if (isEditing && currentEmployee.profilePictureUrl === undefined) { 
+        } else if (updatedEmployeeData.profilePictureUrl === undefined) { 
             const oldPath = currentEmployee.profilePictureStoragePath;
             if (oldPath) {
                 await deleteFileFromStorage(oldPath).catch(e => console.warn("Profile pic deletion failed, continuing...", e));
@@ -409,7 +409,7 @@ export default function EmployeesPage() {
 
         // Handle Associated File
         if (associatedFile) {
-            const oldPath = isEditing ? currentEmployee.associatedFileStoragePath : undefined;
+            const oldPath = currentEmployee.associatedFileStoragePath;
             if (oldPath) {
                 await deleteFileFromStorage(oldPath).catch(e => console.warn("Old assoc. file deletion failed, continuing...", e));
             }
@@ -418,7 +418,7 @@ export default function EmployeesPage() {
             updatedEmployeeData.associatedFileUrl = newUrl;
             updatedEmployeeData.associatedFileStoragePath = newPath;
             updatedEmployeeData.associatedFileName = associatedFile.name;
-        } else if (isEditing && currentEmployee.associatedFileUrl === undefined) {
+        } else if (updatedEmployeeData.associatedFileUrl === undefined) {
             const oldPath = currentEmployee.associatedFileStoragePath;
             if (oldPath) {
                 await deleteFileFromStorage(oldPath).catch(e => console.warn("Assoc. file deletion failed, continuing...", e));
@@ -433,31 +433,19 @@ export default function EmployeesPage() {
             position: updatedEmployeeData.position!,
             salary: salaryNum,
             description: updatedEmployeeData.description || '',
-            companyId: user.companyId,
-            profilePictureUrl: updatedEmployeeData.profilePictureUrl || '',
-            profilePictureStoragePath: updatedEmployeeData.profilePictureStoragePath || '',
-            associatedFileUrl: updatedEmployeeData.associatedFileUrl || '',
-            associatedFileName: updatedEmployeeData.associatedFileName || '',
-            associatedFileStoragePath: updatedEmployeeData.associatedFileStoragePath || '',
+            profilePictureUrl: updatedEmployeeData.profilePictureUrl,
+            profilePictureStoragePath: updatedEmployeeData.profilePictureStoragePath,
+            associatedFileUrl: updatedEmployeeData.associatedFileUrl,
+            associatedFileName: updatedEmployeeData.associatedFileName,
+            associatedFileStoragePath: updatedEmployeeData.associatedFileStoragePath,
+            updatedAt: serverTimestamp(),
         };
 
-        if (isEditing && currentEmployee.id) {
-            const employeeRef = doc(db, 'employees', currentEmployee.id);
-            await updateDoc(employeeRef, { ...dataToSave, updatedAt: serverTimestamp() });
-            toast({ title: "Employee Updated" });
-        } else {
-            const newEmployeeRef = doc(db, 'employees', employeeDocId);
-            await setDoc(newEmployeeRef, { 
-                ...dataToSave, 
-                createdAt: serverTimestamp(),
-                addedById: user.uid,
-                addedBy: user.displayName || user.email || 'System'
-            });
-            toast({ title: "Employee Added" });
-        }
-    
+        await updateDoc(employeeRef, dataToSave);
+        toast({ title: "Employee Updated" });
+        
         fetchEmployees();
-        resetFormState();
+        resetEditFormState();
 
     } catch (error: any) {
         console.error("Error saving employee:", error);
@@ -467,24 +455,13 @@ export default function EmployeesPage() {
     }
   };
 
-  const handleCreateNew = () => {
-    setCurrentEmployee({ salary: '' });
-    setProfilePictureFile(null);
-    setProfilePicturePreview(null);
-    setAssociatedFile(null);
-    setShowProfileWebcam(false);
-    setIsEditing(false);
-    setIsFormOpen(true);
-  };
-
   const handleEditEmployee = (employee: EmployeeDisplay) => {
     setCurrentEmployee({ ...employee, salary: employee.salary.toString() });
     setProfilePicturePreview(employee.profilePictureUrl || null);
     setProfilePictureFile(null);
     setAssociatedFile(null);
     setShowProfileWebcam(false);
-    setIsEditing(true);
-    setIsFormOpen(true);
+    setIsEditDialogOpen(true);
   };
   
   const promptDeleteEmployee = (id: string) => {
@@ -737,16 +714,12 @@ export default function EmployeesPage() {
   const handleRemoveProfilePic = () => {
     setProfilePictureFile(null);
     setProfilePicturePreview(null);
-    if (isEditing) {
-        setCurrentEmployee(prev => ({...prev, profilePictureUrl: undefined, profilePictureStoragePath: prev.profilePictureStoragePath ? prev.profilePictureStoragePath : undefined }));
-    }
+    setCurrentEmployee(prev => ({...prev, profilePictureUrl: undefined, profilePictureStoragePath: prev.profilePictureStoragePath ? prev.profilePictureStoragePath : undefined }));
   };
 
   const handleRemoveAssociatedFile = () => {
     setAssociatedFile(null);
-     if (isEditing) {
-        setCurrentEmployee(prev => ({...prev, associatedFileUrl: undefined, associatedFileName: undefined, associatedFileStoragePath: prev.associatedFileStoragePath ? prev.associatedFileStoragePath : undefined }));
-    }
+     setCurrentEmployee(prev => ({...prev, associatedFileUrl: undefined, associatedFileName: undefined, associatedFileStoragePath: prev.associatedFileStoragePath ? prev.associatedFileStoragePath : undefined }));
   };
   
   const handleDragEvents = (e: React.DragEvent<HTMLDivElement>) => {
@@ -899,6 +872,7 @@ export default function EmployeesPage() {
     <div className="space-y-6 p-4 sm:p-6 lg:p-8">
       <PageTitle title="Employees" subtitle="Manage your team members." icon={Users2}>
         <div className="flex flex-col sm:flex-row gap-2">
+            <TooltipProvider>
             <Tooltip>
               <TooltipTrigger asChild>
                 <Button variant="outline" size="icon" onClick={handleImportClick} disabled={isSaving || isLoadingEmployees}>
@@ -921,8 +895,11 @@ export default function EmployeesPage() {
                 <p>Scan Document</p>
               </TooltipContent>
             </Tooltip>
-            <Button onClick={handleCreateNew} disabled={isSaving || isLoadingEmployees}>
+            </TooltipProvider>
+            <Button asChild disabled={isSaving || isLoadingEmployees}>
+              <Link href="/employees/new">
                 <PlusCircle className="mr-2 h-4 w-4" /> Add Employee
+              </Link>
             </Button>
             <input type="file" ref={fileInputRef} onChange={handleImportFileChange} className="hidden" accept=".xlsx, .xls, .csv" />
         </div>
@@ -1052,14 +1029,14 @@ export default function EmployeesPage() {
       </Card>
 
 
-      <Dialog open={isFormOpen} onOpenChange={(open) => { if (!open) resetFormState(); else setIsFormOpen(true); }}>
+      <Dialog open={isEditDialogOpen} onOpenChange={(open) => { if (!open) resetEditFormState(); else setIsEditDialogOpen(true); }}>
         <DialogContent className="sm:max-w-lg max-h-[90vh] flex flex-col">
           <DialogHeader>
-            <DialogTitle className="font-headline">{isEditing ? 'Edit Employee' : 'Add New Employee'}</DialogTitle>
-            <DialogDescription>{isEditing ? 'Update employee details.' : 'Fill in new employee details.'}</DialogDescription>
+            <DialogTitle className="font-headline">Edit Employee</DialogTitle>
+            <DialogDescription>Update employee details.</DialogDescription>
           </DialogHeader>
           
-          <form id="employeeDialogForm" onSubmit={handleFormSubmit} className="space-y-3 py-1 overflow-y-auto flex-grow pr-3 pl-1">
+          <form id="employeeDialogForm" onSubmit={handleUpdateSubmit} className="space-y-3 py-1 overflow-y-auto flex-grow pr-3 pl-1">
             <div>
               <Label htmlFor="nameEmp">Full Name</Label>
               <Input id="nameEmp" name="name" value={currentEmployee.name || ''} onChange={handleInputChange} required disabled={isSaving} />
@@ -1101,7 +1078,7 @@ export default function EmployeesPage() {
                         <Button type="button" variant="outline" size="sm" onClick={() => setShowProfileWebcam(prev => !prev)} disabled={isSaving} className="flex-1 text-xs">
                         <Camera className="mr-1.5 h-3.5 w-3.5" /> {showProfileWebcam ? 'Close Cam' : 'Webcam'}
                         </Button>
-                        {(profilePicturePreview || (isEditing && currentEmployee.profilePictureUrl)) && (
+                        {(profilePicturePreview || currentEmployee.profilePictureUrl) && (
                         <Button type="button" variant="ghost" size="sm" onClick={handleRemoveProfilePic} className="text-destructive hover:text-destructive-foreground hover:bg-destructive/90 flex-1 text-xs">
                             <XCircle className="mr-1.5 h-3.5 w-3.5" /> Remove
                         </Button>
@@ -1175,11 +1152,11 @@ export default function EmployeesPage() {
 
           <DialogFooter className="mt-auto pt-3 border-t">
               <DialogClose asChild>
-                 <Button type="button" variant="outline" onClick={resetFormState} disabled={isSaving}>Cancel</Button>
+                 <Button type="button" variant="outline" onClick={resetEditFormState} disabled={isSaving}>Cancel</Button>
               </DialogClose>
               <Button type="submit" form="employeeDialogForm" disabled={isSaving}>
                 {isSaving ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Save className="mr-2 h-4 w-4" />}
-                {isSaving ? 'Saving...' : (isEditing ? 'Save Changes' : 'Add Employee')}
+                {isSaving ? 'Saving...' : 'Save Changes'}
               </Button>
             </DialogFooter>
         </DialogContent>
@@ -1286,3 +1263,5 @@ export default function EmployeesPage() {
     </div>
   );
 }
+
+    

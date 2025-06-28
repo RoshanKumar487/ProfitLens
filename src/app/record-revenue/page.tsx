@@ -22,6 +22,7 @@ import { collection, addDoc, getDocs, query, where, orderBy, Timestamp, serverTi
 import { updateRevenueEntry, deleteRevenueEntry, type RevenueUpdateData } from './actions';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow, TableCaption } from '@/components/ui/table';
+import Link from 'next/link';
 
 interface RevenueEntryFirestore {
   id?: string; 
@@ -48,12 +49,6 @@ export default function RecordRevenuePage() {
   const { user, isLoading: authIsLoading } = useAuth();
   const currency = user?.currencySymbol || '$';
 
-  // State for new entry
-  const [newEntryDate, setNewEntryDate] = useState<Date | undefined>(new Date());
-  const [newEntryAmount, setNewEntryAmount] = useState<string>('');
-  const [newEntrySource, setNewEntrySource] = useState<string>('');
-  const [newEntryDescription, setNewEntryDescription] = useState<string>('');
-  
   const [recentEntries, setRecentEntries] = useState<RevenueEntryDisplay[]>([]);
   const [isLoadingEntries, setIsLoadingEntries] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
@@ -63,7 +58,6 @@ export default function RecordRevenuePage() {
   const [sortConfig, setSortConfig] = useState<{ key: keyof RevenueEntryDisplay; direction: 'ascending' | 'descending' }>({ key: 'date', direction: 'descending' });
 
   // State for dialogs
-  const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
   const [currentRevenue, setCurrentRevenue] = useState<RevenueEntryDisplay | null>(null);
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
@@ -155,55 +149,6 @@ export default function RecordRevenuePage() {
     return <ArrowDown className="ml-2 h-4 w-4" />;
   };
 
-  const resetNewEntryForm = () => {
-    setNewEntryDate(new Date());
-    setNewEntryAmount('');
-    setNewEntrySource('');
-    setNewEntryDescription('');
-  };
-
-  const handleNewEntrySubmit = async (e: FormEvent) => {
-    e.preventDefault();
-    if (!user || !user.companyId) {
-      toast({ title: 'Authentication Error', variant: 'destructive' });
-      return;
-    }
-    if (!newEntryDate || !newEntryAmount || !newEntrySource) {
-      toast({ title: 'Missing Information', description: 'Please fill in date, amount, and source.', variant: 'destructive' });
-      return;
-    }
-    
-    const amountNum = parseFloat(newEntryAmount);
-    if (isNaN(amountNum) || amountNum <= 0) {
-      toast({ title: 'Invalid Amount', description: 'Amount must be a positive number.', variant: 'destructive' });
-      return;
-    }
-
-    setIsSaving(true);
-    const newEntryPayload = {
-      date: Timestamp.fromDate(newEntryDate), 
-      amount: amountNum,
-      source: newEntrySource,
-      description: newEntryDescription || '',
-      companyId: user.companyId,
-      createdAt: serverTimestamp(),
-      addedById: user.uid,
-      addedBy: user.displayName || user.email || 'System'
-    };
-
-    try {
-      await addDoc(collection(db, 'revenueEntries'), newEntryPayload);
-      fetchRevenueEntries(); 
-      toast({ title: 'Revenue Recorded', description: `Successfully recorded ${currency}${amountNum.toFixed(2)} from ${newEntrySource}.` });
-      resetNewEntryForm();
-      setIsAddDialogOpen(false);
-    } catch (error: any) {
-      toast({ title: 'Save Failed', description: error.message, variant: 'destructive' });
-    } finally {
-      setIsSaving(false);
-    }
-  };
-
   const handleEditClick = (revenue: RevenueEntryDisplay) => {
     setCurrentRevenue(revenue);
     setIsEditDialogOpen(true);
@@ -276,9 +221,11 @@ export default function RecordRevenuePage() {
   return (
     <div className="space-y-6 p-4 sm:p-6 lg:p-8">
       <PageTitle title="Record Revenue" subtitle="Log your daily or transaction-based income." icon={TrendingUp}>
-        <Button onClick={() => { resetNewEntryForm(); setIsAddDialogOpen(true); }} disabled={isSaving || isLoadingEntries}>
-          <PlusCircle className="mr-2 h-4 w-4" />
-          Record Revenue
+        <Button asChild disabled={isSaving || isLoadingEntries}>
+          <Link href="/record-revenue/new">
+            <PlusCircle className="mr-2 h-4 w-4" />
+            Record Revenue
+          </Link>
         </Button>
       </PageTitle>
 
@@ -356,49 +303,6 @@ export default function RecordRevenuePage() {
         </CardContent>
       </Card>
       
-      {/* Add Dialog */}
-      <Dialog open={isAddDialogOpen} onOpenChange={setIsAddDialogOpen}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>New Revenue Entry</DialogTitle>
-            <DialogDescription>Enter the details of the revenue received.</DialogDescription>
-          </DialogHeader>
-          <form id="new-revenue-form" onSubmit={handleNewEntrySubmit} className="space-y-4 py-2">
-            <div>
-              <Label htmlFor="new-date">Date</Label>
-              <Popover>
-                <PopoverTrigger asChild>
-                  <Button variant="outline" className="w-full justify-start text-left font-normal" disabled={isSaving}>
-                    <CalendarIcon className="mr-2 h-4 w-4" />
-                    {newEntryDate ? format(newEntryDate, 'PPP') : <span>Pick a date</span>}
-                  </Button>
-                </PopoverTrigger>
-                <PopoverContent className="w-auto p-0"><Calendar mode="single" selected={newEntryDate} onSelect={setNewEntryDate} initialFocus disabled={isSaving}/></PopoverContent>
-              </Popover>
-            </div>
-            <div>
-              <Label htmlFor="new-amount">Amount ({currency})</Label>
-              <Input id="new-amount" type="number" value={newEntryAmount} onChange={(e) => setNewEntryAmount(e.target.value)} placeholder="e.g., 150.00" required min="0.01" step="0.01" disabled={isSaving}/>
-            </div>
-            <div>
-              <Label htmlFor="new-source">Source</Label>
-              <Input id="new-source" value={newEntrySource} onChange={(e) => setNewEntrySource(e.target.value)} placeholder="e.g., Client A Payment, Product Sale" required disabled={isSaving}/>
-            </div>
-            <div>
-              <Label htmlFor="new-description">Description (Optional)</Label>
-              <Textarea id="new-description" value={newEntryDescription} onChange={(e) => setNewEntryDescription(e.target.value)} placeholder="e.g., Payment for project X" disabled={isSaving}/>
-            </div>
-          </form>
-          <DialogFooter>
-            <DialogClose asChild><Button variant="outline" onClick={resetNewEntryForm} disabled={isSaving}>Cancel</Button></DialogClose>
-            <Button type="submit" form="new-revenue-form" disabled={isSaving}>
-              {isSaving ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Save className="mr-2 h-4 w-4" />}
-              {isSaving ? 'Saving...' : 'Record Revenue'}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-
        {/* Edit Dialog */}
       <Dialog open={isEditDialogOpen} onOpenChange={setIsEditDialogOpen}>
         <DialogContent>
@@ -460,3 +364,5 @@ export default function RecordRevenuePage() {
     </div>
   );
 }
+
+    
