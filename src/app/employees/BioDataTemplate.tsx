@@ -1,10 +1,10 @@
+
 'use client';
 
 import React from 'react';
 import { format } from 'date-fns';
 import Image from 'next/image';
 import type { EmployeeDisplay } from './page';
-import { cn } from '@/lib/utils';
 
 interface BioDataTemplateProps {
   employee: EmployeeDisplay;
@@ -12,102 +12,113 @@ interface BioDataTemplateProps {
   companyAddress?: string;
 }
 
-const DottedLine: React.FC = () => <span className="flex-grow border-b border-dotted border-black mx-1"></span>;
-
-const DataField: React.FC<{ label: string; value?: string | number | null, className?: string }> = ({ label, value, className }) => (
-  <div className={cn("flex items-end text-sm", className)}>
-    <span className="font-semibold whitespace-nowrap">{label}</span>
-    <DottedLine />
-    <span className="font-mono text-xs">{value || ''}</span>
+const DataRow: React.FC<{ label: string; value?: string | number | null }> = ({ label, value }) => (
+  <div className="grid grid-cols-[140px_1fr] items-baseline py-1 text-sm">
+    <span className="text-gray-600 font-medium">{label}:</span>
+    <span className="font-semibold text-gray-900 break-words">{value || 'N/A'}</span>
   </div>
 );
 
+const Section: React.FC<{ title: string; children: React.ReactNode; className?: string }> = ({ title, children, className }) => (
+    <div className={className}>
+        <h3 className="text-base font-bold text-gray-800 border-b-2 border-gray-300 pb-1 mb-2">{title}</h3>
+        <div className="space-y-1">
+            {children}
+        </div>
+    </div>
+);
+
+
 const BioDataTemplate = React.forwardRef<HTMLDivElement, BioDataTemplateProps>(
   ({ employee, companyName, companyAddress }, ref) => {
+    
+    const fullPermanentAddress = [
+        employee.permanentAddressHNo,
+        employee.permanentAddressPS,
+        employee.permanentAddressPost,
+        employee.permanentAddressDist,
+        employee.permanentAddressState,
+        employee.permanentAddressPin
+    ].filter(Boolean).join(', ');
+    
     return (
-      <div ref={ref} className="bg-white text-black p-6 font-serif w-[210mm] min-h-[297mm] mx-auto flex flex-col">
-        <div className="text-center mb-4">
-          <h1 className="text-2xl font-bold tracking-widest underline">BIO-DATA</h1>
-        </div>
+      <div ref={ref} className="bg-white text-black p-8 font-sans w-[210mm] min-h-[297mm] mx-auto flex flex-col shadow-lg border border-gray-200">
         
-        <div className="flex justify-between items-start mb-2">
-            <div className="text-sm space-y-1 w-1/3">
-                {/* Shoes No. Removed */}
-            </div>
-            <div className="w-32 h-40 border-2 border-black flex items-center justify-center text-gray-400 p-1">
-                {employee.profilePictureUrl ? (
-                    <Image src={employee.profilePictureUrl} alt="Profile Photo" width={128} height={160} className="object-cover w-full h-full" />
-                ) : (
-                    <span>Passport Photo</span>
-                )}
-            </div>
-        </div>
+        {/* Header */}
+        <header className="text-center mb-6">
+          <h1 className="text-3xl font-bold text-gray-800 uppercase tracking-wide">{companyName || 'Company Name'}</h1>
+          {companyAddress && <p className="text-xs text-gray-500 mt-1">{companyAddress}</p>}
+          <h2 className="text-2xl font-semibold text-gray-700 mt-4 pb-2 border-b-2 border-gray-300">Employee Bio-Data</h2>
+        </header>
         
-        <div className="text-center mb-4">
-            <h2 className="text-lg font-bold">{companyName || 'CENTRAL SECURITY FORCE, SECURITY & INVESTIGATION BUREAU'}</h2>
-            <p className="text-xs">{companyAddress || '#: 6-2-194/44, SHIVARAMPALLY, RAJENDERNAGAR, CIRCLE, HYD (T.S.)'}</p>
-        </div>
-        
-        <div className="space-y-2 text-sm">
-            <DataField label="NAME" value={employee.name} />
-            <DataField label="FATHER'S NAME" value={employee.fatherName} />
-            <DataField label="MOTHER'S NAME" value={employee.motherName} />
-            
-            <div className="font-semibold mt-3">ADDRESS:</div>
-            <DataField label="H.No." value={employee.permanentAddressHNo} />
-            <div className="grid grid-cols-2 gap-x-6">
-                <DataField label="P.S." value={employee.permanentAddressPS} />
-                <DataField label="POST" value={employee.permanentAddressPost} />
-            </div>
-            <div className="grid grid-cols-2 gap-x-6">
-                <DataField label="DIST" value={employee.permanentAddressDist} />
-                <DataField label="STATE" value={employee.permanentAddressState} />
-            </div>
-            <DataField label="PIN NO" value={employee.permanentAddressPin} />
+        {/* Main Content */}
+        <div className="flex-grow grid grid-cols-3 gap-8">
+            <div className="col-span-2 space-y-6">
+                <Section title="Personal Details">
+                    <DataRow label="Full Name" value={employee.name} />
+                    <DataRow label="Father's Name" value={employee.fatherName} />
+                    <DataRow label="Mother's Name" value={employee.motherName} />
+                    <DataRow label="Date of Birth" value={employee.dateOfBirth ? format(employee.dateOfBirth, 'dd MMM, yyyy') : 'N/A'} />
+                    <DataRow label="Phone Number" value={employee.selfPhoneNo} />
+                    <DataRow label="Qualification" value={employee.qualification} />
+                </Section>
+                
+                <Section title="Permanent Address">
+                    <p className="text-sm text-gray-800 font-semibold">{fullPermanentAddress || 'N/A'}</p>
+                </Section>
 
+                <Section title="Guarantor Information">
+                    <DataRow label="Guarantor Name" value={employee.guarantorName} />
+                    <DataRow label="Guarantor Phone" value={employee.guarantorPhone} />
+                </Section>
+            </div>
 
-            <div className="grid grid-cols-2 gap-x-6 pt-2">
-                <DataField label="QUALIFICATION:" value={employee.qualification} />
-                <DataField label="PHONE NO. SELF:" value={employee.selfPhoneNo} />
+            <div className="col-span-1 space-y-6">
+                <div className="flex justify-center">
+                    <div className="w-40 h-48 border-2 border-gray-300 bg-gray-50 flex items-center justify-center text-gray-400 p-1">
+                        {employee.profilePictureUrl ? (
+                            <Image src={employee.profilePictureUrl} alt="Profile Photo" width={160} height={192} className="object-cover w-full h-full" />
+                        ) : (
+                            <span>Passport Photo</span>
+                        )}
+                    </div>
+                </div>
+                 <Section title="Professional Details">
+                    <DataRow label="Position" value={employee.position} />
+                    <DataRow label="Joining Date" value={employee.joiningDate ? format(employee.joiningDate, 'dd MMM, yyyy') : 'N/A'} />
+                    <DataRow label="Experience" value={employee.experience} />
+                 </Section>
+                 <Section title="Physical Attributes">
+                    <DataRow label="Height" value={employee.height} />
+                    <DataRow label="Weight" value={employee.weight} />
+                    <DataRow label="Identification Marks" value={employee.identificationMarks} />
+                 </Section>
             </div>
-            <div className="grid grid-cols-3 gap-x-6">
-                <DataField label="DATE OF BIRTH" value={employee.dateOfBirth ? format(employee.dateOfBirth, 'dd/MM/yyyy') : ''} />
-                <DataField label="HEIGHT" value={employee.height} />
-                <DataField label="WEIGHT" value={employee.weight} />
-            </div>
-            <DataField label="IDENTIFICATION MARKS" value={employee.identificationMarks} />
-            <DataField label="JOINING DATE" value={employee.joiningDate ? format(employee.joiningDate, 'dd/MM/yyyy') : ''} />
-            <div className="grid grid-cols-2 gap-x-6">
-                <DataField label="GUARANTOR NAME" value={employee.guarantorName} />
-                <DataField label="Ph. No. & T. No." value={employee.guarantorPhone} />
-            </div>
-            <DataField label="EXPERIENCE" value={employee.experience} />
         </div>
-
-        <div className="flex-grow"></div>
         
-        <div className="mt-8 grid grid-cols-2 gap-8 text-sm">
+        {/* Footer */}
+        <footer className="mt-12 pt-6 border-t border-gray-300 grid grid-cols-2 gap-8 text-sm">
             <div>
-                <p>THUMB IMPRESSION (LEFT)</p>
-                <div className="w-24 h-12 mt-2 border border-black flex items-center justify-center">
+                <p className="font-semibold text-gray-700">Left Thumb Impression</p>
+                <div className="w-24 h-24 mt-2 border border-gray-300 bg-gray-50 flex items-center justify-center">
                     {employee.leftThumbImpressionUrl ? (
-                         <Image src={employee.leftThumbImpressionUrl} alt="Thumb Impression" width={96} height={48} className="object-contain" />
+                         <Image src={employee.leftThumbImpressionUrl} alt="Thumb Impression" width={96} height={96} className="object-contain" />
                     ) : (
                         <span className="text-xs text-gray-400">Thumb</span>
                     )}
                 </div>
             </div>
-             <div className="text-right">
-                <p>SIGNATURE OF THE EMPLOYEE</p>
-                 <div className="w-48 h-12 mt-2 border border-black inline-block flex items-center justify-center">
+             <div className="text-left">
+                <p className="font-semibold text-gray-700">Employee Signature</p>
+                 <div className="w-48 h-24 mt-2 border border-gray-300 bg-gray-50 flex items-center justify-center p-2">
                      {employee.signatureUrl ? (
-                         <Image src={employee.signatureUrl} alt="Signature" width={192} height={48} className="object-contain h-full w-full" />
+                         <Image src={employee.signatureUrl} alt="Signature" width={192} height={96} className="object-contain h-full w-full" />
                     ) : (
-                        <span className="text-xs text-gray-400 p-2">Signature</span>
+                        <span className="text-xs text-gray-400">Signature</span>
                     )}
                  </div>
             </div>
-        </div>
+        </footer>
       </div>
     );
   }
