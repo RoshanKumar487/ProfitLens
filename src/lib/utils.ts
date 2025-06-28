@@ -34,18 +34,19 @@ export async function urlToDataUri(url: string): Promise<string> {
       return '';
     }
     const blob = await response.blob();
-    return new Promise((resolve, reject) => {
+    return new Promise((resolve) => {
       const reader = new FileReader();
       reader.onloadend = () => {
         if (typeof reader.result === 'string') {
           resolve(reader.result);
         } else {
-          reject(new Error('Failed to convert blob to data URI.'));
+          console.error('Failed to convert blob to data URI.');
+          resolve('');
         }
       };
       reader.onerror = (error) => {
         console.error('FileReader error:', error);
-        reject(error);
+        resolve('');
       };
       reader.readAsDataURL(blob);
     });

@@ -210,17 +210,17 @@ const InvoiceTemplateIndian = React.forwardRef<HTMLDivElement, InvoiceTemplatePr
             {/* Signature */}
             <div className="flex justify-between mt-10">
                 <div className="relative h-24 w-24 flex items-center justify-center">
-                    {(stampDataUri || companyProfileDetails.stampUrl) && (
+                    {stampDataUri && (
                         // eslint-disable-next-line @next/next/no-img-element
-                        <img src={stampDataUri || companyProfileDetails.stampUrl} alt="Company Stamp" className="max-h-full max-w-full object-contain" crossOrigin="anonymous" />
+                        <img src={stampDataUri} alt="Company Stamp" className="max-h-full max-w-full object-contain" crossOrigin="anonymous" />
                     )}
                 </div>
                 <div className="text-right">
                     <p>For {companyProfileDetails.name}</p>
                     <div className="relative h-16 w-32 mx-auto flex items-center justify-center">
-                        {(signatureDataUri || companyProfileDetails.signatureUrl) && (
+                        {signatureDataUri && (
                             // eslint-disable-next-line @next/next/no-img-element
-                            <img src={signatureDataUri || companyProfileDetails.signatureUrl} alt="Signature" className="max-h-full max-w-full object-contain" crossOrigin="anonymous" />
+                            <img src={signatureDataUri} alt="Signature" className="max-h-full max-w-full object-contain" crossOrigin="anonymous" />
                         )}
                     </div>
                 </div>
