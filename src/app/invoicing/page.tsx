@@ -16,7 +16,7 @@ import {
 } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger, DropdownMenuSeparator } from '@/components/ui/dropdown-menu';
-import { Receipt, PlusCircle, Search, MoreHorizontal, Edit, Trash2, Eye, Mail, FileDown, Calendar as CalendarIconLucide, Save, Loader2, UserPlus, Printer, Percent, ArrowUp, ArrowDown, ChevronsUpDown } from 'lucide-react';
+import { Receipt, PlusCircle, Search, MoreHorizontal, Edit, Trash2, Mail, Calendar as CalendarIconLucide, Save, Loader2, UserPlus, Printer, Percent, ArrowUp, ArrowDown, ChevronsUpDown, Download } from 'lucide-react';
 import { format } from 'date-fns';
 import { useToast } from '@/hooks/use-toast';
 import {
@@ -48,10 +48,13 @@ import { ScrollArea } from '@/components/ui/scroll-area';
 import { useAuth } from '@/contexts/AuthContext';
 import { collection, addDoc, getDocs, doc, updateDoc, deleteDoc, query, where, orderBy, Timestamp, serverTimestamp, getDoc } from 'firebase/firestore';
 import { db } from '@/lib/firebaseConfig';
-import Image from 'next/image';
 import { sendInvoiceEmailAction } from './actions'; 
 import { cn } from '@/lib/utils';
 import { Separator } from '@/components/ui/separator';
+import InvoiceTemplate from './InvoiceTemplate';
+import html2canvas from 'html2canvas';
+import jsPDF from 'jspdf';
+
 
 interface InvoiceItem {
   id: string;
@@ -104,12 +107,16 @@ interface ExistingClient {
 interface CompanyDetailsFirestore {
   name: string;
   address: string;
+  city: string;
+  state: string;
+  country: string;
   gstin: string;
   phone: string;
   email: string;
   website: string;
   accountNumber?: string;
   ifscCode?: string;
+  bankName?: string;
 }
 
 const LOCAL_STORAGE_EMAIL_TEMPLATE_KEY = 'profitlens-invoice-email-template-v2';
@@ -136,24 +143,6 @@ Sincerely,
 
 const DEFAULT_EMAIL_SUBJECT_TEMPLATE = "Invoice {{invoiceNumber}} from {{companyName}}";
 
-const TopRightArt = () => (
-  <svg width="200" height="100" viewBox="0 0 200 100" className="absolute top-0 right-0 h-auto print:hidden">
-    <path d="M100 0 L200 0 L200 100 Z" fill="#e3f2fd" />
-    <path d="M125 0 L200 0 L200 75 Z" fill="#bbdefb" />
-    <path d="M150 0 L200 0 L200 50 Z" fill="#90caf9" />
-    <path d="M175 0 L200 0 L200 25 Z" fill="#64b5f6" />
-  </svg>
-);
-
-const BottomLeftArt = () => (
-   <svg width="200" height="100" viewBox="0 0 200 100" className="absolute bottom-0 left-0 h-auto print:hidden">
-    <path d="M0 0 L100 100 L0 100 Z" fill="#e3f2fd" />
-    <path d="M0 25 L75 100 L0 100 Z" fill="#bbdefb" />
-    <path d="M0 50 L50 100 L0 100 Z" fill="#90caf9" />
-    <path d="M0 75 L25 100 L0 100 Z" fill="#64b5f6" />
-  </svg>
-);
-
 
 export default function InvoicingPage() {
   const { user, isLoading: authIsLoading } = useAuth();
@@ -179,16 +168,16 @@ export default function InvoicingPage() {
 
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
+  const [isDownloadingPdf, setIsDownloadingPdf] = useState(false);
 
   const [existingClients, setExistingClients] = useState<ExistingClient[]>([]);
-  const [isClientSuggestionsVisible, setIsClientSuggestionsVisible] = useState(false);
   const invoicePrintRef = useRef<HTMLDivElement>(null);
 
   const [isViewInvoiceDialogOpen, setIsViewInvoiceDialogOpen] = useState(false);
   const [invoiceToView, setInvoiceToView] = useState<InvoiceDisplay | null>(null);
-  const [isDownloadingPDF, setIsDownloadingPDF] = useState(false);
   
   const [sortConfig, setSortConfig] = useState<{ key: keyof InvoiceDisplay; direction: 'ascending' | 'descending' }>({ key: 'issuedDate', direction: 'descending' });
+  const [isClientSuggestionsVisible, setIsClientSuggestionsVisible] = useState(false);
 
 
   useEffect(() => {
@@ -227,13 +216,27 @@ export default function InvoicingPage() {
         const docRef = doc(db, 'companyProfiles', user.companyId);
         const docSnap = await getDoc(docRef);
         if (docSnap.exists()) {
-          setCompanyProfileDetails(docSnap.data() as CompanyDetailsFirestore);
+          const data = docSnap.data();
+          setCompanyProfileDetails({
+            name: data.name || 'Your Company',
+            address: data.address || '',
+            city: data.city || '',
+            state: data.state || '',
+            country: data.country || '',
+            gstin: data.gstin || '',
+            phone: data.phone || '',
+            email: data.email || '',
+            website: data.website || '',
+            accountNumber: data.accountNumber || '',
+            ifscCode: data.ifscCode || '',
+            bankName: data.bankName || '',
+          });
         } else {
-          setCompanyProfileDetails({ name: 'Your Company Name', address: 'Your Address', gstin: 'Your GSTIN', phone: '', email: '', website: '', accountNumber: '', ifscCode: '' });
+          setCompanyProfileDetails({ name: 'Your Company Name', address: 'Your Address', city: '', state: '', country: '', gstin: 'Your GSTIN', phone: '', email: '', website: '', accountNumber: '', ifscCode: '', bankName: '' });
         }
       } catch (error) {
         console.error("[InvoicingPage fetchCompanyProfile] Failed to fetch company details from Firestore:", error);
-        setCompanyProfileDetails({ name: 'Your Company Name', address: 'Your Address', gstin: 'Your GSTIN', phone: '', email: '', website: '', accountNumber: '', ifscCode: '' });
+        setCompanyProfileDetails({ name: 'Your Company Name', address: 'Your Address', city: '', state: '', country: '', gstin: 'Your GSTIN', phone: '', email: '', website: '', accountNumber: '', ifscCode: '', bankName: '' });
         toast({ title: "Error Fetching Company Info", description: "Could not load company details for invoices.", variant: "destructive" });
       } finally {
         setIsFetchingCompanyProfile(false);
@@ -531,7 +534,7 @@ export default function InvoicingPage() {
       .join('');
 
     // Get the HTML content of the invoice
-    const printContents = invoicePrintRef.current.outerHTML;
+    const printContents = invoicePrintRef.current.innerHTML;
     
     const printWindow = window.open('', '_blank');
 
@@ -549,6 +552,9 @@ export default function InvoicingPage() {
                   -webkit-print-color-adjust: exact !important; 
                   print-color-adjust: exact !important;
                 }
+                .no-print {
+                    display: none !important;
+                }
               }
             </style>
           </head>
@@ -560,7 +566,6 @@ export default function InvoicingPage() {
 
       printWindow.document.close();
       
-      // Use a timeout to ensure rendering is complete before printing
       setTimeout(() => {
         try {
           printWindow.focus();
@@ -568,7 +573,7 @@ export default function InvoicingPage() {
         } catch (e) {
           console.error("Print failed:", e);
           toast({ title: "Print Failed", description: "There was an error opening the print dialog.", variant: "destructive"});
-          printWindow.close(); // Close only if printing fails
+          printWindow.close();
         }
       }, 500);
 
@@ -580,36 +585,56 @@ export default function InvoicingPage() {
       });
     }
   };
-
-  const handleDownloadPDF = async () => {
+  
+  const handleDownloadPdf = async () => {
     if (!invoicePrintRef.current || !invoiceToView) return;
-    setIsDownloadingPDF(true);
-    try {
-      const { default: jsPDF } = await import('jspdf');
-      const { default: html2canvas } = await import('html2canvas');
-      const canvas = await html2canvas(invoicePrintRef.current, {
-        scale: 2, 
-        useCORS: true,
-        logging: false, 
-        width: 794,
-        windowWidth: 794,
-      });
-      const imgData = canvas.toDataURL('image/png');
-      const pdf = new jsPDF({
-        orientation: 'portrait',
-        unit: 'px', 
-        format: [794, 1123] // A4 size in pixels at 96 DPI
-      });
 
-      pdf.addImage(imgData, 'PNG', 0, 0, 794, 1123);
-      pdf.save(`Invoice-${invoiceToView.invoiceNumber}.pdf`);
-      toast({ title: "PDF Downloaded", description: `Invoice ${invoiceToView.invoiceNumber}.pdf downloaded.`});
-    } catch (error) {
-      console.error("Error generating PDF:", error);
-      toast({ title: "PDF Generation Failed", description: "Could not generate PDF.", variant: "destructive"});
-    } finally {
-      setIsDownloadingPDF(false);
+    setIsDownloadingPdf(true);
+
+    const canvas = await html2canvas(invoicePrintRef.current, {
+      scale: 2, // Use a higher scale for better resolution
+      useCORS: true,
+      backgroundColor: '#ffffff',
+    });
+
+    const imgData = canvas.toDataURL('image/png');
+    
+    // A4 dimensions in mm: 210w x 297h
+    const pdf = new jsPDF({
+      orientation: 'p',
+      unit: 'mm',
+      format: 'a4',
+    });
+
+    const pdfWidth = pdf.internal.pageSize.getWidth();
+    const pdfHeight = pdf.internal.pageSize.getHeight();
+    
+    // Calculate the aspect ratio of the image
+    const imgProps = pdf.getImageProperties(imgData);
+    const imgAspectRatio = imgProps.width / imgProps.height;
+    
+    let finalWidth, finalHeight;
+    // Check if the image is wider or taller in proportion to the page
+    if (imgAspectRatio > pdfWidth / pdfHeight) {
+      finalWidth = pdfWidth;
+      finalHeight = pdfWidth / imgAspectRatio;
+    } else {
+      finalHeight = pdfHeight;
+      finalWidth = pdfHeight * imgAspectRatio;
     }
+    
+    // Center the image on the page
+    const x = (pdfWidth - finalWidth) / 2;
+    const y = (pdfHeight - finalHeight) / 2;
+
+    pdf.addImage(imgData, 'PNG', x, y, finalWidth, finalHeight);
+    pdf.save(`Invoice_${invoiceToView.invoiceNumber}.pdf`);
+
+    setIsDownloadingPdf(false);
+    toast({
+      title: "PDF Downloaded",
+      description: `Invoice ${invoiceToView.invoiceNumber}.pdf has been saved.`,
+    });
   };
 
   const generateInvoiceHTMLForEmail = (invoice: InvoiceDisplay, company: CompanyDetailsFirestore | null): string => {
@@ -1039,7 +1064,7 @@ export default function InvoicingPage() {
                         </Button>
                       </DropdownMenuTrigger>
                       <DropdownMenuContent align="end">
-                        <DropdownMenuItem onClick={() => handleOpenViewInvoiceDialog(invoice)}><Eye className="mr-2 h-4 w-4" /> View / Print / Download</DropdownMenuItem>
+                        <DropdownMenuItem onClick={() => handleOpenViewInvoiceDialog(invoice)}><Printer className="mr-2 h-4 w-4" /> Print / View</DropdownMenuItem>
                         <DropdownMenuItem onClick={() => handleEditInvoice(invoice)}><Edit className="mr-2 h-4 w-4" /> Edit</DropdownMenuItem>
                         <DropdownMenuItem onClick={() => handleOpenEmailDialog(invoice)} disabled={!invoice.clientEmail || isSendingEmail}><Mail className="mr-2 h-4 w-4" /> Email</DropdownMenuItem>
                         <DropdownMenuSeparator />
@@ -1107,7 +1132,7 @@ export default function InvoicingPage() {
                     </div>
                     {isNewClient && currentInvoice.clientName && currentInvoice.clientName.trim() !== '' && (
                         <p className="text-xs text-muted-foreground mt-1 flex items-center">
-                        <UserPlus className="h-3 w-3 mr-1 text-accent" />
+                        <UserPlus className="h-3 w-3 mr-1 text-chart-2" />
                         New client: '{currentInvoice.clientName}' will be added.
                         </p>
                     )}
@@ -1189,18 +1214,18 @@ export default function InvoicingPage() {
                 <Button type="button" variant="outline" size="sm" onClick={handleAddItem} disabled={isSaving}><PlusCircle className="mr-2 h-4 w-4" /> Add Item</Button>
               </div>
               {(currentInvoice.items || []).map((item) => (
-                <div key={item.id} className="flex flex-wrap items-end gap-2 p-2 border rounded-md bg-muted/30">
-                  <div className="flex-grow min-w-[200px] space-y-1">
+                <div key={item.id} className="grid grid-cols-[1fr,auto,auto,auto] sm:grid-cols-[2fr_1fr_1fr_auto] items-end gap-2 p-2 border rounded-md bg-muted/30">
+                  <div className="space-y-1">
                     <Label htmlFor={`item-desc-${item.id}`} className="text-xs">Description</Label>
                     <Input id={`item-desc-${item.id}`} value={item.description} onChange={e => handleItemChange(item.id, 'description', e.target.value)} placeholder="Service or Product" disabled={isSaving} />
                   </div>
-                  <div className="flex-1 min-w-[60px] space-y-1">
+                  <div className="space-y-1">
                      <Label htmlFor={`item-qty-${item.id}`} className="text-xs">Qty</Label>
-                    <Input id={`item-qty-${item.id}`} type="number" value={item.quantity} onChange={e => handleItemChange(item.id, 'quantity', e.target.value)} min="0" disabled={isSaving} />
+                    <Input id={`item-qty-${item.id}`} type="number" value={item.quantity} onChange={e => handleItemChange(item.id, 'quantity', e.target.value)} min="0" disabled={isSaving} className="w-20" />
                   </div>
-                   <div className="flex-1 min-w-[80px] space-y-1">
+                   <div className="space-y-1">
                     <Label htmlFor={`item-price-${item.id}`} className="text-xs">Unit Price</Label>
-                    <Input id={`item-price-${item.id}`} type="number" value={item.unitPrice} onChange={e => handleItemChange(item.id, 'unitPrice', e.target.value)} min="0" step="0.01" disabled={isSaving} />
+                    <Input id={`item-price-${item.id}`} type="number" value={item.unitPrice} onChange={e => handleItemChange(item.id, 'unitPrice', e.target.value)} min="0" step="0.01" disabled={isSaving} className="w-24"/>
                   </div>
                   <Button type="button" variant="ghost" size="icon" className="text-destructive h-8 w-8" onClick={() => handleRemoveItem(item.id)} disabled={isSaving}><Trash2 className="h-4 w-4" /></Button>
                 </div>
@@ -1234,7 +1259,7 @@ export default function InvoicingPage() {
                     </div>
                 </div>
 
-                <div className="space-y-2 p-4 bg-muted/50 rounded-lg">
+                <div className="space-y-2 p-4 bg-primary/10 border border-primary/20 rounded-lg">
                     <h4 className="font-medium text-center mb-2">Summary</h4>
                     <div className="flex justify-between text-sm">
                         <span className="text-muted-foreground">Subtotal:</span>
@@ -1246,7 +1271,7 @@ export default function InvoicingPage() {
                     </div>
                     <div className="flex justify-between text-sm">
                         <span className="text-muted-foreground">Tax ({currentInvoice.taxRate || 0}%):</span>
-                        <span className="font-medium text-green-600">+ {currency}{(currentInvoice.taxAmount || 0).toFixed(2)}</span>
+                        <span className="font-medium text-chart-2">+ {currency}{(currentInvoice.taxAmount || 0).toFixed(2)}</span>
                     </div>
                     <Separator className="my-2" />
                     <div className="flex justify-between text-lg font-bold">
@@ -1279,153 +1304,41 @@ export default function InvoicingPage() {
       </Dialog>
 
       <Dialog open={isViewInvoiceDialogOpen} onOpenChange={(open) => { setIsViewInvoiceDialogOpen(open); if (!open) setInvoiceToView(null); }}>
-        <DialogContent className="sm:max-w-5xl max-h-[90vh] flex flex-col p-0 bg-gray-100 dark:bg-background">
-            <DialogHeader className="p-4 sm:p-6 pb-2 border-b bg-background no-print">
-                <DialogTitle className="font-headline text-xl">
-                    Invoice {invoiceToView?.invoiceNumber}
-                </DialogTitle>
-            </DialogHeader>
-          
-            <ScrollArea className="flex-grow overflow-y-auto bg-gray-100 dark:bg-background">
-                {isFetchingCompanyProfile && <div className="text-center p-10"><Loader2 className="h-8 w-8 animate-spin text-primary mx-auto" /> <p>Loading company details...</p></div>}
-                {!isFetchingCompanyProfile && invoiceToView && companyProfileDetails && (
-                    <div ref={invoicePrintRef} className="invoice-view-container relative p-6 sm:p-12 text-[#333] font-sans bg-white w-full max-w-[794px] mx-auto my-4 shadow-lg overflow-hidden border border-gray-200 print:shadow-none print:border-none print:my-0">
-                        <TopRightArt />
-                        <BottomLeftArt />
-                        <div className="relative z-10">
-                            <header className="flex justify-between items-start mb-8">
-                                <div>
-                                <h2 className="text-2xl font-bold text-gray-800">{companyProfileDetails.name}</h2>
-                                <p className="text-sm text-gray-500 whitespace-pre-line">{companyProfileDetails.address}</p>
-                                </div>
-                                <div className="text-right">
-                                <h1 className="text-5xl font-light text-[#2962ff] tracking-wider">INVOICE</h1>
-                                </div>
-                            </header>
-
-                            <section className="flex justify-between border-y border-gray-200 py-4 mb-8">
-                                <div className="grid grid-cols-[max-content,1fr] gap-x-6 gap-y-1 text-sm">
-                                <span className="font-semibold text-gray-500">Invoice#</span>
-                                <span className="font-bold">{invoiceToView.invoiceNumber}</span>
-                                <span className="font-semibold text-gray-500">Invoice Date</span>
-                                <span>{format(invoiceToView.issuedDate, 'dd MMM yyyy')}</span>
-                                <span className="font-semibold text-gray-500">Terms</span>
-                                <span>Due on Receipt</span>
-                                <span className="font-semibold text-gray-500">Due Date</span>
-                                <span>{format(invoiceToView.dueDate, 'dd MMM yyyy')}</span>
-                                </div>
-                            </section>
-
-                            <section className="grid grid-cols-2 gap-8 mb-8">
-                                <div>
-                                    <div className="border-b border-gray-200 pb-1 mb-2">
-                                        <h3 className="text-sm font-semibold text-gray-600">Bill To</h3>
-                                    </div>
-                                    <p className="font-bold">{invoiceToView.clientName}</p>
-                                    <p className="text-sm text-gray-600 whitespace-pre-line">{invoiceToView.clientAddress}</p>
-                                </div>
-                                <div>
-                                    <div className="border-b border-gray-200 pb-1 mb-2">
-                                        <h3 className="text-sm font-semibold text-gray-600">Ship To</h3>
-                                    </div>
-                                    <p className="font-bold">{invoiceToView.clientName}</p>
-                                    <p className="text-sm text-gray-600 whitespace-pre-line">{invoiceToView.clientAddress}</p>
-                                </div>
-                            </section>
-
-                            <section>
-                                <table className="w-full text-left border-collapse">
-                                    <thead>
-                                        <tr style={{ backgroundColor: '#1e4e8c', color: 'white' }}>
-                                            <th className="p-3 w-12 text-center font-normal">#</th>
-                                            <th className="p-3 font-normal">Item &amp; Description</th>
-                                            <th className="p-3 w-24 text-right font-normal">Qty</th>
-                                            <th className="p-3 w-32 text-right font-normal">Rate</th>
-                                            <th className="p-3 w-32 text-right font-normal">Amount</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody>
-                                    {(invoiceToView.items || []).map((item, index) => (
-                                        <tr key={item.id} className="border-b border-gray-200">
-                                            <td className="p-3 text-center text-gray-600">{index + 1}</td>
-                                            <td className="p-3">
-                                                <p className="font-semibold text-gray-800">{item.description}</p>
-                                            </td>
-                                            <td className="p-3 text-right text-gray-600">{item.quantity.toFixed(2)}</td>
-                                            <td className="p-3 text-right text-gray-600">{currency}{item.unitPrice.toFixed(2)}</td>
-                                            <td className="p-3 text-right font-semibold text-gray-800">{currency}{(item.quantity * item.unitPrice).toFixed(2)}</td>
-                                        </tr>
-                                    ))}
-                                    {(!invoiceToView.items || invoiceToView.items.length === 0) && (
-                                        <TableRow><TableCell colSpan={5} className="text-center text-gray-500 py-4">No line items for this invoice.</TableCell></TableRow>
-                                    )}
-                                    </tbody>
-                                </table>
-                            </section>
-
-                            <footer className="mt-8">
-                                <div className="text-right mb-4 border-t border-gray-200 pt-2">
-                                    <span className="font-semibold text-gray-600 mr-4">Sub Total</span>
-                                    <span className="font-semibold text-gray-800">{currency}{invoiceToView.subtotal.toFixed(2)}</span>
-                                </div>
-                                <div className="grid grid-cols-2 gap-8">
-                                    <div className="text-sm text-gray-600">
-                                        <p className="font-semibold text-gray-700">Thanks for shopping with us.</p>
-                                        {invoiceToView.notes && <p className="mt-1">{invoiceToView.notes}</p>}
-
-                                        {companyProfileDetails.accountNumber && (
-                                            <div className="mt-4">
-                                                <p className="font-bold text-gray-800">Payment Details</p>
-                                                <p className="text-xs">Account Name: {companyProfileDetails.name}</p>
-                                                <p className="text-xs">Account Number: {companyProfileDetails.accountNumber}</p>
-                                                {companyProfileDetails.ifscCode && <p className="text-xs">IFSC/SWIFT: {companyProfileDetails.ifscCode}</p>}
-                                            </div>
-                                        )}
-                                        
-                                        <p className="font-bold mt-4 text-gray-800">Terms &amp; Conditions</p>
-                                        <p className="text-xs">Full payment is due upon receipt of this invoice. Late payments may incur additional charges or interest as per the applicable laws.</p>
-                                    </div>
-                                    <div className="self-end">
-                                        <table className="w-full text-right" style={{ backgroundColor: '#e3f2fd' }}>
-                                            <tbody>
-                                                <tr>
-                                                    <td className="p-3 font-semibold text-gray-700">Tax Rate</td>
-                                                    <td className="p-3 font-semibold text-gray-800">{invoiceToView.taxRate.toFixed(2)}%</td>
-                                                </tr>
-                                                <tr className="font-bold text-lg">
-                                                    <td className="p-3 text-gray-800">Total</td>
-                                                    <td className="p-3 text-gray-900">{currency}{invoiceToView.amount.toFixed(2)}</td>
-                                                </tr>
-                                                <tr className="font-bold text-lg">
-                                                    <td className="p-3 text-gray-800">Balance Due</td>
-                                                    <td className="p-3 text-gray-900">{currency}{invoiceToView.amount.toFixed(2)}</td>
-                                                </tr>
-                                            </tbody>
-                                        </table>
-                                    </div>
-                                </div>
-                                <div className="text-center text-xs text-gray-400 pt-12 mt-8 border-t border-gray-100">
-                                    <p>Invoice created by ProfitLens. Please visit <a href="https://www.profitlens.com" target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:underline">www.profitlens.com</a>.</p>
-                                </div>
-                            </footer>
-                        </div>
-                    </div>
-                )}
-            </ScrollArea>
-          
-          <DialogFooter className="p-4 sm:p-6 border-t bg-background no-print">
-             <Button type="button" variant="outline" onClick={handlePrintInvoice} disabled={isDownloadingPDF}>
-                <Printer className="mr-2 h-4 w-4" /> Print Invoice
-             </Button>
-             <Button type="button" onClick={handleDownloadPDF} disabled={isDownloadingPDF}>
-                {isDownloadingPDF ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <FileDown className="mr-2 h-4 w-4" />}
-                {isDownloadingPDF ? "Downloading..." : "Download PDF"}
-             </Button>
-            <DialogClose asChild>
-              <Button type="button" variant="ghost" disabled={isDownloadingPDF}>Close</Button>
-            </DialogClose>
-          </DialogFooter>
-        </DialogContent>
+          <DialogContent className="max-w-4xl w-full h-[95vh] flex flex-col p-0 bg-gray-100 dark:bg-background">
+              <DialogHeader className="p-4 sm:p-6 pb-2 border-b bg-background no-print">
+                  <DialogTitle className="font-headline text-xl">
+                      Invoice {invoiceToView?.invoiceNumber}
+                  </DialogTitle>
+                   <DialogDescription>
+                        Preview of the invoice. You can print or download it.
+                    </DialogDescription>
+              </DialogHeader>
+            
+              <ScrollArea className="flex-grow bg-gray-200 dark:bg-zinc-800 p-4 sm:p-8">
+                  {isFetchingCompanyProfile && <div className="text-center p-10"><Loader2 className="h-8 w-8 animate-spin text-primary mx-auto" /> <p>Loading company details...</p></div>}
+                  {!isFetchingCompanyProfile && invoiceToView && companyProfileDetails && (
+                      <InvoiceTemplate
+                        ref={invoicePrintRef}
+                        invoiceToView={invoiceToView}
+                        companyProfileDetails={companyProfileDetails}
+                        currencySymbol={currency}
+                      />
+                  )}
+              </ScrollArea>
+            
+            <DialogFooter className="p-4 sm:p-6 border-t bg-background no-print justify-end gap-2">
+                <Button type="button" variant="secondary" onClick={handleDownloadPdf} disabled={isDownloadingPdf}>
+                    {isDownloadingPdf ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Download className="mr-2 h-4 w-4" />}
+                    Download PDF
+                </Button>
+                <Button type="button" variant="default" onClick={handlePrintInvoice} disabled={isDownloadingPdf}>
+                  <Printer className="mr-2 h-4 w-4" /> Print Invoice
+                </Button>
+              <DialogClose asChild>
+                <Button type="button" variant="outline" disabled={isDownloadingPdf}>Close</Button>
+              </DialogClose>
+            </DialogFooter>
+          </DialogContent>
       </Dialog>
 
       <Dialog open={isEmailPreviewDialogOpen} onOpenChange={(open) => { setIsEmailPreviewDialogOpen(open); if (!open) setInvoiceForEmail(null); }}>

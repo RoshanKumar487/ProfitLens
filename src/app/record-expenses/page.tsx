@@ -501,29 +501,31 @@ export default function RecordExpensesPage() {
   return (
     <div className="space-y-6 p-4 sm:p-6 lg:p-8">
       <PageTitle title="Record Expenses" subtitle="Log and manage your business expenditures." icon={TrendingDown}>
-        <div className="flex flex-col sm:flex-row gap-2">
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <Button variant="outline" size="icon" onClick={handleImportClick} disabled={isSaving || isLoadingEntries}>
-                    <Upload className="h-4 w-4" />
-                    <span className="sr-only">Import from Excel</span>
-                </Button>
-              </TooltipTrigger>
-              <TooltipContent>
-                <p>Import from Excel</p>
-              </TooltipContent>
-            </Tooltip>
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <Button onClick={() => setIsScanDialogOpen(true)} variant="outline" size="icon" disabled={isSaving || isLoadingEntries}>
-                  <ScanLine className="h-4 w-4" />
-                  <span className="sr-only">Scan Receipt</span>
-                </Button>
-              </TooltipTrigger>
-              <TooltipContent>
-                 <p>Scan Receipt</p>
-              </TooltipContent>
-            </Tooltip>
+        <div className="flex items-center gap-2">
+            <TooltipProvider>
+                <Tooltip>
+                <TooltipTrigger asChild>
+                    <Button variant="outline" size="icon" onClick={handleImportClick} disabled={isSaving || isLoadingEntries}>
+                        <Upload className="h-4 w-4" />
+                        <span className="sr-only">Import from Excel</span>
+                    </Button>
+                </TooltipTrigger>
+                <TooltipContent>
+                    <p>Import from Excel</p>
+                </TooltipContent>
+                </Tooltip>
+                <Tooltip>
+                <TooltipTrigger asChild>
+                    <Button onClick={() => setIsScanDialogOpen(true)} variant="outline" size="icon" disabled={isSaving || isLoadingEntries}>
+                    <ScanLine className="h-4 w-4" />
+                    <span className="sr-only">Scan Receipt</span>
+                    </Button>
+                </TooltipTrigger>
+                <TooltipContent>
+                    <p>Scan Receipt</p>
+                </TooltipContent>
+                </Tooltip>
+            </TooltipProvider>
             <Button onClick={() => { resetNewEntryForm(); setIsAddDialogOpen(true); }} disabled={isSaving || isLoadingEntries}>
                 <PlusCircle className="mr-2 h-4 w-4" />
                 Record Expense
