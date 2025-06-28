@@ -1,6 +1,8 @@
 
 'use server';
 
+import { db } from '@/lib/firebaseConfig';
+import { doc, updateDoc, deleteDoc, Timestamp, serverTimestamp } from 'firebase/firestore';
 import nodemailer from 'nodemailer';
 
 interface SendInvoiceEmailPayload {
@@ -52,5 +54,43 @@ export async function sendInvoiceEmailAction(payload: SendInvoiceEmailPayload): 
   } catch (error: any) {
     console.error(`Error sending email for invoice ${invoiceNumber} to ${to}:`, error);
     return { success: false, message: `Failed to send email: ${error.message || 'Unknown error'}`, error: error.toString() };
+  }
+}
+
+
+export async function updateInvoice(id: string, data: any): Promise<{ success: boolean; message: string }> {
+  try {
+    const invoiceRef = doc(db, 'invoices', id);
+    // Convert JS dates back to Timestamps if they exist in the update payload
+    const dataToSave = { ...data };
+    if (data.issuedDate && !(data.issuedDate instanceof Timestamp)) {
+        dataToSave.issuedDate = Timestamp.fromDate(new Date(data.issuedDate));
+    }
+    if (data.dueDate && !(data.dueDate instanceof Timestamp)) {
+        dataToSave.dueDate = Timestamp.fromDate(new Date(data.dueDate));
+    }
+    
+    // Remove the ID field before saving to prevent it from being written to the document
+    delete dataToSave.id;
+
+    await updateDoc(invoiceRef, {
+      ...dataToSave,
+      updatedAt: serverTimestamp(),
+    });
+    return { success: true, message: 'Invoice updated successfully.' };
+  } catch (error: any) {
+    console.error("Error updating invoice:", error);
+    return { success: false, message: `Failed to update invoice: ${error.message}` };
+  }
+}
+
+export async function deleteInvoice(id: string): Promise<{ success: boolean; message: string }> {
+  try {
+    const invoiceRef = doc(db, 'invoices', id);
+    await deleteDoc(invoiceRef);
+    return { success: true, message: 'Invoice deleted successfully.' };
+  } catch (error: any) {
+    console.error("Error deleting invoice:", error);
+    return { success: false, message: `Failed to delete invoice: ${error.message}` };
   }
 }

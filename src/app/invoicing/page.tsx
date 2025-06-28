@@ -1,6 +1,7 @@
+
 'use client';
 
-import React, { useState, useMemo, useEffect, useCallback, useRef } from 'react';
+import React, { useState, useMemo, useEffect, useCallback } from 'react';
 import PageTitle from '@/components/PageTitle';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -15,6 +16,7 @@ import {
 } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger, DropdownMenuSeparator } from '@/components/ui/dropdown-menu';
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { Receipt, PlusCircle, Search, MoreHorizontal, Edit, Trash2, ArrowUp, ArrowDown, ChevronsUpDown, Loader2 } from 'lucide-react';
 import { format } from 'date-fns';
 import { useToast } from '@/hooks/use-toast';
@@ -23,14 +25,9 @@ import { collection, getDocs, query, where, orderBy, Timestamp } from 'firebase/
 import { db } from '@/lib/firebaseConfig';
 import Link from 'next/link';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { deleteInvoice } from './actions';
+import { Skeleton } from '@/components/ui/skeleton';
 
-// Simplified interfaces for this version
-interface InvoiceItem {
-  id: string;
-  description: string;
-  quantity: number;
-  unitPrice: number;
-}
 
 interface InvoiceDisplay {
   id: string;
@@ -40,7 +37,6 @@ interface InvoiceDisplay {
   dueDate: Date;
   status: 'Paid' | 'Pending' | 'Overdue' | 'Draft';
   issuedDate: Date;
-  items: InvoiceItem[];
 }
 
 export default function InvoicingPage() {
@@ -48,9 +44,14 @@ export default function InvoicingPage() {
   const [invoices, setInvoices] = useState<InvoiceDisplay[]>([]);
   const [searchTerm, setSearchTerm] = useState<string>('');
   const [isLoading, setIsLoading] = useState(true);
+  const [isDeleting, setIsDeleting] = useState(false);
   const { toast } = useToast();
   
   const [sortConfig, setSortConfig] = useState<{ key: keyof InvoiceDisplay; direction: 'ascending' | 'descending' }>({ key: 'issuedDate', direction: 'descending' });
+
+  // Delete Dialog State
+  const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
+  const [invoiceToDeleteId, setInvoiceToDeleteId] = useState<string | null>(null);
 
   const fetchInvoices = useCallback(async () => {
     if (!user || !user.companyId) {
@@ -73,7 +74,6 @@ export default function InvoicingPage() {
           dueDate: (data.dueDate as Timestamp).toDate(),
           status: data.status,
           issuedDate: (data.issuedDate as Timestamp).toDate(),
-          items: data.items || [],
         } as InvoiceDisplay;
       });
       setInvoices(fetchedInvoices);
@@ -157,6 +157,27 @@ export default function InvoicingPage() {
     }
   };
 
+  const handleDeleteClick = (id: string) => {
+    setInvoiceToDeleteId(id);
+    setIsDeleteDialogOpen(true);
+  };
+
+  const confirmDelete = async () => {
+    if (!invoiceToDeleteId) return;
+    setIsDeleting(true);
+    const result = await deleteInvoice(invoiceToDeleteId);
+    if (result.success) {
+      toast({ title: 'Invoice Deleted', description: result.message });
+      fetchInvoices();
+    } else {
+      toast({ title: 'Error', description: result.message, variant: 'destructive' });
+    }
+    setIsDeleting(false);
+    setIsDeleteDialogOpen(false);
+    setInvoiceToDeleteId(null);
+  };
+
+
   if (authIsLoading) {
     return (
       <div className="flex items-center justify-center h-[calc(100vh-200px)] p-4 sm:p-6 lg:p-8">
@@ -206,15 +227,8 @@ export default function InvoicingPage() {
           </div>
         </CardHeader>
         <CardContent>
-          {isLoading && (
-             <div className="flex items-center justify-center py-10">
-                <Loader2 className="h-8 w-8 animate-spin text-primary mx-auto" />
-                <span className="ml-2">Loading invoices...</span>
-            </div>
-          )}
-          {!isLoading && (
             <Table>
-                <TableCaption>{sortedInvoices.length === 0 ? "No invoices found." : "A list of your recent invoices."}</TableCaption>
+                <TableCaption>{!isLoading && sortedInvoices.length === 0 ? "No invoices found." : "A list of your recent invoices."}</TableCaption>
                 <TableHeader>
                 <TableRow>
                     <TableHead><Button variant="ghost" onClick={() => requestSort('invoiceNumber')} className="-ml-4 h-auto p-1 text-xs sm:text-sm">Number {getSortIcon('invoiceNumber')}</Button></TableHead>
@@ -227,7 +241,19 @@ export default function InvoicingPage() {
                 </TableRow>
                 </TableHeader>
                 <TableBody>
-                {sortedInvoices.map((invoice) => (
+                {isLoading ? (
+                    [...Array(5)].map((_, i) => (
+                        <TableRow key={i}>
+                            <TableCell><Skeleton className="h-4 w-[100px]" /></TableCell>
+                            <TableCell><Skeleton className="h-4 w-[150px]" /></TableCell>
+                            <TableCell className="text-right"><Skeleton className="h-4 w-[80px] ml-auto" /></TableCell>
+                            <TableCell className="hidden md:table-cell"><Skeleton className="h-4 w-[100px]" /></TableCell>
+                            <TableCell className="hidden md:table-cell"><Skeleton className="h-4 w-[100px]" /></TableCell>
+                            <TableCell><Skeleton className="h-6 w-[70px] rounded-full" /></TableCell>
+                            <TableCell className="text-right"><Skeleton className="h-8 w-8 ml-auto" /></TableCell>
+                        </TableRow>
+                    ))
+                ) : sortedInvoices.map((invoice) => (
                     <TableRow key={invoice.id}>
                     <TableCell className="font-medium">{invoice.invoiceNumber}</TableCell>
                     <TableCell>{invoice.clientName}</TableCell>
@@ -239,11 +265,13 @@ export default function InvoicingPage() {
                         <DropdownMenu>
                         <DropdownMenuTrigger asChild><Button variant="ghost" size="icon" className="h-8 w-8"><MoreHorizontal className="h-4 w-4" /></Button></DropdownMenuTrigger>
                         <DropdownMenuContent align="end">
-                            <DropdownMenuItem disabled>
-                                <Edit className="mr-2 h-4 w-4" /> Edit
+                            <DropdownMenuItem asChild>
+                                <Link href={`/invoicing/${invoice.id}`}>
+                                    <Edit className="mr-2 h-4 w-4" /> View / Edit
+                                </Link>
                             </DropdownMenuItem>
                             <DropdownMenuSeparator />
-                            <DropdownMenuItem className="text-destructive focus:text-destructive focus:bg-destructive/10" disabled>
+                            <DropdownMenuItem onClick={() => handleDeleteClick(invoice.id)} className="text-destructive focus:text-destructive focus:bg-destructive/10">
                                 <Trash2 className="mr-2 h-4 w-4" /> Delete
                             </DropdownMenuItem>
                         </DropdownMenuContent>
@@ -253,9 +281,25 @@ export default function InvoicingPage() {
                 ))}
                 </TableBody>
             </Table>
-          )}
         </CardContent>
       </Card>
+
+      <AlertDialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Are you sure?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This action cannot be undone. This will permanently delete the invoice.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel onClick={() => setIsDeleteDialogOpen(false)}>Cancel</AlertDialogCancel>
+            <AlertDialogAction onClick={confirmDelete} className="bg-destructive hover:bg-destructive/90" disabled={isDeleting}>
+              {isDeleting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : 'Delete'}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }
