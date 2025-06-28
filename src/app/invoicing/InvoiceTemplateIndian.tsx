@@ -3,7 +3,6 @@
 
 import React from 'react';
 import { format } from 'date-fns';
-import Image from 'next/image';
 
 // Interface definitions mirrored from invoicing/page.tsx for component props
 interface InvoiceItem {
@@ -208,16 +207,18 @@ const InvoiceTemplateIndian = React.forwardRef<HTMLDivElement, InvoiceTemplatePr
 
             {/* Signature */}
             <div className="flex justify-between mt-10">
-                <div className="relative h-24 w-24">
+                <div className="relative h-24 w-24 flex items-center justify-center">
                     {companyProfileDetails.stampUrl && (
-                        <Image src={companyProfileDetails.stampUrl} layout="fill" objectFit="contain" alt="Company Stamp" />
+                        // eslint-disable-next-line @next/next/no-img-element
+                        <img src={companyProfileDetails.stampUrl} alt="Company Stamp" className="max-h-full max-w-full object-contain" crossOrigin="anonymous" />
                     )}
                 </div>
                 <div className="text-right">
                     <p>For {companyProfileDetails.name}</p>
-                    <div className="relative h-16 w-32 mx-auto">
+                    <div className="relative h-16 w-32 mx-auto flex items-center justify-center">
                         {companyProfileDetails.signatureUrl && (
-                            <Image src={companyProfileDetails.signatureUrl} layout="fill" objectFit="contain" alt="Signature" />
+                            // eslint-disable-next-line @next/next/no-img-element
+                            <img src={companyProfileDetails.signatureUrl} alt="Signature" className="max-h-full max-w-full object-contain" crossOrigin="anonymous" />
                         )}
                     </div>
                 </div>

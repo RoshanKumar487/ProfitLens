@@ -3,7 +3,6 @@
 
 import React from 'react';
 import { format } from 'date-fns';
-import Image from 'next/image';
 
 // Interface definitions mirrored from invoicing/page.tsx for component props
 interface InvoiceItem {
@@ -219,16 +218,18 @@ const InvoiceTemplateModern = React.forwardRef<HTMLDivElement, InvoiceTemplatePr
                   <p><span className="font-bold">Account #:</span> {companyProfileDetails.accountNumber || 'N/A'}</p>
                   <p><span className="font-bold">IFSC:</span> {companyProfileDetails.ifscCode || 'N/A'}</p>
                    {companyProfileDetails.stampUrl && (
-                    <div className="relative h-20 w-20 mt-2">
-                      <Image src={companyProfileDetails.stampUrl} layout="fill" objectFit="contain" alt="Company Stamp" />
+                    <div className="relative h-20 w-20 mt-2 flex items-center justify-center">
+                      {/* eslint-disable-next-line @next/next/no-img-element */}
+                      <img src={companyProfileDetails.stampUrl} alt="Company Stamp" className="max-h-full max-w-full object-contain" crossOrigin="anonymous" />
                     </div>
                   )}
                 </div>
                 <div className="flex flex-col items-center justify-between h-24 w-40 text-center">
                   <p className="font-bold">For {companyProfileDetails.name}</p>
-                  <div className="h-12 w-full relative">
+                  <div className="h-12 w-full relative flex items-center justify-center">
                       {companyProfileDetails.signatureUrl && (
-                          <Image src={companyProfileDetails.signatureUrl} layout="fill" objectFit="contain" alt="Signature" />
+                          // eslint-disable-next-line @next/next/no-img-element
+                          <img src={companyProfileDetails.signatureUrl} alt="Signature" className="max-h-full max-w-full object-contain" crossOrigin="anonymous" />
                       )}
                   </div>
                   <p className="border-t border-black w-full pt-1">Authorized Signatory</p>
