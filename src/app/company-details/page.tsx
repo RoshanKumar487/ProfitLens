@@ -1,3 +1,4 @@
+
 'use client';
 
 import React, { useState, useEffect, type FormEvent } from 'react';
@@ -8,13 +9,14 @@ import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Button } from '@/components/ui/button';
 import { useToast } from '@/hooks/use-toast';
-import { Building, Loader2, Save } from 'lucide-react';
+import { Building, Loader2, Save, Image as ImageIcon } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { db } from '@/lib/firebaseConfig';
 import { doc, getDoc, setDoc, Timestamp } from 'firebase/firestore';
 import { Separator } from '@/components/ui/separator';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { COUNTRIES } from '@/lib/countries';
+import Image from 'next/image';
 
 
 interface CompanyDetailsFirestore {
@@ -29,28 +31,28 @@ interface CompanyDetailsFirestore {
   website: string;
   accountNumber?: string;
   ifscCode?: string;
-  createdAt?: Timestamp; // Added for consistency, usually set on creation
+  signatureUrl?: string;
+  signatureStoragePath?: string;
+  stampUrl?: string;
+  stampStoragePath?: string;
+  createdAt?: Timestamp;
   updatedAt?: Timestamp;
 }
 
 export default function CompanyDetailsPage() {
   const { user, isLoading: authIsLoading } = useAuth();
   const [companyDetails, setCompanyDetails] = useState<CompanyDetailsFirestore>({
-    name: '',
-    address: '',
-    city: '',
-    state: '',
-    country: '',
-    gstin: '',
-    phone: '',
-    email: '',
-    website: '',
-    accountNumber: '',
-    ifscCode: '',
+    name: '', address: '', city: '', state: '', country: '', gstin: '',
+    phone: '', email: '', website: '', accountNumber: '', ifscCode: '',
+    signatureUrl: '', stampUrl: '',
   });
   const [isFetching, setIsFetching] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
   const { toast } = useToast();
+
+  // For simplicity, this page does not handle file uploads.
+  // It only displays the images uploaded during signup.
+  // A future enhancement could add upload/delete functionality here.
 
   useEffect(() => {
     const fetchCompanyDetails = async () => {
@@ -60,8 +62,6 @@ export default function CompanyDetailsPage() {
       }
       if (!user || !user.companyId) {
         setIsFetching(false);
-        console.log("CompanyDetails: User or companyId not found for fetching.");
-        setCompanyDetails({ name: '', address: '', city: '', state: '', country: '', gstin: '', phone: '', email: '', website: '', accountNumber: '', ifscCode: '' });
         return;
       }
 
@@ -84,14 +84,11 @@ export default function CompanyDetailsPage() {
             website: data.website || '',
             accountNumber: data.accountNumber || '',
             ifscCode: data.ifscCode || '',
-            createdAt: data.createdAt, // Persist if exists
+            signatureUrl: data.signatureUrl || '',
+            stampUrl: data.stampUrl || '',
+            createdAt: data.createdAt,
             updatedAt: data.updatedAt,
           });
-          console.log("CompanyDetails: Fetched details for companyId:", user.companyId);
-        } else {
-          console.log("CompanyDetails: No details found for companyId:", user.companyId, ". Initializing empty form.");
-          // This case should be less common now as profile is created on signup
-          setCompanyDetails({ name: user.displayName || '', address: '', city: '', state: '', country: '', gstin: '', phone: '', email: user.email || '', website: '', accountNumber: '', ifscCode: '' });
         }
       } catch (error: any) {
         console.error('Error fetching company details from Firestore:', error);
@@ -100,7 +97,6 @@ export default function CompanyDetailsPage() {
           description: error.message || 'Could not load company details from Firestore.',
           variant: 'destructive',
         });
-        setCompanyDetails({ name: '', address: '', city: '', state: '', country: '', gstin: '', phone: '', email: '', website: '', accountNumber: '', ifscCode: '' });
       } finally {
         setIsFetching(false);
       }
@@ -132,7 +128,8 @@ export default function CompanyDetailsPage() {
     setIsSaving(true);
     try {
       const docRef = doc(db, 'companyProfiles', user.companyId);
-      const detailsToSave: CompanyDetailsFirestore = {
+      // We only save text fields here. Image uploads are handled on signup for now.
+      const detailsToSave: Partial<CompanyDetailsFirestore> = {
         name: companyDetails.name,
         address: companyDetails.address,
         city: companyDetails.city,
@@ -144,17 +141,14 @@ export default function CompanyDetailsPage() {
         website: companyDetails.website || '',
         accountNumber: companyDetails.accountNumber || '',
         ifscCode: companyDetails.ifscCode || '',
-        createdAt: companyDetails.createdAt || Timestamp.now(), // Preserve or set if new
         updatedAt: Timestamp.now(),
       };
       await setDoc(docRef, detailsToSave, { merge: true }); 
       
-      setCompanyDetails(detailsToSave); 
       toast({
         title: 'Details Saved',
         description: 'Company information updated. Currency may update on next refresh.',
       });
-      console.log("CompanyDetails: Saved details for companyId:", user.companyId);
 
     } catch (error: any) {
       console.error('Error saving company details to Firestore:', error);
@@ -178,7 +172,7 @@ export default function CompanyDetailsPage() {
             <CardDescription>Loading company details...</CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
-            {[...Array(8)].map((_, i) => ( // Increased skeleton count
+            {[...Array(8)].map((_, i) => (
               <div key={i} className="space-y-2">
                 <div className="h-4 bg-muted rounded w-1/4 animate-pulse"></div>
                 <div className="h-10 bg-muted rounded w-full animate-pulse"></div>
@@ -221,82 +215,33 @@ export default function CompanyDetailsPage() {
           <form onSubmit={handleSave} className="space-y-4">
             <div>
               <Label htmlFor="name">Company Name</Label>
-              <Input
-                id="name"
-                name="name"
-                value={companyDetails.name}
-                onChange={handleChange}
-                placeholder="e.g., Acme Corp Ltd."
-                required
-                disabled={isSaving}
-              />
+              <Input id="name" name="name" value={companyDetails.name} onChange={handleChange} placeholder="e.g., Acme Corp Ltd." required disabled={isSaving}/>
             </div>
             <div>
               <Label htmlFor="address">Street Address</Label>
-              <Textarea
-                id="address"
-                name="address"
-                value={companyDetails.address}
-                onChange={handleChange}
-                placeholder="e.g., 123 Main Street"
-                rows={2}
-                required
-                disabled={isSaving}
-              />
+              <Textarea id="address" name="address" value={companyDetails.address} onChange={handleChange} placeholder="e.g., 123 Main Street" rows={2} required disabled={isSaving} />
             </div>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
                 <Label htmlFor="city">City</Label>
-                <Input
-                  id="city"
-                  name="city"
-                  value={companyDetails.city}
-                  onChange={handleChange}
-                  placeholder="e.g., Anytown"
-                  required
-                  disabled={isSaving}
-                />
+                <Input id="city" name="city" value={companyDetails.city} onChange={handleChange} placeholder="e.g., Anytown" required disabled={isSaving}/>
               </div>
               <div>
                 <Label htmlFor="state">State / Province</Label>
-                <Input
-                  id="state"
-                  name="state"
-                  value={companyDetails.state}
-                  onChange={handleChange}
-                  placeholder="e.g., CA or Ontario"
-                  required
-                  disabled={isSaving}
-                />
+                <Input id="state" name="state" value={companyDetails.state} onChange={handleChange} placeholder="e.g., CA or Ontario" required disabled={isSaving}/>
               </div>
             </div>
             <div>
                 <Label htmlFor="country">Country</Label>
                  <Select value={companyDetails.country} onValueChange={handleCountryChange} required disabled={isSaving}>
-                    <SelectTrigger id="country">
-                        <SelectValue placeholder="Select a country" />
-                    </SelectTrigger>
-                    <SelectContent>
-                        {COUNTRIES.map((c) => (
-                        <SelectItem key={c.code} value={c.code}>
-                            {c.name}
-                        </SelectItem>
-                        ))}
-                    </SelectContent>
+                    <SelectTrigger id="country"><SelectValue placeholder="Select a country" /></SelectTrigger>
+                    <SelectContent>{COUNTRIES.map((c) => (<SelectItem key={c.code} value={c.code}>{c.name}</SelectItem>))}</SelectContent>
                 </Select>
             </div>
              <Separator className="my-4" />
             <div>
               <Label htmlFor="gstin">GSTIN / Tax ID</Label>
-              <Input
-                id="gstin"
-                name="gstin"
-                value={companyDetails.gstin}
-                onChange={handleChange}
-                placeholder="e.g., 22AAAAA0000A1Z5"
-                required
-                disabled={isSaving}
-              />
+              <Input id="gstin" name="gstin" value={companyDetails.gstin} onChange={handleChange} placeholder="e.g., 22AAAAA0000A1Z5" required disabled={isSaving} />
             </div>
              <Separator className="my-4" />
              <div className="space-y-2">
@@ -306,70 +251,52 @@ export default function CompanyDetailsPage() {
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
                     <Label htmlFor="accountNumber">Account Number</Label>
-                    <Input
-                        id="accountNumber"
-                        name="accountNumber"
-                        value={companyDetails.accountNumber || ''}
-                        onChange={handleChange}
-                        placeholder="e.g., 1234567890"
-                        disabled={isSaving}
-                    />
+                    <Input id="accountNumber" name="accountNumber" value={companyDetails.accountNumber || ''} onChange={handleChange} placeholder="e.g., 1234567890" disabled={isSaving} />
                 </div>
                 <div>
                     <Label htmlFor="ifscCode">IFSC / SWIFT Code</Label>
-                    <Input
-                        id="ifscCode"
-                        name="ifscCode"
-                        value={companyDetails.ifscCode || ''}
-                        onChange={handleChange}
-                        placeholder="e.g., SBIN0001234 or SWIFT code"
-                        disabled={isSaving}
-                    />
+                    <Input id="ifscCode" name="ifscCode" value={companyDetails.ifscCode || ''} onChange={handleChange} placeholder="e.g., SBIN0001234 or SWIFT code" disabled={isSaving}/>
                 </div>
             </div>
-            <Separator className="my-4" />
+             <Separator className="my-4" />
+             <div className="space-y-2">
+                <h3 className="text-md font-medium">Contact Details</h3>
+             </div>
             <div>
               <Label htmlFor="phone">Phone Number (Optional)</Label>
-              <Input
-                id="phone"
-                name="phone"
-                type="tel"
-                value={companyDetails.phone}
-                onChange={handleChange}
-                placeholder="e.g., +1-555-123-4567"
-                disabled={isSaving}
-              />
+              <Input id="phone" name="phone" type="tel" value={companyDetails.phone} onChange={handleChange} placeholder="e.g., +1-555-123-4567" disabled={isSaving} />
             </div>
             <div>
               <Label htmlFor="email">Contact Email (Optional)</Label>
-              <Input
-                id="email"
-                name="email"
-                type="email"
-                value={companyDetails.email}
-                onChange={handleChange}
-                placeholder="e.g., contact@example.com"
-                disabled={isSaving}
-              />
+              <Input id="email" name="email" type="email" value={companyDetails.email} onChange={handleChange} placeholder="e.g., contact@example.com" disabled={isSaving} />
             </div>
             <div>
               <Label htmlFor="website">Website (Optional)</Label>
-              <Input
-                id="website"
-                name="website"
-                type="url"
-                value={companyDetails.website}
-                onChange={handleChange}
-                placeholder="e.g., https://www.example.com"
-                disabled={isSaving}
-              />
+              <Input id="website" name="website" type="url" value={companyDetails.website} onChange={handleChange} placeholder="e.g., https://www.example.com" disabled={isSaving} />
             </div>
-            <Button type="submit" disabled={isSaving || isFetching} className="w-full sm:w-auto">
-              {isSaving ? (
-                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-              ) : (
-                <Save className="mr-2 h-4 w-4" />
-              )}
+
+            <Separator className="my-4" />
+            <div className="space-y-3">
+                <h3 className="text-md font-medium">Invoice Assets</h3>
+                <p className="text-xs text-muted-foreground">These images were uploaded during signup and are used on invoices. To change them, you would typically need an edit feature here.</p>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                        <Label>Signature Image</Label>
+                        {companyDetails.signatureUrl ? (
+                            <div className="mt-2 p-2 border rounded-md inline-block bg-white"><Image src={companyDetails.signatureUrl} alt="Signature" width={150} height={50} className="object-contain h-12" /></div>
+                        ) : (<p className="text-sm text-muted-foreground mt-2">No signature uploaded.</p>)}
+                    </div>
+                     <div>
+                        <Label>Company Stamp Image</Label>
+                        {companyDetails.stampUrl ? (
+                            <div className="mt-2 p-2 border rounded-md inline-block bg-white"><Image src={companyDetails.stampUrl} alt="Company Stamp" width={100} height={100} className="object-contain h-24 w-24" /></div>
+                        ) : (<p className="text-sm text-muted-foreground mt-2">No stamp uploaded.</p>)}
+                    </div>
+                </div>
+            </div>
+
+            <Button type="submit" disabled={isSaving || isFetching} className="w-full sm:w-auto mt-6">
+              {isSaving ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Save className="mr-2 h-4 w-4" />}
               Save Details
             </Button>
           </form>

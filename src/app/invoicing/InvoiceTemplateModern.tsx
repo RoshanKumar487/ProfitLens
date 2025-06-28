@@ -3,6 +3,7 @@
 
 import React from 'react';
 import { format } from 'date-fns';
+import Image from 'next/image';
 
 // Interface definitions mirrored from invoicing/page.tsx for component props
 interface InvoiceItem {
@@ -42,6 +43,8 @@ interface CompanyDetailsFirestore {
   accountNumber?: string;
   ifscCode?: string;
   bankName?: string;
+  signatureUrl?: string;
+  stampUrl?: string;
 }
 
 interface InvoiceTemplateProps {
@@ -50,7 +53,6 @@ interface InvoiceTemplateProps {
   currencySymbol: string;
 }
 
-// Renamed from InvoiceTemplate to InvoiceTemplateModern
 const InvoiceTemplateModern = React.forwardRef<HTMLDivElement, InvoiceTemplateProps>(
   ({ invoiceToView, companyProfileDetails, currencySymbol }, ref) => {
     
@@ -216,11 +218,20 @@ const InvoiceTemplateModern = React.forwardRef<HTMLDivElement, InvoiceTemplatePr
                   <p><span className="font-bold">Bank:</span> {companyProfileDetails.bankName || 'N/A'}</p>
                   <p><span className="font-bold">Account #:</span> {companyProfileDetails.accountNumber || 'N/A'}</p>
                   <p><span className="font-bold">IFSC:</span> {companyProfileDetails.ifscCode || 'N/A'}</p>
+                   {companyProfileDetails.stampUrl && (
+                    <div className="relative h-20 w-20 mt-2">
+                      <Image src={companyProfileDetails.stampUrl} layout="fill" objectFit="contain" alt="Company Stamp" />
+                    </div>
+                  )}
                 </div>
-                <div className="flex flex-col items-center justify-between h-20 w-40 text-center">
+                <div className="flex flex-col items-center justify-between h-24 w-40 text-center">
                   <p className="font-bold">For {companyProfileDetails.name}</p>
-                  <div className="h-10"></div>
-                  <p>Authorized Signatory</p>
+                  <div className="h-12 w-full relative">
+                      {companyProfileDetails.signatureUrl && (
+                          <Image src={companyProfileDetails.signatureUrl} layout="fill" objectFit="contain" alt="Signature" />
+                      )}
+                  </div>
+                  <p className="border-t-2 border-black w-full pt-1">Authorized Signatory</p>
                 </div>
               </div>
               <div className="grid grid-cols-2 gap-4 pt-2 border-t-2 border-black">

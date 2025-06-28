@@ -3,6 +3,7 @@
 
 import React, { useState, type FormEvent, useEffect, useMemo } from 'react';
 import Link from 'next/link';
+import Image from 'next/image';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useAuth } from '@/contexts/AuthContext';
 import PageTitle from '@/components/PageTitle';
@@ -10,12 +11,13 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
-import { UserPlus, Loader2, AlertTriangle, Building, Search, CheckCircle } from 'lucide-react';
+import { UserPlus, Loader2, AlertTriangle, Building, Search, CheckCircle, UploadCloud } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { Separator } from '@/components/ui/separator';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { COUNTRIES } from '@/lib/countries';
 import { Alert, AlertTitle } from '@/components/ui/alert';
+import { cn } from '@/lib/utils';
 
 export default function SignUpPage() {
   // User fields
@@ -36,6 +38,12 @@ export default function SignUpPage() {
   const [selectedCompany, setSelectedCompany] = useState<{ id: string; name: string } | null>(null);
   const [isSearching, setIsSearching] = useState(false);
   const [showCompanyList, setShowCompanyList] = useState(false);
+
+  // New state for signature and stamp
+  const [signatureFile, setSignatureFile] = useState<File | null>(null);
+  const [stampFile, setStampFile] = useState<File | null>(null);
+  const [signaturePreview, setSignaturePreview] = useState<string | null>(null);
+  const [stampPreview, setStampPreview] = useState<string | null>(null);
 
   const { signUp, isLoading, error } = useAuth();
   const { toast } = useToast();
@@ -101,6 +109,8 @@ export default function SignUpPage() {
       city: city,
       stateOrProvince: state,
       country: country,
+      signatureFile: signatureFile,
+      stampFile: stampFile,
     };
 
     const result = await signUp(email, password, displayName, companyInfo);
@@ -117,6 +127,21 @@ export default function SignUpPage() {
     setShowCompanyList(false);
   };
   
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>, setFile: React.Dispatch<React.SetStateAction<File | null>>, setPreview: React.Dispatch<React.SetStateAction<string | null>>) => {
+    const file = e.target.files?.[0] || null;
+    if (file) {
+      if (file.size > 2 * 1024 * 1024) { // 2MB limit
+        toast({ title: "File Too Large", description: "Image must be less than 2MB.", variant: "destructive" });
+        return;
+      }
+      setFile(file);
+      setPreview(URL.createObjectURL(file));
+    } else {
+      setFile(null);
+      setPreview(null);
+    }
+  };
+
   if (pendingApproval) {
     return (
        <div className="flex flex-col items-center justify-center min-h-screen py-8">
@@ -233,6 +258,21 @@ export default function SignUpPage() {
                             <SelectTrigger id="country"><SelectValue placeholder="Select a country" /></SelectTrigger>
                             <SelectContent>{COUNTRIES.map((c) => (<SelectItem key={c.code} value={c.code}>{c.name}</SelectItem>))}</SelectContent>
                         </Select>
+                    </div>
+
+                    <Separator className="my-4" />
+                     <p className="text-sm text-muted-foreground">Optionally, upload signature and stamp images for your invoices.</p>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <div>
+                        <Label htmlFor="signatureFile">Signature Image (PNG)</Label>
+                        <Input id="signatureFile" type="file" accept="image/png" onChange={(e) => handleFileChange(e, setSignatureFile, setSignaturePreview)} disabled={isLoading} />
+                        {signaturePreview && <div className="mt-2 p-2 border rounded-md inline-block bg-white"><Image src={signaturePreview} alt="Signature Preview" width={150} height={50} className="object-contain h-12" /></div>}
+                      </div>
+                      <div>
+                        <Label htmlFor="stampFile">Company Stamp (PNG)</Label>
+                        <Input id="stampFile" type="file" accept="image/png" onChange={(e) => handleFileChange(e, setStampFile, setStampPreview)} disabled={isLoading} />
+                        {stampPreview && <div className="mt-2 p-2 border rounded-md inline-block bg-white"><Image src={stampPreview} alt="Stamp Preview" width={100} height={100} className="object-contain h-24 w-24" /></div>}
+                      </div>
                     </div>
                 </div>
             )}

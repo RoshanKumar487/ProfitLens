@@ -3,6 +3,7 @@
 
 import React from 'react';
 import { format } from 'date-fns';
+import Image from 'next/image';
 
 // Interface definitions mirrored from invoicing/page.tsx for component props
 interface InvoiceItem {
@@ -45,6 +46,8 @@ interface CompanyDetailsFirestore {
   ifscCode?: string;
   bankName?: string;
   branch?: string;
+  signatureUrl?: string;
+  stampUrl?: string;
 }
 
 interface InvoiceTemplateProps {
@@ -203,9 +206,20 @@ const InvoiceTemplateIndian = React.forwardRef<HTMLDivElement, InvoiceTemplatePr
             </table>
 
             {/* Signature */}
-            <div className="text-right mt-10">
-                <p>For {companyProfileDetails.name}</p>
-                <div className="h-16"></div> {/* Blank space for signature */}
+            <div className="flex justify-between mt-10">
+                <div className="relative h-24 w-24">
+                    {companyProfileDetails.stampUrl && (
+                        <Image src={companyProfileDetails.stampUrl} layout="fill" objectFit="contain" alt="Company Stamp" />
+                    )}
+                </div>
+                <div className="text-right">
+                    <p>For {companyProfileDetails.name}</p>
+                    <div className="relative h-16 w-32 mx-auto">
+                        {companyProfileDetails.signatureUrl && (
+                            <Image src={companyProfileDetails.signatureUrl} layout="fill" objectFit="contain" alt="Signature" />
+                        )}
+                    </div>
+                </div>
             </div>
           </div>
       </div>

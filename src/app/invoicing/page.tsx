@@ -118,6 +118,8 @@ interface CompanyDetailsFirestore {
   accountNumber?: string;
   ifscCode?: string;
   bankName?: string;
+  signatureUrl?: string;
+  stampUrl?: string;
 }
 
 const LOCAL_STORAGE_EMAIL_TEMPLATE_KEY = 'profitlens-invoice-email-template-v2';
@@ -250,6 +252,8 @@ export default function InvoicingPage() {
             accountNumber: data.accountNumber || '',
             ifscCode: data.ifscCode || '',
             bankName: data.bankName || '',
+            signatureUrl: data.signatureUrl || '',
+            stampUrl: data.stampUrl || '',
           });
         } else {
           setCompanyProfileDetails({ name: 'Your Company Name', address: 'Your Address', city: '', state: '', country: '', gstin: 'Your GSTIN', phone: '', email: '', website: '', accountNumber: '', ifscCode: '', bankName: '' });
@@ -543,118 +547,63 @@ export default function InvoicingPage() {
   const handlePrintInvoice = () => {
     if (!invoicePrintRef.current || !invoiceToView) return;
 
-    // Get all link tags with rel="stylesheet" from the main document head
-    const styleLinks = Array.from(document.querySelectorAll('link[rel="stylesheet"]'))
-      .map(link => link.outerHTML)
-      .join('');
-      
-    // Get all style tags from the main document head
-    const styleTags = Array.from(document.querySelectorAll('style'))
-      .map(style => style.outerHTML)
-      .join('');
-
-    // Get the HTML content of the invoice
+    const styleLinks = Array.from(document.querySelectorAll('link[rel="stylesheet"]')).map(link => link.outerHTML).join('');
+    const styleTags = Array.from(document.querySelectorAll('style')).map(style => style.outerHTML).join('');
     const printContents = invoicePrintRef.current.innerHTML;
     
     const printWindow = window.open('', '_blank');
 
     if (printWindow) {
       printWindow.document.write(`
-        <html>
-          <head>
-            <title>Invoice ${invoiceToView.invoiceNumber}</title>
-            ${styleLinks}
-            ${styleTags}
-            <style>
-              @media print {
-                @page { size: A4; margin: 0; }
-                body { 
-                  -webkit-print-color-adjust: exact !important; 
-                  print-color-adjust: exact !important;
-                }
-                .no-print {
-                    display: none !important;
-                }
-              }
-            </style>
-          </head>
-          <body class="bg-white">
-            ${printContents}
-          </body>
-        </html>
-      `);
-
+        <html><head><title>Invoice ${invoiceToView.invoiceNumber}</title>${styleLinks}${styleTags}<style>@media print {@page {size: A4; margin: 0;} body {-webkit-print-color-adjust: exact !important; print-color-adjust: exact !important;}}</style></head>
+        <body class="bg-white">${printContents}</body></html>`);
       printWindow.document.close();
-      
       setTimeout(() => {
         try {
           printWindow.focus();
           printWindow.print();
         } catch (e) {
           console.error("Print failed:", e);
-          toast({ title: "Print Failed", description: "There was an error opening the print dialog.", variant: "destructive"});
+          toast({ title: "Print Failed", description: "Error opening print dialog.", variant: "destructive"});
           printWindow.close();
         }
       }, 500);
-
     } else {
-      toast({
-        title: "Print Error",
-        description: "Could not open print window. Please check your pop-up blocker settings.",
-        variant: "destructive"
-      });
+      toast({ title: "Print Error", description: "Could not open print window. Check pop-up blocker.", variant: "destructive"});
     }
   };
   
   const handleDownloadPdf = async () => {
     if (!invoicePrintRef.current || !invoiceToView) return;
-
     setIsDownloadingPdf(true);
 
-    const canvas = await html2canvas(invoicePrintRef.current, {
-      scale: 2, // Use a higher scale for better resolution
-      useCORS: true,
-      backgroundColor: '#ffffff',
-    });
-
-    const imgData = canvas.toDataURL('image/png');
-    
-    // A4 dimensions in mm: 210w x 297h
-    const pdf = new jsPDF({
-      orientation: 'p',
-      unit: 'mm',
-      format: 'a4',
-    });
-
-    const pdfWidth = pdf.internal.pageSize.getWidth();
-    const pdfHeight = pdf.internal.pageSize.getHeight();
-    
-    // Calculate the aspect ratio of the image
-    const imgProps = pdf.getImageProperties(imgData);
-    const imgAspectRatio = imgProps.width / imgProps.height;
-    
-    let finalWidth, finalHeight;
-    // Check if the image is wider or taller in proportion to the page
-    if (imgAspectRatio > pdfWidth / pdfHeight) {
-      finalWidth = pdfWidth;
-      finalHeight = pdfWidth / imgAspectRatio;
-    } else {
-      finalHeight = pdfHeight;
-      finalWidth = pdfHeight * imgAspectRatio;
+    try {
+        const canvas = await html2canvas(invoicePrintRef.current, { scale: 2, useCORS: true, backgroundColor: '#ffffff' });
+        const imgData = canvas.toDataURL('image/png');
+        const pdf = new jsPDF({ orientation: 'p', unit: 'mm', format: 'a4' });
+        const pdfWidth = pdf.internal.pageSize.getWidth();
+        const pdfHeight = pdf.internal.pageSize.getHeight();
+        const imgProps = pdf.getImageProperties(imgData);
+        const imgAspectRatio = imgProps.width / imgProps.height;
+        let finalWidth, finalHeight;
+        if (imgAspectRatio > pdfWidth / pdfHeight) {
+          finalWidth = pdfWidth;
+          finalHeight = pdfWidth / imgAspectRatio;
+        } else {
+          finalHeight = pdfHeight;
+          finalWidth = pdfHeight * imgAspectRatio;
+        }
+        const x = (pdfWidth - finalWidth) / 2;
+        const y = (pdfHeight - finalHeight) / 2;
+        pdf.addImage(imgData, 'PNG', x, y, finalWidth, finalHeight);
+        pdf.save(`Invoice_${invoiceToView.invoiceNumber}.pdf`);
+        toast({ title: "PDF Downloaded", description: `Invoice ${invoiceToView.invoiceNumber}.pdf has been saved.` });
+    } catch (error) {
+        console.error("PDF generation failed", error);
+        toast({ title: "PDF Download Failed", description: "Could not generate PDF.", variant: "destructive" });
+    } finally {
+        setIsDownloadingPdf(false);
     }
-    
-    // Center the image on the page
-    const x = (pdfWidth - finalWidth) / 2;
-    const y = (pdfHeight - finalHeight) / 2;
-
-    pdf.addImage(imgData, 'PNG', x, y, finalWidth, finalHeight);
-    pdf.save(`Invoice_${invoiceToView.invoiceNumber}.pdf`);
-
-    setIsDownloadingPdf(false);
-    toast({
-      title: "PDF Downloaded",
-      description: `Invoice ${invoiceToView.invoiceNumber}.pdf has been saved.`,
-    });
   };
 
   const generateInvoiceHTMLForEmail = (invoice: InvoiceDisplay, company: CompanyDetailsFirestore | null): string => {
