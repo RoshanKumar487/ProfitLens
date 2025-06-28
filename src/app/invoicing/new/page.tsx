@@ -40,6 +40,7 @@ interface InvoiceDisplay {
   clientName: string;
   clientEmail?: string;
   clientAddress?: string;
+  clientGstin?: string;
   subtotal: number;
   discountType: DiscountType;
   discountValue: number;
@@ -58,6 +59,7 @@ interface ExistingClient {
   name: string;
   email?: string;
   address?: string;
+  gstin?: string;
 }
 
 const LOCAL_STORAGE_NOTES_TEMPLATE_KEY = 'profitlens-invoice-notes-template-v1';
@@ -94,6 +96,7 @@ export default function NewInvoicePage() {
             clientName: '',
             clientEmail: '',
             clientAddress: '',
+            clientGstin: '',
             notes: savedNotes,
             subtotal: 0,
             discountType: savedDiscountType,
@@ -132,7 +135,8 @@ export default function NewInvoicePage() {
                     clientsMap.set(inv.clientName.toLowerCase(), { 
                         name: inv.clientName,
                         email: inv.clientEmail || existingEntry?.email || '',
-                        address: inv.clientAddress || existingEntry?.address || ''
+                        address: inv.clientAddress || existingEntry?.address || '',
+                        gstin: inv.clientGstin || existingEntry?.gstin || ''
                     });
                 }
             });
@@ -187,6 +191,7 @@ export default function NewInvoicePage() {
             clientName: currentInvoice.clientName!,
             clientEmail: currentInvoice.clientEmail || '', 
             clientAddress: currentInvoice.clientAddress || '',
+            clientGstin: currentInvoice.clientGstin || '',
             subtotal: currentInvoice.subtotal || 0,
             discountType: currentInvoice.discountType || 'fixed',
             discountValue: Number(currentInvoice.discountValue) || 0,
@@ -260,7 +265,7 @@ export default function NewInvoicePage() {
             status: 'Draft',
           });
         } else {
-          setCurrentInvoice(prev => ({ ...prev, clientName: client.name, clientEmail: client.email || '', clientAddress: client.address || '' }));
+          setCurrentInvoice(prev => ({ ...prev, clientName: client.name, clientEmail: client.email || '', clientAddress: client.address || '', clientGstin: client.gstin || '' }));
         }
         setIsClientSuggestionsVisible(false);
     };
@@ -335,6 +340,10 @@ export default function NewInvoicePage() {
                                 <Label htmlFor="clientEmail">Client Email</Label>
                                 <Input id="clientEmail" type="email" value={currentInvoice.clientEmail || ''} onChange={(e) => setCurrentInvoice({ ...currentInvoice, clientEmail: e.target.value })} placeholder="Enter client email" disabled={isSaving} />
                             </div>
+                        </div>
+                        <div>
+                            <Label htmlFor="clientGstin">Client GSTIN</Label>
+                            <Input id="clientGstin" value={currentInvoice.clientGstin || ''} onChange={(e) => setCurrentInvoice({ ...currentInvoice, clientGstin: e.target.value })} placeholder="Enter client's GSTIN (optional)" disabled={isSaving} />
                         </div>
                         <div>
                             <Label htmlFor="clientAddress">Client Address</Label>

@@ -26,11 +26,14 @@ interface CompanyDetailsFirestore {
   state: string; // State or Province
   country: string;
   gstin: string;
+  pan?: string;
   phone: string;
   email: string;
   website: string;
   accountNumber?: string;
   ifscCode?: string;
+  bankName?: string;
+  branch?: string;
   signatureUrl?: string;
   signatureStoragePath?: string;
   stampUrl?: string;
@@ -41,18 +44,14 @@ interface CompanyDetailsFirestore {
 
 export default function CompanyDetailsPage() {
   const { user, isLoading: authIsLoading } = useAuth();
-  const [companyDetails, setCompanyDetails] = useState<CompanyDetailsFirestore>({
-    name: '', address: '', city: '', state: '', country: '', gstin: '',
-    phone: '', email: '', website: '', accountNumber: '', ifscCode: '',
+  const [companyDetails, setCompanyDetails] = useState<Partial<CompanyDetailsFirestore>>({
+    name: '', address: '', city: '', state: '', country: '', gstin: '', pan: '',
+    phone: '', email: '', website: '', accountNumber: '', ifscCode: '', bankName: '', branch: '',
     signatureUrl: '', stampUrl: '',
   });
   const [isFetching, setIsFetching] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
   const { toast } = useToast();
-
-  // For simplicity, this page does not handle file uploads.
-  // It only displays the images uploaded during signup.
-  // A future enhancement could add upload/delete functionality here.
 
   useEffect(() => {
     const fetchCompanyDetails = async () => {
@@ -79,11 +78,14 @@ export default function CompanyDetailsPage() {
             state: data.state || '',
             country: data.country || '',
             gstin: data.gstin || '',
+            pan: data.pan || '',
             phone: data.phone || '',
             email: data.email || '',
             website: data.website || '',
             accountNumber: data.accountNumber || '',
             ifscCode: data.ifscCode || '',
+            bankName: data.bankName || '',
+            branch: data.branch || '',
             signatureUrl: data.signatureUrl || '',
             stampUrl: data.stampUrl || '',
             createdAt: data.createdAt,
@@ -128,7 +130,6 @@ export default function CompanyDetailsPage() {
     setIsSaving(true);
     try {
       const docRef = doc(db, 'companyProfiles', user.companyId);
-      // We only save text fields here. Image uploads are handled on signup for now.
       const detailsToSave: Partial<CompanyDetailsFirestore> = {
         name: companyDetails.name,
         address: companyDetails.address,
@@ -136,11 +137,14 @@ export default function CompanyDetailsPage() {
         state: companyDetails.state,
         country: companyDetails.country,
         gstin: companyDetails.gstin,
+        pan: companyDetails.pan || '',
         phone: companyDetails.phone || '',
         email: companyDetails.email || '',
         website: companyDetails.website || '',
         accountNumber: companyDetails.accountNumber || '',
         ifscCode: companyDetails.ifscCode || '',
+        bankName: companyDetails.bankName || '',
+        branch: companyDetails.branch || '',
         updatedAt: Timestamp.now(),
       };
       await setDoc(docRef, detailsToSave, { merge: true }); 
@@ -239,9 +243,15 @@ export default function CompanyDetailsPage() {
                 </Select>
             </div>
              <Separator className="my-4" />
-            <div>
-              <Label htmlFor="gstin">GSTIN / Tax ID</Label>
-              <Input id="gstin" name="gstin" value={companyDetails.gstin} onChange={handleChange} placeholder="e.g., 22AAAAA0000A1Z5" required disabled={isSaving} />
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div>
+                <Label htmlFor="gstin">GSTIN / Tax ID</Label>
+                <Input id="gstin" name="gstin" value={companyDetails.gstin} onChange={handleChange} placeholder="e.g., 22AAAAA0000A1Z5" required disabled={isSaving} />
+              </div>
+              <div>
+                <Label htmlFor="pan">PAN Number</Label>
+                <Input id="pan" name="pan" value={companyDetails.pan || ''} onChange={handleChange} placeholder="e.g., ABCDE1234F" disabled={isSaving} />
+              </div>
             </div>
              <Separator className="my-4" />
              <div className="space-y-2">
@@ -250,12 +260,22 @@ export default function CompanyDetailsPage() {
             </div>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
+                    <Label htmlFor="bankName">Bank Name</Label>
+                    <Input id="bankName" name="bankName" value={companyDetails.bankName || ''} onChange={handleChange} placeholder="e.g., State Bank of India" disabled={isSaving} />
+                </div>
+                 <div>
                     <Label htmlFor="accountNumber">Account Number</Label>
                     <Input id="accountNumber" name="accountNumber" value={companyDetails.accountNumber || ''} onChange={handleChange} placeholder="e.g., 1234567890" disabled={isSaving} />
                 </div>
+            </div>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
-                    <Label htmlFor="ifscCode">IFSC / SWIFT Code</Label>
-                    <Input id="ifscCode" name="ifscCode" value={companyDetails.ifscCode || ''} onChange={handleChange} placeholder="e.g., SBIN0001234 or SWIFT code" disabled={isSaving}/>
+                    <Label htmlFor="ifscCode">IFSC Code</Label>
+                    <Input id="ifscCode" name="ifscCode" value={companyDetails.ifscCode || ''} onChange={handleChange} placeholder="e.g., SBIN0001234" disabled={isSaving}/>
+                </div>
+                <div>
+                    <Label htmlFor="branch">Branch</Label>
+                    <Input id="branch" name="branch" value={companyDetails.branch || ''} onChange={handleChange} placeholder="e.g., Main Street Branch" disabled={isSaving}/>
                 </div>
             </div>
              <Separator className="my-4" />

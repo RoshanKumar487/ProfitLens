@@ -18,7 +18,7 @@ interface InvoiceDisplay {
   clientName: string;
   clientEmail?: string;
   clientAddress?: string;
-  clientGstin?: string; // Assuming client GSTIN might be part of address or a separate field
+  clientGstin?: string;
   subtotal: number;
   discountAmount: number;
   taxRate: number;
@@ -99,11 +99,11 @@ const InvoiceTemplateIndian = React.forwardRef<HTMLDivElement, InvoiceTemplatePr
     const sgstAmount = invoiceToView.taxAmount / 2;
 
     return (
-      <div ref={ref} className="bg-white text-black p-8 font-sans text-xs w-[210mm] min-h-[297mm] mx-auto flex flex-col justify-center">
+      <div ref={ref} className="bg-white text-black p-4 font-sans text-xs w-[210mm] min-h-[297mm] mx-auto flex flex-col justify-center">
           <div>
             {/* Header */}
             <header className="grid grid-cols-3 mb-1">
-                <div className="text-left">
+                <div className="text-left text-xs">
                     <p>GST No: {companyProfileDetails.gstin}</p>
                     <p>PAN No: {companyProfileDetails.pan || 'N/A'}</p>
                 </div>
@@ -111,7 +111,7 @@ const InvoiceTemplateIndian = React.forwardRef<HTMLDivElement, InvoiceTemplatePr
                     <p>INVOICE</p>
                     <p>HSN CODE: 998525</p>
                 </div>
-                <div className="text-right">
+                <div className="text-right text-xs">
                     <p>Phone: {companyProfileDetails.phone}</p>
                 </div>
             </header>
@@ -166,6 +166,7 @@ const InvoiceTemplateIndian = React.forwardRef<HTMLDivElement, InvoiceTemplatePr
                             <td className="p-1 text-right">{(item.quantity * item.unitPrice).toFixed(2)}</td>
                         </tr>
                     ))}
+                     <tr className="h-full"><td className="border-r border-black"></td><td className="border-r border-black"></td><td className="border-r border-black"></td><td className="border-r border-black"></td><td></td></tr>
                 </tbody>
             </table>
 

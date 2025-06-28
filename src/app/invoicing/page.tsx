@@ -73,6 +73,7 @@ interface InvoiceFirestore {
   clientName: string;
   clientEmail?: string;
   clientAddress?: string;
+  clientGstin?: string;
   
   subtotal: number;
   discountType: DiscountType;
@@ -98,12 +99,14 @@ interface InvoiceDisplay extends Omit<InvoiceFirestore, 'dueDate' | 'issuedDate'
   items: InvoiceItem[];
   notes?: string;
   clientAddress?: string;
+  clientGstin?: string;
 }
 
 interface ExistingClient {
   name: string;
   email?: string;
   address?: string;
+  gstin?: string;
 }
 
 interface CompanyDetailsFirestore {
@@ -113,12 +116,14 @@ interface CompanyDetailsFirestore {
   state: string;
   country: string;
   gstin: string;
+  pan?: string;
   phone: string;
   email: string;
   website: string;
   accountNumber?: string;
   ifscCode?: string;
   bankName?: string;
+  branch?: string;
   signatureUrl?: string;
   stampUrl?: string;
 }
@@ -248,12 +253,14 @@ export default function InvoicingPage() {
             state: data.state || '',
             country: data.country || '',
             gstin: data.gstin || '',
+            pan: data.pan || '',
             phone: data.phone || '',
             email: data.email || '',
             website: data.website || '',
             accountNumber: data.accountNumber || '',
             ifscCode: data.ifscCode || '',
             bankName: data.bankName || '',
+            branch: data.branch || '',
             signatureUrl: data.signatureUrl || '',
             stampUrl: data.stampUrl || '',
           });
@@ -291,7 +298,6 @@ export default function InvoicingPage() {
     }
     setIsLoading(true);
     try {
-      // Fetch Invoices
       const invoicesColRef = collection(db, 'invoices');
       const qInvoices = query(invoicesColRef, where('companyId', '==', user.companyId), orderBy('createdAt', 'desc'));
       const invoiceSnapshot = await getDocs(qInvoices);
@@ -299,6 +305,7 @@ export default function InvoicingPage() {
         const data = docSnap.data() as Omit<InvoiceFirestore, 'id'>;
         return {
           id: docSnap.id, invoiceNumber: data.invoiceNumber, clientName: data.clientName, clientEmail: data.clientEmail, clientAddress: data.clientAddress,
+          clientGstin: data.clientGstin,
           subtotal: data.subtotal || 0, discountType: data.discountType || 'fixed', discountValue: data.discountValue || 0, discountAmount: data.discountAmount || 0,
           taxRate: data.taxRate || 0, taxAmount: data.taxAmount || 0, amount: data.amount, dueDate: data.dueDate.toDate(), status: data.status,
           issuedDate: data.issuedDate.toDate(), items: data.items || [], notes: data.notes || '',
@@ -311,7 +318,7 @@ export default function InvoicingPage() {
         if (inv.clientName) {
             const existingEntry = clientsMap.get(inv.clientName.toLowerCase());
             clientsMap.set(inv.clientName.toLowerCase(), { 
-                name: inv.clientName, email: inv.clientEmail || existingEntry?.email || '', address: inv.clientAddress || existingEntry?.address || ''
+                name: inv.clientName, email: inv.clientEmail || existingEntry?.email || '', address: inv.clientAddress || existingEntry?.address || '', gstin: inv.clientGstin || existingEntry?.gstin || ''
             });
         }
       });
@@ -420,6 +427,7 @@ export default function InvoicingPage() {
       clientName: currentInvoice.clientName!,
       clientEmail: currentInvoice.clientEmail || '', 
       clientAddress: currentInvoice.clientAddress || '',
+      clientGstin: currentInvoice.clientGstin || '',
       subtotal: currentInvoice.subtotal || 0,
       discountType: currentInvoice.discountType || 'fixed',
       discountValue: Number(currentInvoice.discountValue) || 0,
@@ -458,6 +466,7 @@ export default function InvoicingPage() {
       ...invoice,
       notes: invoice.notes || '',
       clientAddress: invoice.clientAddress || '',
+      clientGstin: invoice.clientGstin || '',
     });
     setIsEditDialogOpen(true);
   };
@@ -864,7 +873,6 @@ export default function InvoicingPage() {
             <DialogDescription>Update details for invoice {currentInvoice.invoiceNumber || ''}.</DialogDescription>
           </DialogHeader>
           <form onSubmit={handleFormSubmit} id="invoice-form-explicit" className="space-y-4 overflow-y-auto flex-grow p-1 pr-3">
-            {/* Form content is the same as the new page, but we only render it when a currentInvoice is set */}
             {currentInvoice.id && (
                 <>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -877,7 +885,10 @@ export default function InvoicingPage() {
                         <Input id="clientEmail" type="email" value={currentInvoice.clientEmail || ''} onChange={(e) => setCurrentInvoice({ ...currentInvoice, clientEmail: e.target.value })} disabled={isSaving} />
                     </div>
                 </div>
-
+                 <div>
+                    <Label htmlFor="clientGstin">Client GSTIN</Label>
+                    <Input id="clientGstin" value={currentInvoice.clientGstin || ''} onChange={(e) => setCurrentInvoice({ ...currentInvoice, clientGstin: e.target.value })} placeholder="Enter client's GSTIN (optional)" disabled={isSaving} />
+                </div>
                 <div>
                     <Label htmlFor="clientAddress">Client Address</Label>
                     <Textarea id="clientAddress" value={currentInvoice.clientAddress || ''} onChange={(e) => setCurrentInvoice({ ...currentInvoice, clientAddress: e.target.value })} disabled={isSaving} rows={3}/>
@@ -996,7 +1007,7 @@ export default function InvoicingPage() {
         <AlertDialogContent>
           <AlertDialogHeader><AlertDialogTitle>Are you absolutely sure?</AlertDialogTitle><AlertDialogDescription>This action cannot be undone. This will permanently delete the invoice.</AlertDialogDescription></AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel onClick={() => setInvoiceToDeleteId(null)} disabled={isSaving}>Cancel</AlertDialogCancel>
+            <AlertDialogCancel onClick={() => setInvoiceToDeleteId(null)} disabled={isSaving}>Cancel</Button></AlertDialogCancel>
             <AlertDialogAction onClick={confirmDeleteInvoice} className="bg-destructive hover:bg-destructive/90" disabled={isSaving}>{isSaving ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : 'Delete'}</AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
