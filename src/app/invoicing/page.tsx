@@ -51,7 +51,8 @@ import { db } from '@/lib/firebaseConfig';
 import { sendInvoiceEmailAction } from './actions'; 
 import { cn } from '@/lib/utils';
 import { Separator } from '@/components/ui/separator';
-import InvoiceTemplate from './InvoiceTemplate';
+import InvoiceTemplateModern from './InvoiceTemplateModern';
+import InvoiceTemplateIndian from './InvoiceTemplateIndian';
 import html2canvas from 'html2canvas';
 import jsPDF from 'jspdf';
 
@@ -124,6 +125,7 @@ const LOCAL_STORAGE_NOTES_TEMPLATE_KEY = 'profitlens-invoice-notes-template-v1';
 const LOCAL_STORAGE_TAX_RATE_KEY = 'profitlens-invoice-tax-rate-v1';
 const LOCAL_STORAGE_DISCOUNT_TYPE_KEY = 'profitlens-invoice-discount-type-v1';
 const LOCAL_STORAGE_DISCOUNT_VALUE_KEY = 'profitlens-invoice-discount-value-v1';
+const LOCAL_STORAGE_DEFAULT_TEMPLATE_KEY = 'profitlens-default-invoice-template';
 
 
 const getDefaultEmailBody = (currency: string) => `
@@ -178,7 +180,25 @@ export default function InvoicingPage() {
   
   const [sortConfig, setSortConfig] = useState<{ key: keyof InvoiceDisplay; direction: 'ascending' | 'descending' }>({ key: 'issuedDate', direction: 'descending' });
   const [isClientSuggestionsVisible, setIsClientSuggestionsVisible] = useState(false);
+  
+  type TemplateName = 'modern' | 'indian';
+  const [template, setTemplate] = useState<TemplateName>('modern');
 
+
+  useEffect(() => {
+    const savedTemplate = localStorage.getItem(LOCAL_STORAGE_DEFAULT_TEMPLATE_KEY) as TemplateName;
+    if (savedTemplate) {
+      setTemplate(savedTemplate);
+    }
+  }, []);
+
+  const handleSetDefaultTemplate = (templateName: TemplateName) => {
+    localStorage.setItem(LOCAL_STORAGE_DEFAULT_TEMPLATE_KEY, templateName);
+    toast({
+      title: 'Default Template Set',
+      description: `Your default invoice template is now "${templateName === 'modern' ? 'Modern' : 'Indian GST'}".`,
+    });
+  };
 
   useEffect(() => {
     if (!isFormOpen) return;
@@ -1317,26 +1337,49 @@ export default function InvoicingPage() {
               <ScrollArea className="flex-grow bg-gray-200 dark:bg-zinc-800 p-4 sm:p-8">
                   {isFetchingCompanyProfile && <div className="text-center p-10"><Loader2 className="h-8 w-8 animate-spin text-primary mx-auto" /> <p>Loading company details...</p></div>}
                   {!isFetchingCompanyProfile && invoiceToView && companyProfileDetails && (
-                      <InvoiceTemplate
-                        ref={invoicePrintRef}
-                        invoiceToView={invoiceToView}
-                        companyProfileDetails={companyProfileDetails}
-                        currencySymbol={currency}
-                      />
+                      <>
+                        {template === 'modern' ? (
+                            <InvoiceTemplateModern
+                                ref={invoicePrintRef}
+                                invoiceToView={invoiceToView}
+                                companyProfileDetails={companyProfileDetails}
+                                currencySymbol={currency}
+                            />
+                        ) : (
+                            <InvoiceTemplateIndian
+                                ref={invoicePrintRef}
+                                invoiceToView={invoiceToView}
+                                companyProfileDetails={companyProfileDetails}
+                                currencySymbol={currency}
+                            />
+                        )}
+                      </>
                   )}
               </ScrollArea>
             
-            <DialogFooter className="p-4 sm:p-6 border-t bg-background no-print justify-end gap-2">
-                <Button type="button" variant="secondary" onClick={handleDownloadPdf} disabled={isDownloadingPdf}>
-                    {isDownloadingPdf ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Download className="mr-2 h-4 w-4" />}
-                    Download PDF
-                </Button>
-                <Button type="button" variant="default" onClick={handlePrintInvoice} disabled={isDownloadingPdf}>
-                  <Printer className="mr-2 h-4 w-4" /> Print Invoice
-                </Button>
-              <DialogClose asChild>
-                <Button type="button" variant="outline" disabled={isDownloadingPdf}>Close</Button>
-              </DialogClose>
+            <DialogFooter className="p-4 sm:p-6 border-t bg-background no-print justify-between flex-wrap gap-2">
+                <div className="flex-grow flex items-center gap-2">
+                    <Label htmlFor="template-select">Template:</Label>
+                     <Select value={template} onValueChange={(value) => setTemplate(value as TemplateName)}>
+                        <SelectTrigger id="template-select" className="w-[180px]">
+                            <SelectValue placeholder="Select template" />
+                        </SelectTrigger>
+                        <SelectContent>
+                            <SelectItem value="modern">Modern</SelectItem>
+                            <SelectItem value="indian">Indian GST</SelectItem>
+                        </SelectContent>
+                    </Select>
+                    <Button variant="outline" size="sm" onClick={() => handleSetDefaultTemplate(template)}>Set as Default</Button>
+                </div>
+                <div className="flex gap-2">
+                    <Button type="button" variant="secondary" onClick={handleDownloadPdf} disabled={isDownloadingPdf}>
+                        {isDownloadingPdf ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Download className="mr-2 h-4 w-4" />}
+                        Download PDF
+                    </Button>
+                    <Button type="button" variant="default" onClick={handlePrintInvoice} disabled={isDownloadingPdf}>
+                      <Printer className="mr-2 h-4 w-4" /> Print Invoice
+                    </Button>
+                </div>
             </DialogFooter>
           </DialogContent>
       </Dialog>
