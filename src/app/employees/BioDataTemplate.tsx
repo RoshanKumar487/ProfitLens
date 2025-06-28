@@ -1,4 +1,3 @@
-
 'use client';
 
 import React from 'react';
@@ -33,7 +32,7 @@ const BioDataTemplate = React.forwardRef<HTMLDivElement, BioDataTemplateProps>(
         
         <div className="flex justify-between items-start mb-2">
             <div className="text-sm space-y-1 w-1/3">
-                <DataField label="Shoes No.:" value={employee.shoesNo} />
+                {/* Shoes No. Removed */}
             </div>
             <div className="w-32 h-40 border-2 border-black flex items-center justify-center text-gray-400 p-1">
                 {employee.profilePictureUrl ? (
@@ -53,22 +52,9 @@ const BioDataTemplate = React.forwardRef<HTMLDivElement, BioDataTemplateProps>(
             <DataField label="NAME" value={employee.name} />
             <DataField label="FATHER'S NAME" value={employee.fatherName} />
             <DataField label="MOTHER'S NAME" value={employee.motherName} />
-
-            <div className="font-semibold mt-3">PRESENT ADDRESS:</div>
-            <DataField label="H.No." value={employee.presentAddressHNo} />
-            <div className="grid grid-cols-3 gap-x-6">
-                <DataField label="P.S." value={employee.presentAddressPS} />
-                <DataField label="POST" value={employee.presentAddressPost} />
-                <DataField label="DIST" value={employee.presentAddressDist} />
-            </div>
-             <div className="grid grid-cols-3 gap-x-6">
-                <DataField label="STATE" value={employee.presentAddressState} />
-                <DataField label="PIN NO" value={employee.presentAddressPin} />
-                <DataField label="Phone No." value={employee.phoneNo} />
-            </div>
-
-            <div className="font-semibold mt-3">PERMANENT ADDRESS:</div>
-             <DataField label="H.No." value={employee.permanentAddressHNo} />
+            
+            <div className="font-semibold mt-3">ADDRESS:</div>
+            <DataField label="H.No." value={employee.permanentAddressHNo} />
             <div className="grid grid-cols-2 gap-x-6">
                 <DataField label="P.S." value={employee.permanentAddressPS} />
                 <DataField label="POST" value={employee.permanentAddressPost} />
@@ -96,8 +82,6 @@ const BioDataTemplate = React.forwardRef<HTMLDivElement, BioDataTemplateProps>(
                 <DataField label="Ph. No. & T. No." value={employee.guarantorPhone} />
             </div>
             <DataField label="EXPERIENCE" value={employee.experience} />
-            <DataField label="VILLAGE PRESIDENT NAME" value={employee.villagePresidentName} />
-            <p className="text-xs ml-4">(M.L.A. Corp., M.P. Present)</p>
         </div>
 
         <div className="flex-grow"></div>

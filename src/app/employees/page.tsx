@@ -1,4 +1,3 @@
-
 'use client';
 
 import React, { useState, useEffect, FormEvent, useCallback, useRef, useMemo } from 'react';
@@ -53,16 +52,8 @@ interface EmployeeFirestore {
   companyId: string;
   createdAt: Timestamp;
   updatedAt?: Timestamp;
-  shoesNo?: string;
   fatherName?: string;
   motherName?: string;
-  presentAddressHNo?: string;
-  presentAddressPS?: string;
-  presentAddressPost?: string;
-  presentAddressDist?: string;
-  presentAddressState?: string;
-  presentAddressPin?: string;
-  phoneNo?: string;
   permanentAddressHNo?: string;
   permanentAddressPS?: string;
   permanentAddressPost?: string;
@@ -79,7 +70,6 @@ interface EmployeeFirestore {
   guarantorName?: string;
   guarantorPhone?: string;
   experience?: string;
-  villagePresidentName?: string;
   leftThumbImpressionUrl?: string;
   leftThumbImpressionStoragePath?: string;
   signatureUrl?: string;
@@ -685,8 +675,7 @@ export default function EmployeesPage() {
               <Separator />
               {/* Bio-Data Fields */}
               <CardDescription>Bio-Data Details</CardDescription>
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                    <div><Label>Shoes No.</Label><Input value={currentEmployee.shoesNo || ''} onChange={e => setCurrentEmployee(p => ({...p, shoesNo: e.target.value}))} disabled={isSaving}/></div>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div><Label>Father's Name</Label><Input value={currentEmployee.fatherName || ''} onChange={e => setCurrentEmployee(p => ({...p, fatherName: e.target.value}))} disabled={isSaving}/></div>
                     <div><Label>Mother's Name</Label><Input value={currentEmployee.motherName || ''} onChange={e => setCurrentEmployee(p => ({...p, motherName: e.target.value}))} disabled={isSaving}/></div>
                 </div>

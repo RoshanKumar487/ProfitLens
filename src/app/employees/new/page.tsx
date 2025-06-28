@@ -1,4 +1,3 @@
-
 'use client';
 
 import React, { useState, FormEvent, useCallback, useRef, useEffect } from 'react';
@@ -49,16 +48,8 @@ export default function NewEmployeePage() {
     const [description, setDescription] = useState('');
     
     // Bio-Data Fields
-    const [shoesNo, setShoesNo] = useState('');
     const [fatherName, setFatherName] = useState('');
     const [motherName, setMotherName] = useState('');
-    const [presentAddressHNo, setPresentAddressHNo] = useState('');
-    const [presentAddressPS, setPresentAddressPS] = useState('');
-    const [presentAddressPost, setPresentAddressPost] = useState('');
-    const [presentAddressDist, setPresentAddressDist] = useState('');
-    const [presentAddressState, setPresentAddressState] = useState('');
-    const [presentAddressPin, setPresentAddressPin] = useState('');
-    const [phoneNo, setPhoneNo] = useState('');
     const [permanentAddressHNo, setPermanentAddressHNo] = useState('');
     const [permanentAddressPS, setPermanentAddressPS] = useState('');
     const [permanentAddressPost, setPermanentAddressPost] = useState('');
@@ -75,7 +66,6 @@ export default function NewEmployeePage() {
     const [guarantorName, setGuarantorName] = useState('');
     const [guarantorPhone, setGuarantorPhone] = useState('');
     const [experience, setExperience] = useState('');
-    const [villagePresidentName, setVillagePresidentName] = useState('');
 
     // Files
     const [profilePictureFile, setProfilePictureFile] = useState<File | null>(null);
@@ -233,13 +223,12 @@ export default function NewEmployeePage() {
                 leftThumbImpressionUrl: thumbFile.url, leftThumbImpressionStoragePath: thumbFile.path,
                 signatureUrl: sigFile.url, signatureStoragePath: sigFile.path,
 
-                shoesNo, fatherName, motherName,
-                presentAddressHNo, presentAddressPS, presentAddressPost, presentAddressDist, presentAddressState, presentAddressPin, phoneNo,
+                fatherName, motherName,
                 permanentAddressHNo, permanentAddressPS, permanentAddressPost, permanentAddressDist, permanentAddressState, permanentAddressPin,
                 qualification, selfPhoneNo,
                 dateOfBirth: dateOfBirth ? Timestamp.fromDate(dateOfBirth) : null,
                 joiningDate: joiningDate ? Timestamp.fromDate(joiningDate) : null,
-                height, weight, identificationMarks, guarantorName, guarantorPhone, experience, villagePresidentName,
+                height, weight, identificationMarks, guarantorName, guarantorPhone, experience,
             };
 
             await setDoc(doc(db, 'employees', employeeDocId), dataToSave);
@@ -271,28 +260,11 @@ export default function NewEmployeePage() {
                         
                         {/* Bio-Data */}
                         <CardDescription>Bio-Data Details</CardDescription>
-                        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                            <div><Label>Shoes No.</Label><Input value={shoesNo} onChange={e => setShoesNo(e.target.value)} disabled={isSaving}/></div>
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                              <div><Label>Father's Name</Label><Input value={fatherName} onChange={e => setFatherName(e.target.value)} disabled={isSaving}/></div>
                             <div><Label>Mother's Name</Label><Input value={motherName} onChange={e => setMotherName(e.target.value)} disabled={isSaving}/></div>
                         </div>
                        
-                        <Separator />
-                        <CardDescription>Present Address</CardDescription>
-                         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                            <div><Label>H.No / Street</Label><Input value={presentAddressHNo} onChange={e => setPresentAddressHNo(e.target.value)} disabled={isSaving}/></div>
-                            <div><Label>Phone No.</Label><Input value={phoneNo} onChange={e => setPhoneNo(e.target.value)} disabled={isSaving}/></div>
-                        </div>
-                        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                            <div><Label>Police Station (P.S.)</Label><Input value={presentAddressPS} onChange={e => setPresentAddressPS(e.target.value)} disabled={isSaving}/></div>
-                            <div><Label>Post Office</Label><Input value={presentAddressPost} onChange={e => setPresentAddressPost(e.target.value)} disabled={isSaving}/></div>
-                            <div><Label>District</Label><Input value={presentAddressDist} onChange={e => setPresentAddressDist(e.target.value)} disabled={isSaving}/></div>
-                        </div>
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                            <div><Label>State</Label><Input value={presentAddressState} onChange={e => setPresentAddressState(e.target.value)} disabled={isSaving}/></div>
-                            <div><Label>PIN Code</Label><Input value={presentAddressPin} onChange={e => setPresentAddressPin(e.target.value)} disabled={isSaving}/></div>
-                        </div>
-                        
                         <Separator />
                         <CardDescription>Permanent Address</CardDescription>
                          <div><Label>H.No / Street</Label><Input value={permanentAddressHNo} onChange={e => setPermanentAddressHNo(e.target.value)} disabled={isSaving}/></div>
@@ -326,7 +298,6 @@ export default function NewEmployeePage() {
                            <div><Label>Guarantor Name</Label><Input value={guarantorName} onChange={e => setGuarantorName(e.target.value)} disabled={isSaving}/></div>
                            <div><Label>Guarantor Phone</Label><Input value={guarantorPhone} onChange={e => setGuarantorPhone(e.target.value)} disabled={isSaving}/></div>
                         </div>
-                        <div><Label>Village President Name</Label><Input value={villagePresidentName} onChange={e => setVillagePresidentName(e.target.value)} disabled={isSaving}/></div>
                         
                         <Separator />
                         <CardDescription>File Uploads</CardDescription>
