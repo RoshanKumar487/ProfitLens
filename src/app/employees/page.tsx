@@ -617,26 +617,16 @@ export default function EmployeesPage() {
 
     try {
         const elementToPrint = bioDataPrintRef.current;
-        const images = Array.from(elementToPrint.getElementsByTagName('img'));
-        const imagePromises = images.map(img => {
-            if (img.complete) return Promise.resolve();
-            return new Promise<void>((resolve) => {
-                img.onload = () => resolve();
-                img.onerror = () => {
-                    console.warn('An image failed to load for printing:', img.src);
-                    resolve(); // Don't block printing for a failed image
-                };
-            });
+        const canvas = await html2canvas(elementToPrint, {
+            scale: 2,
+            useCORS: true,
+            backgroundColor: '#ffffff',
         });
-        
-        await Promise.all(imagePromises);
-
-        const canvas = await html2canvas(elementToPrint, { scale: 2, useCORS: true, backgroundColor: '#ffffff' });
         const imgData = canvas.toDataURL('image/png');
         if (!imgData || imgData === 'data:,') {
             toast({
                 title: "Print Failed",
-                description: "Could not generate document image. This can happen if an image like a profile picture failed to load.",
+                description: "Could not generate a printable image of the document.",
                 variant: "destructive",
             });
             setIsPrinting(false);

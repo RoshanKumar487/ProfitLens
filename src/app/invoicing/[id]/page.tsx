@@ -207,46 +207,35 @@ export default function EditInvoicePage() {
         if (!printRef.current) return;
         setIsPrinting(true);
         try {
-            const elementToPrint = printRef.current;
-            const images = Array.from(elementToPrint.getElementsByTagName('img'));
-            const imagePromises = images.map(img => {
-                if (img.complete) return Promise.resolve();
-                return new Promise<void>((resolve, reject) => {
-                    img.onload = () => resolve();
-                    img.onerror = () => {
-                        console.warn('An image failed to load for printing:', img.src);
-                        resolve(); // Resolve even if an image fails, to not block printing
-                    };
-                });
+            const canvas = await html2canvas(printRef.current, {
+                scale: 2,
+                useCORS: true,
+                backgroundColor: '#ffffff',
             });
-
-            await Promise.all(imagePromises);
-
-            const canvas = await html2canvas(elementToPrint, { scale: 2, useCORS: true, backgroundColor: '#ffffff' });
             const imgData = canvas.toDataURL('image/png');
-            
+    
             if (!imgData || imgData === 'data:,') {
-                 toast({
+                toast({
                     title: "Print Failed",
-                    description: "Could not generate document image. This can happen if an image like a signature or stamp failed to load.",
+                    description: "Could not generate a printable image of the invoice. This might happen if an image failed to load.",
                     variant: "destructive",
                 });
                 setIsPrinting(false);
                 return;
             }
-
+    
             const pdf = new jsPDF({ orientation: 'p', unit: 'mm', format: 'a4' });
             const pdfWidth = pdf.internal.pageSize.getWidth();
             const pdfHeight = pdf.internal.pageSize.getHeight();
             const imgProps = pdf.getImageProperties(imgData);
             const imgHeight = (imgProps.height * pdfWidth) / imgProps.width;
-
+    
             let heightLeft = imgHeight;
             let position = 0;
-
+    
             pdf.addImage(imgData, 'PNG', 0, position, pdfWidth, imgHeight);
             heightLeft -= pdfHeight;
-
+    
             while (heightLeft > 0) {
                 position = heightLeft - imgHeight;
                 pdf.addPage();
