@@ -173,6 +173,8 @@ export default function InvoicingPage() {
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
   const [isDownloadingPdf, setIsDownloadingPdf] = useState(false);
+  const [isPrinting, setIsPrinting] = useState(false);
+
 
   const [existingClients, setExistingClients] = useState<ExistingClient[]>([]);
   const invoicePrintRef = useRef<HTMLDivElement>(null);
@@ -488,31 +490,48 @@ export default function InvoicingPage() {
     setIsViewInvoiceDialogOpen(true);
   };
 
-  const handlePrintInvoice = () => {
+  const handlePrintInvoice = async () => {
     if (!invoicePrintRef.current || !invoiceToView) return;
+    setIsPrinting(true);
 
-    const styleLinks = Array.from(document.querySelectorAll('link[rel="stylesheet"]')).map(link => link.outerHTML).join('');
-    const styleTags = Array.from(document.querySelectorAll('style')).map(style => style.outerHTML).join('');
-    const printContents = invoicePrintRef.current.innerHTML;
-    
-    const printWindow = window.open('', '_blank');
+    try {
+        const canvas = await html2canvas(invoicePrintRef.current, { scale: 2, useCORS: true, backgroundColor: '#ffffff' });
+        const imgData = canvas.toDataURL('image/png');
+        const pdf = new jsPDF({ orientation: 'p', unit: 'mm', format: 'a4' });
+        const pdfWidth = pdf.internal.pageSize.getWidth();
+        const pdfHeight = pdf.internal.pageSize.getHeight();
+        const imgProps = pdf.getImageProperties(imgData);
+        const imgAspectRatio = imgProps.width / imgProps.height;
 
-    if (printWindow) {
-      printWindow.document.write(`
-        <html><head><title>Invoice ${invoiceToView.invoiceNumber}</title>${styleLinks}${styleTags}<style>@media print {@page {size: A4; margin: 0;} body {-webkit-print-color-adjust: exact !important; print-color-adjust: exact !important;}}</style></head>
-        <body class="bg-white">${printContents}</body></html>`);
-      printWindow.document.close();
-      setTimeout(() => {
-        try {
-          printWindow.focus();
-          printWindow.print();
-        } catch (e) {
-          toast({ title: "Print Failed", description: "Error opening print dialog.", variant: "destructive"});
-          printWindow.close();
+        let finalWidth, finalHeight;
+        if (imgAspectRatio > pdfWidth / pdfHeight) {
+          finalWidth = pdfWidth;
+          finalHeight = pdfWidth / imgAspectRatio;
+        } else {
+          finalHeight = pdfHeight;
+          finalWidth = pdfHeight * imgAspectRatio;
         }
-      }, 500);
-    } else {
-      toast({ title: "Print Error", description: "Could not open print window. Check pop-up blocker.", variant: "destructive"});
+        
+        const x = (pdfWidth - finalWidth) / 2;
+        const y = (pdfHeight - finalHeight) / 2;
+
+        pdf.addImage(imgData, 'PNG', x, y, finalWidth, finalHeight);
+
+        const pdfBlob = pdf.output('blob');
+        const pdfUrl = URL.createObjectURL(pdfBlob);
+        const printWindow = window.open(pdfUrl);
+        
+        if (printWindow) {
+            printWindow.onload = () => {
+                printWindow.print();
+            };
+        } else {
+             toast({ title: "Print Error", description: "Could not open print window. Please check your pop-up blocker.", variant: "destructive"});
+        }
+    } catch (error) {
+        toast({ title: "Print Failed", description: "Could not generate document for printing.", variant: "destructive" });
+    } finally {
+        setIsPrinting(false);
     }
   };
   
@@ -948,8 +967,11 @@ export default function InvoicingPage() {
                     <Button variant="outline" size="sm" onClick={() => handleSetDefaultTemplate(template)}>Set as Default</Button>
                 </div>
                 <div className="flex gap-2">
-                    <Button type="button" variant="secondary" onClick={handleDownloadPdf} disabled={isDownloadingPdf}>{isDownloadingPdf ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Download className="mr-2 h-4 w-4" />}Download PDF</Button>
-                    <Button type="button" variant="default" onClick={handlePrintInvoice} disabled={isDownloadingPdf}><Printer className="mr-2 h-4 w-4" /> Print Invoice</Button>
+                    <Button type="button" variant="secondary" onClick={handleDownloadPdf} disabled={isDownloadingPdf || isPrinting}>{isDownloadingPdf ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Download className="mr-2 h-4 w-4" />}Download PDF</Button>
+                    <Button type="button" variant="default" onClick={handlePrintInvoice} disabled={isDownloadingPdf || isPrinting}>
+                        {isPrinting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Printer className="mr-2 h-4 w-4" />}
+                        {isPrinting ? 'Preparing...' : 'Print Invoice'}
+                    </Button>
                 </div>
             </DialogFooter>
           </DialogContent>

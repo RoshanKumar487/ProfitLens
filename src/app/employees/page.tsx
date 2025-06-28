@@ -1,3 +1,4 @@
+
 'use client';
 
 import React, { useState, useEffect, FormEvent, useCallback, useRef, useMemo } from 'react';
@@ -34,6 +35,8 @@ import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover
 import { Calendar } from '@/components/ui/calendar';
 import { format } from 'date-fns';
 import { Calendar as CalendarIcon } from 'lucide-react';
+import jsPDF from 'jspdf';
+import html2canvas from 'html2canvas';
 
 
 interface EmployeeFirestore {
@@ -575,7 +578,7 @@ export default function EmployeesPage() {
     setIsImporting(false);
   };
 
-   const handlePrintBioData = async (employee: EmployeeDisplay) => {
+   const handleOpenBioDataDialog = async (employee: EmployeeDisplay) => {
     setEmployeeToPrint(employee);
     if (!user?.companyId) return;
     if (!companyDetails) {
@@ -589,22 +592,49 @@ export default function EmployeesPage() {
     }
     setIsBioDataDialogOpen(true);
   };
-   const triggerPrint = () => {
+
+  const handlePrint = async () => {
     if (!bioDataPrintRef.current) return;
-    const printWindow = window.open('', '_blank');
-    if (printWindow) {
-      printWindow.document.write('<html><head><title>Bio-Data</title>');
-      const styles = Array.from(document.styleSheets).map(s => s.href ? `<link rel="stylesheet" href="${s.href}">` : `<style>${Array.from(s.cssRules).map(r => r.cssText).join('')}</style>`).join('');
-      printWindow.document.write(styles);
-      printWindow.document.write('</head><body class="bg-white">');
-      printWindow.document.write(bioDataPrintRef.current.innerHTML);
-      printWindow.document.write('</body></html>');
-      printWindow.document.close();
-      setTimeout(() => {
-        printWindow.focus();
-        printWindow.print();
-        printWindow.close();
-      }, 500);
+    setIsPrinting(true);
+
+    try {
+        const canvas = await html2canvas(bioDataPrintRef.current, { scale: 2, useCORS: true, backgroundColor: '#ffffff' });
+        const imgData = canvas.toDataURL('image/png');
+        const pdf = new jsPDF({ orientation: 'p', unit: 'mm', format: 'a4' });
+        const pdfWidth = pdf.internal.pageSize.getWidth();
+        const pdfHeight = pdf.internal.pageSize.getHeight();
+        const imgProps = pdf.getImageProperties(imgData);
+        const imgAspectRatio = imgProps.width / imgProps.height;
+
+        let finalWidth, finalHeight;
+        if (imgAspectRatio > pdfWidth / pdfHeight) {
+          finalWidth = pdfWidth;
+          finalHeight = pdfWidth / imgAspectRatio;
+        } else {
+          finalHeight = pdfHeight;
+          finalWidth = pdfHeight * imgAspectRatio;
+        }
+
+        const x = (pdfWidth - finalWidth) / 2;
+        const y = (pdfHeight - finalHeight) / 2;
+
+        pdf.addImage(imgData, 'PNG', x, y, finalWidth, finalHeight);
+
+        const pdfBlob = pdf.output('blob');
+        const pdfUrl = URL.createObjectURL(pdfBlob);
+        const printWindow = window.open(pdfUrl);
+        
+        if (printWindow) {
+            printWindow.onload = () => {
+                printWindow.print();
+            };
+        } else {
+             toast({ title: "Print Error", description: "Could not open print window. Please check your pop-up blocker.", variant: "destructive"});
+        }
+    } catch (error) {
+        toast({ title: "Print Failed", description: "Could not generate document for printing.", variant: "destructive" });
+    } finally {
+        setIsPrinting(false);
     }
   };
 
@@ -651,7 +681,7 @@ export default function EmployeesPage() {
                   <TableCell className="max-w-[200px] truncate text-sm text-muted-foreground" title={employee.description}>{employee.description || '-'}</TableCell>
                   <TableCell className="text-right">{currencySymbol}{employee.salary.toLocaleString()}</TableCell>
                   <TableCell>{employee.associatedFileUrl && employee.associatedFileName ? (<a href={employee.associatedFileUrl} target="_blank" rel="noopener noreferrer" className="text-sm text-primary hover:underline truncate max-w-[120px] inline-block" title={employee.associatedFileName}><FileText className="h-4 w-4 inline mr-1 flex-shrink-0" />{employee.associatedFileName}</a>) : ( <span className="text-sm text-muted-foreground">None</span> )}</TableCell>
-                  <TableCell className="text-right"><DropdownMenu><DropdownMenuTrigger asChild><Button variant="ghost" size="icon" className="h-8 w-8" disabled={isSaving}><MoreHorizontal className="h-4 w-4" /></Button></DropdownMenuTrigger><DropdownMenuContent align="end"><DropdownMenuItem onClick={() => handlePrintBioData(employee)}><Printer className="mr-2 h-4 w-4"/>Print Bio-Data</DropdownMenuItem><DropdownMenuItem onClick={() => handleEditEmployee(employee)}><Edit className="mr-2 h-4 w-4" /> Edit</DropdownMenuItem><DropdownMenuSeparator /><DropdownMenuItem onClick={() => promptDeleteEmployee(employee.id)} className="text-destructive focus:text-destructive focus:bg-destructive/10"><Trash2 className="mr-2 h-4 w-4" /> Delete</DropdownMenuItem></DropdownMenuContent></DropdownMenu></TableCell>
+                  <TableCell className="text-right"><DropdownMenu><DropdownMenuTrigger asChild><Button variant="ghost" size="icon" className="h-8 w-8" disabled={isSaving}><MoreHorizontal className="h-4 w-4" /></Button></DropdownMenuTrigger><DropdownMenuContent align="end"><DropdownMenuItem onClick={() => handleOpenBioDataDialog(employee)}><Printer className="mr-2 h-4 w-4"/>Print Bio-Data</DropdownMenuItem><DropdownMenuItem onClick={() => handleEditEmployee(employee)}><Edit className="mr-2 h-4 w-4" /> Edit</DropdownMenuItem><DropdownMenuSeparator /><DropdownMenuItem onClick={() => promptDeleteEmployee(employee.id)} className="text-destructive focus:text-destructive focus:bg-destructive/10"><Trash2 className="mr-2 h-4 w-4" /> Delete</DropdownMenuItem></DropdownMenuContent></DropdownMenu></TableCell>
                 </TableRow>
               ))}
             </TableBody>
@@ -713,7 +743,10 @@ export default function EmployeesPage() {
                   {employeeToPrint && <BioDataTemplate ref={bioDataPrintRef} employee={employeeToPrint} companyName={companyDetails?.name} companyAddress={companyDetails?.address} />}
               </ScrollArea>
               <DialogFooter className="p-4 sm:p-6 border-t bg-background no-print justify-end flex-wrap gap-2">
-                 <Button type="button" variant="default" onClick={triggerPrint} disabled={isPrinting}><Printer className="mr-2 h-4 w-4" /> Print Bio-Data</Button>
+                 <Button type="button" variant="default" onClick={handlePrint} disabled={isPrinting}>
+                    {isPrinting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Printer className="mr-2 h-4 w-4" />} 
+                    {isPrinting ? 'Preparing...' : 'Print Bio-Data'}
+                 </Button>
               </DialogFooter>
           </DialogContent>
       </Dialog>
