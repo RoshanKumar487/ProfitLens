@@ -53,11 +53,9 @@ interface EmployeeFirestore {
   companyId: string;
   createdAt: Timestamp;
   updatedAt?: Timestamp;
-  tNo?: string;
-  ufSize?: string;
   shoesNo?: string;
   fatherName?: string;
-  wifeOrMotherName?: string;
+  motherName?: string;
   presentAddressHNo?: string;
   presentAddressPS?: string;
   presentAddressPost?: string;
@@ -688,13 +686,9 @@ export default function EmployeesPage() {
               {/* Bio-Data Fields */}
               <CardDescription>Bio-Data Details</CardDescription>
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                    <div><Label>T.No</Label><Input value={currentEmployee.tNo || ''} onChange={e => setCurrentEmployee(p => ({...p, tNo: e.target.value}))} disabled={isSaving}/></div>
-                    <div><Label>UF Size</Label><Input value={currentEmployee.ufSize || ''} onChange={e => setCurrentEmployee(p => ({...p, ufSize: e.target.value}))} disabled={isSaving}/></div>
                     <div><Label>Shoes No.</Label><Input value={currentEmployee.shoesNo || ''} onChange={e => setCurrentEmployee(p => ({...p, shoesNo: e.target.value}))} disabled={isSaving}/></div>
-                </div>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div><Label>Father's Name</Label><Input value={currentEmployee.fatherName || ''} onChange={e => setCurrentEmployee(p => ({...p, fatherName: e.target.value}))} disabled={isSaving}/></div>
-                    <div><Label>Wife/Mother's Name</Label><Input value={currentEmployee.wifeOrMotherName || ''} onChange={e => setCurrentEmployee(p => ({...p, wifeOrMotherName: e.target.value}))} disabled={isSaving}/></div>
+                    <div><Label>Mother's Name</Label><Input value={currentEmployee.motherName || ''} onChange={e => setCurrentEmployee(p => ({...p, motherName: e.target.value}))} disabled={isSaving}/></div>
                 </div>
               {/* ... All other bio-data fields ... */}
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">

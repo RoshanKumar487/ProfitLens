@@ -49,11 +49,9 @@ export default function NewEmployeePage() {
     const [description, setDescription] = useState('');
     
     // Bio-Data Fields
-    const [tNo, setTNo] = useState('');
-    const [ufSize, setUfSize] = useState('');
     const [shoesNo, setShoesNo] = useState('');
     const [fatherName, setFatherName] = useState('');
-    const [wifeOrMotherName, setWifeOrMotherName] = useState('');
+    const [motherName, setMotherName] = useState('');
     const [presentAddressHNo, setPresentAddressHNo] = useState('');
     const [presentAddressPS, setPresentAddressPS] = useState('');
     const [presentAddressPost, setPresentAddressPost] = useState('');
@@ -235,7 +233,7 @@ export default function NewEmployeePage() {
                 leftThumbImpressionUrl: thumbFile.url, leftThumbImpressionStoragePath: thumbFile.path,
                 signatureUrl: sigFile.url, signatureStoragePath: sigFile.path,
 
-                tNo, ufSize, shoesNo, fatherName, wifeOrMotherName,
+                shoesNo, fatherName, motherName,
                 presentAddressHNo, presentAddressPS, presentAddressPost, presentAddressDist, presentAddressState, presentAddressPin, phoneNo,
                 permanentAddressHNo, permanentAddressPS, permanentAddressPost, permanentAddressDist, permanentAddressState, permanentAddressPin,
                 qualification, selfPhoneNo,
@@ -274,15 +272,11 @@ export default function NewEmployeePage() {
                         {/* Bio-Data */}
                         <CardDescription>Bio-Data Details</CardDescription>
                         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                            <div><Label>T.No</Label><Input value={tNo} onChange={e => setTNo(e.target.value)} disabled={isSaving}/></div>
-                            <div><Label>UF Size</Label><Input value={ufSize} onChange={e => setUfSize(e.target.value)} disabled={isSaving}/></div>
                             <div><Label>Shoes No.</Label><Input value={shoesNo} onChange={e => setShoesNo(e.target.value)} disabled={isSaving}/></div>
+                             <div><Label>Father's Name</Label><Input value={fatherName} onChange={e => setFatherName(e.target.value)} disabled={isSaving}/></div>
+                            <div><Label>Mother's Name</Label><Input value={motherName} onChange={e => setMotherName(e.target.value)} disabled={isSaving}/></div>
                         </div>
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                            <div><Label>Father's Name</Label><Input value={fatherName} onChange={e => setFatherName(e.target.value)} disabled={isSaving}/></div>
-                            <div><Label>Wife or Mother's Name</Label><Input value={wifeOrMotherName} onChange={e => setWifeOrMotherName(e.target.value)} disabled={isSaving}/></div>
-                        </div>
-                        
+                       
                         <Separator />
                         <CardDescription>Present Address</CardDescription>
                          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">

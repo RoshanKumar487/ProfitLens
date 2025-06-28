@@ -33,8 +33,6 @@ const BioDataTemplate = React.forwardRef<HTMLDivElement, BioDataTemplateProps>(
         
         <div className="flex justify-between items-start mb-2">
             <div className="text-sm space-y-1 w-1/3">
-                <DataField label="T.No:" value={employee.tNo} />
-                <DataField label="UF Size:" value={employee.ufSize} />
                 <DataField label="Shoes No.:" value={employee.shoesNo} />
             </div>
             <div className="w-32 h-40 border-2 border-black flex items-center justify-center text-gray-400 p-1">
@@ -54,7 +52,7 @@ const BioDataTemplate = React.forwardRef<HTMLDivElement, BioDataTemplateProps>(
         <div className="space-y-2 text-sm">
             <DataField label="NAME" value={employee.name} />
             <DataField label="FATHER'S NAME" value={employee.fatherName} />
-            <DataField label="WIFE NAME OR MOTHER NAME" value={employee.wifeOrMotherName} />
+            <DataField label="MOTHER'S NAME" value={employee.motherName} />
 
             <div className="font-semibold mt-3">PRESENT ADDRESS:</div>
             <DataField label="H.No." value={employee.presentAddressHNo} />
