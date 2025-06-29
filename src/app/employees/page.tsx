@@ -14,7 +14,7 @@ import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger, DropdownMenuSeparator } from '@/components/ui/dropdown-menu';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
-import { Users2, PlusCircle, MoreHorizontal, Edit, Trash2, Loader2, Save, Camera, UploadCloud, FileText, XCircle, SwitchCamera, Upload, ArrowUp, ArrowDown, ChevronsUpDown, Search, ScanLine, Printer, Fingerprint, PenSquare } from 'lucide-react';
+import { Users2, PlusCircle, MoreHorizontal, Edit, Trash2, Loader2, Save, Camera, UploadCloud, FileText, XCircle, SwitchCamera, Upload, ArrowUp, ArrowDown, ChevronsUpDown, Search, ScanLine, Printer, Fingerprint, PenSquare, Download } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/contexts/AuthContext';
 import { db } from '@/lib/firebaseConfig';
@@ -618,7 +618,7 @@ export default function EmployeesPage() {
     try {
         const elementToPrint = bioDataPrintRef.current;
         const canvas = await html2canvas(elementToPrint, {
-            scale: 2,
+            scale: 3,
             useCORS: true,
             backgroundColor: '#ffffff',
         });
@@ -652,6 +652,43 @@ export default function EmployeesPage() {
         }
     } catch (error: any) {
         toast({ title: "Print Failed", description: `Could not generate document for printing: ${error.message}`, variant: "destructive" });
+    } finally {
+        setIsPrinting(false);
+    }
+  };
+
+    const handleDownloadBioDataPdf = async () => {
+    if (!bioDataPrintRef.current || !employeeToPrint) return;
+    setIsPrinting(true);
+
+    try {
+        const elementToPrint = bioDataPrintRef.current;
+        const canvas = await html2canvas(elementToPrint, {
+            scale: 3, // Increased scale for better quality
+            useCORS: true,
+            backgroundColor: '#ffffff',
+        });
+        const imgData = canvas.toDataURL('image/png');
+        if (!imgData || imgData === 'data:,') {
+            toast({
+                title: "Download Failed",
+                description: "Could not generate an image of the document.",
+                variant: "destructive",
+            });
+            setIsPrinting(false);
+            return;
+        }
+        
+        const pdf = new jsPDF({ orientation: 'p', unit: 'mm', format: 'a4' });
+        const pdfWidth = pdf.internal.pageSize.getWidth();
+        const pdfHeight = pdf.internal.pageSize.getHeight();
+        pdf.addImage(imgData, 'PNG', 0, 0, pdfWidth, pdfHeight);
+
+        pdf.save(`BioData-${employeeToPrint.name.replace(/\s+/g, '_')}.pdf`);
+        toast({ title: "Download Started", description: "Bio-data PDF is being downloaded." });
+
+    } catch (error: any) {
+        toast({ title: "Download Failed", description: `Could not generate PDF: ${error.message}`, variant: "destructive" });
     } finally {
         setIsPrinting(false);
     }
@@ -770,6 +807,10 @@ export default function EmployeesPage() {
                    />}
               </ScrollArea>
               <DialogFooter className="p-4 sm:p-6 border-t bg-background no-print justify-end flex-wrap gap-2">
+                 <Button type="button" variant="secondary" onClick={handleDownloadBioDataPdf} disabled={isPrinting}>
+                    {isPrinting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Download className="mr-2 h-4 w-4" />} 
+                    Download PDF
+                 </Button>
                  <Button type="button" variant="default" onClick={handlePrint} disabled={isPrinting}>
                     {isPrinting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Printer className="mr-2 h-4 w-4" />} 
                     {isPrinting ? 'Preparing...' : 'Print Bio-Data'}

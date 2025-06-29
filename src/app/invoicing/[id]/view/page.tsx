@@ -4,7 +4,7 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/button';
-import { Receipt, Mail, Printer, ArrowLeft, Loader2, Edit } from 'lucide-react';
+import { Receipt, Mail, Printer, ArrowLeft, Loader2, Edit, Download } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/contexts/AuthContext';
 import { doc, getDoc, Timestamp } from 'firebase/firestore';
@@ -126,12 +126,42 @@ export default function ViewInvoicePage() {
         }
     }, [authIsLoading, fetchAllData]);
 
+    const handleDownloadPdf = async () => {
+        if (!printRef.current || !invoice) return;
+        setIsProcessing(true);
+        try {
+            const elementToPrint = printRef.current;
+            const canvas = await html2canvas(elementToPrint, { scale: 3, useCORS: true, backgroundColor: '#ffffff' });
+            const imgData = canvas.toDataURL('image/png');
+
+            if (!imgData || imgData === 'data:,') {
+              toast({ title: "Download Failed", description: "Could not generate an image of the document.", variant: "destructive" });
+              setIsProcessing(false);
+              return;
+            }
+
+            const pdf = new jsPDF({ orientation: 'p', unit: 'mm', format: 'a4' });
+            const pdfWidth = pdf.internal.pageSize.getWidth();
+            const pdfHeight = pdf.internal.pageSize.getHeight();
+            pdf.addImage(imgData, 'PNG', 0, 0, pdfWidth, pdfHeight);
+            
+            pdf.save(`Invoice-${invoice.invoiceNumber}.pdf`);
+
+            toast({ title: "Download Started", description: `Invoice ${invoice.invoiceNumber}.pdf is being downloaded.` });
+
+        } catch (error: any) {
+            toast({ title: "Download Failed", description: `Could not generate PDF: ${error.message}`, variant: "destructive" });
+        } finally {
+            setIsProcessing(false);
+        }
+    };
+
     const handlePrint = async () => {
         if (!printRef.current) return;
         setIsProcessing(true);
         try {
             const elementToPrint = printRef.current;
-            const canvas = await html2canvas(elementToPrint, { scale: 2, useCORS: true, backgroundColor: null }); // Use null for transparent bg
+            const canvas = await html2canvas(elementToPrint, { scale: 3, useCORS: true, backgroundColor: '#ffffff' });
             const imgData = canvas.toDataURL('image/png');
 
             if (!imgData || imgData === 'data:,') {
@@ -232,6 +262,9 @@ export default function ViewInvoicePage() {
                             <Edit className="mr-2 h-4 w-4" />
                             Edit
                         </Link>
+                    </Button>
+                    <Button onClick={handleDownloadPdf} disabled={isProcessing || !companyProfile}>
+                        {isProcessing ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Download className="mr-2 h-4 w-4" />} Download PDF
                     </Button>
                     <Button onClick={handleEmail} disabled={isProcessing || !companyProfile}>
                         {isProcessing ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Mail className="mr-2 h-4 w-4" />} Email
