@@ -59,6 +59,10 @@ body {
     --sidebar-accent-foreground: 222.2 47.4% 11.2%;
     --sidebar-border: 214.3 31.8% 91.4%;
     --sidebar-ring: 217 91% 60%;
+
+    /* Background Animation */
+    --gradient-from: 210 40% 97%;
+    --gradient-to: 210 40% 99%;
   }
 
   .dark {
@@ -102,6 +106,10 @@ body {
     --sidebar-accent-foreground: 210 40% 98%;
     --sidebar-border: 215 28% 17%;
     --sidebar-ring: 217 91% 60%;
+    
+    /* Background Animation */
+    --gradient-from: 224 71% 6%;
+    --gradient-to: 224 71% 2%;
   }
 }
 

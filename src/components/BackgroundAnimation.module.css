@@ -1,18 +1,12 @@
 
 .area {
-    background: hsl(210 40% 98%);
-    background: linear-gradient(to right, hsl(210 40% 97%), hsl(210 40% 99%));
+    background: linear-gradient(to right, hsl(var(--gradient-from)), hsl(var(--gradient-to)));
     width: 100%;
     height: 100vh;
     position: fixed;
     top: 0;
     left: 0;
     z-index: -1;
-}
-
-.dark .area {
-    background: hsl(224 71% 4%);
-    background: linear-gradient(to right, hsl(224 71% 6%), hsl(224 71% 2%));
 }
 
 .circles {
