@@ -24,7 +24,7 @@ import { LogOut, Loader2, Building, LayoutTemplate, Bell, Bot, HelpCircle } from
 import { useAuth } from '@/contexts/AuthContext';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
-import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { AssistantChat } from '@/components/AssistantChat';
 import { collection, query, where, onSnapshot } from 'firebase/firestore';
@@ -80,6 +80,8 @@ const AppShellLayout = ({ children }: { children: React.ReactNode }) => {
   const isAuthPage = pathname.startsWith('/auth/');
   
   const visibleNavItems = useMemo(() => {
+    // In a future step, this will filter based on granular user permissions.
+    // For now, it only filters the admin link based on the user's role.
     return NAV_ITEMS.filter(item => {
       if (item.href === '/admin') {
         return user?.role === 'admin';
@@ -95,12 +97,15 @@ const AppShellLayout = ({ children }: { children: React.ReactNode }) => {
           <SidebarHeader className="p-2">
             <Button
               variant="ghost"
-              className="h-12 w-full justify-start gap-3 px-3 group-data-[collapsible=icon]:justify-center cursor-default"
+              className="h-12 w-full justify-start gap-3 px-3 group-data-[collapsible=icon]:justify-center"
+              asChild
             >
-              <LayoutTemplate className="h-7 w-7 shrink-0 text-primary" />
-              <h1 className="text-xl font-headline font-bold text-sidebar-foreground group-data-[collapsible=icon]:hidden">
-                ProfitLens
-              </h1>
+             <Link href="/">
+                <LayoutTemplate className="h-7 w-7 shrink-0 text-primary" />
+                <h1 className="text-xl font-headline font-bold text-sidebar-foreground group-data-[collapsible=icon]:hidden">
+                  ProfitLens
+                </h1>
+              </Link>
             </Button>
           </SidebarHeader>
           <Separator className="bg-sidebar-border" />
@@ -118,6 +123,11 @@ const AppShellLayout = ({ children }: { children: React.ReactNode }) => {
                     <Link href={item.href} onClick={handleNavigationClick}>
                       <item.icon />
                       <span className="group-data-[collapsible=icon]:hidden">{item.label}</span>
+                       {item.href === '/admin' && pendingRequestCount > 0 && (
+                          <Badge variant="destructive" className="ml-auto group-data-[collapsible=icon]:hidden">
+                            {pendingRequestCount}
+                          </Badge>
+                       )}
                     </Link>
                   </SidebarMenuButton>
                 </SidebarMenuItem>
