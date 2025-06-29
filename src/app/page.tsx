@@ -6,7 +6,7 @@ import PageTitle from '@/components/PageTitle';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { NAV_ITEMS } from '@/lib/constants';
 import Link from 'next/link';
-import { LayoutDashboard } from 'lucide-react';
+import { LayoutGrid } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { cn } from '@/lib/utils';
 
@@ -43,16 +43,15 @@ const ToolCard = ({ item, isEnabled }: { item: (typeof NAV_ITEMS)[0]; isEnabled:
 export default function MyToolsPage() {
   const { user } = useAuth();
 
-  // For this foundational step, all tools are visible.
-  // In the future, this would be driven by user permissions.
-  const accessibleTools = NAV_ITEMS;
+  // Filter out the 'My Tools' item itself from the list of cards to display.
+  const accessibleTools = NAV_ITEMS.filter(item => item.href !== '/');
 
   return (
     <div className="space-y-6 p-4 sm:p-6 lg:p-8">
       <PageTitle
         title="My Tools"
         subtitle="Your central hub for managing all aspects of your business."
-        icon={LayoutDashboard}
+        icon={LayoutGrid}
       />
       <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
         {accessibleTools.map(item => (
