@@ -4,7 +4,7 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/button';
-import { Receipt, Mail, Printer, ArrowLeft, Loader2, Edit, Download } from 'lucide-react';
+import { Receipt, Mail, Printer, ArrowLeft, Loader2, Edit, Download, Eye } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/contexts/AuthContext';
 import { doc, getDoc, Timestamp } from 'firebase/firestore';
@@ -16,6 +16,10 @@ import html2canvas from 'html2canvas';
 import { Skeleton } from '@/components/ui/skeleton';
 import { urlToDataUri } from '@/lib/utils';
 import Link from 'next/link';
+import { Switch } from '@/components/ui/switch';
+import { Label } from '@/components/ui/label';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
+import Letterhead from '@/components/Letterhead';
 
 // Interface definitions mirrored from invoicing/page.tsx for component props
 interface InvoiceItem {
@@ -77,6 +81,7 @@ export default function ViewInvoicePage() {
     const [imageDataUris, setImageDataUris] = useState<{ signature?: string; stamp?: string }>({});
     const [isLoadingData, setIsLoadingData] = useState(true);
     const [isProcessing, setIsProcessing] = useState(false);
+    const [useLetterhead, setUseLetterhead] = useState(false);
     const printRef = useRef<HTMLDivElement>(null);
 
     const fetchAllData = useCallback(async () => {
@@ -263,6 +268,24 @@ export default function ViewInvoicePage() {
                             Edit
                         </Link>
                     </Button>
+                     <Dialog>
+                        <DialogTrigger asChild>
+                            <Button variant="outline" disabled={isProcessing || !companyProfile}>
+                                <Eye className="mr-2 h-4 w-4" />
+                                Preview Letterhead
+                            </Button>
+                        </DialogTrigger>
+                        <DialogContent className="max-w-4xl p-8">
+                            <DialogHeader>
+                                <DialogTitle>Letterhead Preview</DialogTitle>
+                            </DialogHeader>
+                            {companyProfile && <div className="border rounded-md"><Letterhead companyDetails={companyProfile} /></div>}
+                        </DialogContent>
+                    </Dialog>
+                    <div className="flex items-center space-x-2">
+                        <Switch id="letterhead-toggle" checked={useLetterhead} onCheckedChange={setUseLetterhead} />
+                        <Label htmlFor="letterhead-toggle">Use Letterhead</Label>
+                    </div>
                     <Button onClick={handleDownloadPdf} disabled={isProcessing || !companyProfile}>
                         {isProcessing ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Download className="mr-2 h-4 w-4" />} Download PDF
                     </Button>
@@ -277,13 +300,15 @@ export default function ViewInvoicePage() {
         </header>
 
         <main className="w-full bg-muted py-8">
-            <div ref={printRef} className="bg-white shadow-lg mx-auto">
+            <div className="bg-white shadow-lg mx-auto">
                 <InvoiceTemplateIndian 
+                    ref={printRef}
                     invoiceToView={invoice} 
                     companyProfileDetails={companyProfile} 
                     currencySymbol={currencySymbol} 
                     signatureDataUri={imageDataUris.signature}
                     stampDataUri={imageDataUris.stamp}
+                    withLetterhead={useLetterhead}
                 />
             </div>
         </main>

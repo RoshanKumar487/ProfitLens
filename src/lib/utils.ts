@@ -34,7 +34,7 @@ export async function urlToDataUri(url: string): Promise<string> {
       return '';
     }
     const blob = await response.blob();
-    return new Promise((resolve) => {
+    return new Promise((resolve, reject) => {
       const reader = new FileReader();
       reader.onloadend = () => {
         if (typeof reader.result === 'string') {
@@ -46,7 +46,7 @@ export async function urlToDataUri(url: string): Promise<string> {
       };
       reader.onerror = (error) => {
         console.error('FileReader error:', error);
-        resolve('');
+        reject(error);
       };
       reader.readAsDataURL(blob);
     });
@@ -54,4 +54,13 @@ export async function urlToDataUri(url: string): Promise<string> {
     console.error(`Could not convert URL to data URI: ${url}`, error);
     return ''; // Return empty string on failure
   }
+}
+
+export function stringToHslColor(str: string, saturation: number, lightness: number): string {
+  let hash = 0;
+  for (let i = 0; i < str.length; i++) {
+    hash = str.charCodeAt(i) + ((hash << 5) - hash);
+  }
+  const hue = hash % 360;
+  return `hsl(${hue}, ${saturation}%, ${lightness}%)`;
 }

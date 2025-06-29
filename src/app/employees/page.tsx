@@ -37,7 +37,8 @@ import { format } from 'date-fns';
 import { Calendar as CalendarIcon } from 'lucide-react';
 import jsPDF from 'jspdf';
 import html2canvas from 'html2canvas';
-
+import { Switch } from '@/components/ui/switch';
+import Letterhead from '@/components/Letterhead';
 
 interface EmployeeFirestore {
   id?: string;
@@ -150,8 +151,9 @@ export default function EmployeesPage() {
   const [isBioDataDialogOpen, setIsBioDataDialogOpen] = useState(false);
   const [employeeToPrint, setEmployeeToPrint] = useState<EmployeeDisplay | null>(null);
   const [bioDataImageUris, setBioDataImageUris] = useState<Record<string, string | undefined>>({});
-  const [companyDetails, setCompanyDetails] = useState<{name: string, address: string} | null>(null);
+  const [companyDetails, setCompanyDetails] = useState<any | null>(null);
   const [isPrinting, setIsPrinting] = useState(false);
+  const [useLetterheadBioData, setUseLetterheadBioData] = useState(false);
 
 
   const filteredEmployees = useMemo(() => {
@@ -532,10 +534,10 @@ export default function EmployeesPage() {
   const handleDragEvents = (e: React.DragEvent<HTMLDivElement>) => { e.preventDefault(); e.stopPropagation(); };
   const handleProfileDragEnter = (e: React.DragEvent<HTMLDivElement>) => { handleDragEvents(e); if (e.dataTransfer.items?.length > 0) setIsDraggingProfile(true); };
   const handleProfileDragLeave = (e: React.DragEvent<HTMLDivElement>) => { handleDragEvents(e); setIsDraggingProfile(false); };
-  const handleProfileDrop = (e: React.DragEvent<HTMLDivElement>) => { handleDragEvents(e); setIsDraggingProfile(false); handleFileChange(e.dataTransfer, setProfilePictureFile, setProfilePicturePreview); };
+  const handleProfileDrop = (e: React.DragEvent<HTMLDivElement>) => { handleDragEvents(e); setIsDraggingProfile(false); handleFileChange(e.dataTransfer as any, setProfilePictureFile, setProfilePicturePreview); };
   const handleFileDragEnter = (e: React.DragEvent<HTMLDivElement>) => { handleDragEvents(e); if (e.dataTransfer.items?.length > 0) setIsDraggingFile(true); };
   const handleFileDragLeave = (e: React.DragEvent<HTMLDivElement>) => { handleDragEvents(e); setIsDraggingFile(false); };
-  const handleFileDrop = (e: React.DragEvent<HTMLDivElement>) => { handleDragEvents(e); setIsDraggingFile(false); handleFileChange(e.dataTransfer, setAssociatedFile); };
+  const handleFileDrop = (e: React.DragEvent<HTMLDivElement>) => { handleDragEvents(e); setIsDraggingFile(false); handleFileChange(e.dataTransfer as any, setAssociatedFile); };
 
   // Bulk import handlers
   const handleImportClick = () => { fileInputRef.current?.click(); };
@@ -586,9 +588,7 @@ export default function EmployeesPage() {
         const companyRef = doc(db, 'companyProfiles', user.companyId);
         const companySnap = await getDoc(companyRef);
         if (companySnap.exists()) {
-            const data = companySnap.data();
-            const fullAddress = [data.address, data.city, data.state, data.country].filter(Boolean).join(', ');
-            setCompanyDetails({ name: data.name, address: fullAddress });
+            setCompanyDetails(companySnap.data());
         }
     }
     
@@ -796,25 +796,31 @@ export default function EmployeesPage() {
           <DialogContent className="max-w-4xl w-full h-[95vh] flex flex-col p-0 bg-gray-100 dark:bg-background">
               <DialogHeader className="p-4 sm:p-6 pb-2 border-b bg-background no-print"><DialogTitle className="font-headline text-xl">Bio-Data: {employeeToPrint?.name}</DialogTitle></DialogHeader>
               <ScrollArea className="flex-grow bg-muted p-4 sm:p-8">
-                  {employeeToPrint && <BioDataTemplate 
+                  {employeeToPrint && <div className="bg-white shadow-lg mx-auto"><BioDataTemplate 
                     ref={bioDataPrintRef} 
                     employee={employeeToPrint} 
-                    companyName={companyDetails?.name} 
-                    companyAddress={companyDetails?.address}
+                    companyDetails={companyDetails}
                     profilePictureDataUri={bioDataImageUris.profile}
                     leftThumbImpressionDataUri={bioDataImageUris.thumb}
                     signatureDataUri={bioDataImageUris.signature}
-                   />}
+                    withLetterhead={useLetterheadBioData}
+                   /></div>}
               </ScrollArea>
-              <DialogFooter className="p-4 sm:p-6 border-t bg-background no-print justify-end flex-wrap gap-2">
-                 <Button type="button" variant="secondary" onClick={handleDownloadBioDataPdf} disabled={isPrinting}>
-                    {isPrinting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Download className="mr-2 h-4 w-4" />} 
-                    Download PDF
-                 </Button>
-                 <Button type="button" variant="default" onClick={handlePrint} disabled={isPrinting}>
-                    {isPrinting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Printer className="mr-2 h-4 w-4" />} 
-                    {isPrinting ? 'Preparing...' : 'Print Bio-Data'}
-                 </Button>
+              <DialogFooter className="p-4 sm:p-6 border-t bg-background no-print justify-between items-center flex-wrap gap-2">
+                 <div className="flex items-center space-x-2">
+                    <Switch id="biodata-letterhead-toggle" checked={useLetterheadBioData} onCheckedChange={setUseLetterheadBioData} />
+                    <Label htmlFor="biodata-letterhead-toggle">Use Letterhead</Label>
+                </div>
+                <div className="flex gap-2">
+                     <Button type="button" variant="secondary" onClick={handleDownloadBioDataPdf} disabled={isPrinting}>
+                        {isPrinting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Download className="mr-2 h-4 w-4" />} 
+                        Download PDF
+                     </Button>
+                     <Button type="button" variant="default" onClick={handlePrint} disabled={isPrinting}>
+                        {isPrinting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Printer className="mr-2 h-4 w-4" />} 
+                        {isPrinting ? 'Preparing...' : 'Print Bio-Data'}
+                     </Button>
+                </div>
               </DialogFooter>
           </DialogContent>
       </Dialog>

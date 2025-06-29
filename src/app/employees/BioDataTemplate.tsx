@@ -4,14 +4,15 @@
 import React from 'react';
 import { format } from 'date-fns';
 import type { EmployeeDisplay } from './page';
+import Letterhead from '@/components/Letterhead';
 
 interface BioDataTemplateProps {
   employee: EmployeeDisplay;
-  companyName?: string;
-  companyAddress?: string;
+  companyDetails?: any;
   profilePictureDataUri?: string;
   leftThumbImpressionDataUri?: string;
   signatureDataUri?: string;
+  withLetterhead: boolean;
 }
 
 const DataRow: React.FC<{ label: string; value?: string | number | null }> = ({ label, value }) => (
@@ -32,7 +33,7 @@ const Section: React.FC<{ title: string; children: React.ReactNode; className?: 
 
 
 const BioDataTemplate = React.forwardRef<HTMLDivElement, BioDataTemplateProps>(
-  ({ employee, companyName, companyAddress, profilePictureDataUri, leftThumbImpressionDataUri, signatureDataUri }, ref) => {
+  ({ employee, companyDetails, profilePictureDataUri, leftThumbImpressionDataUri, signatureDataUri, withLetterhead }, ref) => {
     
     const fullPermanentAddress = [
         employee.permanentAddressHNo,
@@ -44,17 +45,21 @@ const BioDataTemplate = React.forwardRef<HTMLDivElement, BioDataTemplateProps>(
     ].filter(Boolean).join(', ');
     
     return (
-      <div ref={ref} className="bg-white text-black p-8 font-sans w-[210mm] min-h-[297mm] mx-auto flex flex-col shadow-lg border border-gray-200">
+      <div ref={ref} className="bg-white text-black p-8 font-sans w-[210mm] min-h-[297mm] mx-auto flex flex-col">
         
-        {/* Header */}
-        <header className="text-center mb-6">
-          <h1 className="text-3xl font-bold text-gray-800 uppercase tracking-wide">{companyName || 'Company Name'}</h1>
-          {companyAddress && <p className="text-xs text-gray-500 mt-1">{companyAddress}</p>}
-          <h2 className="text-2xl font-semibold text-gray-700 mt-4 pb-2 border-b-2 border-gray-300">Employee Bio-Data</h2>
-        </header>
+        {withLetterhead && companyDetails && <Letterhead companyDetails={companyDetails} />}
+
+        {!withLetterhead && (
+          <header className="text-center mb-6">
+            <div className="w-full h-24">{/* Blank space for letterhead */}</div>
+            <h1 className="text-3xl font-bold text-gray-800 uppercase tracking-wide">{companyDetails?.name || 'Company Name'}</h1>
+          </header>
+        )}
+
+        <h2 className="text-2xl font-semibold text-gray-700 mt-4 pb-2 border-b-2 border-gray-300 text-center">Employee Bio-Data</h2>
         
         {/* Main Content */}
-        <div className="flex-grow grid grid-cols-3 gap-8">
+        <div className="flex-grow grid grid-cols-3 gap-8 pt-6">
             <div className="col-span-2 space-y-6">
                 <Section title="Personal Details">
                     <DataRow label="Full Name" value={employee.name} />

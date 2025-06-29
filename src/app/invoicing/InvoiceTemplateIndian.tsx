@@ -3,6 +3,7 @@
 
 import React from 'react';
 import { format } from 'date-fns';
+import Letterhead from '@/components/Letterhead';
 
 // Interface definitions mirrored from invoicing/page.tsx for component props
 interface InvoiceItem {
@@ -55,6 +56,7 @@ interface InvoiceTemplateProps {
   currencySymbol: string;
   signatureDataUri?: string;
   stampDataUri?: string;
+  withLetterhead: boolean;
 }
 
 const numberToWords = (num: number): string => {
@@ -92,7 +94,7 @@ const numberToWords = (num: number): string => {
 };
 
 const InvoiceTemplateIndian = React.forwardRef<HTMLDivElement, InvoiceTemplateProps>(
-  ({ invoiceToView, companyProfileDetails, currencySymbol, signatureDataUri, stampDataUri }, ref) => {
+  ({ invoiceToView, companyProfileDetails, currencySymbol, signatureDataUri, stampDataUri, withLetterhead }, ref) => {
     
     const amountInWords = numberToWords(Math.floor(invoiceToView.amount));
     const subtotal = (invoiceToView.items || []).reduce((acc, item) => acc + (item.quantity * item.unitPrice), 0);
@@ -107,16 +109,19 @@ const InvoiceTemplateIndian = React.forwardRef<HTMLDivElement, InvoiceTemplatePr
 
 
     return (
-      <div ref={ref} className="bg-white text-black p-4 font-sans text-xs w-[210mm] min-h-[297mm] mx-auto flex flex-col">
-          <div className="flex-grow flex flex-col p-2 space-y-4">
-            {/* Header */}
-            <header className="text-center space-y-2">
-                <div className="w-full h-24">{/* Blank space for letterhead */}</div>
-                <h1 className="text-2xl font-bold uppercase tracking-wider text-gray-800">{companyProfileDetails.name}</h1>
-                <p className="text-sm text-gray-600">{fullCompanyAddress}</p>
-                <p className="text-sm text-gray-600">GSTIN: {companyProfileDetails.gstin} | PAN: {companyProfileDetails.pan || 'N/A'}</p>
-                <h2 className="text-lg font-bold border-y-2 border-black py-1">TAX INVOICE</h2>
-            </header>
+      <div ref={ref} className="bg-white text-black font-sans text-xs w-[210mm] min-h-[297mm] mx-auto flex flex-col">
+          {withLetterhead && <Letterhead companyDetails={companyProfileDetails} />}
+          <div className="flex-grow flex flex-col p-4 space-y-4">
+            {!withLetterhead && (
+                <header className="text-center space-y-2">
+                    <div className="w-full h-24">{/* Blank space for letterhead */}</div>
+                    <h1 className="text-2xl font-bold uppercase tracking-wider text-gray-800">{companyProfileDetails.name}</h1>
+                    <p className="text-sm text-gray-600">{fullCompanyAddress}</p>
+                    <p className="text-sm text-gray-600">GSTIN: {companyProfileDetails.gstin} | PAN: {companyProfileDetails.pan || 'N/A'}</p>
+                </header>
+            )}
+            
+            <h2 className="text-lg font-bold border-y-2 border-black py-1 text-center">TAX INVOICE</h2>
 
             {/* Details Table */}
             <table className="w-full border-collapse text-sm">
@@ -223,7 +228,6 @@ const InvoiceTemplateIndian = React.forwardRef<HTMLDivElement, InvoiceTemplatePr
                         <p className="font-bold">For {companyProfileDetails.name}</p>
                     </div>
                 </div>
-                 <div className="w-full h-12">{/* Blank space at bottom */}</div>
             </footer>
           </div>
       </div>
@@ -232,4 +236,3 @@ const InvoiceTemplateIndian = React.forwardRef<HTMLDivElement, InvoiceTemplatePr
 );
 InvoiceTemplateIndian.displayName = 'InvoiceTemplateIndian';
 export default InvoiceTemplateIndian;
-
