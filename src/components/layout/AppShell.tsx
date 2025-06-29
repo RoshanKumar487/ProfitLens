@@ -108,6 +108,14 @@ const AppShellLayout = ({ children }: { children: React.ReactNode }) => {
                 </h1>
               </Link>
             </Button>
+            {user && user.companyName && (
+              <div className="mt-1 px-2 group-data-[collapsible=icon]:hidden">
+                <div className="flex items-center gap-2 rounded-md bg-primary/10 p-2 shadow-inner">
+                  <Building className="h-4 w-4 flex-shrink-0 text-primary/80" />
+                  <p className="truncate text-sm font-semibold text-primary">{user.companyName}</p>
+                </div>
+              </div>
+            )}
           </SidebarHeader>
           <Separator className="bg-sidebar-border" />
           <SidebarContent className="p-2">

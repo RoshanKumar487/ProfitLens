@@ -26,6 +26,7 @@ interface User {
   email: string | null;
   displayName: string | null;
   companyId: string | null; // A user might not have a companyId until approved
+  companyName: string | null;
   country?: string;
   currencySymbol: string;
   role: UserRole;
@@ -103,12 +104,14 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
           const userRole: UserRole = isSuperAdmin ? 'admin' : userData.role || 'pending';
 
           let userCountry: string | undefined = undefined;
+          let companyName: string | null = null;
           if (companyId) {
             try {
               const companyDocRef = doc(db, 'companyProfiles', companyId);
               const companyDocSnap = await getDoc(companyDocRef);
               if (companyDocSnap.exists()) {
                 userCountry = companyDocSnap.data()?.country;
+                companyName = companyDocSnap.data()?.name;
               }
             } catch (e) {
               console.error("AuthContext: Could not fetch company profile for currency.", e);
@@ -121,6 +124,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
             email: firebaseUser.email,
             displayName: firebaseUser.displayName,
             companyId: companyId || null,
+            companyName: companyName || null,
             country: userCountry,
             currencySymbol: currencySymbol,
             role: userRole,
