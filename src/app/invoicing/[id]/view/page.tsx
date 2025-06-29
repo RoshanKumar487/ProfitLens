@@ -11,6 +11,7 @@ import { db } from '@/lib/firebaseConfig';
 import { sendInvoiceEmailAction } from '../../actions';
 import InvoiceTemplateIndian from '../../InvoiceTemplateIndian';
 import InvoiceTemplateModern from '../../InvoiceTemplateModern';
+import InvoiceTemplateBusiness from '../../InvoiceTemplateBusiness';
 import jsPDF from 'jspdf';
 import html2canvas from 'html2canvas';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -82,7 +83,7 @@ export default function ViewInvoicePage() {
     const [imageDataUris, setImageDataUris] = useState<{ signature?: string; stamp?: string }>({});
     const [isLoadingData, setIsLoadingData] = useState(true);
     const [isProcessing, setIsProcessing] = useState(false);
-    const [template, setTemplate] = useState<'simple' | 'modern'>('modern');
+    const [template, setTemplate] = useState<'simple' | 'modern' | 'business'>('business');
     const printRef = useRef<HTMLDivElement>(null);
 
     const fetchAllData = useCallback(async () => {
@@ -275,13 +276,14 @@ export default function ViewInvoicePage() {
                     </Button>
                     <div className="flex items-center gap-4 border-l pl-4">
                          <Label htmlFor="template-select">Template</Label>
-                         <Select value={template} onValueChange={(value) => setTemplate(value as 'simple' | 'modern')} disabled={isProcessing}>
+                         <Select value={template} onValueChange={(value) => setTemplate(value as any)} disabled={isProcessing}>
                             <SelectTrigger className="w-[180px]" id="template-select">
                                 <SelectValue placeholder="Select a template" />
                             </SelectTrigger>
                             <SelectContent>
                                 <SelectItem value="simple">Simple</SelectItem>
                                 <SelectItem value="modern">Modern</SelectItem>
+                                <SelectItem value="business">Business</SelectItem>
                             </SelectContent>
                         </Select>
                     </div>
@@ -308,6 +310,14 @@ export default function ViewInvoicePage() {
                         currencySymbol={currencySymbol} 
                         signatureDataUri={imageDataUris.signature}
                         stampDataUri={imageDataUris.stamp}
+                        invoiceSettings={invoiceSettings}
+                    />
+                 ) : template === 'business' ? (
+                     <InvoiceTemplateBusiness
+                        ref={printRef}
+                        invoiceToView={invoice} 
+                        companyProfileDetails={companyProfile} 
+                        currencySymbol={currencySymbol} 
                         invoiceSettings={invoiceSettings}
                     />
                  ) : (
