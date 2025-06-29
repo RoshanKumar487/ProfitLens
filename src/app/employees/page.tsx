@@ -38,6 +38,7 @@ import { Calendar as CalendarIcon } from 'lucide-react';
 import jsPDF from 'jspdf';
 import html2canvas from 'html2canvas';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Switch } from '@/components/ui/switch';
 
 interface EmployeeFirestore {
   id?: string;
@@ -152,7 +153,8 @@ export default function EmployeesPage() {
   const [bioDataImageUris, setBioDataImageUris] = useState<Record<string, string | undefined>>({});
   const [companyDetails, setCompanyDetails] = useState<any | null>(null);
   const [isPrinting, setIsPrinting] = useState(false);
-  const [letterheadTemplate, setLetterheadTemplate] = useState('none');
+  const [useLetterhead, setUseLetterhead] = useState(true);
+  const [letterheadTemplate, setLetterheadTemplate] = useState<'simple' | 'modern'>('simple');
 
 
   const filteredEmployees = useMemo(() => {
@@ -793,7 +795,28 @@ export default function EmployeesPage() {
 
       <Dialog open={isBioDataDialogOpen} onOpenChange={setIsBioDataDialogOpen}>
           <DialogContent className="max-w-4xl w-full h-[95vh] flex flex-col p-0 bg-gray-100 dark:bg-background">
-              <DialogHeader className="p-4 sm:p-6 pb-2 border-b bg-background no-print"><DialogTitle className="font-headline text-xl">Bio-Data: {employeeToPrint?.name}</DialogTitle></DialogHeader>
+              <DialogHeader className="p-4 sm:p-6 pb-2 border-b bg-background no-print">
+                 <div className="flex justify-between items-center gap-4">
+                    <DialogTitle className="font-headline text-xl truncate">Bio-Data: {employeeToPrint?.name}</DialogTitle>
+                    <div className="flex items-center gap-4">
+                        <div className="flex items-center space-x-2">
+                            <Switch id="use-letterhead-bio" checked={useLetterhead} onCheckedChange={setUseLetterhead} disabled={isPrinting} />
+                            <Label htmlFor="use-letterhead-bio">Letterhead</Label>
+                        </div>
+                        {useLetterhead && (
+                            <Select value={letterheadTemplate} onValueChange={(value) => setLetterheadTemplate(value as 'simple' | 'modern')} disabled={isPrinting}>
+                                <SelectTrigger className="w-[180px]">
+                                    <SelectValue placeholder="Select a template" />
+                                </SelectTrigger>
+                                <SelectContent>
+                                    <SelectItem value="simple">Simple</SelectItem>
+                                    <SelectItem value="modern">Modern</SelectItem>
+                                </SelectContent>
+                            </Select>
+                        )}
+                    </div>
+                </div>
+              </DialogHeader>
               <ScrollArea className="flex-grow bg-muted p-4 sm:p-8">
                   {employeeToPrint && <div className="bg-white shadow-lg mx-auto"><BioDataTemplate 
                     ref={bioDataPrintRef} 
@@ -802,23 +825,10 @@ export default function EmployeesPage() {
                     profilePictureDataUri={bioDataImageUris.profile}
                     leftThumbImpressionDataUri={bioDataImageUris.thumb}
                     signatureDataUri={bioDataImageUris.signature}
-                    letterheadTemplate={letterheadTemplate}
+                    letterheadTemplate={useLetterhead ? letterheadTemplate : 'none'}
                    /></div>}
               </ScrollArea>
-              <DialogFooter className="p-4 sm:p-6 border-t bg-background no-print justify-between items-center flex-wrap gap-2">
-                 <div className="flex items-center space-x-2">
-                    <Label htmlFor="letterhead-select">Letterhead</Label>
-                    <Select value={letterheadTemplate} onValueChange={setLetterheadTemplate}>
-                        <SelectTrigger className="w-[180px]">
-                            <SelectValue placeholder="Select a template" />
-                        </SelectTrigger>
-                        <SelectContent>
-                            <SelectItem value="none">None</SelectItem>
-                            <SelectItem value="simple">Simple</SelectItem>
-                            <SelectItem value="modern">Modern</SelectItem>
-                        </SelectContent>
-                    </Select>
-                </div>
+              <DialogFooter className="p-4 sm:p-6 border-t bg-background no-print justify-end flex-wrap gap-2">
                 <div className="flex gap-2">
                      <Button type="button" variant="secondary" onClick={handleDownloadBioDataPdf} disabled={isPrinting}>
                         {isPrinting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Download className="mr-2 h-4 w-4" />} 

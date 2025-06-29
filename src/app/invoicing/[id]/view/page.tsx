@@ -18,6 +18,7 @@ import { urlToDataUri } from '@/lib/utils';
 import Link from 'next/link';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Switch } from '@/components/ui/switch';
 
 // Interface definitions mirrored from invoicing/page.tsx for component props
 interface InvoiceItem {
@@ -79,7 +80,8 @@ export default function ViewInvoicePage() {
     const [imageDataUris, setImageDataUris] = useState<{ signature?: string; stamp?: string }>({});
     const [isLoadingData, setIsLoadingData] = useState(true);
     const [isProcessing, setIsProcessing] = useState(false);
-    const [letterheadTemplate, setLetterheadTemplate] = useState('none');
+    const [useLetterhead, setUseLetterhead] = useState(true);
+    const [letterheadTemplate, setLetterheadTemplate] = useState<'simple' | 'modern'>('simple');
     const printRef = useRef<HTMLDivElement>(null);
 
     const fetchAllData = useCallback(async () => {
@@ -266,18 +268,22 @@ export default function ViewInvoicePage() {
                             Edit
                         </Link>
                     </Button>
-                    <div className="flex items-center space-x-2">
-                        <Label htmlFor="letterhead-select">Letterhead</Label>
-                         <Select value={letterheadTemplate} onValueChange={setLetterheadTemplate}>
-                            <SelectTrigger className="w-[180px]">
-                                <SelectValue placeholder="Select a template" />
-                            </SelectTrigger>
-                            <SelectContent>
-                                <SelectItem value="none">None</SelectItem>
-                                <SelectItem value="simple">Simple</SelectItem>
-                                <SelectItem value="modern">Modern</SelectItem>
-                            </SelectContent>
-                        </Select>
+                    <div className="flex items-center gap-4 border-l pl-4">
+                        <div className="flex items-center space-x-2">
+                            <Switch id="use-letterhead" checked={useLetterhead} onCheckedChange={setUseLetterhead} disabled={isProcessing} />
+                            <Label htmlFor="use-letterhead">Letterhead</Label>
+                        </div>
+                        {useLetterhead && (
+                             <Select value={letterheadTemplate} onValueChange={(value) => setLetterheadTemplate(value as 'simple' | 'modern')} disabled={isProcessing}>
+                                <SelectTrigger className="w-[180px]">
+                                    <SelectValue placeholder="Select a template" />
+                                </SelectTrigger>
+                                <SelectContent>
+                                    <SelectItem value="simple">Simple</SelectItem>
+                                    <SelectItem value="modern">Modern</SelectItem>
+                                </SelectContent>
+                            </Select>
+                        )}
                     </div>
                     <Button onClick={handleDownloadPdf} disabled={isProcessing || !companyProfile}>
                         {isProcessing ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Download className="mr-2 h-4 w-4" />} Download PDF
@@ -301,7 +307,7 @@ export default function ViewInvoicePage() {
                     currencySymbol={currencySymbol} 
                     signatureDataUri={imageDataUris.signature}
                     stampDataUri={imageDataUris.stamp}
-                    letterheadTemplate={letterheadTemplate}
+                    letterheadTemplate={useLetterhead ? letterheadTemplate : 'none'}
                 />
             </div>
         </main>
