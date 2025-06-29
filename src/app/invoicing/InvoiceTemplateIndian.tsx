@@ -98,48 +98,41 @@ const InvoiceTemplateIndian = React.forwardRef<HTMLDivElement, InvoiceTemplatePr
     const subtotal = (invoiceToView.items || []).reduce((acc, item) => acc + (item.quantity * item.unitPrice), 0);
     const cgstAmount = invoiceToView.taxAmount / 2;
     const sgstAmount = invoiceToView.taxAmount / 2;
+    const fullCompanyAddress = [
+        companyProfileDetails.address,
+        companyProfileDetails.city,
+        companyProfileDetails.state,
+        companyProfileDetails.country
+    ].filter(Boolean).join(', ');
+
 
     return (
       <div ref={ref} className="bg-white text-black p-4 font-sans text-xs w-[210mm] min-h-[297mm] mx-auto flex flex-col">
-          <div className="border border-black flex-grow flex flex-col p-2">
+          <div className="flex-grow flex flex-col p-2 space-y-4">
             {/* Header */}
-            <header className="grid grid-cols-3 mb-1">
-                <div className="text-left text-xs">
-                    <p>GST No: {companyProfileDetails.gstin}</p>
-                    <p>PAN No: {companyProfileDetails.pan || 'N/A'}</p>
-                </div>
-                <div className="text-center font-bold">
-                    <p>INVOICE</p>
-                    <p>HSN CODE: 998525</p>
-                </div>
-                <div className="text-right text-xs">
-                    <p>Phone: {companyProfileDetails.phone}</p>
-                </div>
+            <header className="text-center space-y-2">
+                <div className="w-full h-24">{/* Blank space for letterhead */}</div>
+                <h1 className="text-2xl font-bold uppercase tracking-wider text-gray-800">{companyProfileDetails.name}</h1>
+                <p className="text-sm text-gray-600">{fullCompanyAddress}</p>
+                <p className="text-sm text-gray-600">GSTIN: {companyProfileDetails.gstin} | PAN: {companyProfileDetails.pan || 'N/A'}</p>
+                <h2 className="text-lg font-bold border-y-2 border-black py-1">TAX INVOICE</h2>
             </header>
 
-            <div className="text-center font-bold border-y border-black py-1">
-                Bill for The Month of {format(invoiceToView.issuedDate, 'MMMM yyyy').toUpperCase()}
-            </div>
-
             {/* Details Table */}
-            <table className="w-full border-collapse border border-black mt-1">
+            <table className="w-full border-collapse text-sm">
                 <tbody>
                     <tr>
-                        <td className="w-1/2 border-r border-black p-1 align-top">
-                            <p>To,</p>
-                            <p className="font-bold">{invoiceToView.clientName}</p>
+                        <td className="w-1/2 p-2 align-top border border-black">
+                            <p className="font-bold">Bill To:</p>
+                            <p className="font-bold text-base">{invoiceToView.clientName}</p>
                             <p className="whitespace-pre-line">{invoiceToView.clientAddress}</p>
-                            <p className="mt-4">GSTIN NO. {invoiceToView.clientGstin || 'N/A'}</p>
+                            <p className="mt-2">GSTIN: {invoiceToView.clientGstin || 'N/A'}</p>
                         </td>
-                        <td className="w-1/2 p-1 align-top text-xs">
-                            <div className="grid grid-cols-[auto_1fr] gap-x-2">
-                                <span>Invoice No:</span><span className="font-bold">{invoiceToView.invoiceNumber}</span>
-                                <span>DATE:</span><span className="font-bold">{format(invoiceToView.issuedDate, 'dd-MM-yyyy')}</span>
-                                <span className="col-span-2 mt-2 font-bold">A/C. NAME : {companyProfileDetails.name}</span>
-                                <span>BANK NAME:</span><span>{companyProfileDetails.bankName}</span>
-                                <span>A/C NO. :</span><span>{companyProfileDetails.accountNumber}</span>
-                                <span>IFSC CODE :</span><span>{companyProfileDetails.ifscCode}</span>
-                                <span>BRANCH :</span><span>{companyProfileDetails.branch}</span>
+                        <td className="w-1/2 p-2 align-top border border-black">
+                             <div className="grid grid-cols-[auto_1fr] gap-x-4 gap-y-1">
+                                <span className="font-bold">Invoice No:</span><span>{invoiceToView.invoiceNumber}</span>
+                                <span className="font-bold">Invoice Date:</span><span>{format(invoiceToView.issuedDate, 'dd-MM-yyyy')}</span>
+                                <span className="font-bold">Due Date:</span><span>{format(invoiceToView.dueDate, 'dd-MM-yyyy')}</span>
                             </div>
                         </td>
                     </tr>
@@ -147,87 +140,90 @@ const InvoiceTemplateIndian = React.forwardRef<HTMLDivElement, InvoiceTemplatePr
             </table>
 
             {/* Items Table */}
-             <div className="flex-grow flex flex-col">
-                <table className="w-full border-collapse border-x border-b border-black text-center">
-                    <thead>
+            <div className="flex-grow">
+                <table className="w-full border-collapse border border-black text-center text-sm">
+                    <thead className="bg-gray-100">
                         <tr className="border-b border-black">
-                            <th className="p-1 border-r border-black">Description</th>
-                            <th className="p-1 border-r border-black w-24">Per Head</th>
-                            <th className="p-1 border-r border-black w-20">No. Of<br/>person</th>
-                            <th className="p-1 border-r border-black w-20">No. Of Duties</th>
-                            <th className="p-1 w-28">Total Amount</th>
+                            <th className="p-2 border-r border-black w-10">#</th>
+                            <th className="p-2 border-r border-black text-left">Item Description</th>
+                            <th className="p-2 border-r border-black w-24">HSN/SAC</th>
+                            <th className="p-2 border-r border-black w-20">Qty</th>
+                            <th className="p-2 border-r border-black w-28">Rate</th>
+                            <th className="p-2 w-32">Amount</th>
                         </tr>
                     </thead>
                     <tbody>
                         {(invoiceToView.items || []).map((item, index) => (
-                            <tr key={item.id} className="border-b border-black last:border-b-0">
-                                <td className="p-1 border-r border-black text-left">{index + 1}. {item.description}</td>
-                                <td className="p-1 border-r border-black">{item.unitPrice.toFixed(2)}</td>
-                                <td className="p-1 border-r border-black">{item.quantity}</td>
-                                <td className="p-1 border-r border-black">-</td>
-                                <td className="p-1 text-right">{(item.quantity * item.unitPrice).toFixed(2)}</td>
+                            <tr key={item.id} className="border-b border-gray-200 last:border-b-0">
+                                <td className="p-2 border-r border-black">{index + 1}</td>
+                                <td className="p-2 border-r border-black text-left">{item.description}</td>
+                                <td className="p-2 border-r border-black">998314</td>
+                                <td className="p-2 border-r border-black">{item.quantity}</td>
+                                <td className="p-2 border-r border-black text-right">{currencySymbol}{item.unitPrice.toFixed(2)}</td>
+                                <td className="p-2 text-right">{currencySymbol}{(item.quantity * item.unitPrice).toFixed(2)}</td>
                             </tr>
                         ))}
-                         <tr className="h-full"><td className="border-r border-black"></td><td className="border-r border-black"></td><td className="border-r border-black"></td><td className="border-r border-black"></td><td></td></tr>
+                         {/* Spacer row to push footer down */}
+                         <tr><td colSpan={6} className="py-24">&nbsp;</td></tr>
                     </tbody>
                 </table>
              </div>
 
             {/* Footer */}
             <footer className="mt-auto">
-                <table className="w-full border-collapse border border-black mt-[-1px]">
-                    <tbody>
-                        <tr>
-                            <td className="w-2/3 p-1 border-r border-black align-top">
-                                <p>In Words: {amountInWords} rupees only.</p>
-                                <div className="mt-16">
-                                    <p>Checked by:</p>
-                                </div>
-                            </td>
-                            <td className="w-1/3 p-0 align-top">
-                                <table className="w-full border-collapse">
-                                    <tbody>
-                                        <tr className="border-b border-black">
-                                            <td className="p-1">Total</td>
-                                            <td className="p-1 text-right">{subtotal.toFixed(2)}</td>
-                                        </tr>
-                                        <tr className="border-b border-black">
-                                            <td className="p-1">RCM CGST {invoiceToView.taxRate / 2}%</td>
-                                            <td className="p-1 text-right">{cgstAmount > 0 ? cgstAmount.toFixed(2) : '-'}</td>
-                                        </tr>
-                                        <tr className="border-b border-black">
-                                            <td className="p-1">RCM SGST {invoiceToView.taxRate / 2}%</td>
-                                            <td className="p-1 text-right">{sgstAmount > 0 ? sgstAmount.toFixed(2) : '-'}</td>
-                                        </tr>
-                                        <tr>
-                                            <td className="p-1 font-bold">Grand Total</td>
-                                            <td className="p-1 text-right font-bold">{invoiceToView.amount.toFixed(2)}</td>
-                                        </tr>
-                                    </tbody>
-                                </table>
-                            </td>
-                        </tr>
-                    </tbody>
-                </table>
-
-                {/* Signature */}
-                <div className="flex justify-between mt-10">
-                    <div className="relative h-24 w-24 flex items-center justify-center">
-                        {stampDataUri && (
-                            // eslint-disable-next-line @next/next/no-img-element
-                            <img src={stampDataUri} alt="Company Stamp" className="max-h-full max-w-full object-contain" crossOrigin="anonymous" />
-                        )}
+                <div className="grid grid-cols-[60%_40%] border border-black">
+                     <div className="p-2 border-r border-black">
+                        <p className="font-bold">Amount in Words:</p>
+                        <p>{amountInWords} Only.</p>
+                        <br/>
+                        <p className="font-bold">Bank Details:</p>
+                        <p>Bank: {companyProfileDetails.bankName || 'N/A'}</p>
+                        <p>A/C No: {companyProfileDetails.accountNumber || 'N/A'}</p>
+                        <p>IFSC: {companyProfileDetails.ifscCode || 'N/A'}</p>
+                        <p>Branch: {companyProfileDetails.branch || 'N/A'}</p>
                     </div>
-                    <div className="text-right">
-                        <p>For {companyProfileDetails.name}</p>
-                        <div className="relative h-16 w-32 mx-auto flex items-center justify-center">
-                            {signatureDataUri && (
-                                // eslint-disable-next-line @next/next/no-img-element
-                                <img src={signatureDataUri} alt="Signature" className="max-h-full max-w-full object-contain" crossOrigin="anonymous" />
-                            )}
-                        </div>
+                    <div className="p-0">
+                         <table className="w-full border-collapse text-sm">
+                            <tbody>
+                                <tr className="border-b border-black">
+                                    <td className="p-2">Subtotal</td>
+                                    <td className="p-2 text-right">{currencySymbol}{subtotal.toFixed(2)}</td>
+                                </tr>
+                                <tr className="border-b border-black">
+                                    <td className="p-2">CGST ({invoiceToView.taxRate / 2}%)</td>
+                                    <td className="p-2 text-right">{currencySymbol}{cgstAmount > 0 ? cgstAmount.toFixed(2) : '0.00'}</td>
+                                </tr>
+                                <tr className="border-b border-black">
+                                    <td className="p-2">SGST ({invoiceToView.taxRate / 2}%)</td>
+                                    <td className="p-2 text-right">{currencySymbol}{sgstAmount > 0 ? sgstAmount.toFixed(2) : '0.00'}</td>
+                                </tr>
+                                <tr className="bg-gray-100 font-bold">
+                                    <td className="p-2">Grand Total</td>
+                                    <td className="p-2 text-right">{currencySymbol}{invoiceToView.amount.toFixed(2)}</td>
+                                </tr>
+                            </tbody>
+                        </table>
                     </div>
                 </div>
+
+                <div className="grid grid-cols-2 mt-4">
+                    <div className="p-2 text-xs">
+                        <p className="font-bold">Terms & Conditions:</p>
+                        <p>1. Please pay within {format(invoiceToView.dueDate, 'dd-MM-yyyy')}.</p>
+                        <p>2. This is a computer generated invoice.</p>
+                    </div>
+                    <div className="p-2 text-center">
+                        <div className="relative h-24 w-48 mx-auto flex flex-col items-center justify-end">
+                             {signatureDataUri && (
+                                // eslint-disable-next-line @next/next/no-img-element
+                                <img src={signatureDataUri} alt="Signature" className="max-h-16 max-w-full object-contain" crossOrigin="anonymous" />
+                            )}
+                             <p className="border-t border-black w-full pt-1 mt-2">Authorised Signatory</p>
+                        </div>
+                        <p className="font-bold">For {companyProfileDetails.name}</p>
+                    </div>
+                </div>
+                 <div className="w-full h-12">{/* Blank space at bottom */}</div>
             </footer>
           </div>
       </div>
@@ -236,3 +232,4 @@ const InvoiceTemplateIndian = React.forwardRef<HTMLDivElement, InvoiceTemplatePr
 );
 InvoiceTemplateIndian.displayName = 'InvoiceTemplateIndian';
 export default InvoiceTemplateIndian;
+

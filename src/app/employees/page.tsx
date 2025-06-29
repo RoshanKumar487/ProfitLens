@@ -636,23 +636,7 @@ export default function EmployeesPage() {
         const pdf = new jsPDF({ orientation: 'p', unit: 'mm', format: 'a4' });
         const pdfWidth = pdf.internal.pageSize.getWidth();
         const pdfHeight = pdf.internal.pageSize.getHeight();
-        const imgProps = pdf.getImageProperties(imgData);
-        const imgAspectRatio = imgProps.width / imgProps.height;
-        const pdfAspectRatio = pdfWidth / pdfHeight;
-
-        let finalWidth, finalHeight;
-        if (imgAspectRatio > pdfAspectRatio) {
-          finalWidth = pdfWidth;
-          finalHeight = pdfWidth / imgAspectRatio;
-        } else {
-          finalHeight = pdfHeight;
-          finalWidth = pdfHeight * imgAspectRatio;
-        }
-
-        const x = (pdfWidth - finalWidth) / 2;
-        const y = (pdfHeight - finalHeight) / 2;
-
-        pdf.addImage(imgData, 'PNG', x, y, finalWidth, finalHeight);
+        pdf.addImage(imgData, 'PNG', 0, 0, pdfWidth, pdfHeight);
 
         const pdfBlob = pdf.output('blob');
         const pdfUrl = URL.createObjectURL(pdfBlob);
@@ -774,7 +758,7 @@ export default function EmployeesPage() {
       <Dialog open={isBioDataDialogOpen} onOpenChange={setIsBioDataDialogOpen}>
           <DialogContent className="max-w-4xl w-full h-[95vh] flex flex-col p-0 bg-gray-100 dark:bg-background">
               <DialogHeader className="p-4 sm:p-6 pb-2 border-b bg-background no-print"><DialogTitle className="font-headline text-xl">Bio-Data: {employeeToPrint?.name}</DialogTitle></DialogHeader>
-              <ScrollArea className="flex-grow bg-gray-200 dark:bg-zinc-800 p-4 sm:p-8">
+              <ScrollArea className="flex-grow bg-muted p-4 sm:p-8">
                   {employeeToPrint && <BioDataTemplate 
                     ref={bioDataPrintRef} 
                     employee={employeeToPrint} 
