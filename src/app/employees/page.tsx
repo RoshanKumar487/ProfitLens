@@ -154,7 +154,6 @@ export default function EmployeesPage() {
   const [companyDetails, setCompanyDetails] = useState<any | null>(null);
   const [isPrinting, setIsPrinting] = useState(false);
   const [useLetterhead, setUseLetterhead] = useState(true);
-  const [letterheadTemplate, setLetterheadTemplate] = useState<'simple' | 'modern'>('simple');
 
 
   const filteredEmployees = useMemo(() => {
@@ -801,19 +800,8 @@ export default function EmployeesPage() {
                     <div className="flex items-center gap-4">
                         <div className="flex items-center space-x-2">
                             <Switch id="use-letterhead-bio" checked={useLetterhead} onCheckedChange={setUseLetterhead} disabled={isPrinting} />
-                            <Label htmlFor="use-letterhead-bio">Letterhead</Label>
+                            <Label htmlFor="use-letterhead-bio">Use Letterhead</Label>
                         </div>
-                        {useLetterhead && (
-                            <Select value={letterheadTemplate} onValueChange={(value) => setLetterheadTemplate(value as 'simple' | 'modern')} disabled={isPrinting}>
-                                <SelectTrigger className="w-[180px]">
-                                    <SelectValue placeholder="Select a template" />
-                                </SelectTrigger>
-                                <SelectContent>
-                                    <SelectItem value="simple">Simple</SelectItem>
-                                    <SelectItem value="modern">Modern</SelectItem>
-                                </SelectContent>
-                            </Select>
-                        )}
                     </div>
                 </div>
               </DialogHeader>
@@ -825,7 +813,7 @@ export default function EmployeesPage() {
                     profilePictureDataUri={bioDataImageUris.profile}
                     leftThumbImpressionDataUri={bioDataImageUris.thumb}
                     signatureDataUri={bioDataImageUris.signature}
-                    letterheadTemplate={useLetterhead ? letterheadTemplate : 'none'}
+                    letterheadTemplate={useLetterhead ? 'simple' : 'none'}
                    /></div>}
               </ScrollArea>
               <DialogFooter className="p-4 sm:p-6 border-t bg-background no-print justify-end flex-wrap gap-2">

@@ -4,7 +4,6 @@ import React from 'react';
 import { format } from 'date-fns';
 import type { EmployeeDisplay } from './page';
 import Letterhead from '@/components/Letterhead';
-import LetterheadModern from '@/components/LetterheadModern';
 import { stringToHslColor } from '@/lib/utils';
 
 interface BioDataTemplateProps {
@@ -13,7 +12,7 @@ interface BioDataTemplateProps {
   profilePictureDataUri?: string;
   leftThumbImpressionDataUri?: string;
   signatureDataUri?: string;
-  letterheadTemplate: 'none' | 'simple' | 'modern';
+  letterheadTemplate: 'none' | 'simple';
 }
 
 const DataRow: React.FC<{ label: string; value?: string | number | null }> = ({ label, value }) => (
@@ -45,13 +44,10 @@ const BioDataTemplate = React.forwardRef<HTMLDivElement, BioDataTemplateProps>(
         employee.permanentAddressPin
     ].filter(Boolean).join(', ');
     
-    const primaryBgColor = companyDetails ? stringToHslColor(companyDetails.name, 40, 25) : 'transparent';
-
     return (
       <div ref={ref} className="bg-white text-black font-sans w-[210mm] min-h-[297mm] mx-auto flex flex-col">
         <div className="flex-grow p-8 flex flex-col">
             {letterheadTemplate === 'simple' && companyDetails && <Letterhead companyDetails={companyDetails} />}
-            {letterheadTemplate === 'modern' && companyDetails && <LetterheadModern companyDetails={companyDetails} />}
 
             {letterheadTemplate === 'none' && (
             <header className="text-center mb-6">
@@ -134,10 +130,6 @@ const BioDataTemplate = React.forwardRef<HTMLDivElement, BioDataTemplateProps>(
                 </div>
             </footer>
         </div>
-        
-        {letterheadTemplate === 'modern' && companyDetails && (
-          <footer style={{ backgroundColor: primaryBgColor, height: '25px' }} />
-        )}
       </div>
     );
   }
