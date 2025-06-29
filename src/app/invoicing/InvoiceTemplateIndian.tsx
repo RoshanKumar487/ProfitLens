@@ -3,7 +3,6 @@
 import React from 'react';
 import { format } from 'date-fns';
 import Letterhead from '@/components/Letterhead';
-import LetterheadModern from '@/components/LetterheadModern';
 import { stringToHslColor } from '@/lib/utils';
 import type { InvoiceSettings } from '../settings/actions';
 
@@ -59,7 +58,7 @@ interface InvoiceTemplateProps {
   currencySymbol: string;
   signatureDataUri?: string;
   stampDataUri?: string;
-  letterheadTemplate: 'none' | 'simple' | 'modern';
+  letterheadTemplate: 'none' | 'simple';
   invoiceSettings: InvoiceSettings | null;
 }
 
@@ -111,13 +110,12 @@ const InvoiceTemplateIndian = React.forwardRef<HTMLDivElement, InvoiceTemplatePr
         companyProfileDetails.country
     ].filter(Boolean).join(', ');
 
-    const primaryBgColor = letterheadTemplate === 'modern' ? stringToHslColor(companyProfileDetails.name, 40, 25) : 'transparent';
+    const primaryBgColor = stringToHslColor(companyProfileDetails.name, 40, 25);
     const customColumns = invoiceSettings?.customItemColumns || [];
 
     return (
       <div ref={ref} className="bg-white text-black font-sans text-xs w-[210mm] min-h-[297mm] mx-auto flex flex-col">
           {letterheadTemplate === 'simple' && <Letterhead companyDetails={companyProfileDetails} />}
-          {letterheadTemplate === 'modern' && <LetterheadModern companyDetails={companyProfileDetails} />}
 
           <div className="flex-grow flex flex-col p-4 space-y-4">
             {letterheadTemplate === 'none' && (
@@ -242,9 +240,6 @@ const InvoiceTemplateIndian = React.forwardRef<HTMLDivElement, InvoiceTemplatePr
                 </div>
             </footer>
           </div>
-          {letterheadTemplate === 'modern' && (
-              <footer style={{ backgroundColor: primaryBgColor, height: '25px' }} />
-          )}
       </div>
     );
   }
