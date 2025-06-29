@@ -24,3 +24,43 @@ export function downloadCsv(csvString: string, filename: string) {
 export function formatAmount(amount: number, currencySymbol = '$') {
   return `${currencySymbol}${amount.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 }
+
+export async function urlToDataUri(url: string): Promise<string> {
+  if (!url) return '';
+  try {
+    const response = await fetch(url);
+    if (!response.ok) {
+      console.error(`Failed to fetch image: ${response.statusText} for URL: ${url}`);
+      return '';
+    }
+    const blob = await response.blob();
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        if (typeof reader.result === 'string') {
+          resolve(reader.result);
+        } else {
+          console.error('Failed to convert blob to data URI.');
+          resolve('');
+        }
+      };
+      reader.onerror = (error) => {
+        console.error('FileReader error:', error);
+        reject(error);
+      };
+      reader.readAsDataURL(blob);
+    });
+  } catch (error) {
+    console.error(`Could not convert URL to data URI: ${url}`, error);
+    return ''; // Return empty string on failure
+  }
+}
+
+export function stringToHslColor(str: string, saturation: number, lightness: number): string {
+  let hash = 0;
+  for (let i = 0; i < str.length; i++) {
+    hash = str.charCodeAt(i) + ((hash << 5) - hash);
+  }
+  const hue = hash % 360;
+  return `hsl(${hue}, ${saturation}%, ${lightness}%)`;
+}

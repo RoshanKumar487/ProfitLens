@@ -1,3 +1,4 @@
+
 'use client'
 
 import * as React from "react"
@@ -5,18 +6,17 @@ import Link from "next/link"
 import { Pie, PieChart, ResponsiveContainer, Cell, Tooltip } from "recharts"
 import { useAuth } from "@/contexts/AuthContext"
 import { db } from "@/lib/firebaseConfig"
-import { collectionGroup, query, where, getDocs } from "firebase/firestore"
+import { collection, query, where, getDocs } from "firebase/firestore"
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Skeleton } from "@/components/ui/skeleton"
 import { Alert, AlertTitle } from "@/components/ui/alert"
 import { Info, ArrowRight } from "lucide-react"
 
-interface Transaction {
+interface Expense {
   id: string;
   category: string;
   amount: number;
-  type: 'deposit' | 'withdrawal';
 }
 
 const COLORS = [
@@ -43,19 +43,18 @@ export default function TransactionPieChart() {
     const fetchData = async () => {
       setIsLoading(true);
       const q = query(
-        collectionGroup(db, 'transactions'),
-        where('companyId', '==', user.companyId),
-        where('type', '==', 'withdrawal')
+        collection(db, 'expenses'),
+        where('companyId', '==', user.companyId)
       );
 
       try {
         const snapshot = await getDocs(q);
-        const transactions: Transaction[] = [];
+        const expenses: Expense[] = [];
         snapshot.forEach(doc => {
-            transactions.push({ id: doc.id, ...doc.data() } as Transaction);
+            expenses.push({ id: doc.id, ...doc.data() } as Expense);
         });
 
-        const categoryTotals = transactions.reduce((acc, tx) => {
+        const categoryTotals = expenses.reduce((acc, tx) => {
             if (!acc[tx.category]) {
             acc[tx.category] = 0;
             }
@@ -73,7 +72,7 @@ export default function TransactionPieChart() {
         setTotalExpenses(total);
 
       } catch (error) {
-          console.error("Error fetching transaction data for chart:", error);
+          console.error("Error fetching expense data for chart:", error);
       } finally {
           setIsLoading(false);
       }
@@ -101,11 +100,11 @@ export default function TransactionPieChart() {
         <div className="flex justify-between items-start">
             <div>
                 <CardTitle className="font-headline">Expense Breakdown</CardTitle>
-                <CardDescription>Withdrawals by category from your bank accounts.</CardDescription>
+                <CardDescription>Breakdown of your recorded expenses by category.</CardDescription>
             </div>
             <Button asChild variant="ghost" size="sm" className="flex-shrink-0">
-                <Link href="/bank-accounts">
-                    Manage Accounts
+                <Link href="/record-expenses">
+                    Manage Expenses
                     <ArrowRight className="ml-2 h-4 w-4" />
                 </Link>
             </Button>
@@ -121,7 +120,7 @@ export default function TransactionPieChart() {
             <Alert className="border-primary/20 max-w-sm">
               <Info className="h-4 w-4 text-primary" />
               <AlertTitle>No Data Yet</AlertTitle>
-              <p className="text-xs text-muted-foreground">Add bank accounts and log some withdrawal transactions to see your expense breakdown here.</p>
+              <p className="text-xs text-muted-foreground">Use the "Record Expenses" page to log your spending. It will be visualized here.</p>
             </Alert>
           </div>
         ) : (

@@ -27,6 +27,7 @@ import * as xlsx from 'xlsx';
 import { updateExpenseEntry, deleteExpenseEntry, type ExpenseUpdateData, bulkAddExpenses, type ExpenseImportData } from './actions';
 import { analyzeReceipt } from '@/ai/flows/analyze-receipt-flow';
 import { Skeleton } from '@/components/ui/skeleton';
+import Link from 'next/link';
 
 const EXPENSE_CATEGORIES = [
   'Software & Subscriptions',
@@ -68,13 +69,6 @@ export default function RecordExpensesPage() {
   const { user, isLoading: authIsLoading } = useAuth();
   const currency = user?.currencySymbol || '$';
   
-  // State for new entry form
-  const [newEntryDate, setNewEntryDate] = useState<Date | undefined>(new Date());
-  const [newEntryAmount, setNewEntryAmount] = useState<string>('');
-  const [newEntryCategory, setNewEntryCategory] = useState<string>('');
-  const [newEntryDescription, setNewEntryDescription] = useState<string>('');
-  const [newEntryVendor, setNewEntryVendor] = useState<string>('');
-  
   const [recentEntries, setRecentEntries] = useState<ExpenseEntryDisplay[]>([]);
   const [isLoadingEntries, setIsLoadingEntries] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
@@ -83,9 +77,7 @@ export default function RecordExpensesPage() {
   const [searchTerm, setSearchTerm] = useState<string>('');
   const [sortConfig, setSortConfig] = useState<{ key: keyof ExpenseEntryDisplay; direction: 'ascending' | 'descending' }>({ key: 'date', direction: 'descending' });
 
-
   // State for dialogs
-  const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
   const [currentExpense, setCurrentExpense] = useState<ExpenseEntryDisplay | null>(null);
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
@@ -196,57 +188,6 @@ export default function RecordExpensesPage() {
       return <ArrowDown className="ml-2 h-4 w-4" />;
   };
 
-  const resetNewEntryForm = () => {
-    setNewEntryDate(new Date());
-    setNewEntryAmount('');
-    setNewEntryCategory('');
-    setNewEntryDescription('');
-    setNewEntryVendor('');
-  };
-
-  const handleNewEntrySubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!user || !user.companyId) {
-      toast({ title: 'Authentication Error', description: 'User not authenticated.', variant: 'destructive' });
-      return;
-    }
-    if (!newEntryDate || !newEntryAmount || !newEntryCategory) {
-      toast({ title: 'Missing Information', description: 'Please fill in date, amount, and category.', variant: 'destructive' });
-      return;
-    }
-    
-    const amountNum = parseFloat(newEntryAmount);
-    if (isNaN(amountNum) || amountNum <= 0) {
-      toast({ title: 'Invalid Amount', description: 'Amount must be a positive number.', variant: 'destructive' });
-      return;
-    }
-
-    setIsSaving(true);
-    const newEntryPayload = {
-      date: Timestamp.fromDate(newEntryDate),
-      amount: amountNum,
-      category: newEntryCategory,
-      description: newEntryDescription || '',
-      vendor: newEntryVendor || '',
-      companyId: user.companyId,
-      createdAt: serverTimestamp(),
-      addedById: user.uid,
-      addedBy: user.displayName || user.email || 'System'
-    };
-
-    try {
-      await addDoc(collection(db, 'expenses'), newEntryPayload);
-      fetchExpenseEntries();
-      toast({ title: 'Expense Recorded', description: `Successfully recorded ${currency}${amountNum.toFixed(2)} for ${newEntryCategory}.` });
-      resetNewEntryForm();
-      setIsAddDialogOpen(false);
-    } catch (error: any) {
-      toast({ title: 'Save Failed', description: error.message, variant: 'destructive' });
-    } finally {
-      setIsSaving(false);
-    }
-  };
-  
   const handleEditClick = (expense: ExpenseEntryDisplay) => {
     setCurrentExpense(expense);
     setIsEditDialogOpen(true);
@@ -439,29 +380,27 @@ export default function RecordExpensesPage() {
 
       try {
           const result = await analyzeReceipt({ receiptImage: imageDataUrl });
-
-          setNewEntryAmount(result.amount?.toString() || '');
-          setNewEntryVendor(result.vendor || '');
-          setNewEntryDescription(result.description || '');
-          setNewEntryCategory(result.category || '');
+          
+          const router = (await import('next/navigation')).useRouter();
+          const queryParams = new URLSearchParams();
+          if (result.amount) queryParams.set('amount', result.amount.toString());
+          if (result.vendor) queryParams.set('vendor', result.vendor);
+          if (result.description) queryParams.set('description', result.description);
+          if (result.category) queryParams.set('category', result.category);
           if (result.date) {
-              const parsedDate = new Date(result.date + 'T00:00:00');
-              if (!isNaN(parsedDate.getTime())) {
-                  setNewEntryDate(parsedDate);
-              } else {
-                  setNewEntryDate(new Date());
-              }
-          } else {
-              setNewEntryDate(new Date());
+            const parsedDate = new Date(result.date + 'T00:00:00');
+            if (!isNaN(parsedDate.getTime())) {
+                queryParams.set('date', parsedDate.toISOString());
+            }
           }
 
           toast({
               title: "Receipt Scanned",
-              description: "Please review the extracted information below.",
+              description: "Review the extracted information on the new expense page.",
           });
 
           setIsScanDialogOpen(false);
-          setIsAddDialogOpen(true);
+          router.push(`/record-expenses/new?${queryParams.toString()}`);
 
       } catch (error: any) {
           console.error("Error analyzing receipt:", error);
@@ -470,7 +409,6 @@ export default function RecordExpensesPage() {
               title: 'Scan Failed',
               description: 'Could not extract data from the receipt. Please enter it manually.',
           });
-      } finally {
           setIsScanning(false);
       }
   };
@@ -526,9 +464,11 @@ export default function RecordExpensesPage() {
                 </TooltipContent>
                 </Tooltip>
             </TooltipProvider>
-            <Button onClick={() => { resetNewEntryForm(); setIsAddDialogOpen(true); }} disabled={isSaving || isLoadingEntries}>
+            <Button asChild disabled={isSaving || isLoadingEntries}>
+              <Link href="/record-expenses/new">
                 <PlusCircle className="mr-2 h-4 w-4" />
                 Record Expense
+              </Link>
             </Button>
             <input type="file" ref={fileInputRef} onChange={handleImportFileChange} className="hidden" accept=".xlsx, .xls, .csv" />
         </div>
@@ -612,56 +552,6 @@ export default function RecordExpensesPage() {
         </CardContent>
       </Card>
       
-       {/* Add Dialog */}
-      <Dialog open={isAddDialogOpen} onOpenChange={setIsAddDialogOpen}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>New Expense Entry</DialogTitle>
-            <DialogDescription>Enter the details of the expense incurred.</DialogDescription>
-          </DialogHeader>
-          <form id="new-expense-form" onSubmit={handleNewEntrySubmit} className="space-y-4 py-2">
-            <div>
-              <Label htmlFor="new-date">Date</Label>
-              <Popover>
-                <PopoverTrigger asChild>
-                  <Button variant="outline" className="w-full justify-start text-left font-normal" disabled={isSaving}>
-                    <CalendarIcon className="mr-2 h-4 w-4" />
-                    {newEntryDate ? format(newEntryDate, 'PPP') : <span>Pick a date</span>}
-                  </Button>
-                </PopoverTrigger>
-                <PopoverContent className="w-auto p-0"><Calendar mode="single" selected={newEntryDate} onSelect={setNewEntryDate} initialFocus disabled={isSaving}/></PopoverContent>
-              </Popover>
-            </div>
-            <div>
-              <Label htmlFor="new-amount">Amount ({currency})</Label>
-              <Input id="new-amount" type="number" value={newEntryAmount} onChange={(e) => setNewEntryAmount(e.target.value)} placeholder="e.g., 75.50" required min="0.01" step="0.01" disabled={isSaving} />
-            </div>
-            <div>
-              <Label htmlFor="new-category">Category</Label>
-              <Select value={newEntryCategory} onValueChange={setNewEntryCategory} disabled={isSaving}>
-                <SelectTrigger id="new-category" required><SelectValue placeholder="Select a category" /></SelectTrigger>
-                <SelectContent>{EXPENSE_CATEGORIES.map((cat) => (<SelectItem key={cat} value={cat}>{cat}</SelectItem>))}</SelectContent>
-              </Select>
-            </div>
-            <div>
-              <Label htmlFor="new-vendor">Vendor (Optional)</Label>
-              <Input id="new-vendor" value={newEntryVendor} onChange={(e) => setNewEntryVendor(e.target.value)} placeholder="e.g., AWS, Staples" disabled={isSaving}/>
-            </div>
-            <div>
-              <Label htmlFor="new-description">Description (Optional)</Label>
-              <Textarea id="new-description" value={newEntryDescription} onChange={(e) => setNewEntryDescription(e.target.value)} placeholder="e.g., Monthly server costs, Printer paper" disabled={isSaving}/>
-            </div>
-          </form>
-          <DialogFooter>
-            <DialogClose asChild><Button variant="outline" onClick={resetNewEntryForm} disabled={isSaving}>Cancel</Button></DialogClose>
-            <Button type="submit" form="new-expense-form" disabled={isSaving}>
-              {isSaving ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Save className="mr-2 h-4 w-4" />}
-              {isSaving ? 'Saving...' : 'Record Expense'}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-
        {/* Edit Dialog */}
       <Dialog open={isEditDialogOpen} onOpenChange={setIsEditDialogOpen}>
         <DialogContent>
@@ -811,3 +701,5 @@ export default function RecordExpensesPage() {
     </div>
   );
 }
+
+    

@@ -12,10 +12,12 @@ import {
   updateProfile,
   sendPasswordResetEmail,
 } from 'firebase/auth';
-import { doc, setDoc, serverTimestamp, getDoc, collection, addDoc } from 'firebase/firestore';
+import { doc, setDoc, serverTimestamp, getDoc, collection, addDoc, updateDoc } from 'firebase/firestore';
 import { useRouter, usePathname } from 'next/navigation';
 import { useToast } from '@/hooks/use-toast';
 import { getCurrencySymbol } from '@/lib/countries';
+import { uploadFileToStorage } from '@/lib/firebaseStorageUtils';
+
 
 type UserRole = 'admin' | 'member' | 'pending' | 'rejected';
 
@@ -24,6 +26,7 @@ interface User {
   email: string | null;
   displayName: string | null;
   companyId: string | null; // A user might not have a companyId until approved
+  companyName: string | null;
   country?: string;
   currencySymbol: string;
   role: UserRole;
@@ -37,6 +40,8 @@ interface SignUpCompanyInfo {
   city: string;
   stateOrProvince: string;
   country: string;
+  signatureFile?: File | null;
+  stampFile?: File | null;
 }
 
 interface AuthContextType {
@@ -99,12 +104,14 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
           const userRole: UserRole = isSuperAdmin ? 'admin' : userData.role || 'pending';
 
           let userCountry: string | undefined = undefined;
+          let companyName: string | null = null;
           if (companyId) {
             try {
               const companyDocRef = doc(db, 'companyProfiles', companyId);
               const companyDocSnap = await getDoc(companyDocRef);
               if (companyDocSnap.exists()) {
                 userCountry = companyDocSnap.data()?.country;
+                companyName = companyDocSnap.data()?.name;
               }
             } catch (e) {
               console.error("AuthContext: Could not fetch company profile for currency.", e);
@@ -117,6 +124,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
             email: firebaseUser.email,
             displayName: firebaseUser.displayName,
             companyId: companyId || null,
+            companyName: companyName || null,
             country: userCountry,
             currencySymbol: currencySymbol,
             role: userRole,
@@ -130,9 +138,9 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
             console.log(`AuthContext: User authenticated. UID: ${firebaseUser.uid}, Role: ${appUser.role}`);
           }
           
-          const authPages = ['/auth/signin', '/auth/signup'];
-          if (authPages.includes(pathname)) {
-            router.push('/');
+          const authPages = ['/auth/signin', '/auth/signup', '/auth/forgot-password'];
+          if (authPages.includes(pathname) || pathname === '/') {
+            router.push('/dashboard');
           }
         } else {
           setUser(null);
@@ -197,13 +205,43 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         return { user: firebaseUser, status: 'pending' };
       } else { // Creating a new company
         const newCompanyDocRef = doc(collection(db, 'companyProfiles'));
+        const companyId = newCompanyDocRef.id;
+
+        // Upload signature and stamp if they exist
+        let signatureUrl = '';
+        let signatureStoragePath = '';
+        if (companyInfo.signatureFile) {
+            const path = `companyProfiles/${companyId}/signature.${companyInfo.signatureFile.name.split('.').pop()}`;
+            signatureUrl = await uploadFileToStorage(companyInfo.signatureFile, path);
+            signatureStoragePath = path;
+        }
+
+        let stampUrl = '';
+        let stampStoragePath = '';
+        if (companyInfo.stampFile) {
+            const path = `companyProfiles/${companyId}/stamp.${companyInfo.stampFile.name.split('.').pop()}`;
+            stampUrl = await uploadFileToStorage(companyInfo.stampFile, path);
+            stampStoragePath = path;
+        }
+
+        // Create company profile document with all details
         await setDoc(newCompanyDocRef, {
-          name: companyInfo.name, address: companyInfo.address, city: companyInfo.city,
-          state: companyInfo.stateOrProvince, country: companyInfo.country,
+          name: companyInfo.name,
+          address: companyInfo.address,
+          city: companyInfo.city,
+          state: companyInfo.stateOrProvince,
+          country: companyInfo.country,
           gstin: '', phone: '', email: firebaseUser.email || '', website: '',
-          adminUserId: firebaseUser.uid, createdAt: serverTimestamp(), updatedAt: serverTimestamp(),
+          adminUserId: firebaseUser.uid,
+          createdAt: serverTimestamp(),
+          updatedAt: serverTimestamp(),
+          signatureUrl,
+          signatureStoragePath,
+          stampUrl,
+          stampStoragePath,
         });
         
+        // Create user document
         const userDocRef = doc(db, 'users', firebaseUser.uid);
         await setDoc(userDocRef, {
           uid: firebaseUser.uid, email: firebaseUser.email, displayName,
