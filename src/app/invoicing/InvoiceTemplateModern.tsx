@@ -1,3 +1,4 @@
+
 'use client';
 
 import React from 'react';
@@ -55,6 +56,7 @@ interface InvoiceTemplateProps {
   signatureDataUri?: string;
   stampDataUri?: string;
   invoiceSettings: InvoiceSettings | null;
+  letterheadTemplate: 'none' | 'simple';
 }
 
 const InvoiceTemplateModern = React.forwardRef<HTMLDivElement, InvoiceTemplateProps>(

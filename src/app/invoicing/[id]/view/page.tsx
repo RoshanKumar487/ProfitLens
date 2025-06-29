@@ -1,3 +1,4 @@
+
 'use client';
 
 import React, { useState, useEffect, useRef, useCallback } from 'react';
@@ -20,6 +21,7 @@ import Link from 'next/link';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { getInvoiceSettings, type InvoiceSettings } from '@/app/settings/actions';
+import { Switch } from '@/components/ui/switch';
 
 // Interface definitions mirrored from invoicing/page.tsx for component props
 interface InvoiceItem {
@@ -84,6 +86,7 @@ export default function ViewInvoicePage() {
     const [isLoadingData, setIsLoadingData] = useState(true);
     const [isProcessing, setIsProcessing] = useState(false);
     const [template, setTemplate] = useState<'simple' | 'modern' | 'business'>('business');
+    const [useLetterhead, setUseLetterhead] = useState(true);
     const printRef = useRef<HTMLDivElement>(null);
 
     const fetchAllData = useCallback(async () => {
@@ -275,7 +278,10 @@ export default function ViewInvoicePage() {
                         </Link>
                     </Button>
                     <div className="flex items-center gap-4 border-l pl-4">
-                         <Label htmlFor="template-select">Template</Label>
+                         <div className="flex items-center gap-2">
+                            <Switch id="use-letterhead" checked={useLetterhead} onCheckedChange={setUseLetterhead} disabled={isProcessing} />
+                            <Label htmlFor="use-letterhead" className="cursor-pointer">Letterhead</Label>
+                        </div>
                          <Select value={template} onValueChange={(value) => setTemplate(value as any)} disabled={isProcessing}>
                             <SelectTrigger className="w-[180px]" id="template-select">
                                 <SelectValue placeholder="Select a template" />
@@ -311,6 +317,7 @@ export default function ViewInvoicePage() {
                         signatureDataUri={imageDataUris.signature}
                         stampDataUri={imageDataUris.stamp}
                         invoiceSettings={invoiceSettings}
+                        letterheadTemplate={useLetterhead ? 'simple' : 'none'}
                     />
                  ) : template === 'business' ? (
                      <InvoiceTemplateBusiness
@@ -319,6 +326,7 @@ export default function ViewInvoicePage() {
                         companyProfileDetails={companyProfile} 
                         currencySymbol={currencySymbol} 
                         invoiceSettings={invoiceSettings}
+                        letterheadTemplate={useLetterhead ? 'simple' : 'none'}
                     />
                  ) : (
                     <InvoiceTemplateIndian 
@@ -328,7 +336,7 @@ export default function ViewInvoicePage() {
                         currencySymbol={currencySymbol} 
                         signatureDataUri={imageDataUris.signature}
                         stampDataUri={imageDataUris.stamp}
-                        letterheadTemplate='simple'
+                        letterheadTemplate={useLetterhead ? 'simple' : 'none'}
                         invoiceSettings={invoiceSettings}
                     />
                  )}

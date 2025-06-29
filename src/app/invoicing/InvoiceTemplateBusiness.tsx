@@ -1,8 +1,10 @@
+
 'use client';
 
 import React from 'react';
 import { format } from 'date-fns';
 import type { InvoiceSettings } from '../settings/actions';
+import Letterhead from '@/components/Letterhead';
 
 // Interface definitions mirrored from invoicing/page.tsx for component props
 interface InvoiceItem {
@@ -55,11 +57,12 @@ interface InvoiceTemplateProps {
   companyProfileDetails: CompanyDetailsFirestore;
   currencySymbol: string;
   invoiceSettings: InvoiceSettings | null;
+  letterheadTemplate: 'none' | 'simple';
 }
 
 
 const InvoiceTemplateBusiness = React.forwardRef<HTMLDivElement, InvoiceTemplateProps>(
-  ({ invoiceToView, companyProfileDetails, currencySymbol, invoiceSettings }, ref) => {
+  ({ invoiceToView, companyProfileDetails, currencySymbol, invoiceSettings, letterheadTemplate }, ref) => {
     
     const fullCompanyAddress = [
         companyProfileDetails.address,
@@ -73,8 +76,11 @@ const InvoiceTemplateBusiness = React.forwardRef<HTMLDivElement, InvoiceTemplate
     return (
       <div ref={ref} className="bg-white text-gray-800 font-sans text-xs w-[210mm] min-h-[297mm] mx-auto flex flex-col p-8">
         
-        {/* Spacer for external letterhead */}
-        <div className="h-24 w-full"></div>
+        {letterheadTemplate === 'simple' && companyProfileDetails ? (
+            <Letterhead companyDetails={companyProfileDetails} />
+        ) : (
+            <div className="h-24 w-full"></div>
+        )}
 
         <header className="flex justify-between items-start mb-4">
             <div>
@@ -105,12 +111,12 @@ const InvoiceTemplateBusiness = React.forwardRef<HTMLDivElement, InvoiceTemplate
         <section className="flex border-b border-gray-900">
             <div className="w-7/12 border-r border-gray-900 p-2">
                 <h3 className="text-xs text-gray-600 font-bold mb-1">Bill To</h3>
-                <p className="font-bold">{invoiceToView.clientName}</p>
+                <p className="font-bold text-xl">{invoiceToView.clientName}</p>
                 <p className="whitespace-pre-line text-xs">{invoiceToView.clientAddress}</p>
             </div>
              <div className="w-5/12 p-2">
                 <h3 className="text-xs text-gray-600 font-bold mb-1">Ship To</h3>
-                <p className="font-bold">{invoiceToView.clientName}</p>
+                <p className="font-bold text-xl">{invoiceToView.clientName}</p>
                 <p className="whitespace-pre-line text-xs">{invoiceToView.clientAddress}</p>
             </div>
         </section>
