@@ -1,4 +1,3 @@
-
 'use client';
 
 import React from 'react';
@@ -122,7 +121,7 @@ const InvoiceTemplateModern = React.forwardRef<HTMLDivElement, InvoiceTemplatePr
             <div className="grid grid-cols-[60%_40%] border-b border-black">
               <div className="p-2 border-r border-black">
                 <p className="font-bold">Customer Details:</p>
-                <p className="font-bold text-base">{invoiceToView.clientName}</p>
+                <p className="font-bold text-lg">{invoiceToView.clientName}</p>
                 <p className="font-bold mt-1">Billing Address:</p>
                 <p className="whitespace-pre-line">{invoiceToView.clientAddress}</p>
                 <p className="font-bold mt-1">Shipping Address:</p>

@@ -137,7 +137,7 @@ const InvoiceTemplateIndian = React.forwardRef<HTMLDivElement, InvoiceTemplatePr
                     <tr>
                         <td className="w-1/2 p-2 align-top border border-black">
                             <p className="font-bold">Bill To:</p>
-                            <p className="font-bold text-base">{invoiceToView.clientName}</p>
+                            <p className="font-bold text-xl">{invoiceToView.clientName}</p>
                             <p className="whitespace-pre-line">{invoiceToView.clientAddress}</p>
                             <p className="mt-2">GSTIN: {invoiceToView.clientGstin || 'N/A'}</p>
                         </td>
