@@ -223,25 +223,27 @@ export default function EditInvoicePage() {
                 setIsPrinting(false);
                 return;
             }
-    
+            
             const pdf = new jsPDF({ orientation: 'p', unit: 'mm', format: 'a4' });
             const pdfWidth = pdf.internal.pageSize.getWidth();
             const pdfHeight = pdf.internal.pageSize.getHeight();
             const imgProps = pdf.getImageProperties(imgData);
-            const imgHeight = (imgProps.height * pdfWidth) / imgProps.width;
-    
-            let heightLeft = imgHeight;
-            let position = 0;
-    
-            pdf.addImage(imgData, 'PNG', 0, position, pdfWidth, imgHeight);
-            heightLeft -= pdfHeight;
-    
-            while (heightLeft > 0) {
-                position = heightLeft - imgHeight;
-                pdf.addPage();
-                pdf.addImage(imgData, 'PNG', 0, position, pdfWidth, imgHeight);
-                heightLeft -= pdfHeight;
+            const imgAspectRatio = imgProps.width / imgProps.height;
+            const pdfAspectRatio = pdfWidth / pdfHeight;
+
+            let finalWidth, finalHeight;
+            if (imgAspectRatio > pdfAspectRatio) {
+              finalWidth = pdfWidth;
+              finalHeight = pdfWidth / imgAspectRatio;
+            } else {
+              finalHeight = pdfHeight;
+              finalWidth = pdfHeight * imgAspectRatio;
             }
+
+            const x = (pdfWidth - finalWidth) / 2;
+            const y = (pdfHeight - finalHeight) / 2;
+
+            pdf.addImage(imgData, 'PNG', x, y, finalWidth, finalHeight);
             
             const pdfBlob = pdf.output('blob');
             const pdfUrl = URL.createObjectURL(pdfBlob);
