@@ -9,7 +9,7 @@ import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/contexts/AuthContext';
 import { doc, getDoc, Timestamp } from 'firebase/firestore';
 import { db } from '@/lib/firebaseConfig';
-import { sendInvoiceEmailAction } from '../actions';
+import { sendInvoiceEmailAction } from '../../actions';
 import InvoiceTemplateIndian from '../../InvoiceTemplateIndian';
 import jsPDF from 'jspdf';
 import html2canvas from 'html2canvas';
