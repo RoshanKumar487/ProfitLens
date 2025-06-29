@@ -17,7 +17,7 @@ import {
 import { Badge } from '@/components/ui/badge';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger, DropdownMenuSeparator } from '@/components/ui/dropdown-menu';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
-import { Receipt, PlusCircle, Search, MoreHorizontal, Edit, Trash2, ArrowUp, ArrowDown, ChevronsUpDown, Loader2 } from 'lucide-react';
+import { Receipt, PlusCircle, Search, MoreHorizontal, Edit, Trash2, ArrowUp, ArrowDown, ChevronsUpDown, Loader2, Eye } from 'lucide-react';
 import { format } from 'date-fns';
 import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/contexts/AuthContext';
@@ -262,9 +262,14 @@ export default function InvoicingPage() {
                         <DropdownMenu>
                         <DropdownMenuTrigger asChild><Button variant="ghost" size="icon" className="h-8 w-8"><MoreHorizontal className="h-4 w-4" /></Button></DropdownMenuTrigger>
                         <DropdownMenuContent align="end">
+                             <DropdownMenuItem asChild>
+                                <Link href={`/invoicing/${invoice.id}/view`}>
+                                    <Eye className="mr-2 h-4 w-4" /> View / Print
+                                </Link>
+                            </DropdownMenuItem>
                             <DropdownMenuItem asChild>
                                 <Link href={`/invoicing/${invoice.id}`}>
-                                    <Edit className="mr-2 h-4 w-4" /> View / Edit
+                                    <Edit className="mr-2 h-4 w-4" /> Edit
                                 </Link>
                             </DropdownMenuItem>
                             <DropdownMenuSeparator />
