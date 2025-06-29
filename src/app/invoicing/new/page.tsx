@@ -71,7 +71,25 @@ export default function NewInvoicePage() {
     const { toast } = useToast();
     const router = useRouter();
 
-    const [currentInvoice, setCurrentInvoice] = useState<Partial<InvoiceDisplay>>({});
+    const [currentInvoice, setCurrentInvoice] = useState<Partial<InvoiceDisplay>>({
+            issuedDate: new Date(),
+            dueDate: new Date(new Date().setDate(new Date().getDate() + 30)),
+            status: 'Draft',
+            items: [{ id: crypto.randomUUID(), description: '', quantity: 1, unitPrice: 0 }],
+            invoiceNumber: `INV${(Date.now()).toString().slice(-6)}`,
+            clientName: '',
+            clientEmail: '',
+            clientAddress: '',
+            clientGstin: '',
+            notes: '',
+            subtotal: 0,
+            discountType: 'fixed',
+            discountValue: 0,
+            discountAmount: 0,
+            taxRate: 0,
+            taxAmount: 0,
+            amount: 0,
+    });
     const [isSaving, setIsSaving] = useState(false);
     const [existingClients, setExistingClients] = useState<ExistingClient[]>([]);
     const [isClientSuggestionsVisible, setIsClientSuggestionsVisible] = useState(false);
@@ -84,25 +102,13 @@ export default function NewInvoicePage() {
         const savedDiscountType = (localStorage.getItem(LOCAL_STORAGE_DISCOUNT_TYPE_KEY) as DiscountType) || 'fixed';
         const savedDiscountValue = parseFloat(localStorage.getItem(LOCAL_STORAGE_DISCOUNT_VALUE_KEY) || '0');
 
-        setCurrentInvoice({
-            issuedDate: new Date(),
-            dueDate: new Date(new Date().setDate(new Date().getDate() + 30)),
-            status: 'Draft',
-            items: [{ id: crypto.randomUUID(), description: '', quantity: 1, unitPrice: 0 }],
-            invoiceNumber: `INV${(Date.now()).toString().slice(-6)}`,
-            clientName: '',
-            clientEmail: '',
-            clientAddress: '',
-            clientGstin: '',
+        setCurrentInvoice(prev => ({
+            ...prev,
             notes: savedNotes,
-            subtotal: 0,
+            taxRate: savedTaxRate,
             discountType: savedDiscountType,
             discountValue: savedDiscountValue,
-            discountAmount: 0,
-            taxRate: savedTaxRate,
-            taxAmount: 0,
-            amount: 0,
-        });
+        }));
     }, []);
     
     useEffect(() => {
@@ -248,6 +254,7 @@ export default function NewInvoicePage() {
 
         if (mostRecentInvoice) {
           setCurrentInvoice({
+            ...currentInvoice,
             ...mostRecentInvoice,
             id: undefined, 
             invoiceNumber: `INV${(Date.now()).toString().slice(-6)}`,

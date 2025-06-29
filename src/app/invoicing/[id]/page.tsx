@@ -1,12 +1,12 @@
 
 'use client';
 
-import React, { useState, useEffect, type FormEvent, useRef } from 'react';
+import React, { useState, useEffect, type FormEvent } from 'react';
 import { useRouter, useParams } from 'next/navigation';
 import PageTitle from '@/components/PageTitle';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Receipt, PlusCircle, Save, Loader2, Calendar as CalendarIconLucide, Trash2, Mail, Printer } from 'lucide-react';
+import { Receipt, Save, Loader2, Calendar as CalendarIconLucide, Trash2, Eye, PlusCircle } from 'lucide-react';
 import { format } from 'date-fns';
 import { useToast } from '@/hooks/use-toast';
 import { Label } from '@/components/ui/label';
@@ -20,12 +20,8 @@ import { doc, getDoc, Timestamp } from 'firebase/firestore';
 import { db } from '@/lib/firebaseConfig';
 import { Separator } from '@/components/ui/separator';
 import Link from 'next/link';
-import { updateInvoice, sendInvoiceEmailAction } from '../actions';
-import InvoiceTemplateIndian from '../InvoiceTemplateIndian';
-import jsPDF from 'jspdf';
-import html2canvas from 'html2canvas';
+import { updateInvoice } from '../actions';
 import { Skeleton } from '@/components/ui/skeleton';
-import { urlToDataUri } from '@/lib/utils';
 
 interface InvoiceItem {
   id: string;
@@ -55,45 +51,26 @@ interface InvoiceDisplay {
   items: InvoiceItem[];
   notes?: string;
 }
-interface CompanyDetailsFirestore {
-  name: string;
-  address: string;
-  city: string;
-  state: string;
-  country: string;
-  gstin: string;
-  pan?: string;
-  phone: string;
-  email: string;
-  website: string;
-  accountNumber?: string;
-  ifscCode?: string;
-  bankName?: string;
-  branch?: string;
-  signatureUrl?: string;
-  stampUrl?: string;
-}
 
 export default function EditInvoicePage() {
-    const { user, currencySymbol } = useAuth();
+    const { user, currencySymbol, isLoading: authLoading } = useAuth();
     const { toast } = useToast();
     const router = useRouter();
     const params = useParams();
     const invoiceId = params.id as string;
 
     const [invoice, setInvoice] = useState<InvoiceDisplay | null>(null);
-    const [companyProfile, setCompanyProfile] = useState<CompanyDetailsFirestore | null>(null);
-    const [imageDataUris, setImageDataUris] = useState<{ signature?: string; stamp?: string }>({});
     const [isLoading, setIsLoading] = useState(true);
     const [isSaving, setIsSaving] = useState(false);
-    const [isPrinting, setIsPrinting] = useState(false);
-    const [isSendingEmail, setIsSendingEmail] = useState(false);
-    const printRef = useRef<HTMLDivElement>(null);
 
     useEffect(() => {
-        if (!user || !invoiceId) return;
+        if (authLoading) return;
+        if (!user || !invoiceId) {
+            router.push('/auth/signin');
+            return;
+        }
 
-        const fetchInvoiceAndCompany = async () => {
+        const fetchInvoice = async () => {
             setIsLoading(true);
             try {
                 const invoiceRef = doc(db, 'invoices', invoiceId);
@@ -112,23 +89,6 @@ export default function EditInvoicePage() {
                     dueDate: (data.dueDate as Timestamp).toDate(),
                 } as InvoiceDisplay);
 
-                const companyRef = doc(db, 'companyProfiles', user.companyId);
-                const companySnap = await getDoc(companyRef);
-                if (companySnap.exists()) {
-                    const companyData = companySnap.data() as CompanyDetailsFirestore;
-                    setCompanyProfile(companyData);
-
-                    // Fetch images as data URIs for printing
-                    const uris: { signature?: string; stamp?: string } = {};
-                    if (companyData.signatureUrl) {
-                        uris.signature = await urlToDataUri(companyData.signatureUrl);
-                    }
-                    if (companyData.stampUrl) {
-                        uris.stamp = await urlToDataUri(companyData.stampUrl);
-                    }
-                    setImageDataUris(uris);
-                }
-
             } catch (error) {
                 toast({ title: "Error", description: "Failed to load invoice data.", variant: "destructive" });
             } finally {
@@ -136,8 +96,8 @@ export default function EditInvoicePage() {
             }
         };
 
-        fetchInvoiceAndCompany();
-    }, [invoiceId, user, router, toast]);
+        fetchInvoice();
+    }, [invoiceId, user, authLoading, router, toast]);
 
     useEffect(() => {
         if (!invoice) return;
@@ -199,91 +159,12 @@ export default function EditInvoicePage() {
         setInvoice(prev => prev ? ({ ...prev, items: (prev.items || []).filter(item => item.id !== itemId) }) : null);
     };
     
-    const handleValueChange = (field: keyof InvoiceDisplay, value: any) => {
+    const handleValueChange = (field: keyof Omit<InvoiceDisplay, 'items'>, value: any) => {
         setInvoice(prev => prev ? ({ ...prev, [field]: value }) : null);
     };
 
-    const handlePrint = async () => {
-        if (!printRef.current) return;
-        setIsPrinting(true);
-        try {
-            const canvas = await html2canvas(printRef.current, {
-                scale: 2,
-                useCORS: true,
-                backgroundColor: '#ffffff',
-            });
-            const imgData = canvas.toDataURL('image/png');
-    
-            if (!imgData || imgData === 'data:,') {
-                toast({
-                    title: "Print Failed",
-                    description: "Could not generate a printable image of the invoice. This might happen if an image failed to load.",
-                    variant: "destructive",
-                });
-                setIsPrinting(false);
-                return;
-            }
-            
-            const pdf = new jsPDF({ orientation: 'p', unit: 'mm', format: 'a4' });
-            const pdfWidth = pdf.internal.pageSize.getWidth();
-            const pdfHeight = pdf.internal.pageSize.getHeight();
-            const imgProps = pdf.getImageProperties(imgData);
-            const imgAspectRatio = imgProps.width / imgProps.height;
-            const pdfAspectRatio = pdfWidth / pdfHeight;
 
-            let finalWidth, finalHeight;
-            if (imgAspectRatio > pdfAspectRatio) {
-              finalWidth = pdfWidth;
-              finalHeight = pdfWidth / imgAspectRatio;
-            } else {
-              finalHeight = pdfHeight;
-              finalWidth = pdfHeight * imgAspectRatio;
-            }
-
-            const x = (pdfWidth - finalWidth) / 2;
-            const y = (pdfHeight - finalHeight) / 2;
-
-            pdf.addImage(imgData, 'PNG', x, y, finalWidth, finalHeight);
-            
-            const pdfBlob = pdf.output('blob');
-            const pdfUrl = URL.createObjectURL(pdfBlob);
-            const printWindow = window.open(pdfUrl);
-            if (printWindow) {
-                printWindow.onload = () => {
-                    printWindow.print();
-                    URL.revokeObjectURL(pdfUrl);
-                };
-            } else {
-                 toast({ title: "Print Error", description: "Could not open print window. Please check your pop-up blocker.", variant: "destructive"});
-            }
-        } catch (error: any) {
-            console.error("Error generating PDF:", error);
-            toast({ title: "Print Failed", description: `Could not generate document for printing. ${error.message}`, variant: "destructive" });
-        } finally {
-            setIsPrinting(false);
-        }
-    };
-    
-    const handleEmail = async () => {
-        if (!invoice?.clientEmail || !printRef.current) {
-            toast({ title: "Missing Information", description: "Client email is required to send an invoice.", variant: "destructive" });
-            return;
-        }
-        setIsSendingEmail(true);
-        try {
-            const subject = `Invoice ${invoice.invoiceNumber} from ${companyProfile?.name || 'Us'}`;
-            const htmlBody = printRef.current.innerHTML;
-
-            const result = await sendInvoiceEmailAction({ to: invoice.clientEmail, subject, htmlBody, invoiceNumber: invoice.invoiceNumber });
-            toast({ title: result.success ? "Success" : "Error", description: result.message, variant: result.success ? "default" : "destructive" });
-        } catch (error: any) {
-             toast({ title: 'Email Failed', description: error.message, variant: 'destructive' });
-        } finally {
-            setIsSendingEmail(false);
-        }
-    };
-
-    if (isLoading || !invoice) {
+    if (isLoading || authLoading || !invoice) {
         return (
             <div className="space-y-6 p-4 sm:p-6 lg:p-8">
                 <Skeleton className="h-8 w-1/3" />
@@ -304,15 +185,12 @@ export default function EditInvoicePage() {
 
     return (
         <div className="space-y-6 p-4 sm:p-6 lg:p-8">
-            <PageTitle title={`Invoice ${invoice.invoiceNumber}`} subtitle={`Manage invoice for ${invoice.clientName}`} icon={Receipt}>
-                <div className="flex gap-2">
-                    <Button variant="outline" onClick={handlePrint} disabled={isPrinting || !companyProfile}>
-                        {isPrinting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Printer className="mr-2 h-4 w-4" />} Print
-                    </Button>
-                    <Button variant="outline" onClick={handleEmail} disabled={isSendingEmail || !companyProfile}>
-                        {isSendingEmail ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Mail className="mr-2 h-4 w-4" />} Email
-                    </Button>
-                </div>
+            <PageTitle title={`Edit Invoice ${invoice.invoiceNumber}`} subtitle={`Editing invoice for ${invoice.clientName}`} icon={Receipt}>
+                <Button variant="outline" asChild>
+                    <Link href={`/invoicing/${invoice.id}/view`}>
+                        <Eye className="mr-2 h-4 w-4" /> View & Print
+                    </Link>
+                </Button>
             </PageTitle>
 
             <Card className="max-w-4xl mx-auto shadow-lg">
@@ -324,34 +202,34 @@ export default function EditInvoicePage() {
                         </div>
                         <div>
                             <Label htmlFor="clientEmail">Client Email</Label>
-                            <Input id="clientEmail" type="email" value={invoice.clientEmail} onChange={(e) => handleValueChange('clientEmail', e.target.value)} disabled={isSaving}/>
+                            <Input id="clientEmail" type="email" value={invoice.clientEmail || ''} onChange={(e) => handleValueChange('clientEmail', e.target.value)} disabled={isSaving}/>
                         </div>
                         <div>
                             <Label htmlFor="clientGstin">Client GSTIN</Label>
-                            <Input id="clientGstin" value={invoice.clientGstin} onChange={(e) => handleValueChange('clientGstin', e.target.value)} disabled={isSaving} />
+                            <Input id="clientGstin" value={invoice.clientGstin || ''} onChange={(e) => handleValueChange('clientGstin', e.target.value)} disabled={isSaving} />
                         </div>
                         <div>
                             <Label htmlFor="clientAddress">Client Address</Label>
-                            <Textarea id="clientAddress" value={invoice.clientAddress} onChange={(e) => handleValueChange('clientAddress', e.target.value)} disabled={isSaving} rows={3} />
+                            <Textarea id="clientAddress" value={invoice.clientAddress || ''} onChange={(e) => handleValueChange('clientAddress', e.target.value)} disabled={isSaving} rows={3} />
                         </div>
                         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
                             <div>
                                 <Label>Issued Date</Label>
                                 <Popover>
-                                    <PopoverTrigger asChild><Button variant="outline" className="w-full justify-start"><CalendarIconLucide className="mr-2 h-4 w-4" />{format(invoice.issuedDate, 'PPP')}</Button></PopoverTrigger>
+                                    <PopoverTrigger asChild><Button variant="outline" className="w-full justify-start"><CalendarIconLucide className="mr-2 h-4 w-4" />{invoice.issuedDate ? format(invoice.issuedDate, 'PPP') : 'Pick a date'}</Button></PopoverTrigger>
                                     <PopoverContent className="w-auto p-0"><Calendar mode="single" selected={invoice.issuedDate} onSelect={(d) => handleValueChange('issuedDate', d)}/></PopoverContent>
                                 </Popover>
                             </div>
                             <div>
                                 <Label>Due Date</Label>
                                 <Popover>
-                                    <PopoverTrigger asChild><Button variant="outline" className="w-full justify-start"><CalendarIconLucide className="mr-2 h-4 w-4" />{format(invoice.dueDate, 'PPP')}</Button></PopoverTrigger>
+                                    <PopoverTrigger asChild><Button variant="outline" className="w-full justify-start"><CalendarIconLucide className="mr-2 h-4 w-4" />{invoice.dueDate ? format(invoice.dueDate, 'PPP') : 'Pick a date'}</Button></PopoverTrigger>
                                     <PopoverContent className="w-auto p-0"><Calendar mode="single" selected={invoice.dueDate} onSelect={(d) => handleValueChange('dueDate', d)}/></PopoverContent>
                                 </Popover>
                             </div>
                             <div>
                                 <Label>Status</Label>
-                                <Select value={invoice.status} onValueChange={(v) => handleValueChange('status', v)}>
+                                <Select value={invoice.status} onValueChange={(v: InvoiceDisplay['status']) => handleValueChange('status', v)}>
                                     <SelectTrigger><SelectValue/></SelectTrigger>
                                     <SelectContent>
                                         <SelectItem value="Draft">Draft</SelectItem>
@@ -401,7 +279,7 @@ export default function EditInvoicePage() {
                             </div>
                         </div>
 
-                        <div><Label>Notes / Terms</Label><Textarea value={invoice.notes} onChange={(e) => handleValueChange('notes', e.target.value)} /></div>
+                        <div><Label>Notes / Terms</Label><Textarea value={invoice.notes || ''} onChange={(e) => handleValueChange('notes', e.target.value)} /></div>
 
                     </CardContent>
                     <CardHeader className="p-6 pt-0">
@@ -415,18 +293,6 @@ export default function EditInvoicePage() {
                     </CardHeader>
                 </form>
             </Card>
-
-            <div className="hidden">
-                 <div ref={printRef}>
-                    {companyProfile && <InvoiceTemplateIndian 
-                        invoiceToView={invoice} 
-                        companyProfileDetails={companyProfile} 
-                        currencySymbol={currencySymbol} 
-                        signatureDataUri={imageDataUris.signature}
-                        stampDataUri={imageDataUris.stamp}
-                    />}
-                 </div>
-            </div>
         </div>
     );
 }
