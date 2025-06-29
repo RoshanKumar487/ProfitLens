@@ -27,9 +27,16 @@ import { Button } from '@/components/ui/button';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { AssistantChat } from '@/components/AssistantChat';
-import { collection, query, where, onSnapshot } from 'firebase/firestore';
+import { collection, query, where, onSnapshot, orderBy, Timestamp } from 'firebase/firestore';
 import { db } from '@/lib/firebaseConfig';
 import { Badge } from '@/components/ui/badge';
+import { formatDistanceToNow } from 'date-fns';
+
+interface Notification {
+  id: string;
+  userName: string;
+  createdAt: Timestamp;
+}
 
 const AppShellLayout = ({ children }: { children: React.ReactNode }) => {
   const pathname = usePathname();
@@ -37,10 +44,12 @@ const AppShellLayout = ({ children }: { children: React.ReactNode }) => {
   const { user, signOut, isLoading: authLoading } = useAuth(); 
   const [isAssistantOpen, setIsAssistantOpen] = React.useState(false);
   const [pendingRequestCount, setPendingRequestCount] = React.useState(0);
+  const [notifications, setNotifications] = React.useState<Notification[]>([]);
   
   React.useEffect(() => {
     if (user?.role !== 'admin' || !user?.companyId) {
       setPendingRequestCount(0);
+      setNotifications([]);
       return;
     }
 
@@ -48,13 +57,23 @@ const AppShellLayout = ({ children }: { children: React.ReactNode }) => {
     const q = query(
       requestsRef,
       where('companyId', '==', user.companyId),
-      where('status', '==', 'pending')
+      where('status', '==', 'pending'),
+      orderBy('createdAt', 'desc')
     );
 
     const unsubscribe = onSnapshot(q, (snapshot) => {
+      const fetchedNotifications = snapshot.docs.map(doc => {
+        const data = doc.data();
+        return {
+            id: doc.id,
+            userName: data.userName,
+            createdAt: data.createdAt as Timestamp,
+        };
+      });
+      setNotifications(fetchedNotifications);
       setPendingRequestCount(snapshot.size);
     }, (error) => {
-      console.error("Error fetching pending request count:", error);
+      console.error("Error fetching pending requests:", error);
     });
 
     return () => unsubscribe();
@@ -164,14 +183,43 @@ const AppShellLayout = ({ children }: { children: React.ReactNode }) => {
 
               {user && (
                   <div className="flex items-center gap-2">
-                      <Button variant="ghost" size="icon" className="relative h-10 w-10 rounded-full">
-                          <Bell className="h-5 w-5" />
-                           {pendingRequestCount > 0 && (
-                            <Badge variant="destructive" className="absolute top-1 right-1 h-5 w-5 p-0 flex items-center justify-center text-xs rounded-full">
-                                {pendingRequestCount}
-                            </Badge>
-                          )}
-                      </Button>
+                      <DropdownMenu>
+                          <DropdownMenuTrigger asChild>
+                            <Button variant="ghost" size="icon" className="relative h-10 w-10 rounded-full">
+                                <Bell className="h-5 w-5" />
+                                {pendingRequestCount > 0 && (
+                                    <Badge variant="destructive" className="absolute top-1 right-1 h-5 w-5 p-0 flex items-center justify-center text-xs rounded-full">
+                                    {pendingRequestCount}
+                                    </Badge>
+                                )}
+                            </Button>
+                          </DropdownMenuTrigger>
+                          <DropdownMenuContent className="w-80" align="end">
+                            <DropdownMenuLabel>Notifications</DropdownMenuLabel>
+                            <DropdownMenuSeparator />
+                            {notifications.length > 0 ? (
+                                notifications.map((notif) => (
+                                <DropdownMenuItem key={notif.id} asChild>
+                                    <Link href="/admin" className="cursor-pointer" onClick={handleNavigationClick}>
+                                    <div className="flex flex-col">
+                                        <p className="text-sm font-medium">
+                                        <span className="font-bold">{notif.userName}</span> requested to join.
+                                        </p>
+                                        <p className="text-xs text-muted-foreground">
+                                        {formatDistanceToNow(notif.createdAt.toDate(), { addSuffix: true })}
+                                        </p>
+                                    </div>
+                                    </Link>
+                                </DropdownMenuItem>
+                                ))
+                            ) : (
+                                <div className="p-4 text-sm text-center text-muted-foreground">
+                                    You have no new notifications.
+                                </div>
+                            )}
+                          </DropdownMenuContent>
+                      </DropdownMenu>
+
                       <DropdownMenu>
                           <DropdownMenuTrigger asChild>
                             <Button variant="ghost" className="relative h-10 w-10 rounded-full">
