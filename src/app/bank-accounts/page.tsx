@@ -1,3 +1,4 @@
+
 'use client';
 
 import React, { useState, useEffect, useCallback } from 'react';
@@ -230,7 +231,7 @@ export default function BankAccountsPage() {
     return (
       <div className="p-4 sm:p-6 lg:p-8">
         <PageTitle title="Bank Accounts" icon={Banknote} />
-        <Card><CardHeader><CardTitle>Access Denied</CardTitle><CardContent><p>Please sign in to manage bank accounts.</p></CardContent></CardHeader></Card>
+        <Card><CardHeader><CardTitle>Access Denied</CardTitle></CardHeader><CardContent><p>Please sign in to manage bank accounts.</p></CardContent></Card>
       </div>
     );
   }
