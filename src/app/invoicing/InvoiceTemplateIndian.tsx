@@ -5,6 +5,7 @@ import { format } from 'date-fns';
 import Letterhead from '@/components/Letterhead';
 import LetterheadModern from '@/components/LetterheadModern';
 import { stringToHslColor } from '@/lib/utils';
+import type { InvoiceSettings } from '../settings/actions';
 
 // Interface definitions mirrored from invoicing/page.tsx for component props
 interface InvoiceItem {
@@ -12,6 +13,7 @@ interface InvoiceItem {
   description: string;
   quantity: number;
   unitPrice: number;
+  customFields?: { [key: string]: string };
 }
 
 interface InvoiceDisplay {
@@ -58,6 +60,7 @@ interface InvoiceTemplateProps {
   signatureDataUri?: string;
   stampDataUri?: string;
   letterheadTemplate: 'none' | 'simple' | 'modern';
+  invoiceSettings: InvoiceSettings | null;
 }
 
 const numberToWords = (num: number): string => {
@@ -95,7 +98,7 @@ const numberToWords = (num: number): string => {
 };
 
 const InvoiceTemplateIndian = React.forwardRef<HTMLDivElement, InvoiceTemplateProps>(
-  ({ invoiceToView, companyProfileDetails, currencySymbol, signatureDataUri, stampDataUri, letterheadTemplate }, ref) => {
+  ({ invoiceToView, companyProfileDetails, currencySymbol, signatureDataUri, stampDataUri, letterheadTemplate, invoiceSettings }, ref) => {
     
     const amountInWords = numberToWords(Math.floor(invoiceToView.amount));
     const subtotal = (invoiceToView.items || []).reduce((acc, item) => acc + (item.quantity * item.unitPrice), 0);
@@ -109,6 +112,7 @@ const InvoiceTemplateIndian = React.forwardRef<HTMLDivElement, InvoiceTemplatePr
     ].filter(Boolean).join(', ');
 
     const primaryBgColor = letterheadTemplate === 'modern' ? stringToHslColor(companyProfileDetails.name, 40, 25) : 'transparent';
+    const customColumns = invoiceSettings?.customItemColumns || [];
 
     return (
       <div ref={ref} className="bg-white text-black font-sans text-xs w-[210mm] min-h-[297mm] mx-auto flex flex-col">
@@ -155,7 +159,9 @@ const InvoiceTemplateIndian = React.forwardRef<HTMLDivElement, InvoiceTemplatePr
                         <tr className="border-b border-black">
                             <th className="p-2 border-r border-black w-10">#</th>
                             <th className="p-2 border-r border-black text-left">Item Description</th>
-                            <th className="p-2 border-r border-black w-24">HSN/SAC</th>
+                             {customColumns.map(col => (
+                                <th key={col.id} className="p-2 border-r border-black w-24">{col.label}</th>
+                            ))}
                             <th className="p-2 border-r border-black w-20">Qty</th>
                             <th className="p-2 border-r border-black w-28">Rate</th>
                             <th className="p-2 w-32">Amount</th>
@@ -166,14 +172,16 @@ const InvoiceTemplateIndian = React.forwardRef<HTMLDivElement, InvoiceTemplatePr
                             <tr key={item.id} className="border-b border-gray-200 last:border-b-0">
                                 <td className="p-2 border-r border-black">{index + 1}</td>
                                 <td className="p-2 border-r border-black text-left">{item.description}</td>
-                                <td className="p-2 border-r border-black">998314</td>
+                                {customColumns.map(col => (
+                                    <td key={col.id} className="p-2 border-r border-black">{item.customFields?.[col.id] || ''}</td>
+                                ))}
                                 <td className="p-2 border-r border-black">{item.quantity}</td>
                                 <td className="p-2 border-r border-black text-right">{currencySymbol}{item.unitPrice.toFixed(2)}</td>
                                 <td className="p-2 text-right">{currencySymbol}{(item.quantity * item.unitPrice).toFixed(2)}</td>
                             </tr>
                         ))}
                          {/* Spacer row to push footer down */}
-                         <tr><td colSpan={6} className="py-24">&nbsp;</td></tr>
+                         <tr><td colSpan={5 + customColumns.length} className="py-24">&nbsp;</td></tr>
                     </tbody>
                 </table>
              </div>

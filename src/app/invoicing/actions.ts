@@ -1,4 +1,3 @@
-
 'use server';
 
 import { db } from '@/lib/firebaseConfig';
@@ -23,6 +22,7 @@ interface InvoiceItem {
   description: string;
   quantity: number;
   unitPrice: number;
+  customFields?: { [key: string]: string };
 }
 interface InvoiceData {
   clientName: string;

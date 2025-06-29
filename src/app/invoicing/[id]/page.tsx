@@ -1,4 +1,3 @@
-
 'use client';
 
 import React, { useState, useEffect, type FormEvent } from 'react';
@@ -22,12 +21,14 @@ import { Separator } from '@/components/ui/separator';
 import Link from 'next/link';
 import { updateInvoice } from '../actions';
 import { Skeleton } from '@/components/ui/skeleton';
+import { getInvoiceSettings, type InvoiceSettings } from '@/app/settings/actions';
 
 interface InvoiceItem {
   id: string;
   description: string;
   quantity: number;
   unitPrice: number;
+  customFields?: { [key: string]: string };
 }
 type DiscountType = 'fixed' | 'percentage';
 
@@ -60,6 +61,7 @@ export default function EditInvoicePage() {
     const invoiceId = params.id as string;
 
     const [invoice, setInvoice] = useState<InvoiceDisplay | null>(null);
+    const [invoiceSettings, setInvoiceSettings] = useState<InvoiceSettings | null>(null);
     const [isLoading, setIsLoading] = useState(true);
     const [isSaving, setIsSaving] = useState(false);
 
@@ -73,8 +75,12 @@ export default function EditInvoicePage() {
         const fetchInvoice = async () => {
             setIsLoading(true);
             try {
-                const invoiceRef = doc(db, 'invoices', invoiceId);
-                const invoiceSnap = await getDoc(invoiceRef);
+                const [settings, invoiceSnap] = await Promise.all([
+                    getInvoiceSettings(user.companyId!),
+                    getDoc(doc(db, 'invoices', invoiceId))
+                ]);
+                
+                setInvoiceSettings(settings);
 
                 if (!invoiceSnap.exists() || invoiceSnap.data().companyId !== user.companyId) {
                     toast({ title: "Not Found", description: "Invoice not found or you don't have permission to view it.", variant: "destructive" });
@@ -142,17 +148,36 @@ export default function EditInvoicePage() {
     };
 
     const handleAddItem = () => {
-        const newItem: InvoiceItem = { id: crypto.randomUUID(), description: '', quantity: 1, unitPrice: 0 };
+        const newItem: InvoiceItem = { id: crypto.randomUUID(), description: '', quantity: 1, unitPrice: 0, customFields: {} };
         setInvoice(prev => prev ? ({ ...prev, items: [...(prev.items || []), newItem] }) : null);
     };
 
-    const handleItemChange = (itemId: string, field: keyof InvoiceItem, value: string | number) => {
+    const handleItemChange = (itemId: string, field: keyof Omit<InvoiceItem, 'customFields'>, value: string | number) => {
         setInvoice(prev => prev ? ({
             ...prev,
             items: (prev.items || []).map(item =>
                 item.id === itemId ? { ...item, [field]: typeof value === 'string' && (field === 'quantity' || field === 'unitPrice') ? parseFloat(value) || 0 : value } : item
             )
         }) : null);
+    };
+
+    const handleCustomFieldChange = (itemId: string, fieldId: string, value: string) => {
+        setInvoice(prev => {
+            if (!prev) return null;
+            const newItems = (prev.items || []).map(item => {
+                if (item.id === itemId) {
+                    return {
+                        ...item,
+                        customFields: {
+                            ...(item.customFields || {}),
+                            [fieldId]: value,
+                        },
+                    };
+                }
+                return item;
+            });
+            return { ...prev, items: newItems };
+        });
     };
 
     const handleRemoveItem = (itemId: string) => {
@@ -248,11 +273,26 @@ export default function EditInvoicePage() {
                                 <Button type="button" variant="outline" size="sm" onClick={handleAddItem} disabled={isSaving}><PlusCircle className="mr-2 h-4 w-4" /> Add Item</Button>
                             </div>
                             {(invoice.items || []).map((item) => (
-                                <div key={item.id} className="grid grid-cols-[1fr,auto,auto,auto] sm:grid-cols-[2fr_1fr_1fr_auto] items-end gap-2 p-2 border rounded-md bg-muted/30">
-                                    <div className="space-y-1"><Label htmlFor={`item-desc-${item.id}`} className="text-xs">Description</Label><Input id={`item-desc-${item.id}`} value={item.description} onChange={e => handleItemChange(item.id, 'description', e.target.value)} disabled={isSaving} /></div>
-                                    <div className="space-y-1"><Label htmlFor={`item-qty-${item.id}`} className="text-xs">Qty</Label><Input id={`item-qty-${item.id}`} type="number" value={item.quantity} onChange={e => handleItemChange(item.id, 'quantity', e.target.value)} disabled={isSaving} className="w-20" /></div>
-                                    <div className="space-y-1"><Label htmlFor={`item-price-${item.id}`} className="text-xs">Unit Price</Label><Input id={`item-price-${item.id}`} type="number" value={item.unitPrice} onChange={e => handleItemChange(item.id, 'unitPrice', e.target.value)} disabled={isSaving} className="w-24"/></div>
-                                    <Button type="button" variant="ghost" size="icon" className="text-destructive h-8 w-8" onClick={() => handleRemoveItem(item.id)} disabled={isSaving}><Trash2 className="h-4 w-4" /></Button>
+                                <div key={item.id} className="p-3 border rounded-md bg-muted/30 space-y-3">
+                                    <div className="grid grid-cols-[1fr,auto,auto,auto] sm:grid-cols-[2fr_1fr_1fr_auto] items-end gap-2">
+                                        <div className="space-y-1"><Label htmlFor={`item-desc-${item.id}`} className="text-xs">Description</Label><Input id={`item-desc-${item.id}`} value={item.description} onChange={e => handleItemChange(item.id, 'description', e.target.value)} disabled={isSaving} /></div>
+                                        <div className="space-y-1"><Label htmlFor={`item-qty-${item.id}`} className="text-xs">Qty</Label><Input id={`item-qty-${item.id}`} type="number" value={item.quantity} onChange={e => handleItemChange(item.id, 'quantity', e.target.value)} disabled={isSaving} className="w-20" /></div>
+                                        <div className="space-y-1"><Label htmlFor={`item-price-${item.id}`} className="text-xs">Unit Price</Label><Input id={`item-price-${item.id}`} type="number" value={item.unitPrice} onChange={e => handleItemChange(item.id, 'unitPrice', e.target.value)} disabled={isSaving} className="w-24"/></div>
+                                        <Button type="button" variant="ghost" size="icon" className="text-destructive h-8 w-8" onClick={() => handleRemoveItem(item.id)} disabled={isSaving}><Trash2 className="h-4 w-4" /></Button>
+                                    </div>
+                                    <div className="grid grid-cols-2 md:grid-cols-3 gap-2">
+                                        {invoiceSettings?.customItemColumns.map(col => (
+                                            <div key={col.id} className="space-y-1">
+                                                <Label htmlFor={`item-custom-${item.id}-${col.id}`} className="text-xs">{col.label}</Label>
+                                                <Input 
+                                                    id={`item-custom-${item.id}-${col.id}`}
+                                                    value={item.customFields?.[col.id] || ''}
+                                                    onChange={e => handleCustomFieldChange(item.id, col.id, e.target.value)}
+                                                    disabled={isSaving}
+                                                />
+                                            </div>
+                                        ))}
+                                    </div>
                                 </div>
                             ))}
                         </div>

@@ -1,4 +1,3 @@
-
 'use client';
 
 import React, { useState, useMemo, useEffect, type FormEvent } from 'react';
@@ -22,12 +21,14 @@ import { db } from '@/lib/firebaseConfig';
 import { Separator } from '@/components/ui/separator';
 import Link from 'next/link';
 import { createInvoice } from '../actions';
+import { getInvoiceSettings, type InvoiceSettings } from '@/app/settings/actions';
 
 interface InvoiceItem {
   id: string;
   description: string;
   quantity: number;
   unitPrice: number;
+  customFields?: { [key: string]: string };
 }
 
 type DiscountType = 'fixed' | 'percentage';
@@ -75,7 +76,7 @@ export default function NewInvoicePage() {
             issuedDate: new Date(),
             dueDate: new Date(new Date().setDate(new Date().getDate() + 30)),
             status: 'Draft',
-            items: [{ id: crypto.randomUUID(), description: '', quantity: 1, unitPrice: 0 }],
+            items: [{ id: crypto.randomUUID(), description: '', quantity: 1, unitPrice: 0, customFields: {} }],
             invoiceNumber: `INV${(Date.now()).toString().slice(-6)}`,
             clientName: '',
             clientEmail: '',
@@ -94,6 +95,8 @@ export default function NewInvoicePage() {
     const [existingClients, setExistingClients] = useState<ExistingClient[]>([]);
     const [isClientSuggestionsVisible, setIsClientSuggestionsVisible] = useState(false);
     const [invoices, setInvoices] = useState<InvoiceDisplay[]>([]);
+    const [invoiceSettings, setInvoiceSettings] = useState<InvoiceSettings | null>(null);
+    const [isLoadingSettings, setIsLoadingSettings] = useState(true);
 
 
     useEffect(() => {
@@ -114,39 +117,50 @@ export default function NewInvoicePage() {
     useEffect(() => {
         if (!user || !user.companyId) return;
 
-        const fetchExistingClientsData = async () => {
+        const fetchInitialData = async () => {
             const invoicesColRef = collection(db, 'invoices');
             const qInvoices = query(invoicesColRef, where('companyId', '==', user.companyId), orderBy('createdAt', 'desc'));
-            const invoiceSnapshot = await getDocs(qInvoices);
             
-            const fetchedInvoices = invoiceSnapshot.docs.map(docSnap => {
-                const data = docSnap.data();
-                return {
-                    id: docSnap.id,
-                    ...data,
-                    issuedDate: (data.issuedDate as Timestamp).toDate(),
-                    dueDate: (data.dueDate as Timestamp).toDate(),
-                } as InvoiceDisplay;
-            });
-            setInvoices(fetchedInvoices);
+            try {
+                const [invoiceSnapshot, settings] = await Promise.all([
+                    getDocs(qInvoices),
+                    getInvoiceSettings(user.companyId)
+                ]);
 
-            const clientsMap = new Map<string, ExistingClient>();
-            fetchedInvoices.forEach(inv => {
-                if (inv.clientName) {
-                    const existingEntry = clientsMap.get(inv.clientName.toLowerCase());
-                    clientsMap.set(inv.clientName.toLowerCase(), { 
-                        name: inv.clientName,
-                        email: inv.clientEmail || existingEntry?.email || '',
-                        address: inv.clientAddress || existingEntry?.address || '',
-                        gstin: inv.clientGstin || existingEntry?.gstin || ''
-                    });
-                }
-            });
-            setExistingClients(Array.from(clientsMap.values()));
+                const fetchedInvoices = invoiceSnapshot.docs.map(docSnap => {
+                    const data = docSnap.data();
+                    return {
+                        id: docSnap.id,
+                        ...data,
+                        issuedDate: (data.issuedDate as Timestamp).toDate(),
+                        dueDate: (data.dueDate as Timestamp).toDate(),
+                    } as InvoiceDisplay;
+                });
+                setInvoices(fetchedInvoices);
+
+                const clientsMap = new Map<string, ExistingClient>();
+                fetchedInvoices.forEach(inv => {
+                    if (inv.clientName) {
+                        const existingEntry = clientsMap.get(inv.clientName.toLowerCase());
+                        clientsMap.set(inv.clientName.toLowerCase(), { 
+                            name: inv.clientName,
+                            email: inv.clientEmail || existingEntry?.email || '',
+                            address: inv.clientAddress || existingEntry?.address || '',
+                            gstin: inv.clientGstin || existingEntry?.gstin || ''
+                        });
+                    }
+                });
+                setExistingClients(Array.from(clientsMap.values()));
+                setInvoiceSettings(settings);
+            } catch (e) {
+                toast({ title: "Error", description: "Could not load initial invoicing data." });
+            } finally {
+                setIsLoadingSettings(false);
+            }
         };
 
-        fetchExistingClientsData();
-    }, [user]);
+        fetchInitialData();
+    }, [user, toast]);
 
     useEffect(() => {
         const subtotal = (currentInvoice.items || []).reduce((sum, item) => sum + (Number(item.quantity || 0) * Number(item.unitPrice || 0)), 0);
@@ -224,17 +238,36 @@ export default function NewInvoicePage() {
     };
     
     const handleAddItem = () => {
-        const newItem: InvoiceItem = { id: crypto.randomUUID(), description: '', quantity: 1, unitPrice: 0 };
+        const newItem: InvoiceItem = { id: crypto.randomUUID(), description: '', quantity: 1, unitPrice: 0, customFields: {} };
         setCurrentInvoice(prev => ({ ...prev, items: [...(prev.items || []), newItem] }));
     };
 
-    const handleItemChange = (itemId: string, field: keyof InvoiceItem, value: string | number) => {
+    const handleItemChange = (itemId: string, field: keyof Omit<InvoiceItem, 'customFields'>, value: string | number) => {
         setCurrentInvoice(prev => ({
             ...prev,
             items: (prev.items || []).map(item =>
                 item.id === itemId ? { ...item, [field]: typeof value === 'string' && (field === 'quantity' || field === 'unitPrice') ? parseFloat(value) || 0 : value } : item
             )
         }));
+    };
+    
+    const handleCustomFieldChange = (itemId: string, fieldId: string, value: string) => {
+        setCurrentInvoice(prev => {
+            if (!prev) return null;
+            const newItems = (prev.items || []).map(item => {
+                if (item.id === itemId) {
+                    return {
+                        ...item,
+                        customFields: {
+                            ...(item.customFields || {}),
+                            [fieldId]: value,
+                        },
+                    };
+                }
+                return item;
+            });
+            return { ...prev, items: newItems };
+        });
     };
 
     const handleRemoveItem = (itemId: string) => {
@@ -388,20 +421,35 @@ export default function NewInvoicePage() {
                                 <Button type="button" variant="outline" size="sm" onClick={handleAddItem} disabled={isSaving}><PlusCircle className="mr-2 h-4 w-4" /> Add Item</Button>
                             </div>
                             {(currentInvoice.items || []).map((item) => (
-                                <div key={item.id} className="grid grid-cols-[1fr,auto,auto,auto] sm:grid-cols-[2fr_1fr_1fr_auto] items-end gap-2 p-2 border rounded-md bg-muted/30">
-                                    <div className="space-y-1">
-                                        <Label htmlFor={`item-desc-${item.id}`} className="text-xs">Description</Label>
-                                        <Input id={`item-desc-${item.id}`} value={item.description} onChange={e => handleItemChange(item.id, 'description', e.target.value)} placeholder="Service or Product" disabled={isSaving} />
+                                 <div key={item.id} className="p-3 border rounded-md bg-muted/30 space-y-3">
+                                    <div className="grid grid-cols-[1fr,auto,auto,auto] sm:grid-cols-[2fr_1fr_1fr_auto] items-end gap-2">
+                                        <div className="space-y-1">
+                                            <Label htmlFor={`item-desc-${item.id}`} className="text-xs">Description</Label>
+                                            <Input id={`item-desc-${item.id}`} value={item.description} onChange={e => handleItemChange(item.id, 'description', e.target.value)} placeholder="Service or Product" disabled={isSaving} />
+                                        </div>
+                                        <div className="space-y-1">
+                                            <Label htmlFor={`item-qty-${item.id}`} className="text-xs">Qty</Label>
+                                            <Input id={`item-qty-${item.id}`} type="number" value={item.quantity} onChange={e => handleItemChange(item.id, 'quantity', e.target.value)} min="0" disabled={isSaving} className="w-20" />
+                                        </div>
+                                        <div className="space-y-1">
+                                            <Label htmlFor={`item-price-${item.id}`} className="text-xs">Unit Price</Label>
+                                            <Input id={`item-price-${item.id}`} type="number" value={item.unitPrice} onChange={e => handleItemChange(item.id, 'unitPrice', e.target.value)} min="0" step="0.01" disabled={isSaving} className="w-24"/>
+                                        </div>
+                                        <Button type="button" variant="ghost" size="icon" className="text-destructive h-8 w-8" onClick={() => handleRemoveItem(item.id)} disabled={isSaving}><Trash2 className="h-4 w-4" /></Button>
                                     </div>
-                                    <div className="space-y-1">
-                                        <Label htmlFor={`item-qty-${item.id}`} className="text-xs">Qty</Label>
-                                        <Input id={`item-qty-${item.id}`} type="number" value={item.quantity} onChange={e => handleItemChange(item.id, 'quantity', e.target.value)} min="0" disabled={isSaving} className="w-20" />
+                                    <div className="grid grid-cols-2 md:grid-cols-3 gap-2">
+                                        {invoiceSettings?.customItemColumns.map(col => (
+                                            <div key={col.id} className="space-y-1">
+                                                <Label htmlFor={`item-custom-${item.id}-${col.id}`} className="text-xs">{col.label}</Label>
+                                                <Input 
+                                                    id={`item-custom-${item.id}-${col.id}`}
+                                                    value={item.customFields?.[col.id] || ''}
+                                                    onChange={e => handleCustomFieldChange(item.id, col.id, e.target.value)}
+                                                    disabled={isSaving}
+                                                />
+                                            </div>
+                                        ))}
                                     </div>
-                                    <div className="space-y-1">
-                                        <Label htmlFor={`item-price-${item.id}`} className="text-xs">Unit Price</Label>
-                                        <Input id={`item-price-${item.id}`} type="number" value={item.unitPrice} onChange={e => handleItemChange(item.id, 'unitPrice', e.target.value)} min="0" step="0.01" disabled={isSaving} className="w-24"/>
-                                    </div>
-                                    <Button type="button" variant="ghost" size="icon" className="text-destructive h-8 w-8" onClick={() => handleRemoveItem(item.id)} disabled={isSaving}><Trash2 className="h-4 w-4" /></Button>
                                 </div>
                             ))}
                         </div>

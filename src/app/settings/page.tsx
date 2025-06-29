@@ -64,6 +64,15 @@ export default function SettingsPage() {
     setNewColumnName('');
   };
 
+  const handleColumnLabelChange = (id: string, newLabel: string) => {
+    setSettings(prev => ({
+      ...prev,
+      customItemColumns: prev.customItemColumns.map(col =>
+        col.id === id ? { ...col, label: newLabel } : col
+      ),
+    }));
+  };
+
   const handleDeleteColumn = (id: string) => {
     setSettings(prev => ({
         ...prev,
@@ -129,7 +138,7 @@ export default function SettingsPage() {
             <CardHeader>
                 <CardTitle>Invoice Settings</CardTitle>
                 <CardDescription>
-                    Add or remove custom columns that will appear in the items section of your invoices.
+                    Add, rename, or remove custom columns for your invoice items. These will appear on the invoice forms and templates.
                 </CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
@@ -137,7 +146,11 @@ export default function SettingsPage() {
                     {settings.customItemColumns.length > 0 ? (
                     settings.customItemColumns.map(col => (
                         <div key={col.id} className="flex items-center gap-2 p-2 border rounded-md bg-muted/50">
-                        <Input value={col.label} disabled className="font-medium" />
+                        <Input 
+                            value={col.label} 
+                            onChange={(e) => handleColumnLabelChange(col.id, e.target.value)}
+                            disabled={isSaving}
+                            className="font-medium" />
                         <Button variant="ghost" size="icon" onClick={() => handleDeleteColumn(col.id)} disabled={isSaving}>
                             <Trash2 className="h-4 w-4 text-destructive" />
                         </Button>
@@ -157,19 +170,13 @@ export default function SettingsPage() {
                         onChange={e => setNewColumnName(e.target.value)}
                         placeholder="e.g., HSN Code, Serial Number"
                         disabled={isSaving}
+                        onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); handleAddColumn(); }}}
                     />
                     </div>
                     <Button onClick={handleAddColumn} disabled={isSaving}>
                     <PlusCircle className="mr-2 h-4 w-4" /> Add Column
                     </Button>
                 </div>
-                <Alert>
-                    <Info className="h-4 w-4" />
-                    <AlertTitle>What's Next?</AlertTitle>
-                    <AlertDescription>
-                        After saving your columns, they need to be integrated into the invoice creation form and templates. This requires further development.
-                    </AlertDescription>
-                </Alert>
             </CardContent>
             <CardFooter className="justify-end">
                  <Button onClick={handleSaveChanges} disabled={isSaving}>

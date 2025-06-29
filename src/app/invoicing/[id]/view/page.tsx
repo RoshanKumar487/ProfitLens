@@ -1,4 +1,3 @@
-
 'use client';
 
 import React, { useState, useEffect, useRef, useCallback } from 'react';
@@ -19,6 +18,7 @@ import Link from 'next/link';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Switch } from '@/components/ui/switch';
+import { getInvoiceSettings, type InvoiceSettings } from '@/app/settings/actions';
 
 // Interface definitions mirrored from invoicing/page.tsx for component props
 interface InvoiceItem {
@@ -26,6 +26,7 @@ interface InvoiceItem {
   description: string;
   quantity: number;
   unitPrice: number;
+  customFields?: { [key: string]: string };
 }
 
 interface InvoiceDisplay {
@@ -77,6 +78,7 @@ export default function ViewInvoicePage() {
 
     const [invoice, setInvoice] = useState<InvoiceDisplay | null>(null);
     const [companyProfile, setCompanyProfile] = useState<CompanyDetailsFirestore | null>(null);
+    const [invoiceSettings, setInvoiceSettings] = useState<InvoiceSettings | null>(null);
     const [imageDataUris, setImageDataUris] = useState<{ signature?: string; stamp?: string }>({});
     const [isLoadingData, setIsLoadingData] = useState(true);
     const [isProcessing, setIsProcessing] = useState(false);
@@ -117,6 +119,10 @@ export default function ViewInvoicePage() {
                 if (companyData.stampUrl) uris.stamp = await urlToDataUri(companyData.stampUrl);
                 setImageDataUris(uris);
             }
+
+            const settings = await getInvoiceSettings(companyId);
+            setInvoiceSettings(settings);
+
         } catch (error: any) {
             toast({ title: "Error", description: error.message || "Failed to load invoice data.", variant: "destructive" });
             router.push('/invoicing');
@@ -308,6 +314,7 @@ export default function ViewInvoicePage() {
                     signatureDataUri={imageDataUris.signature}
                     stampDataUri={imageDataUris.stamp}
                     letterheadTemplate={useLetterhead ? letterheadTemplate : 'none'}
+                    invoiceSettings={invoiceSettings}
                 />
             </div>
         </main>
