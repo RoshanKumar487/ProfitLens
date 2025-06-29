@@ -4,6 +4,8 @@
 import React from 'react';
 import { format } from 'date-fns';
 import Letterhead from '@/components/Letterhead';
+import LetterheadModern from '@/components/LetterheadModern';
+import { stringToHslColor } from '@/lib/utils';
 
 // Interface definitions mirrored from invoicing/page.tsx for component props
 interface InvoiceItem {
@@ -56,7 +58,7 @@ interface InvoiceTemplateProps {
   currencySymbol: string;
   signatureDataUri?: string;
   stampDataUri?: string;
-  withLetterhead: boolean;
+  letterheadTemplate: 'none' | 'simple' | 'modern';
 }
 
 const numberToWords = (num: number): string => {
@@ -94,7 +96,7 @@ const numberToWords = (num: number): string => {
 };
 
 const InvoiceTemplateIndian = React.forwardRef<HTMLDivElement, InvoiceTemplateProps>(
-  ({ invoiceToView, companyProfileDetails, currencySymbol, signatureDataUri, stampDataUri, withLetterhead }, ref) => {
+  ({ invoiceToView, companyProfileDetails, currencySymbol, signatureDataUri, stampDataUri, letterheadTemplate }, ref) => {
     
     const amountInWords = numberToWords(Math.floor(invoiceToView.amount));
     const subtotal = (invoiceToView.items || []).reduce((acc, item) => acc + (item.quantity * item.unitPrice), 0);
@@ -107,12 +109,17 @@ const InvoiceTemplateIndian = React.forwardRef<HTMLDivElement, InvoiceTemplatePr
         companyProfileDetails.country
     ].filter(Boolean).join(', ');
 
+    const modernFooterStyle = letterheadTemplate === 'modern' 
+    ? { borderBottom: `4px solid ${stringToHslColor(companyProfileDetails.name, 70, 55)}` }
+    : {};
 
     return (
-      <div ref={ref} className="bg-white text-black font-sans text-xs w-[210mm] min-h-[297mm] mx-auto flex flex-col">
-          {withLetterhead && <Letterhead companyDetails={companyProfileDetails} />}
+      <div ref={ref} className="bg-white text-black font-sans text-xs w-[210mm] min-h-[297mm] mx-auto flex flex-col" style={modernFooterStyle}>
+          {letterheadTemplate === 'simple' && <Letterhead companyDetails={companyProfileDetails} />}
+          {letterheadTemplate === 'modern' && <LetterheadModern companyDetails={companyProfileDetails} />}
+
           <div className="flex-grow flex flex-col p-4 space-y-4">
-            {!withLetterhead && (
+            {letterheadTemplate === 'none' && (
                 <header className="text-center space-y-2">
                     <div className="w-full h-24">{/* Blank space for letterhead */}</div>
                     <h1 className="text-2xl font-bold uppercase tracking-wider text-gray-800">{companyProfileDetails.name}</h1>

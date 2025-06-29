@@ -5,6 +5,8 @@ import React from 'react';
 import { format } from 'date-fns';
 import type { EmployeeDisplay } from './page';
 import Letterhead from '@/components/Letterhead';
+import LetterheadModern from '@/components/LetterheadModern';
+import { stringToHslColor } from '@/lib/utils';
 
 interface BioDataTemplateProps {
   employee: EmployeeDisplay;
@@ -12,7 +14,7 @@ interface BioDataTemplateProps {
   profilePictureDataUri?: string;
   leftThumbImpressionDataUri?: string;
   signatureDataUri?: string;
-  withLetterhead: boolean;
+  letterheadTemplate: 'none' | 'simple' | 'modern';
 }
 
 const DataRow: React.FC<{ label: string; value?: string | number | null }> = ({ label, value }) => (
@@ -33,7 +35,7 @@ const Section: React.FC<{ title: string; children: React.ReactNode; className?: 
 
 
 const BioDataTemplate = React.forwardRef<HTMLDivElement, BioDataTemplateProps>(
-  ({ employee, companyDetails, profilePictureDataUri, leftThumbImpressionDataUri, signatureDataUri, withLetterhead }, ref) => {
+  ({ employee, companyDetails, profilePictureDataUri, leftThumbImpressionDataUri, signatureDataUri, letterheadTemplate }, ref) => {
     
     const fullPermanentAddress = [
         employee.permanentAddressHNo,
@@ -44,12 +46,17 @@ const BioDataTemplate = React.forwardRef<HTMLDivElement, BioDataTemplateProps>(
         employee.permanentAddressPin
     ].filter(Boolean).join(', ');
     
-    return (
-      <div ref={ref} className="bg-white text-black p-8 font-sans w-[210mm] min-h-[297mm] mx-auto flex flex-col">
-        
-        {withLetterhead && companyDetails && <Letterhead companyDetails={companyDetails} />}
+    const modernFooterStyle = letterheadTemplate === 'modern' && companyDetails
+    ? { borderBottom: `4px solid ${stringToHslColor(companyDetails.name, 70, 55)}` }
+    : {};
 
-        {!withLetterhead && (
+    return (
+      <div ref={ref} className="bg-white text-black p-8 font-sans w-[210mm] min-h-[297mm] mx-auto flex flex-col" style={modernFooterStyle}>
+        
+        {letterheadTemplate === 'simple' && companyDetails && <Letterhead companyDetails={companyDetails} />}
+        {letterheadTemplate === 'modern' && companyDetails && <LetterheadModern companyDetails={companyDetails} />}
+
+        {letterheadTemplate === 'none' && (
           <header className="text-center mb-6">
             <div className="w-full h-24">{/* Blank space for letterhead */}</div>
             <h1 className="text-3xl font-bold text-gray-800 uppercase tracking-wide">{companyDetails?.name || 'Company Name'}</h1>

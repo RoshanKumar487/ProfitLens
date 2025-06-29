@@ -37,8 +37,7 @@ import { format } from 'date-fns';
 import { Calendar as CalendarIcon } from 'lucide-react';
 import jsPDF from 'jspdf';
 import html2canvas from 'html2canvas';
-import { Switch } from '@/components/ui/switch';
-import Letterhead from '@/components/Letterhead';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 
 interface EmployeeFirestore {
   id?: string;
@@ -153,7 +152,7 @@ export default function EmployeesPage() {
   const [bioDataImageUris, setBioDataImageUris] = useState<Record<string, string | undefined>>({});
   const [companyDetails, setCompanyDetails] = useState<any | null>(null);
   const [isPrinting, setIsPrinting] = useState(false);
-  const [useLetterheadBioData, setUseLetterheadBioData] = useState(false);
+  const [letterheadTemplate, setLetterheadTemplate] = useState('none');
 
 
   const filteredEmployees = useMemo(() => {
@@ -626,7 +625,7 @@ export default function EmployeesPage() {
         if (!imgData || imgData === 'data:,') {
             toast({
                 title: "Print Failed",
-                description: "Could not generate a printable image of the document.",
+                description: "Could not generate a printable image of the document. This can be caused by a temporary network issue with images. Please try again.",
                 variant: "destructive",
             });
             setIsPrinting(false);
@@ -672,7 +671,7 @@ export default function EmployeesPage() {
         if (!imgData || imgData === 'data:,') {
             toast({
                 title: "Download Failed",
-                description: "Could not generate an image of the document.",
+                description: "Could not generate an image of the document. This may be due to a network issue. Please try again.",
                 variant: "destructive",
             });
             setIsPrinting(false);
@@ -803,13 +802,22 @@ export default function EmployeesPage() {
                     profilePictureDataUri={bioDataImageUris.profile}
                     leftThumbImpressionDataUri={bioDataImageUris.thumb}
                     signatureDataUri={bioDataImageUris.signature}
-                    withLetterhead={useLetterheadBioData}
+                    letterheadTemplate={letterheadTemplate}
                    /></div>}
               </ScrollArea>
               <DialogFooter className="p-4 sm:p-6 border-t bg-background no-print justify-between items-center flex-wrap gap-2">
                  <div className="flex items-center space-x-2">
-                    <Switch id="biodata-letterhead-toggle" checked={useLetterheadBioData} onCheckedChange={setUseLetterheadBioData} />
-                    <Label htmlFor="biodata-letterhead-toggle">Use Letterhead</Label>
+                    <Label htmlFor="letterhead-select">Letterhead</Label>
+                    <Select value={letterheadTemplate} onValueChange={setLetterheadTemplate}>
+                        <SelectTrigger className="w-[180px]">
+                            <SelectValue placeholder="Select a template" />
+                        </SelectTrigger>
+                        <SelectContent>
+                            <SelectItem value="none">None</SelectItem>
+                            <SelectItem value="simple">Simple</SelectItem>
+                            <SelectItem value="modern">Modern</SelectItem>
+                        </SelectContent>
+                    </Select>
                 </div>
                 <div className="flex gap-2">
                      <Button type="button" variant="secondary" onClick={handleDownloadBioDataPdf} disabled={isPrinting}>
