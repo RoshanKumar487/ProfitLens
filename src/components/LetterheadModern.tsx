@@ -2,7 +2,7 @@
 
 import React from 'react';
 import { stringToHslColor } from '@/lib/utils';
-import { Phone, Mail } from 'lucide-react';
+import { Phone, Mail, Globe } from 'lucide-react';
 
 interface CompanyDetails {
   name: string;
@@ -12,6 +12,7 @@ interface CompanyDetails {
   country?: string;
   phone?: string;
   email?: string;
+  website?: string;
 }
 
 interface LetterheadModernProps {
@@ -19,8 +20,10 @@ interface LetterheadModernProps {
 }
 
 const LetterheadModern: React.FC<LetterheadModernProps> = ({ companyDetails }) => {
-  const primaryColor = stringToHslColor(companyDetails.name, 60, 40); // e.g., Teal/Green shade
-  const accentColor = stringToHslColor(companyDetails.name, 70, 55);  // Brighter accent for borders
+  // A dark, saturated color for the background
+  const primaryBgColor = stringToHslColor(companyDetails.name, 40, 25);
+  // A slightly lighter, vibrant color for the company name text, to pop against the dark BG
+  const companyNameColor = stringToHslColor(companyDetails.name, 70, 75);
 
   const fullAddress = [
     companyDetails.address,
@@ -30,30 +33,33 @@ const LetterheadModern: React.FC<LetterheadModernProps> = ({ companyDetails }) =
   ].filter(Boolean).join(', ');
 
   return (
-    <header className="relative w-full text-black font-sans" style={{ borderTop: `4px solid ${accentColor}` }}>
-      <div className="flex justify-between items-center p-4">
-        <div className="relative w-2/3">
-           <h1 className="text-3xl font-bold uppercase tracking-wider relative z-10" style={{ color: primaryColor }}>
+    <header className="w-full text-white p-6 font-sans" style={{ backgroundColor: primaryBgColor }}>
+      <div className="flex justify-between items-start">
+        {/* Left side: Company Name */}
+        <div className="w-1/2">
+           <h1 className="text-3xl font-headline font-bold uppercase tracking-wider" style={{ color: companyNameColor }}>
             {companyDetails.name}
           </h1>
-          <div 
-              className="absolute -bottom-1 -left-2 h-8 w-56 opacity-20 z-0"
-              style={{
-                  background: `linear-gradient(45deg, ${primaryColor}, transparent)`
-              }}
-          />
         </div>
-        <div className="text-right text-xs w-1/3 space-y-0.5">
-           <p className="font-bold" style={{color: primaryColor}}>Address:</p>
+
+        {/* Right side: Contact Info */}
+        <div className="text-right text-xs w-1/2 space-y-1">
+           <p className="font-bold text-sm" style={{ color: companyNameColor }}>Address:</p>
            <p>{fullAddress}</p>
-           <div className="flex items-center justify-end gap-1.5 mt-1">
-              <Phone size={10} style={{ color: primaryColor }} />
+           <div className="flex items-center justify-end gap-1.5 mt-2">
+              <Phone size={10} />
               <span>{companyDetails.phone || 'N/A'}</span>
            </div>
            <div className="flex items-center justify-end gap-1.5">
-              <Mail size={10} style={{ color: primaryColor }} />
+              <Mail size={10} />
               <span>{companyDetails.email || 'N/A'}</span>
            </div>
+           {companyDetails.website && (
+            <div className="flex items-center justify-end gap-1.5">
+                <Globe size={10} />
+                <span>{companyDetails.website}</span>
+            </div>
+           )}
         </div>
       </div>
     </header>

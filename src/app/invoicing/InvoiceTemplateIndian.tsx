@@ -1,4 +1,3 @@
-
 'use client';
 
 import React from 'react';
@@ -109,12 +108,10 @@ const InvoiceTemplateIndian = React.forwardRef<HTMLDivElement, InvoiceTemplatePr
         companyProfileDetails.country
     ].filter(Boolean).join(', ');
 
-    const modernFooterStyle = letterheadTemplate === 'modern' 
-    ? { borderBottom: `4px solid ${stringToHslColor(companyProfileDetails.name, 70, 55)}` }
-    : {};
+    const primaryBgColor = letterheadTemplate === 'modern' ? stringToHslColor(companyProfileDetails.name, 40, 25) : 'transparent';
 
     return (
-      <div ref={ref} className="bg-white text-black font-sans text-xs w-[210mm] min-h-[297mm] mx-auto flex flex-col" style={modernFooterStyle}>
+      <div ref={ref} className="bg-white text-black font-sans text-xs w-[210mm] min-h-[297mm] mx-auto flex flex-col">
           {letterheadTemplate === 'simple' && <Letterhead companyDetails={companyProfileDetails} />}
           {letterheadTemplate === 'modern' && <LetterheadModern companyDetails={companyProfileDetails} />}
 
@@ -237,6 +234,9 @@ const InvoiceTemplateIndian = React.forwardRef<HTMLDivElement, InvoiceTemplatePr
                 </div>
             </footer>
           </div>
+          {letterheadTemplate === 'modern' && (
+              <footer style={{ backgroundColor: primaryBgColor, height: '25px' }} />
+          )}
       </div>
     );
   }
