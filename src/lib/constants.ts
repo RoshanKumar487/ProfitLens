@@ -7,6 +7,7 @@ export interface NavItem {
   href: string;
   icon: LucideIcon;
   description: string;
+  sidebar?: boolean;
 }
 
 export const NAV_ITEMS: NavItem[] = [
@@ -50,7 +51,8 @@ export const NAV_ITEMS: NavItem[] = [
     label: 'Bank Accounts',
     href: '/bank-accounts',
     icon: Banknote,
-    description: 'Manually track bank accounts and categorize transactions.'
+    description: 'Manually track bank accounts and categorize transactions.',
+    sidebar: false,
   },
   {
     label: 'Employees',

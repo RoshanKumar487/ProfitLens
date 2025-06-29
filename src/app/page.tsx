@@ -43,8 +43,14 @@ const ToolCard = ({ item, isEnabled }: { item: (typeof NAV_ITEMS)[0]; isEnabled:
 export default function MyToolsPage() {
   const { user } = useAuth();
 
-  // Filter out the 'My Tools' item itself from the list of cards to display.
-  const accessibleTools = NAV_ITEMS.filter(item => item.href !== '/');
+  // Explicitly define which tools appear on this page.
+  const toolHrefs = ['/reports', '/settings', '/admin', '/bank-accounts'];
+  const accessibleTools = NAV_ITEMS.filter(item => {
+    if (item.href === '/admin') {
+      return user?.role === 'admin' && toolHrefs.includes(item.href);
+    }
+    return toolHrefs.includes(item.href);
+  });
 
   return (
     <div className="space-y-6 p-4 sm:p-6 lg:p-8">

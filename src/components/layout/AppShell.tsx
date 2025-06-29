@@ -80,9 +80,10 @@ const AppShellLayout = ({ children }: { children: React.ReactNode }) => {
   const isAuthPage = pathname.startsWith('/auth/');
   
   const visibleNavItems = useMemo(() => {
-    // In a future step, this will filter based on granular user permissions.
-    // For now, it only filters the admin link based on the user's role.
     return NAV_ITEMS.filter(item => {
+      if (item.sidebar === false) {
+        return false;
+      }
       if (item.href === '/admin') {
         return user?.role === 'admin';
       }
