@@ -16,7 +16,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { useAuth } from '@/contexts/AuthContext';
-import { collection, getDocs, query, where, orderBy, Timestamp, getDoc } from 'firebase/firestore';
+import { collection, getDocs, query, where, orderBy, Timestamp, getDoc, doc } from 'firebase/firestore';
 import { db } from '@/lib/firebaseConfig';
 import { Separator } from '@/components/ui/separator';
 import Link from 'next/link';
@@ -531,4 +531,4 @@ export default function NewInvoicePage() {
         </div>
     );
 }
-
+    
