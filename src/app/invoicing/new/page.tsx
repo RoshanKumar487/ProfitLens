@@ -117,7 +117,7 @@ export default function NewInvoicePage() {
     const [isLoading, setIsLoading] = useState(true);
 
     const [isSettingsDialogOpen, setIsSettingsDialogOpen] = useState(false);
-    const [tempSettings, setTempSettings] = useState<InvoiceSettings>({ customItemColumns: [] });
+    const [tempSettings, setTempSettings] = useState<InvoiceSettings>({ customItemColumns: [], defaultPaymentTermsDays: 30, defaultHsnCode: '' });
     const [newColumnName, setNewColumnName] = useState('');
 
 
@@ -190,7 +190,8 @@ export default function NewInvoicePage() {
                 setCurrentInvoice(prev => ({
                     ...prev,
                     dueDate: defaultDueDate,
-                    items: (prev.items || []).map(item => ({...item, hsnNo: settings.defaultHsnCode || ''}))
+                    items: (prev.items || []).map(item => ({...item, hsnNo: settings.defaultHsnCode || ''})),
+                    notes: settings.defaultNotes || 'Thank you for your business. Please make the payment by the due date.',
                 }));
 
             } catch (e) {
@@ -334,36 +335,59 @@ export default function NewInvoicePage() {
           .filter(inv => inv.clientName === client.name)
           .sort((a, b) => b.issuedDate.getTime() - a.issuedDate.getTime())[0];
 
+        // Preserve user's current default settings (tax/discount) but reset everything else
+        const defaultsToKeep = {
+            taxRate: currentInvoice.taxRate,
+            discountType: currentInvoice.discountType,
+            discountValue: currentInvoice.discountValue,
+        };
+
         const days = invoiceSettings?.defaultPaymentTermsDays || 30;
         const newDueDate = new Date();
         newDueDate.setDate(newDueDate.getDate() + days);
 
-        const baseInvoiceState = {
-            ...currentInvoice,
-            invoiceNumber: `INV${(Date.now()).toString().slice(-6)}`,
-            issuedDate: new Date(),
-            dueDate: newDueDate,
-            status: 'Draft',
-        };
-
         if (mostRecentInvoice) {
-          const newItems = (mostRecentInvoice.items || []).map(item => ({...item, id: crypto.randomUUID()}));
-          setCurrentInvoice({
-            ...baseInvoiceState,
-            clientName: mostRecentInvoice.clientName,
-            clientEmail: mostRecentInvoice.clientEmail,
-            clientAddress: mostRecentInvoice.clientAddress,
-            clientGstin: mostRecentInvoice.clientGstin,
-            items: newItems,
-            notes: mostRecentInvoice.notes,
-          });
+            const newItems = (mostRecentInvoice.items || []).map(item => ({
+                ...item, 
+                id: crypto.randomUUID(),
+                hsnNo: item.hsnNo || invoiceSettings?.defaultHsnCode || '',
+                customFields: item.customFields || {} 
+            }));
+
+            setCurrentInvoice({
+                ...defaultsToKeep,
+                clientName: mostRecentInvoice.clientName,
+                clientEmail: mostRecentInvoice.clientEmail,
+                clientAddress: mostRecentInvoice.clientAddress,
+                clientGstin: mostRecentInvoice.clientGstin,
+                items: newItems,
+                notes: mostRecentInvoice.notes || invoiceSettings?.defaultNotes,
+                invoiceNumber: `INV${(Date.now()).toString().slice(-6)}`,
+                issuedDate: new Date(),
+                dueDate: newDueDate,
+                status: 'Draft',
+                subtotal: 0,
+                discountAmount: 0,
+                taxAmount: 0,
+                amount: 0,
+            });
         } else {
-          setCurrentInvoice({ 
-              ...baseInvoiceState, 
-              clientName: client.name, 
-              clientEmail: client.email || '', 
-              clientAddress: client.address || '', 
-              clientGstin: client.gstin || '' 
+            setCurrentInvoice({ 
+                ...defaultsToKeep, 
+                clientName: client.name, 
+                clientEmail: client.email || '', 
+                clientAddress: client.address || '', 
+                clientGstin: client.gstin || '',
+                items: [{ id: crypto.randomUUID(), description: '', hsnNo: invoiceSettings?.defaultHsnCode || '', quantity: 1, unitPrice: 0, customFields: {} }],
+                notes: invoiceSettings?.defaultNotes || 'Thank you for your business. Please make the payment by the due date.',
+                invoiceNumber: `INV${(Date.now()).toString().slice(-6)}`,
+                issuedDate: new Date(),
+                dueDate: newDueDate,
+                status: 'Draft',
+                subtotal: 0,
+                discountAmount: 0,
+                taxAmount: 0,
+                amount: 0,
             });
         }
         setIsClientSuggestionsVisible(false);
@@ -535,9 +559,9 @@ export default function NewInvoicePage() {
                                     <tr className="bg-[#0A2B58] text-white">
                                         <th className="p-1 w-8 text-center font-normal">#</th>
                                         <th className="p-1 font-normal flex items-center gap-1">
-                                            Item & Description
-                                            <Button type="button" size="icon" variant="ghost" className="h-5 w-5 text-white/80 hover:text-white hover:bg-white/20" onClick={() => { setTempSettings(invoiceSettings || { customItemColumns: [] }); setIsSettingsDialogOpen(true); }}>
-                                                <PlusCircle className="h-3 w-3" />
+                                            Item &amp; Description
+                                            <Button type="button" size="icon" variant="ghost" className="h-5 w-5 text-white/80 hover:text-white hover:bg-white/20" onClick={() => { setTempSettings(invoiceSettings || { customItemColumns: [], defaultPaymentTermsDays: 30, defaultHsnCode: '' }); setIsSettingsDialogOpen(true); }}>
+                                                <Settings className="h-3 w-3" />
                                             </Button>
                                         </th>
                                         <th className="p-1 w-24 font-normal">HSN No.</th>
@@ -590,7 +614,7 @@ export default function NewInvoicePage() {
                             </div>
                             <div className="flex justify-between items-start">
                                 <div className="w-1/2 text-xs">
-                                    <p className="font-bold">Terms & Conditions</p>
+                                    <p className="font-bold">Terms &amp; Conditions</p>
                                     <Textarea className="p-1 h-16 text-xs" value={currentInvoice.notes || ''} onChange={(e) => setCurrentInvoice({...currentInvoice, notes: e.target.value})} />
                                 </div>
                                 <div className="w-1/3">
@@ -658,7 +682,9 @@ export default function NewInvoicePage() {
                             <CardHeader>
                                 <div className="flex justify-between items-center">
                                     <CardTitle>Items</CardTitle>
-                                    <Button type="button" size="sm" variant="outline" onClick={handleAddItem}><PlusCircle className="mr-2 h-4 w-4"/>Add</Button>
+                                    <Button type="button" size="sm" variant="outline" onClick={() => { setTempSettings(invoiceSettings || { customItemColumns: [], defaultPaymentTermsDays: 30, defaultHsnCode: '' }); setIsSettingsDialogOpen(true); }}>
+                                        <Settings className="mr-2 h-4 w-4"/>Manage Columns
+                                    </Button>
                                 </div>
                             </CardHeader>
                             <CardContent className="space-y-4">
@@ -683,10 +709,11 @@ export default function NewInvoicePage() {
                                         </div>
                                     </div>
                                 ))}
+                                <Button type="button" className="w-full" variant="outline" onClick={handleAddItem}><PlusCircle className="mr-2 h-4 w-4"/>Add Item</Button>
                             </CardContent>
                         </Card>
                         <Card>
-                            <CardHeader><CardTitle>Summary & Terms</CardTitle></CardHeader>
+                            <CardHeader><CardTitle>Summary &amp; Terms</CardTitle></CardHeader>
                             <CardContent className="space-y-4">
                                 <div className="grid grid-cols-2 gap-4">
                                     <div><Label>Discount Type</Label><Select value={currentInvoice.discountType || 'fixed'} onValueChange={(v: DiscountType) => setCurrentInvoice({...currentInvoice, discountType: v})}><SelectTrigger><SelectValue/></SelectTrigger><SelectContent><SelectItem value="fixed">Fixed ({currencySymbol})</SelectItem><SelectItem value="percentage">Percentage (%)</SelectItem></SelectContent></Select></div>
@@ -765,4 +792,6 @@ export default function NewInvoicePage() {
         </div>
     );
 }
+    
+
     
