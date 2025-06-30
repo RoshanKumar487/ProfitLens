@@ -5,7 +5,7 @@ import React, { useState, useMemo, useEffect, type FormEvent } from 'react';
 import { useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Receipt, PlusCircle, UserPlus, Save, Loader2, Calendar as CalendarIconLucide, Trash2, ArrowLeft } from 'lucide-react';
+import { Receipt, PlusCircle, UserPlus, Save, Loader2, Calendar as CalendarIconLucide, Trash2, ArrowLeft, Settings } from 'lucide-react';
 import { format } from 'date-fns';
 import { useToast } from '@/hooks/use-toast';
 import { Label } from '@/components/ui/label';
@@ -21,13 +21,16 @@ import { db } from '@/lib/firebaseConfig';
 import { Separator } from '@/components/ui/separator';
 import Link from 'next/link';
 import { createInvoice } from '../actions';
-import { getInvoiceSettings, type InvoiceSettings } from '@/app/settings/actions';
+import { getInvoiceSettings, saveInvoiceSettings, type InvoiceSettings, type CustomItemColumn } from '@/app/settings/actions';
 import { cn } from '@/lib/utils';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
+import { v4 as uuidv4 } from 'uuid';
 
 
 interface InvoiceItem {
   id: string;
   description: string;
+  hsnNo?: string;
   quantity: number;
   unitPrice: number;
   customFields?: { [key: string]: string };
@@ -91,7 +94,7 @@ export default function NewInvoicePage() {
             issuedDate: new Date(),
             dueDate: new Date(new Date().setDate(new Date().getDate() + 30)),
             status: 'Draft',
-            items: [{ id: crypto.randomUUID(), description: '', quantity: 1, unitPrice: 0, customFields: {} }],
+            items: [{ id: crypto.randomUUID(), description: '', hsnNo: '', quantity: 1, unitPrice: 0, customFields: {} }],
             invoiceNumber: `INV${(Date.now()).toString().slice(-6)}`,
             clientName: '',
             clientEmail: '',
@@ -112,6 +115,10 @@ export default function NewInvoicePage() {
     const [invoices, setInvoices] = useState<InvoiceDisplay[]>([]);
     const [invoiceSettings, setInvoiceSettings] = useState<InvoiceSettings | null>(null);
     const [isLoading, setIsLoading] = useState(true);
+
+    const [isSettingsDialogOpen, setIsSettingsDialogOpen] = useState(false);
+    const [tempSettings, setTempSettings] = useState<InvoiceSettings>({ customItemColumns: [] });
+    const [newColumnName, setNewColumnName] = useState('');
 
 
     useEffect(() => {
@@ -174,6 +181,7 @@ export default function NewInvoicePage() {
                 });
                 setExistingClients(Array.from(clientsMap.values()));
                 setInvoiceSettings(settings);
+                setTempSettings(settings);
             } catch (e) {
                 toast({ title: "Error", description: "Could not load initial invoicing data." });
             } finally {
@@ -260,7 +268,7 @@ export default function NewInvoicePage() {
     };
     
     const handleAddItem = () => {
-        const newItem: InvoiceItem = { id: crypto.randomUUID(), description: '', quantity: 1, unitPrice: 0, customFields: {} };
+        const newItem: InvoiceItem = { id: crypto.randomUUID(), description: '', hsnNo: '', quantity: 1, unitPrice: 0, customFields: {} };
         setCurrentInvoice(prev => ({ ...prev, items: [...(prev.items || []), newItem] }));
     };
 
@@ -308,9 +316,11 @@ export default function NewInvoicePage() {
           .sort((a, b) => b.issuedDate.getTime() - a.issuedDate.getTime())[0];
 
         if (mostRecentInvoice) {
+          const newItems = (mostRecentInvoice.items || []).map(item => ({...item, id: crypto.randomUUID()}));
           setCurrentInvoice({
             ...currentInvoice,
             ...mostRecentInvoice,
+            items: newItems,
             id: undefined, 
             invoiceNumber: `INV${(Date.now()).toString().slice(-6)}`,
             issuedDate: new Date(),
@@ -328,18 +338,50 @@ export default function NewInvoicePage() {
         if (!currentName) return [];
         return existingClients.filter(client => client.name.toLowerCase().includes(currentName));
     }, [currentInvoice.clientName, existingClients]);
-    
-    const isNewClient = useMemo(() => {
-        if (!currentInvoice.clientName) return false;
-        return !existingClients.some(c => c.name.toLowerCase() === currentInvoice.clientName!.toLowerCase());
-    }, [currentInvoice.clientName, existingClients]);
-    
+        
     const fullCompanyAddress = companyDetails ? [
         companyDetails.address,
         companyDetails.city,
         companyDetails.state,
         companyDetails.country
     ].filter(Boolean).join('\\n') : '';
+
+    // Settings Dialog Logic
+    const handleAddColumn = () => {
+        if (!newColumnName.trim()) return;
+        const newColumn: CustomItemColumn = { id: uuidv4(), label: newColumnName.trim() };
+        setTempSettings(prev => ({ ...prev, customItemColumns: [...prev.customItemColumns, newColumn] }));
+        setNewColumnName('');
+    };
+
+    const handleSettingsColumnLabelChange = (id: string, newLabel: string) => {
+        setTempSettings(prev => ({
+            ...prev,
+            customItemColumns: prev.customItemColumns.map(col => col.id === id ? { ...col, label: newLabel } : col)
+        }));
+    };
+
+    const handleDeleteColumn = (id: string) => {
+        setTempSettings(prev => ({
+            ...prev,
+            customItemColumns: prev.customItemColumns.filter(col => col.id !== id)
+        }));
+    };
+
+    const handleSaveSettings = async () => {
+        if (!user || !user.companyId) return;
+        setIsSaving(true);
+        const result = await saveInvoiceSettings(user.companyId, tempSettings);
+        if (result.success) {
+            setInvoiceSettings(tempSettings);
+            toast({ title: 'Settings Saved' });
+            setIsSettingsDialogOpen(false);
+        } else {
+            toast({ title: 'Error', description: result.message, variant: 'destructive' });
+        }
+        setIsSaving(false);
+    };
+
 
     return (
         <div className="bg-muted">
@@ -454,29 +496,45 @@ export default function NewInvoicePage() {
                             <table className="w-full text-left text-xs">
                                 <thead>
                                     <tr className="bg-[#0A2B58] text-white">
-                                        <th className="p-2 w-10 text-center font-normal">#</th>
-                                        <th className="p-2 font-normal">Item & Description</th>
+                                        <th className="p-1 w-8 text-center font-normal">#</th>
+                                        <th className="p-1 font-normal flex items-center gap-1">
+                                            Item & Description
+                                            <Button type="button" size="icon" variant="ghost" className="h-5 w-5 text-white/80 hover:text-white hover:bg-white/20" onClick={() => { setTempSettings(invoiceSettings || { customItemColumns: [] }); setIsSettingsDialogOpen(true); }}>
+                                                <PlusCircle className="h-3 w-3" />
+                                            </Button>
+                                        </th>
+                                        <th className="p-1 w-24 font-normal">HSN No.</th>
                                         {invoiceSettings?.customItemColumns.map(col => (
-                                            <th key={col.id} className="p-2 w-24 font-normal text-right">{col.label}</th>
+                                            <th key={col.id} className="p-1 w-24 font-normal text-right">{col.label}</th>
                                         ))}
-                                        <th className="p-2 w-20 text-right font-normal">Qty</th>
-                                        <th className="p-2 w-24 text-right font-normal">Rate</th>
-                                        <th className="p-2 w-28 text-right font-normal">Amount</th>
-                                        <th className="p-2 w-10 text-center font-normal"></th>
+                                        <th className="p-1 w-16 text-right font-normal">Qty</th>
+                                        <th className="p-1 w-20 text-right font-normal">Rate</th>
+                                        <th className="p-1 w-24 text-right font-normal">Amount</th>
+                                        <th className="p-1 w-8 text-center font-normal"></th>
                                     </tr>
                                 </thead>
                                 <tbody>
                                     {(currentInvoice.items || []).map((item, index) => (
                                         <tr key={item.id} className="border-b align-top">
-                                            <td className="p-2 text-center">{index + 1}</td>
-                                            <td className="p-2"><Textarea className="p-1 h-12 text-xs" placeholder="Item Description" value={item.description} onChange={e => handleItemChange(item.id, 'description', e.target.value)} /></td>
+                                            <td className="p-1 text-center">{index + 1}</td>
+                                            <td className="p-1">
+                                                <Textarea 
+                                                  className="p-1 h-10 text-xs resize-none hover:h-20 focus:h-20 transition-all duration-200" 
+                                                  placeholder="Item Description" 
+                                                  value={item.description} 
+                                                  onChange={e => handleItemChange(item.id, 'description', e.target.value)} 
+                                                />
+                                            </td>
+                                            <td className="p-1 align-top"><Input className="h-10 text-xs p-1" placeholder="HSN" value={item.hsnNo || ''} onChange={e => handleItemChange(item.id, 'hsnNo', e.target.value)} /></td>
                                             {invoiceSettings?.customItemColumns.map(col => (
-                                                <td key={col.id} className="p-2"><Input className="h-12 text-xs p-1 text-right" value={item.customFields?.[col.id] || ''} onChange={e => handleCustomFieldChange(item.id, col.id, e.target.value)} /></td>
+                                                <td key={col.id} className="p-1 align-top">
+                                                    <Input className="h-10 text-xs p-1 text-right" value={item.customFields?.[col.id] || ''} onChange={e => handleCustomFieldChange(item.id, col.id, e.target.value)} />
+                                                </td>
                                             ))}
-                                            <td className="p-2"><Input className="h-12 text-xs p-1 text-right" type="number" value={item.quantity} onChange={e => handleItemChange(item.id, 'quantity', e.target.value)} /></td>
-                                            <td className="p-2"><Input className="h-12 text-xs p-1 text-right" type="number" value={item.unitPrice} onChange={e => handleItemChange(item.id, 'unitPrice', e.target.value)} /></td>
-                                            <td className="p-2 text-right">{currencySymbol}{(item.quantity * item.unitPrice).toFixed(2)}</td>
-                                            <td className="p-2 text-center"><Button type="button" size="icon" variant="ghost" className="h-6 w-6 text-destructive" onClick={() => handleRemoveItem(item.id)}><Trash2 className="h-3 w-3"/></Button></td>
+                                            <td className="p-1 align-top"><Input className="h-10 text-xs p-1 text-right" type="number" value={item.quantity} onChange={e => handleItemChange(item.id, 'quantity', e.target.value)} /></td>
+                                            <td className="p-1 align-top"><Input className="h-10 text-xs p-1 text-right" type="number" value={item.unitPrice} onChange={e => handleItemChange(item.id, 'unitPrice', e.target.value)} /></td>
+                                            <td className="p-1 text-right">{currencySymbol}{(item.quantity * item.unitPrice).toFixed(2)}</td>
+                                            <td className="p-1 text-center"><Button type="button" size="icon" variant="ghost" className="h-6 w-6 text-destructive" onClick={() => handleRemoveItem(item.id)}><Trash2 className="h-3 w-3"/></Button></td>
                                         </tr>
                                     ))}
                                 </tbody>
@@ -528,6 +586,60 @@ export default function NewInvoicePage() {
                 </div>
                 )}
             </main>
+
+             <Dialog open={isSettingsDialogOpen} onOpenChange={setIsSettingsDialogOpen}>
+                <DialogContent>
+                    <DialogHeader>
+                        <DialogTitle>Manage Custom Invoice Columns</DialogTitle>
+                        <CardDescription>Add, rename, or remove custom columns for your invoice items.</CardDescription>
+                    </DialogHeader>
+                    <div className="space-y-4 py-4">
+                        <div className="space-y-2 max-h-64 overflow-y-auto">
+                            {tempSettings.customItemColumns.length > 0 ? (
+                            tempSettings.customItemColumns.map(col => (
+                                <div key={col.id} className="flex items-center gap-2 p-2 border rounded-md bg-muted/50">
+                                <Input 
+                                    value={col.label} 
+                                    onChange={(e) => handleSettingsColumnLabelChange(col.id, e.target.value)}
+                                    disabled={isSaving}
+                                    className="font-medium" />
+                                <Button variant="ghost" size="icon" onClick={() => handleDeleteColumn(col.id)} disabled={isSaving}>
+                                    <Trash2 className="h-4 w-4 text-destructive" />
+                                </Button>
+                                </div>
+                            ))
+                            ) : (
+                            <p className="text-sm text-muted-foreground text-center py-4">No custom columns added yet.</p>
+                            )}
+                        </div>
+
+                        <div className="flex items-end gap-2 pt-4 border-t">
+                            <div className="flex-grow">
+                            <Label htmlFor="new-column-name">New Column Name</Label>
+                            <Input
+                                id="new-column-name"
+                                value={newColumnName}
+                                onChange={e => setNewColumnName(e.target.value)}
+                                placeholder="e.g., Serial Number"
+                                disabled={isSaving}
+                                onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); handleAddColumn(); }}}
+                            />
+                            </div>
+                            <Button onClick={handleAddColumn} disabled={isSaving}>
+                            <PlusCircle className="mr-2 h-4 w-4" /> Add
+                            </Button>
+                        </div>
+                    </div>
+                    <DialogFooter>
+                        <Button variant="outline" onClick={() => setIsSettingsDialogOpen(false)}>Cancel</Button>
+                        <Button onClick={handleSaveSettings} disabled={isSaving}>
+                            {isSaving ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Save className="mr-2 h-4 w-4" />}
+                            Save Settings
+                        </Button>
+                    </DialogFooter>
+                </DialogContent>
+            </Dialog>
+
         </div>
     );
 }

@@ -1,3 +1,4 @@
+
 'use client';
 
 import React from 'react';
@@ -10,6 +11,7 @@ import type { InvoiceSettings } from '../settings/actions';
 interface InvoiceItem {
   id: string;
   description: string;
+  hsnNo?: string;
   quantity: number;
   unitPrice: number;
   customFields?: { [key: string]: string };
@@ -157,6 +159,7 @@ const InvoiceTemplateIndian = React.forwardRef<HTMLDivElement, InvoiceTemplatePr
                         <tr className="border-b border-black">
                             <th className="p-2 border-r border-black w-10">#</th>
                             <th className="p-2 border-r border-black text-left">Item Description</th>
+                            <th className="p-2 border-r border-black w-24">HSN No.</th>
                              {customColumns.map(col => (
                                 <th key={col.id} className="p-2 border-r border-black w-24">{col.label}</th>
                             ))}
@@ -170,6 +173,7 @@ const InvoiceTemplateIndian = React.forwardRef<HTMLDivElement, InvoiceTemplatePr
                             <tr key={item.id} className="border-b border-gray-200 last:border-b-0">
                                 <td className="p-2 border-r border-black">{index + 1}</td>
                                 <td className="p-2 border-r border-black text-left">{item.description}</td>
+                                <td className="p-2 border-r border-black">{item.hsnNo || ''}</td>
                                 {customColumns.map(col => (
                                     <td key={col.id} className="p-2 border-r border-black">{item.customFields?.[col.id] || ''}</td>
                                 ))}
@@ -179,7 +183,7 @@ const InvoiceTemplateIndian = React.forwardRef<HTMLDivElement, InvoiceTemplatePr
                             </tr>
                         ))}
                          {/* Spacer row to push footer down */}
-                         <tr><td colSpan={5 + customColumns.length} className="py-24">&nbsp;</td></tr>
+                         <tr><td colSpan={6 + customColumns.length} className="py-24">&nbsp;</td></tr>
                     </tbody>
                 </table>
              </div>

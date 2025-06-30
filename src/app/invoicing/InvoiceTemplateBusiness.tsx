@@ -10,6 +10,7 @@ import Letterhead from '@/components/Letterhead';
 interface InvoiceItem {
   id: string;
   description: string;
+  hsnNo?: string;
   quantity: number;
   unitPrice: number;
   customFields?: { [key: string]: string };
@@ -127,6 +128,7 @@ const InvoiceTemplateBusiness = React.forwardRef<HTMLDivElement, InvoiceTemplate
                     <tr style={{ backgroundColor: '#0A2B58' }} className="text-white">
                         <th className="p-2 w-10 text-center font-normal">#</th>
                         <th className="p-2 font-normal">Item & Description</th>
+                        <th className="p-2 w-24 font-normal">HSN No.</th>
                         {customColumns.map(col => (
                             <th key={col.id} className="p-2 w-24 font-normal text-right">{col.label}</th>
                         ))}
@@ -141,8 +143,8 @@ const InvoiceTemplateBusiness = React.forwardRef<HTMLDivElement, InvoiceTemplate
                             <td className="p-2 text-center align-top">{index + 1}</td>
                             <td className="p-2 align-top">
                                 <p className="font-bold">{item.description}</p>
-                                {/* <p className="text-gray-600 text-[10px]">Additional details can go here.</p> */}
                             </td>
+                            <td className="p-2 align-top">{item.hsnNo || ''}</td>
                              {customColumns.map(col => (
                                 <td key={col.id} className="p-2 text-right align-top">{item.customFields?.[col.id] || ''}</td>
                             ))}
@@ -152,7 +154,7 @@ const InvoiceTemplateBusiness = React.forwardRef<HTMLDivElement, InvoiceTemplate
                         </tr>
                     ))}
                     {/* Spacer to push footer down */}
-                    <tr><td colSpan={5 + customColumns.length} className="pt-4">&nbsp;</td></tr>
+                    <tr><td colSpan={6 + customColumns.length} className="pt-4">&nbsp;</td></tr>
                 </tbody>
             </table>
         </main>

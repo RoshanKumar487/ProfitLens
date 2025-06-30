@@ -27,6 +27,7 @@ import { Switch } from '@/components/ui/switch';
 interface InvoiceItem {
   id: string;
   description: string;
+  hsnNo?: string;
   quantity: number;
   unitPrice: number;
   customFields?: { [key: string]: string };

@@ -9,8 +9,10 @@ import type { InvoiceSettings } from '../settings/actions';
 interface InvoiceItem {
   id: string;
   description: string;
+  hsnNo?: string;
   quantity: number;
   unitPrice: number;
+  customFields?: { [key: string]: string };
 }
 
 interface InvoiceDisplay {
@@ -60,7 +62,7 @@ interface InvoiceTemplateProps {
 }
 
 const InvoiceTemplateModern = React.forwardRef<HTMLDivElement, InvoiceTemplateProps>(
-  ({ invoiceToView, companyProfileDetails, currencySymbol, signatureDataUri }, ref) => {
+  ({ invoiceToView, companyProfileDetails, currencySymbol, signatureDataUri, invoiceSettings }, ref) => {
     
     const fullCompanyAddress = [
       companyProfileDetails.address,
@@ -68,6 +70,9 @@ const InvoiceTemplateModern = React.forwardRef<HTMLDivElement, InvoiceTemplatePr
       companyProfileDetails.state,
       companyProfileDetails.country
     ].filter(Boolean).join(', ');
+
+    const customColumns = invoiceSettings?.customItemColumns || [];
+    const hasCustomColumns = customColumns.length > 0;
 
     return (
       <div ref={ref} className="bg-white text-gray-800 font-sans text-sm w-[210mm] min-h-[297mm] mx-auto flex flex-col p-8">
@@ -117,7 +122,11 @@ const InvoiceTemplateModern = React.forwardRef<HTMLDivElement, InvoiceTemplatePr
           <table className="w-full text-left">
             <thead>
               <tr className="bg-slate-800 text-white">
-                <th className="p-3 w-3/5 rounded-l-lg">Product Description</th>
+                <th className="p-3 w-2/5 rounded-l-lg">Product Description</th>
+                <th className="p-3 text-center">HSN</th>
+                {customColumns.map(col => (
+                  <th key={col.id} className="p-3 text-center">{col.label}</th>
+                ))}
                 <th className="p-3 text-right">Price</th>
                 <th className="p-3 text-right">QTY</th>
                 <th className="p-3 text-right rounded-r-lg">Total</th>
@@ -127,6 +136,10 @@ const InvoiceTemplateModern = React.forwardRef<HTMLDivElement, InvoiceTemplatePr
               {(invoiceToView.items || []).map((item) => (
                 <tr key={item.id} className="border-b">
                   <td className="p-3 font-semibold">{item.description}</td>
+                  <td className="p-3 text-center">{item.hsnNo || ''}</td>
+                   {customColumns.map(col => (
+                    <td key={col.id} className="p-3 text-center">{item.customFields?.[col.id] || ''}</td>
+                  ))}
                   <td className="p-3 text-right">{currencySymbol}{item.unitPrice.toFixed(2)}</td>
                   <td className="p-3 text-right">{item.quantity}</td>
                   <td className="p-3 text-right font-semibold">{currencySymbol}{(item.quantity * item.unitPrice).toFixed(2)}</td>
