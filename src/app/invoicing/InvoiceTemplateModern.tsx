@@ -99,7 +99,6 @@ const InvoiceTemplateModern = React.forwardRef<HTMLDivElement, InvoiceTemplatePr
           <div className="bg-slate-100 p-4 rounded-lg">
             <h3 className="text-lg font-semibold text-slate-800 border-b-2 border-amber-400 pb-1 mb-2">Invoice To:</h3>
             <p className="text-2xl font-bold text-slate-700">{invoiceToView.clientName}</p>
-            <p><strong>Phone:</strong> {invoiceToView.clientEmail || 'N/A'}</p>
             <p><strong>Address:</strong> {invoiceToView.clientAddress || 'N/A'}</p>
           </div>
           <div className="bg-slate-100 p-4 rounded-lg">
