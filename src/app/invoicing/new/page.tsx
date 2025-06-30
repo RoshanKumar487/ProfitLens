@@ -182,6 +182,17 @@ export default function NewInvoicePage() {
                 setExistingClients(Array.from(clientsMap.values()));
                 setInvoiceSettings(settings);
                 setTempSettings(settings);
+
+                const days = settings.defaultPaymentTermsDays || 30;
+                const defaultDueDate = new Date();
+                defaultDueDate.setDate(defaultDueDate.getDate() + days);
+
+                setCurrentInvoice(prev => ({
+                    ...prev,
+                    dueDate: defaultDueDate,
+                    items: (prev.items || []).map(item => ({...item, hsnNo: settings.defaultHsnCode || ''}))
+                }));
+
             } catch (e) {
                 toast({ title: "Error", description: "Could not load initial invoicing data." });
             } finally {
@@ -269,7 +280,14 @@ export default function NewInvoicePage() {
     };
     
     const handleAddItem = () => {
-        const newItem: InvoiceItem = { id: crypto.randomUUID(), description: '', hsnNo: '', quantity: 1, unitPrice: 0, customFields: {} };
+        const newItem: InvoiceItem = { 
+            id: crypto.randomUUID(), 
+            description: '', 
+            hsnNo: invoiceSettings?.defaultHsnCode || '', 
+            quantity: 1, 
+            unitPrice: 0, 
+            customFields: {} 
+        };
         setCurrentInvoice(prev => ({ ...prev, items: [...(prev.items || []), newItem] }));
     };
 
@@ -316,11 +334,15 @@ export default function NewInvoicePage() {
           .filter(inv => inv.clientName === client.name)
           .sort((a, b) => b.issuedDate.getTime() - a.issuedDate.getTime())[0];
 
+        const days = invoiceSettings?.defaultPaymentTermsDays || 30;
+        const newDueDate = new Date();
+        newDueDate.setDate(newDueDate.getDate() + days);
+
         const baseInvoiceState = {
-            ...currentInvoice, // Keeps settings like tax/discount
+            ...currentInvoice,
             invoiceNumber: `INV${(Date.now()).toString().slice(-6)}`,
             issuedDate: new Date(),
-            dueDate: new Date(new Date().setDate(new Date().getDate() + 30)),
+            dueDate: newDueDate,
             status: 'Draft',
         };
 

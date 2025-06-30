@@ -1,3 +1,4 @@
+
 'use client';
 
 import React, { useState, useEffect, useCallback } from 'react';
@@ -15,13 +16,14 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { useTheme } from 'next-themes';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
+import { Separator } from '@/components/ui/separator';
 
 export default function SettingsPage() {
   const { user, isLoading: authIsLoading } = useAuth();
   const { toast } = useToast();
   const { theme, setTheme } = useTheme();
   
-  const [settings, setSettings] = useState<InvoiceSettings>({ customItemColumns: [] });
+  const [settings, setSettings] = useState<InvoiceSettings>({ customItemColumns: [], defaultPaymentTermsDays: 30, defaultHsnCode: '' });
   const [newColumnName, setNewColumnName] = useState('');
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
@@ -138,44 +140,77 @@ export default function SettingsPage() {
             <CardHeader>
                 <CardTitle>Invoice Settings</CardTitle>
                 <CardDescription>
-                    Add, rename, or remove custom columns for your invoice items. These will appear on the invoice forms and templates.
+                    Manage default values and custom fields for your invoices.
                 </CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
-                <div className="space-y-2">
-                    {settings.customItemColumns.length > 0 ? (
-                    settings.customItemColumns.map(col => (
-                        <div key={col.id} className="flex items-center gap-2 p-2 border rounded-md bg-muted/50">
-                        <Input 
-                            value={col.label} 
-                            onChange={(e) => handleColumnLabelChange(col.id, e.target.value)}
+                <div className="space-y-4 pt-2">
+                    <h3 className="text-md font-semibold text-foreground">Default Values</h3>
+                    <div>
+                        <Label htmlFor="payment-terms">Default Payment Terms (Days)</Label>
+                        <Input
+                            id="payment-terms"
+                            type="number"
+                            value={settings.defaultPaymentTermsDays ?? 30}
+                            onChange={(e) => setSettings(prev => ({...prev, defaultPaymentTermsDays: parseInt(e.target.value, 10) || 0}))}
                             disabled={isSaving}
-                            className="font-medium" />
-                        <Button variant="ghost" size="icon" onClick={() => handleDeleteColumn(col.id)} disabled={isSaving}>
-                            <Trash2 className="h-4 w-4 text-destructive" />
-                        </Button>
-                        </div>
-                    ))
-                    ) : (
-                    <p className="text-sm text-muted-foreground text-center py-4">No custom columns added yet.</p>
-                    )}
+                            placeholder="e.g., 30"
+                        />
+                        <p className="text-xs text-muted-foreground mt-1">Sets the default due date for new invoices.</p>
+                    </div>
+                    <div>
+                        <Label htmlFor="hsn-code">Default HSN Code</Label>
+                        <Input
+                            id="hsn-code"
+                            value={settings.defaultHsnCode ?? ''}
+                            onChange={(e) => setSettings(prev => ({...prev, defaultHsnCode: e.target.value}))}
+                            disabled={isSaving}
+                            placeholder="Enter a default HSN code"
+                        />
+                        <p className="text-xs text-muted-foreground mt-1">This HSN code will be pre-filled for every new item you add.</p>
+                    </div>
                 </div>
 
-                <div className="flex items-end gap-2 pt-4 border-t">
-                    <div className="flex-grow">
-                    <Label htmlFor="new-column-name">New Column Name</Label>
-                    <Input
-                        id="new-column-name"
-                        value={newColumnName}
-                        onChange={e => setNewColumnName(e.target.value)}
-                        placeholder="e.g., HSN Code, Serial Number"
-                        disabled={isSaving}
-                        onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); handleAddColumn(); }}}
-                    />
+                <Separator className="my-6" />
+
+                <div className="space-y-4">
+                     <h3 className="text-md font-semibold text-foreground">Custom Item Columns</h3>
+                     <p className="text-sm text-muted-foreground">Add or remove custom columns for your invoice items.</p>
+                    <div className="space-y-2">
+                        {settings.customItemColumns.length > 0 ? (
+                        settings.customItemColumns.map(col => (
+                            <div key={col.id} className="flex items-center gap-2 p-2 border rounded-md bg-muted/50">
+                            <Input 
+                                value={col.label} 
+                                onChange={(e) => handleColumnLabelChange(col.id, e.target.value)}
+                                disabled={isSaving}
+                                className="font-medium" />
+                            <Button variant="ghost" size="icon" onClick={() => handleDeleteColumn(col.id)} disabled={isSaving}>
+                                <Trash2 className="h-4 w-4 text-destructive" />
+                            </Button>
+                            </div>
+                        ))
+                        ) : (
+                        <p className="text-sm text-muted-foreground text-center py-4">No custom columns added yet.</p>
+                        )}
                     </div>
-                    <Button onClick={handleAddColumn} disabled={isSaving}>
-                    <PlusCircle className="mr-2 h-4 w-4" /> Add Column
-                    </Button>
+
+                    <div className="flex items-end gap-2 pt-4 border-t">
+                        <div className="flex-grow">
+                        <Label htmlFor="new-column-name">New Column Name</Label>
+                        <Input
+                            id="new-column-name"
+                            value={newColumnName}
+                            onChange={e => setNewColumnName(e.target.value)}
+                            placeholder="e.g., Serial Number"
+                            disabled={isSaving}
+                            onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); handleAddColumn(); }}}
+                        />
+                        </div>
+                        <Button onClick={handleAddColumn} disabled={isSaving}>
+                        <PlusCircle className="mr-2 h-4 w-4" /> Add Column
+                        </Button>
+                    </div>
                 </div>
             </CardContent>
             <CardFooter className="justify-end">
