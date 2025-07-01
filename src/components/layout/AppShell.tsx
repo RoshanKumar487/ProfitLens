@@ -1,4 +1,3 @@
-
 'use client';
 
 import React, { useMemo } from 'react';
@@ -116,7 +115,7 @@ const AppShellLayout = ({ children }: { children: React.ReactNode }) => {
   const Logo = () => (
     <Button
       variant="ghost"
-      className="h-14 w-full justify-start gap-3 px-4 text-lg font-bold group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:h-12 group-data-[collapsible=icon]:w-12 group-data-[collapsible=icon]:px-0"
+      className="h-14 w-full justify-start gap-3 px-4 text-lg font-bold hover:bg-sidebar-accent hover:text-sidebar-accent-foreground group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:h-12 group-data-[collapsible=icon]:w-12 group-data-[collapsible=icon]:px-0"
       asChild
     >
       <Link href="/">
@@ -177,9 +176,9 @@ const AppShellLayout = ({ children }: { children: React.ReactNode }) => {
 
       <SidebarInset className={cn(isAuthPage && "md:!ml-0")}>
         {!isAuthPage && (
-           <header className="sticky top-0 z-10 flex h-14 items-center gap-4 border-b border-border/20 bg-background/50 px-4 backdrop-blur-sm sm:h-16 sm:px-6">
+           <header className="sticky top-0 z-10 flex h-14 items-center gap-4 border-b border-sidebar-border/20 bg-sidebar/90 px-4 text-sidebar-foreground backdrop-blur-md sm:h-16 sm:px-6">
               <div className="flex items-center gap-4">
-                  <SidebarTrigger variant="ghost" size="icon" className="md:hidden h-10 w-10" />
+                  <SidebarTrigger variant="ghost" size="icon" className="md:hidden h-10 w-10 hover:bg-sidebar-accent hover:text-sidebar-accent-foreground" />
                   <div className="hidden md:block">
                      <Logo />
                   </div>
@@ -191,7 +190,7 @@ const AppShellLayout = ({ children }: { children: React.ReactNode }) => {
                   <div className="flex items-center gap-2">
                       <DropdownMenu>
                           <DropdownMenuTrigger asChild>
-                            <Button variant="ghost" size="icon" className="relative h-10 w-10 rounded-full">
+                            <Button variant="ghost" size="icon" className="relative h-10 w-10 rounded-full hover:bg-sidebar-accent hover:text-sidebar-accent-foreground">
                                 <Bell className="h-5 w-5" />
                                 {pendingRequestCount > 0 && (
                                     <Badge variant="destructive" className="absolute top-1 right-1 h-5 w-5 p-0 flex items-center justify-center text-xs rounded-full">
@@ -228,9 +227,9 @@ const AppShellLayout = ({ children }: { children: React.ReactNode }) => {
 
                       <DropdownMenu>
                           <DropdownMenuTrigger asChild>
-                            <Button variant="ghost" className="relative h-10 w-10 rounded-full">
+                            <Button variant="ghost" className="relative h-10 w-10 rounded-full hover:bg-sidebar-accent hover:text-sidebar-accent-foreground">
                                   <Avatar className="h-10 w-10 border-2 border-primary/50">
-                                      <AvatarFallback className="bg-muted text-muted-foreground font-semibold">
+                                      <AvatarFallback className="bg-sidebar-accent text-sidebar-accent-foreground font-semibold">
                                           {getInitials(user.displayName)}
                                       </AvatarFallback>
                                   </Avatar>
