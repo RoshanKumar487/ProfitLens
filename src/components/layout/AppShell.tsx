@@ -20,7 +20,7 @@ import { NAV_ITEMS } from '@/lib/constants';
 import { Separator } from '@/components/ui/separator';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
-import { LogOut, Loader2, Building, LayoutTemplate, Bell, Bot, HelpCircle } from 'lucide-react';
+import { LogOut, Loader2, Building, LayoutTemplate, Bell, Bot, HelpCircle, User, Crown } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
@@ -106,27 +106,37 @@ const AppShellLayout = ({ children }: { children: React.ReactNode }) => {
       if (item.href === '/admin') {
         return user?.role === 'admin';
       }
+      if (item.href === '/super-admin') {
+        return user?.isSuperAdmin;
+      }
       return true;
     });
   }, [user]);
+  
+  const Logo = () => (
+    <Button
+      variant="ghost"
+      className="h-14 w-full justify-start gap-3 px-4 text-lg font-bold group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:h-12 group-data-[collapsible=icon]:w-12 group-data-[collapsible=icon]:px-0"
+      asChild
+    >
+      <Link href="/">
+        <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-gradient-to-br from-pink-400 to-purple-500 text-white shadow-lg">
+          <span className="text-xl font-black">i</span>
+          <span className="text-sm font-black -ml-0.5">X</span>
+        </div>
+        <h1 className="text-xl font-headline font-bold text-sidebar-foreground group-data-[collapsible=icon]:hidden">
+          InvoiceXR
+        </h1>
+      </Link>
+    </Button>
+  );
 
   return (
     <>
       {!isAuthPage && (
-        <Sidebar collapsible="icon" variant="sidebar" className="border-r">
+        <Sidebar collapsible="icon" variant="sidebar" className="border-r border-border/20 bg-background/30 backdrop-blur-md">
           <SidebarHeader className="p-2">
-            <Button
-              variant="ghost"
-              className="h-12 w-full justify-start gap-3 px-3 group-data-[collapsible=icon]:justify-center"
-              asChild
-            >
-             <Link href="/">
-                <LayoutTemplate className="h-7 w-7 shrink-0 text-primary" />
-                <h1 className="text-xl font-headline font-bold text-sidebar-foreground group-data-[collapsible=icon]:hidden">
-                  ProfitLens
-                </h1>
-              </Link>
-            </Button>
+            <Logo />
             {user && user.companyName && (
               <div className="mt-1 px-2 group-data-[collapsible=icon]:hidden">
                 <div className="flex items-center gap-2 rounded-md bg-primary/10 p-2 shadow-inner">
@@ -136,7 +146,7 @@ const AppShellLayout = ({ children }: { children: React.ReactNode }) => {
               </div>
             )}
           </SidebarHeader>
-          <Separator className="bg-sidebar-border" />
+          <Separator className="bg-sidebar-border/50" />
           <SidebarContent className="p-2">
             <SidebarMenu>
               {visibleNavItems.map((item) => (
@@ -167,16 +177,12 @@ const AppShellLayout = ({ children }: { children: React.ReactNode }) => {
 
       <SidebarInset className={cn(isAuthPage && "md:!ml-0")}>
         {!isAuthPage && (
-           <header className="sticky top-0 z-10 flex h-14 items-center gap-4 border-b bg-background/80 px-4 backdrop-blur-sm sm:h-16 sm:px-6">
+           <header className="sticky top-0 z-10 flex h-14 items-center gap-4 border-b border-border/20 bg-background/50 px-4 backdrop-blur-sm sm:h-16 sm:px-6">
               <div className="flex items-center gap-4">
-                  {/* Mobile trigger */}
-                  <SidebarTrigger variant="outline" size="icon" className="md:hidden" />
-                  
-                  {/* Brand logo/name */}
-                  <Link href="/" onClick={handleNavigationClick} className="flex items-center gap-2">
-                      <LayoutTemplate className="h-6 w-6 text-primary" />
-                      <span className="font-bold text-lg text-foreground">ProfitLens</span>
-                  </Link>
+                  <SidebarTrigger variant="ghost" size="icon" className="md:hidden h-10 w-10" />
+                  <div className="hidden md:block">
+                     <Logo />
+                  </div>
               </div>
 
               <div className="flex-1" />
@@ -223,7 +229,7 @@ const AppShellLayout = ({ children }: { children: React.ReactNode }) => {
                       <DropdownMenu>
                           <DropdownMenuTrigger asChild>
                             <Button variant="ghost" className="relative h-10 w-10 rounded-full">
-                                  <Avatar className="h-10 w-10">
+                                  <Avatar className="h-10 w-10 border-2 border-primary/50">
                                       <AvatarFallback className="bg-muted text-muted-foreground font-semibold">
                                           {getInitials(user.displayName)}
                                       </AvatarFallback>
@@ -238,6 +244,14 @@ const AppShellLayout = ({ children }: { children: React.ReactNode }) => {
                                 </div>
                               </DropdownMenuLabel>
                               <DropdownMenuSeparator />
+                               {user.isSuperAdmin && (
+                                 <DropdownMenuItem asChild>
+                                    <Link href="/super-admin" className="cursor-pointer">
+                                        <Crown className="mr-2 h-4 w-4" />
+                                        <span>Super Admin</span>
+                                    </Link>
+                                </DropdownMenuItem>
+                               )}
                               <DropdownMenuItem asChild>
                                   <Link href="/company-details" className="cursor-pointer">
                                       <Building className="mr-2 h-4 w-4" />
@@ -274,8 +288,8 @@ const AppShellLayout = ({ children }: { children: React.ReactNode }) => {
           <Tooltip>
             <TooltipTrigger asChild>
               <DialogTrigger asChild>
-                <Button className="fixed bottom-4 right-4 h-10 w-10 rounded-full shadow-2xl z-50">
-                  <Bot className="h-5 w-5" />
+                <Button className="fixed bottom-4 right-4 h-12 w-12 rounded-full shadow-2xl z-50 bg-gradient-to-br from-pink-400 to-purple-500 hover:scale-110 transition-transform duration-200">
+                  <Bot className="h-6 w-6" />
                 </Button>
               </DialogTrigger>
             </TooltipTrigger>

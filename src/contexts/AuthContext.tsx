@@ -25,16 +25,17 @@ interface User {
   uid: string;
   email: string | null;
   displayName: string | null;
-  companyId: string | null; // A user might not have a companyId until approved
+  companyId: string | null; 
   companyName: string | null;
   country?: string;
   currencySymbol: string;
   role: UserRole;
+  isSuperAdmin: boolean;
   getIdToken: () => Promise<string>;
 }
 
 interface SignUpCompanyInfo {
-  id?: string; // Exists if joining an existing company
+  id?: string; 
   name: string;
   address: string;
   city: string;
@@ -62,7 +63,6 @@ interface AuthContextType {
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
-// Function to set a cookie
 const setCookie = (name: string, value: string, days: number) => {
   let expires = "";
   if (days) {
@@ -90,17 +90,16 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         const userDocRef = doc(db, 'users', firebaseUser.uid);
         const userDocSnap = await getDoc(userDocRef);
         
-        // Store ID token in a cookie for server-side verification in actions
         const idToken = await firebaseUser.getIdToken();
         setCookie('firebaseIdToken', idToken, 1);
 
-
-        if (userDocSnap.exists()) {
-          const userData = userDocSnap.data();
-          const companyId = userData.companyId;
-
-          // Super admin check
-          const isSuperAdmin = firebaseUser.email === 'roshankumar70975@gmail.com';
+        const isSuperAdmin = firebaseUser.email === 'roshankumar70975@gmail.com';
+        
+        // A super admin might not have a user document, so we allow them to proceed.
+        if (userDocSnap.exists() || isSuperAdmin) {
+          const userData = userDocSnap.data() || {};
+          const companyId = userData.companyId || null;
+          
           const userRole: UserRole = isSuperAdmin ? 'admin' : userData.role || 'pending';
 
           let userCountry: string | undefined = undefined;
@@ -123,20 +122,17 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
             uid: firebaseUser.uid,
             email: firebaseUser.email,
             displayName: firebaseUser.displayName,
-            companyId: companyId || null,
-            companyName: companyName || null,
+            companyId: companyId,
+            companyName: companyName,
             country: userCountry,
             currencySymbol: currencySymbol,
             role: userRole,
+            isSuperAdmin,
             getIdToken: () => firebaseUser.getIdToken(),
           };
           setUser(appUser);
           
-          if (isSuperAdmin) {
-            console.log(`AuthContext: Super admin authenticated. UID: ${firebaseUser.uid}`);
-          } else {
-            console.log(`AuthContext: User authenticated. UID: ${firebaseUser.uid}, Role: ${appUser.role}`);
-          }
+          console.log(`AuthContext: User authenticated. UID: ${firebaseUser.uid}, Role: ${appUser.role}, SuperAdmin: ${appUser.isSuperAdmin}`);
           
           const authPages = ['/auth/signin', '/auth/signup', '/auth/forgot-password'];
           if (authPages.includes(pathname) || pathname === '/') {
@@ -187,7 +183,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       const firebaseUser = userCredential.user;
       await updateProfile(firebaseUser, { displayName });
 
-      if (companyInfo.id) { // Joining an existing company
+      if (companyInfo.id) { 
         const userDocRef = doc(db, 'users', firebaseUser.uid);
         await setDoc(userDocRef, {
           uid: firebaseUser.uid, email: firebaseUser.email, displayName,
@@ -203,11 +199,10 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         console.log('AuthContext: User requested to join company:', companyInfo.id);
         await firebaseSignOut(auth);
         return { user: firebaseUser, status: 'pending' };
-      } else { // Creating a new company
+      } else { 
         const newCompanyDocRef = doc(collection(db, 'companyProfiles'));
         const companyId = newCompanyDocRef.id;
 
-        // Upload signature and stamp if they exist
         let signatureUrl = '';
         let signatureStoragePath = '';
         if (companyInfo.signatureFile) {
@@ -223,8 +218,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
             stampUrl = await uploadFileToStorage(companyInfo.stampFile, path);
             stampStoragePath = path;
         }
-
-        // Create company profile document with all details
+        
         await setDoc(newCompanyDocRef, {
           name: companyInfo.name,
           address: companyInfo.address,
@@ -241,7 +235,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
           stampStoragePath,
         });
         
-        // Create user document
         const userDocRef = doc(db, 'users', firebaseUser.uid);
         await setDoc(userDocRef, {
           uid: firebaseUser.uid, email: firebaseUser.email, displayName,
@@ -266,10 +259,9 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     setAuthError(null);
     try {
       const userCredential = await signInWithEmailAndPassword(auth, email, password);
+      const isSuperAdmin = userCredential.user.email === 'roshankumar70975@gmail.com';
 
-      // Super admin check
-      if (userCredential.user.email !== 'roshankumar70975@gmail.com') {
-        // Check user role from firestore for non-super-admins
+      if (!isSuperAdmin) {
         const userDocRef = doc(db, 'users', userCredential.user.uid);
         const userDocSnap = await getDoc(userDocRef);
         if (!userDocSnap.exists() || userDocSnap.data().role === 'pending' || userDocSnap.data().role === 'rejected') {
@@ -289,7 +281,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
       console.log('AuthContext: User signed in successfully:', userCredential.user.uid);
       toast({ title: "Sign In Successful", description: "Welcome back!"});
-      // onAuthStateChanged will handle setting user state
       return userCredential.user;
     } catch (err) {
       const caughtError = err as AuthError;
