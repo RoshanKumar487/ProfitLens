@@ -36,8 +36,6 @@ body {
     --border: 214.3 31.8% 91.4%;
     --input: 214.3 31.8% 91.4%;
     --ring: 217 91% 60%;
-
-    --radius: 0.5rem;
     
     --success-card: 140 70% 96%;
     --danger-card: 0 80% 96%;
@@ -51,13 +49,13 @@ body {
     --chart-5: 300 80% 60%;
 
     /* Sidebar specific theme */
-    --sidebar-background: 210 40% 96.1%;
-    --sidebar-foreground: 222.2 47.4% 11.2%;
+    --sidebar-background: 220 13% 18%;
+    --sidebar-foreground: 210 40% 98%;
     --sidebar-primary: 217 91% 60%;
-    --sidebar-primary-foreground: 0 0% 98%;
-    --sidebar-accent: 210 40% 90%;
-    --sidebar-accent-foreground: 222.2 47.4% 11.2%;
-    --sidebar-border: 214.3 31.8% 91.4%;
+    --sidebar-primary-foreground: 210 40% 98%;
+    --sidebar-accent: 220 13% 28%;
+    --sidebar-accent-foreground: 210 40% 98%;
+    --sidebar-border: 220 13% 25%;
     --sidebar-ring: 217 91% 60%;
 
     /* Background Animation */

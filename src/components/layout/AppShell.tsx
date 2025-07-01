@@ -134,7 +134,7 @@ const AppShellLayout = ({ children }: { children: React.ReactNode }) => {
   return (
     <>
       {!isAuthPage && (
-        <Sidebar collapsible="icon" variant="sidebar" className="border-r border-border/20 bg-background/30 backdrop-blur-md">
+        <Sidebar collapsible="icon" variant="sidebar" className="border-r border-sidebar-border/20 bg-sidebar/90 backdrop-blur-md">
           <SidebarHeader className="p-2">
             <Logo />
             {user && user.companyName && (
