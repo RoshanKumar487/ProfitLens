@@ -154,18 +154,18 @@ export default function InvoicingPage() {
     return <ArrowDown className="ml-2 h-4 w-4" />;
   };
 
-  const getStatusBadgeVariant = (status: InvoiceDisplay['status']): 'default' | 'secondary' | 'destructive' | 'outline' => {
+  const getStatusBadgeVariant = (status: InvoiceDisplay['status']) => {
     switch (status) {
       case 'Paid':
-        return 'default';
+        return 'bg-green-100 text-green-800 border-green-200';
       case 'Pending':
-        return 'secondary';
+        return 'bg-yellow-100 text-yellow-800 border-yellow-200';
       case 'Overdue':
-        return 'destructive';
+        return 'bg-red-100 text-red-800 border-red-200';
       case 'Draft':
-        return 'outline';
+        return 'bg-gray-100 text-gray-800 border-gray-200';
       default:
-        return 'outline';
+        return 'bg-gray-100 text-gray-800 border-gray-200';
     }
   };
 
@@ -258,7 +258,7 @@ export default function InvoicingPage() {
                     <TableCell className="text-right">{currencySymbol}{invoice.amount.toFixed(2)}</TableCell>
                     <TableCell className="hidden md:table-cell">{format(invoice.issuedDate, 'PP')}</TableCell>
                     <TableCell className="hidden md:table-cell">{format(invoice.dueDate, 'PP')}</TableCell>
-                    <TableCell><Badge variant={getStatusBadgeVariant(invoice.status)}>{invoice.status}</Badge></TableCell>
+                    <TableCell><Badge variant="outline" className={getStatusBadgeVariant(invoice.status)}>{invoice.status}</Badge></TableCell>
                     <TableCell className="text-right">
                         <DropdownMenu>
                         <DropdownMenuTrigger asChild><Button variant="ghost" size="icon" className="h-8 w-8"><MoreHorizontal className="h-4 w-4" /></Button></DropdownMenuTrigger>

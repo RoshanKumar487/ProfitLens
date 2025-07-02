@@ -21,7 +21,7 @@ import { NAV_ITEMS } from '@/lib/constants';
 import { Separator } from '@/components/ui/separator';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
-import { LogOut, Loader2, Building, LayoutTemplate, Bell, Bot, HelpCircle, User, Crown, ChevronLeft, ChevronRight, PlusCircle, ChevronDown, Receipt, TrendingDown, Users } from 'lucide-react';
+import { LogOut, Loader2, Building, LayoutTemplate, Bell, Bot, HelpCircle, User, Crown, ChevronLeft, ChevronRight, PlusCircle, ChevronDown, Receipt, TrendingDown, Users, Sparkles } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
@@ -355,7 +355,7 @@ const AppShellLayout = ({ children }: { children: React.ReactNode }) => {
               <TooltipTrigger asChild>
                 <DialogTrigger asChild>
                   <Button className="fixed bottom-6 right-6 h-14 w-14 rounded-full shadow-2xl z-50 bg-[#7C3AED] hover:bg-[#6D28D9] text-white hover:scale-110 transition-transform duration-200">
-                    <Bot className="h-7 w-7" />
+                    <Sparkles className="h-7 w-7" />
                   </Button>
                 </DialogTrigger>
               </TooltipTrigger>
