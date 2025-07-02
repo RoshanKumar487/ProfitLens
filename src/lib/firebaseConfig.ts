@@ -9,7 +9,6 @@ import { getStorage, type FirebaseStorage } from 'firebase/storage'; // Ensure g
 const firebaseConfig = {
   apiKey: "AIzaSyDhCyWZPBS6lNNzmp8F90mlyg4ikqtOd3o",
   authDomain: "bizsight-k0icr.firebaseapp.com",
-  databaseURL: "https://bizsight-k0icr-default-rtdb.firebaseio.com",
   projectId: "bizsight-k0icr",
   storageBucket: "bizsight-k0icr.appspot.com",
   messagingSenderId: "859842469189",
