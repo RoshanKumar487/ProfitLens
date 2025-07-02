@@ -15,12 +15,13 @@ import {
   SidebarTrigger,
   SidebarInset,
   useSidebar,
+  SidebarFooter,
 } from '@/components/ui/sidebar';
 import { NAV_ITEMS } from '@/lib/constants';
 import { Separator } from '@/components/ui/separator';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
-import { LogOut, Loader2, Building, LayoutTemplate, Bell, Bot, HelpCircle, User, Crown } from 'lucide-react';
+import { LogOut, Loader2, Building, LayoutTemplate, Bell, Bot, HelpCircle, User, Crown, ChevronLeft, ChevronRight } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
@@ -40,11 +41,12 @@ interface Notification {
 
 const AppShellLayout = ({ children }: { children: React.ReactNode }) => {
   const pathname = usePathname();
-  const { isMobile, setOpenMobile } = useSidebar();
+  const { isMobile, setOpenMobile, toggleSidebar, state } = useSidebar();
   const { user, signOut, isLoading: authLoading } = useAuth(); 
   const [isAssistantOpen, setIsAssistantOpen] = React.useState(false);
   const [pendingRequestCount, setPendingRequestCount] = React.useState(0);
   const [notifications, setNotifications] = React.useState<Notification[]>([]);
+  const CollapseIcon = state === 'expanded' ? ChevronLeft : ChevronRight;
   
   React.useEffect(() => {
     if (user?.role !== 'admin' || !user?.companyId) {
@@ -172,6 +174,27 @@ const AppShellLayout = ({ children }: { children: React.ReactNode }) => {
               ))}
             </SidebarMenu>
           </SidebarContent>
+            <SidebarFooter className="mt-auto hidden p-2 md:block">
+              <TooltipProvider delayDuration={0}>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Button
+                      variant="ghost"
+                      className="h-10 w-full justify-start group-data-[collapsible=icon]:h-10 group-data-[collapsible=icon]:w-10 group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:px-0 px-2"
+                      onClick={toggleSidebar}
+                    >
+                      <CollapseIcon className="size-5 shrink-0" />
+                      <span className="group-data-[collapsible=icon]:hidden">
+                        {state === 'expanded' ? 'Collapse' : 'Expand'}
+                      </span>
+                    </Button>
+                  </TooltipTrigger>
+                  <TooltipContent side="right" hidden={state === "expanded"}>
+                    Expand sidebar
+                  </TooltipContent>
+                </Tooltip>
+              </TooltipProvider>
+          </SidebarFooter>
         </Sidebar>
       )}
 
@@ -179,9 +202,7 @@ const AppShellLayout = ({ children }: { children: React.ReactNode }) => {
         {!isAuthPage && (
            <header className="sticky top-0 z-10 border-b border-sidebar-border/20 bg-sidebar/90 text-sidebar-foreground backdrop-blur-md">
               <div className="mx-auto flex h-14 max-w-7xl items-center gap-4 px-4 sm:px-6">
-                <div className="flex items-center gap-4">
-                    <SidebarTrigger variant="ghost" size="icon" className="h-10 w-10 hover:bg-sidebar-accent hover:text-sidebar-accent-foreground" />
-                </div>
+                <SidebarTrigger className="md:hidden" />
 
                 <div className="flex-1" />
 
