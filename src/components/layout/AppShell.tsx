@@ -116,11 +116,11 @@ const AppShellLayout = ({ children }: { children: React.ReactNode }) => {
   const Logo = () => (
     <Button
       variant="ghost"
-      className="h-14 w-full justify-start gap-3 px-4 text-lg font-bold hover:bg-sidebar-accent hover:text-sidebar-accent-foreground group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:h-12 group-data-[collapsible=icon]:w-12 group-data-[collapsible=icon]:px-0"
+      className="h-12 w-full justify-start gap-3 px-4 text-lg font-bold hover:bg-sidebar-accent hover:text-sidebar-accent-foreground group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:h-11 group-data-[collapsible=icon]:w-11 group-data-[collapsible=icon]:px-0"
       asChild
     >
       <Link href="/">
-        <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-gradient-to-br from-pink-400 to-purple-500 text-white shadow-lg">
+        <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-gradient-to-br from-pink-400 to-purple-500 text-white shadow-lg">
           <span className="text-xl font-black">i</span>
           <span className="text-sm font-black -ml-0.5">X</span>
         </div>
@@ -178,7 +178,7 @@ const AppShellLayout = ({ children }: { children: React.ReactNode }) => {
       <SidebarInset className={cn(isAuthPage && "md:!ml-0")}>
         {!isAuthPage && (
            <header className="sticky top-0 z-10 border-b border-sidebar-border/20 bg-sidebar/90 text-sidebar-foreground backdrop-blur-md">
-              <div className="mx-auto flex h-14 max-w-7xl items-center gap-4 px-4 sm:h-16 sm:px-6">
+              <div className="mx-auto flex h-14 max-w-7xl items-center gap-4 px-4 sm:px-6">
                 <div className="flex items-center gap-4">
                     <SidebarTrigger variant="ghost" size="icon" className="h-10 w-10 hover:bg-sidebar-accent hover:text-sidebar-accent-foreground" />
                 </div>
