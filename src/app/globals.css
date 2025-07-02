@@ -9,7 +9,7 @@ body {
 
 @layer base {
   :root {
-    --background: 210 40% 98%;
+    --background: 0 0% 100%;
     --foreground: 222.2 47.4% 11.2%;
     
     --card: 0 0% 100%;
@@ -50,13 +50,13 @@ body {
 
     /* Sidebar specific theme */
     --sidebar-background: 220 13% 18%;
-    --sidebar-foreground: 210 40% 98%;
-    --sidebar-primary: 217 91% 60%;
+    --sidebar-foreground: 210 40% 90%;
+    --sidebar-primary: 300 80% 60%;
     --sidebar-primary-foreground: 210 40% 98%;
     --sidebar-accent: 220 13% 28%;
     --sidebar-accent-foreground: 210 40% 98%;
     --sidebar-border: 220 13% 25%;
-    --sidebar-ring: 217 91% 60%;
+    --sidebar-ring: 300 80% 60%;
 
     /* Background Animation */
     --gradient-from: 210 40% 97%;
@@ -96,14 +96,14 @@ body {
     --danger-card: 0 80% 10%;
     
     /* Sidebar in dark mode should match the new style */
-    --sidebar-background: 224 71% 4%;
-    --sidebar-foreground: 210 40% 98%;
-    --sidebar-primary: 217 91% 60%;
+    --sidebar-background: 220 13% 18%;
+    --sidebar-foreground: 210 40% 90%;
+    --sidebar-primary: 300 80% 60%;
     --sidebar-primary-foreground: 210 40% 98%;
-    --sidebar-accent: 215 28% 17%;
+    --sidebar-accent: 220 13% 28%;
     --sidebar-accent-foreground: 210 40% 98%;
-    --sidebar-border: 215 28% 17%;
-    --sidebar-ring: 217 91% 60%;
+    --sidebar-border: 220 13% 25%;
+    --sidebar-ring: 300 80% 60%;
     
     /* Background Animation */
     --gradient-from: 224 71% 6%;

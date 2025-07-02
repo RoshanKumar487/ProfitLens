@@ -1,3 +1,4 @@
+
 'use client';
 
 import React, { useState, FormEvent, useCallback, useRef, useEffect } from 'react';
@@ -228,7 +229,7 @@ export default function NewEmployeePage() {
                         <h1 className="text-lg font-bold truncate h-8 flex items-center">Add New Employee</h1>
                     </div>
                     <div className="flex items-center gap-2">
-                        <Button variant="outline" asChild type="button"><Link href="/employees">Cancel</Link></Button>
+                        <Button variant="ghost" asChild type="button"><Link href="/employees">Cancel</Link></Button>
                         <Button onClick={handleSubmit} disabled={isSaving}>
                             {isSaving ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Save className="mr-2 h-4 w-4" />}
                             Save Employee

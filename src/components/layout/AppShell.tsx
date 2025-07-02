@@ -136,7 +136,7 @@ const AppShellLayout = ({ children }: { children: React.ReactNode }) => {
   return (
     <>
       {!isAuthPage && (
-        <Sidebar collapsible="icon" variant="sidebar" className="border-r border-sidebar-border/20 bg-sidebar/90 backdrop-blur-md">
+        <Sidebar collapsible="icon" variant="sidebar" className="border-r border-sidebar-border/20 bg-sidebar backdrop-blur-md">
           <SidebarHeader className="p-2">
             <Logo />
             {user && user.companyName && (
@@ -200,7 +200,7 @@ const AppShellLayout = ({ children }: { children: React.ReactNode }) => {
 
       <SidebarInset className={cn(isAuthPage && "md:!ml-0")}>
         {!isAuthPage && (
-           <header className="sticky top-0 z-10 border-b border-sidebar-border/20 bg-sidebar/90 text-sidebar-foreground backdrop-blur-md">
+           <header className="sticky top-0 z-10 border-b border-border bg-background/80 backdrop-blur-sm">
               <div className="mx-auto flex h-14 max-w-7xl items-center gap-4 px-4 sm:px-6">
                 <SidebarTrigger className="md:hidden" />
                 
@@ -255,7 +255,7 @@ const AppShellLayout = ({ children }: { children: React.ReactNode }) => {
 
                         <DropdownMenu>
                             <DropdownMenuTrigger asChild>
-                              <Button variant="ghost" size="icon" className="relative h-10 w-10 rounded-full hover:bg-sidebar-accent hover:text-sidebar-accent-foreground">
+                              <Button variant="ghost" size="icon" className="relative h-10 w-10 rounded-full hover:bg-accent hover:text-accent-foreground">
                                   <Bell className="h-5 w-5" />
                                   {pendingRequestCount > 0 && (
                                       <Badge variant="destructive" className="absolute top-1 right-1 h-5 w-5 p-0 flex items-center justify-center text-xs rounded-full">
@@ -292,9 +292,9 @@ const AppShellLayout = ({ children }: { children: React.ReactNode }) => {
 
                         <DropdownMenu>
                             <DropdownMenuTrigger asChild>
-                              <Button variant="ghost" className="relative h-10 w-10 rounded-full hover:bg-sidebar-accent hover:text-sidebar-accent-foreground">
+                              <Button variant="ghost" className="relative h-10 w-10 rounded-full hover:bg-accent hover:text-accent-foreground">
                                     <Avatar className="h-10 w-10 border-2 border-primary/50">
-                                        <AvatarFallback className="bg-sidebar-accent text-sidebar-accent-foreground font-semibold">
+                                        <AvatarFallback className="bg-muted text-muted-foreground font-semibold">
                                             {getInitials(user.displayName)}
                                         </AvatarFallback>
                                     </Avatar>
