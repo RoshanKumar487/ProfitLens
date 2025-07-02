@@ -122,12 +122,11 @@ const AppShellLayout = ({ children }: { children: React.ReactNode }) => {
       asChild
     >
       <Link href="/">
-        <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-gradient-to-br from-pink-400 to-purple-500 text-white shadow-lg">
-          <span className="text-xl font-black">i</span>
-          <span className="text-sm font-black -ml-0.5">X</span>
+        <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-gradient-to-br from-blue-500 to-indigo-600 text-white shadow-lg">
+          <span className="text-base font-black">BS</span>
         </div>
         <h1 className="text-xl font-headline font-bold text-sidebar-foreground group-data-[collapsible=icon]:hidden">
-          InvoiceXR
+          BizSight
         </h1>
       </Link>
     </Button>
@@ -217,18 +216,10 @@ const AppShellLayout = ({ children }: { children: React.ReactNode }) => {
                     <div className="flex items-center gap-4">
                         <DropdownMenu>
                             <DropdownMenuTrigger asChild>
-                                <Button
-                                    variant="default"
-                                    className="group hidden h-10 items-center justify-center p-0 text-sm font-semibold sm:flex"
-                                >
-                                    <div className="flex items-center gap-2 px-3 py-2">
-                                        <PlusCircle className="h-4 w-4" />
-                                        <span>New</span>
-                                    </div>
-                                    <Separator orientation="vertical" className="h-5 bg-neutral-900/10 dark:bg-white/10" />
-                                    <div className="px-2 py-2">
-                                        <ChevronDown className="h-4 w-4" />
-                                    </div>
+                                <Button variant="default">
+                                    <PlusCircle className="mr-2 h-4 w-4" />
+                                    New
+                                    <ChevronDown className="ml-2 h-4 w-4" />
                                 </Button>
                             </DropdownMenuTrigger>
                             <DropdownMenuContent align="end" className="w-56">
