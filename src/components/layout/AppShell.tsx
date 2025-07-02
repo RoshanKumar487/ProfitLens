@@ -1,3 +1,4 @@
+
 'use client';
 
 import React, { useMemo } from 'react';
@@ -178,10 +179,7 @@ const AppShellLayout = ({ children }: { children: React.ReactNode }) => {
         {!isAuthPage && (
            <header className="sticky top-0 z-10 flex h-14 items-center gap-4 border-b border-sidebar-border/20 bg-sidebar/90 px-4 text-sidebar-foreground backdrop-blur-md sm:h-16 sm:px-6">
               <div className="flex items-center gap-4">
-                  <SidebarTrigger variant="ghost" size="icon" className="md:hidden h-10 w-10 hover:bg-sidebar-accent hover:text-sidebar-accent-foreground" />
-                  <div className="hidden md:block">
-                     <Logo />
-                  </div>
+                  <SidebarTrigger variant="ghost" size="icon" className="h-10 w-10 hover:bg-sidebar-accent hover:text-sidebar-accent-foreground" />
               </div>
 
               <div className="flex-1" />
