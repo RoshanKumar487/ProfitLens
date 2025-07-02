@@ -177,98 +177,100 @@ const AppShellLayout = ({ children }: { children: React.ReactNode }) => {
 
       <SidebarInset className={cn(isAuthPage && "md:!ml-0")}>
         {!isAuthPage && (
-           <header className="sticky top-0 z-10 flex h-14 items-center gap-4 border-b border-sidebar-border/20 bg-sidebar/90 px-4 text-sidebar-foreground backdrop-blur-md sm:h-16 sm:px-6">
-              <div className="flex items-center gap-4">
-                  <SidebarTrigger variant="ghost" size="icon" className="h-10 w-10 hover:bg-sidebar-accent hover:text-sidebar-accent-foreground" />
-              </div>
+           <header className="sticky top-0 z-10 border-b border-sidebar-border/20 bg-sidebar/90 text-sidebar-foreground backdrop-blur-md">
+              <div className="mx-auto flex h-14 max-w-7xl items-center gap-4 px-4 sm:h-16 sm:px-6">
+                <div className="flex items-center gap-4">
+                    <SidebarTrigger variant="ghost" size="icon" className="h-10 w-10 hover:bg-sidebar-accent hover:text-sidebar-accent-foreground" />
+                </div>
 
-              <div className="flex-1" />
+                <div className="flex-1" />
 
-              {user && (
-                  <div className="flex items-center gap-2">
-                      <DropdownMenu>
-                          <DropdownMenuTrigger asChild>
-                            <Button variant="ghost" size="icon" className="relative h-10 w-10 rounded-full hover:bg-sidebar-accent hover:text-sidebar-accent-foreground">
-                                <Bell className="h-5 w-5" />
-                                {pendingRequestCount > 0 && (
-                                    <Badge variant="destructive" className="absolute top-1 right-1 h-5 w-5 p-0 flex items-center justify-center text-xs rounded-full">
-                                    {pendingRequestCount}
-                                    </Badge>
-                                )}
-                            </Button>
-                          </DropdownMenuTrigger>
-                          <DropdownMenuContent className="w-80" align="end">
-                            <DropdownMenuLabel>Notifications</DropdownMenuLabel>
-                            <DropdownMenuSeparator />
-                            {notifications.length > 0 ? (
-                                notifications.map((notif) => (
-                                <DropdownMenuItem key={notif.id} asChild>
-                                    <Link href="/admin" className="cursor-pointer" onClick={handleNavigationClick}>
-                                    <div className="flex flex-col">
-                                        <p className="text-sm font-medium">
-                                        <span className="font-bold">{notif.userName}</span> requested to join.
-                                        </p>
-                                        <p className="text-xs text-muted-foreground">
-                                        {formatDistanceToNow(notif.createdAt.toDate(), { addSuffix: true })}
-                                        </p>
-                                    </div>
-                                    </Link>
-                                </DropdownMenuItem>
-                                ))
-                            ) : (
-                                <div className="p-4 text-sm text-center text-muted-foreground">
-                                    You have no new notifications.
-                                </div>
-                            )}
-                          </DropdownMenuContent>
-                      </DropdownMenu>
-
-                      <DropdownMenu>
-                          <DropdownMenuTrigger asChild>
-                            <Button variant="ghost" className="relative h-10 w-10 rounded-full hover:bg-sidebar-accent hover:text-sidebar-accent-foreground">
-                                  <Avatar className="h-10 w-10 border-2 border-primary/50">
-                                      <AvatarFallback className="bg-sidebar-accent text-sidebar-accent-foreground font-semibold">
-                                          {getInitials(user.displayName)}
-                                      </AvatarFallback>
-                                  </Avatar>
-                            </Button>
-                          </DropdownMenuTrigger>
-                          <DropdownMenuContent className="w-56" align="end" forceMount>
-                              <DropdownMenuLabel className="font-normal">
-                                <div className="flex flex-col space-y-1">
-                                  <p className="text-sm font-medium leading-none">{user.displayName}</p>
-                                  <p className="text-xs leading-none text-muted-foreground">{user.email}</p>
-                                </div>
-                              </DropdownMenuLabel>
+                {user && (
+                    <div className="flex items-center gap-2">
+                        <DropdownMenu>
+                            <DropdownMenuTrigger asChild>
+                              <Button variant="ghost" size="icon" className="relative h-10 w-10 rounded-full hover:bg-sidebar-accent hover:text-sidebar-accent-foreground">
+                                  <Bell className="h-5 w-5" />
+                                  {pendingRequestCount > 0 && (
+                                      <Badge variant="destructive" className="absolute top-1 right-1 h-5 w-5 p-0 flex items-center justify-center text-xs rounded-full">
+                                      {pendingRequestCount}
+                                      </Badge>
+                                  )}
+                              </Button>
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent className="w-80" align="end">
+                              <DropdownMenuLabel>Notifications</DropdownMenuLabel>
                               <DropdownMenuSeparator />
-                               {user.isSuperAdmin && (
-                                 <DropdownMenuItem asChild>
-                                    <Link href="/super-admin" className="cursor-pointer">
-                                        <Crown className="mr-2 h-4 w-4" />
-                                        <span>Super Admin</span>
+                              {notifications.length > 0 ? (
+                                  notifications.map((notif) => (
+                                  <DropdownMenuItem key={notif.id} asChild>
+                                      <Link href="/admin" className="cursor-pointer" onClick={handleNavigationClick}>
+                                      <div className="flex flex-col">
+                                          <p className="text-sm font-medium">
+                                          <span className="font-bold">{notif.userName}</span> requested to join.
+                                          </p>
+                                          <p className="text-xs text-muted-foreground">
+                                          {formatDistanceToNow(notif.createdAt.toDate(), { addSuffix: true })}
+                                          </p>
+                                      </div>
+                                      </Link>
+                                  </DropdownMenuItem>
+                                  ))
+                              ) : (
+                                  <div className="p-4 text-sm text-center text-muted-foreground">
+                                      You have no new notifications.
+                                  </div>
+                              )}
+                            </DropdownMenuContent>
+                        </DropdownMenu>
+
+                        <DropdownMenu>
+                            <DropdownMenuTrigger asChild>
+                              <Button variant="ghost" className="relative h-10 w-10 rounded-full hover:bg-sidebar-accent hover:text-sidebar-accent-foreground">
+                                    <Avatar className="h-10 w-10 border-2 border-primary/50">
+                                        <AvatarFallback className="bg-sidebar-accent text-sidebar-accent-foreground font-semibold">
+                                            {getInitials(user.displayName)}
+                                        </AvatarFallback>
+                                    </Avatar>
+                              </Button>
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent className="w-56" align="end" forceMount>
+                                <DropdownMenuLabel className="font-normal">
+                                  <div className="flex flex-col space-y-1">
+                                    <p className="text-sm font-medium leading-none">{user.displayName}</p>
+                                    <p className="text-xs leading-none text-muted-foreground">{user.email}</p>
+                                  </div>
+                                </DropdownMenuLabel>
+                                <DropdownMenuSeparator />
+                                 {user.isSuperAdmin && (
+                                   <DropdownMenuItem asChild>
+                                      <Link href="/super-admin" className="cursor-pointer">
+                                          <Crown className="mr-2 h-4 w-4" />
+                                          <span>Super Admin</span>
+                                      </Link>
+                                  </DropdownMenuItem>
+                                 )}
+                                <DropdownMenuItem asChild>
+                                    <Link href="/company-details" className="cursor-pointer">
+                                        <Building className="mr-2 h-4 w-4" />
+                                        <span>Company Details</span>
                                     </Link>
                                 </DropdownMenuItem>
-                               )}
-                              <DropdownMenuItem asChild>
-                                  <Link href="/company-details" className="cursor-pointer">
-                                      <Building className="mr-2 h-4 w-4" />
-                                      <span>Company Details</span>
+                                <DropdownMenuItem asChild>
+                                  <Link href="/guide" className="cursor-pointer">
+                                    <HelpCircle className="mr-2 h-4 w-4" />
+                                    <span>Guide</span>
                                   </Link>
-                              </DropdownMenuItem>
-                              <DropdownMenuItem asChild>
-                                <Link href="/guide" className="cursor-pointer">
-                                  <HelpCircle className="mr-2 h-4 w-4" />
-                                  <span>Guide</span>
-                                </Link>
-                              </DropdownMenuItem>
-                              <DropdownMenuSeparator />
-                              <DropdownMenuItem onClick={signOut} className="text-destructive focus:text-destructive cursor-pointer">
-                                <LogOut className="mr-2 h-4 w-4" /> Sign Out
-                              </DropdownMenuItem>
-                        </DropdownMenuContent>
-                      </DropdownMenu>
-                  </div>
-              )}
+                                </DropdownMenuItem>
+                                <DropdownMenuSeparator />
+                                <DropdownMenuItem onClick={signOut} className="text-destructive focus:text-destructive cursor-pointer">
+                                  <LogOut className="mr-2 h-4 w-4" /> Sign Out
+                                </DropdownMenuItem>
+                          </DropdownMenuContent>
+                        </DropdownMenu>
+                    </div>
+                )}
+            </div>
           </header>
         )}
         <main className="flex-1">
