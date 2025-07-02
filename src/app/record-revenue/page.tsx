@@ -23,6 +23,7 @@ import { updateRevenueEntry, deleteRevenueEntry, type RevenueUpdateData } from '
 import { Skeleton } from '@/components/ui/skeleton';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow, TableCaption } from '@/components/ui/table';
 import Link from 'next/link';
+import { Pagination, PaginationContent, PaginationItem, PaginationNext, PaginationPrevious } from '@/components/ui/pagination';
 
 interface RevenueEntryFirestore {
   id?: string; 
@@ -45,6 +46,8 @@ interface RevenueEntryDisplay {
   addedBy: string;
 }
 
+const RECORDS_PER_PAGE = 20;
+
 export default function RecordRevenuePage() {
   const { user, isLoading: authIsLoading } = useAuth();
   const currency = user?.currencySymbol || '$';
@@ -56,8 +59,8 @@ export default function RecordRevenuePage() {
 
   const [searchTerm, setSearchTerm] = useState<string>('');
   const [sortConfig, setSortConfig] = useState<{ key: keyof RevenueEntryDisplay; direction: 'ascending' | 'descending' }>({ key: 'date', direction: 'descending' });
+  const [currentPage, setCurrentPage] = useState(1);
 
-  // State for dialogs
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
   const [currentRevenue, setCurrentRevenue] = useState<RevenueEntryDisplay | null>(null);
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
@@ -131,12 +134,26 @@ export default function RecordRevenuePage() {
     return sortableItems;
   }, [filteredEntries, sortConfig]);
 
+  const paginatedEntries = useMemo(() => {
+    const startIndex = (currentPage - 1) * RECORDS_PER_PAGE;
+    return sortedEntries.slice(startIndex, startIndex + RECORDS_PER_PAGE);
+  }, [sortedEntries, currentPage]);
+
+  const totalPages = Math.ceil(sortedEntries.length / RECORDS_PER_PAGE);
+
+  const handlePageChange = (page: number) => {
+    if (page >= 1 && page <= totalPages) {
+      setCurrentPage(page);
+    }
+  };
+
   const requestSort = (key: keyof RevenueEntryDisplay) => {
     let direction: 'ascending' | 'descending' = 'ascending';
     if (sortConfig.key === key && sortConfig.direction === 'ascending') {
       direction = 'descending';
     }
     setSortConfig({ key, direction });
+    setCurrentPage(1);
   };
   
   const getSortIcon = (key: keyof RevenueEntryDisplay) => {
@@ -280,7 +297,7 @@ export default function RecordRevenuePage() {
                     <TableCell className="text-right"><Skeleton className="h-8 w-8 ml-auto" /></TableCell>
                   </TableRow>
                 ))
-              ) : sortedEntries.map(entry => (
+              ) : paginatedEntries.map(entry => (
                   <TableRow key={entry.id}>
                       <TableCell>{format(entry.date, 'PP')}</TableCell>
                       <TableCell className="font-medium">{entry.source}</TableCell>
@@ -300,6 +317,26 @@ export default function RecordRevenuePage() {
               ))}
               </TableBody>
           </Table>
+           {totalPages > 1 && (
+            <div className="flex items-center justify-between pt-4">
+              <div className="text-sm text-muted-foreground">
+                Showing <strong>{paginatedEntries.length}</strong> of <strong>{sortedEntries.length}</strong> revenue entries.
+              </div>
+              <Pagination>
+                <PaginationContent>
+                  <PaginationItem>
+                    <PaginationPrevious href="#" onClick={(e) => { e.preventDefault(); handlePageChange(currentPage - 1); }} className={currentPage === 1 ? 'pointer-events-none opacity-50' : ''} />
+                  </PaginationItem>
+                  <PaginationItem>
+                    <span className="text-sm p-2">Page {currentPage} of {totalPages}</span>
+                  </PaginationItem>
+                  <PaginationItem>
+                    <PaginationNext href="#" onClick={(e) => { e.preventDefault(); handlePageChange(currentPage + 1); }} className={currentPage === totalPages ? 'pointer-events-none opacity-50' : ''} />
+                  </PaginationItem>
+                </PaginationContent>
+              </Pagination>
+            </div>
+          )}
         </CardContent>
       </Card>
       

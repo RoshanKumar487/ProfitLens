@@ -28,6 +28,7 @@ import { updateExpenseEntry, deleteExpenseEntry, type ExpenseUpdateData, bulkAdd
 import { analyzeReceipt } from '@/ai/flows/analyze-receipt-flow';
 import { Skeleton } from '@/components/ui/skeleton';
 import Link from 'next/link';
+import { Pagination, PaginationContent, PaginationItem, PaginationNext, PaginationPrevious } from '@/components/ui/pagination';
 
 const EXPENSE_CATEGORIES = [
   'Software & Subscriptions',
@@ -65,6 +66,8 @@ interface ExpenseEntryDisplay {
   addedBy: string;
 }
 
+const RECORDS_PER_PAGE = 20;
+
 export default function RecordExpensesPage() {
   const { user, isLoading: authIsLoading } = useAuth();
   const currency = user?.currencySymbol || '$';
@@ -76,23 +79,21 @@ export default function RecordExpensesPage() {
   
   const [searchTerm, setSearchTerm] = useState<string>('');
   const [sortConfig, setSortConfig] = useState<{ key: keyof ExpenseEntryDisplay; direction: 'ascending' | 'descending' }>({ key: 'date', direction: 'descending' });
+  const [currentPage, setCurrentPage] = useState(1);
 
-  // State for dialogs
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
   const [currentExpense, setCurrentExpense] = useState<ExpenseEntryDisplay | null>(null);
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
   const [expenseToDeleteId, setExpenseToDeleteId] = useState<string | null>(null);
 
-  // State for bulk import
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [isImportDialogOpen, setIsImportDialogOpen] = useState(false);
   const [parsedExpenses, setParsedExpenses] = useState<ExpenseImportData[]>([]);
   const [isImporting, setIsImporting] = useState(false);
 
-  // State for scanning
   const [isScanDialogOpen, setIsScanDialogOpen] = useState(false);
   const [isInitializingCamera, setIsInitializingCamera] = useState(false);
-  const [isScanning, setIsScanning] = useState(false); // For AI analysis loading
+  const [isScanning, setIsScanning] = useState(false);
   const [hasCameraPermission, setHasCameraPermission] = useState<boolean | null>(null);
 
   const videoRef = useRef<HTMLVideoElement>(null);
@@ -170,12 +171,26 @@ export default function RecordExpensesPage() {
     return sortableItems;
   }, [filteredEntries, sortConfig]);
 
+  const paginatedEntries = useMemo(() => {
+    const startIndex = (currentPage - 1) * RECORDS_PER_PAGE;
+    return sortedEntries.slice(startIndex, startIndex + RECORDS_PER_PAGE);
+  }, [sortedEntries, currentPage]);
+  
+  const totalPages = Math.ceil(sortedEntries.length / RECORDS_PER_PAGE);
+
+  const handlePageChange = (page: number) => {
+    if (page >= 1 && page <= totalPages) {
+      setCurrentPage(page);
+    }
+  };
+
   const requestSort = (key: keyof ExpenseEntryDisplay) => {
       let direction: 'ascending' | 'descending' = 'ascending';
       if (sortConfig.key === key && sortConfig.direction === 'ascending') {
           direction = 'descending';
       }
       setSortConfig({ key, direction });
+      setCurrentPage(1);
   };
   
   const getSortIcon = (key: keyof ExpenseEntryDisplay) => {
@@ -525,7 +540,7 @@ export default function RecordExpensesPage() {
                     <TableCell className="text-right"><Skeleton className="h-8 w-8 ml-auto" /></TableCell>
                   </TableRow>
                 ))
-              ) : sortedEntries.map(entry => (
+              ) : paginatedEntries.map(entry => (
                   <TableRow key={entry.id}>
                     <TableCell>{format(entry.date, 'PP')}</TableCell>
                     <TableCell>
@@ -549,6 +564,26 @@ export default function RecordExpensesPage() {
               }
             </TableBody>
           </Table>
+           {totalPages > 1 && (
+            <div className="flex items-center justify-between pt-4">
+              <div className="text-sm text-muted-foreground">
+                Showing <strong>{paginatedEntries.length}</strong> of <strong>{sortedEntries.length}</strong> expenses.
+              </div>
+              <Pagination>
+                <PaginationContent>
+                  <PaginationItem>
+                    <PaginationPrevious href="#" onClick={(e) => { e.preventDefault(); handlePageChange(currentPage - 1); }} className={currentPage === 1 ? 'pointer-events-none opacity-50' : ''} />
+                  </PaginationItem>
+                  <PaginationItem>
+                    <span className="text-sm p-2">Page {currentPage} of {totalPages}</span>
+                  </PaginationItem>
+                  <PaginationItem>
+                    <PaginationNext href="#" onClick={(e) => { e.preventDefault(); handlePageChange(currentPage + 1); }} className={currentPage === totalPages ? 'pointer-events-none opacity-50' : ''} />
+                  </PaginationItem>
+                </PaginationContent>
+              </Pagination>
+            </div>
+          )}
         </CardContent>
       </Card>
       

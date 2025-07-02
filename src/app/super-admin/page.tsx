@@ -13,6 +13,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { Crown, Building, Users, Loader2 } from 'lucide-react';
 import { format } from 'date-fns';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
+import { Pagination, PaginationContent, PaginationItem, PaginationNext, PaginationPrevious } from '@/components/ui/pagination';
 
 interface Company {
   id: string;
@@ -32,6 +33,8 @@ interface Employee {
   createdAt: Date;
 }
 
+const RECORDS_PER_PAGE = 20;
+
 const getInitials = (name: string = "") => {
   const names = name.split(' ');
   let initials = names[0] ? names[0][0] : '';
@@ -46,6 +49,9 @@ export default function SuperAdminPage() {
   const [companies, setCompanies] = useState<Company[]>([]);
   const [employees, setEmployees] = useState<Employee[]>([]);
   const [isLoadingData, setIsLoadingData] = useState(true);
+
+  const [companiesPage, setCompaniesPage] = useState(1);
+  const [employeesPage, setEmployeesPage] = useState(1);
 
   useEffect(() => {
     if (!user?.isSuperAdmin) {
@@ -95,6 +101,20 @@ export default function SuperAdminPage() {
         fetchData();
     }
   }, [user]);
+
+  // Pagination logic
+  const paginatedCompanies = useMemo(() => {
+    const startIndex = (companiesPage - 1) * RECORDS_PER_PAGE;
+    return companies.slice(startIndex, startIndex + RECORDS_PER_PAGE);
+  }, [companies, companiesPage]);
+  const totalCompanyPages = Math.ceil(companies.length / RECORDS_PER_PAGE);
+
+  const paginatedEmployees = useMemo(() => {
+    const startIndex = (employeesPage - 1) * RECORDS_PER_PAGE;
+    return employees.slice(startIndex, startIndex + RECORDS_PER_PAGE);
+  }, [employees, employeesPage]);
+  const totalEmployeePages = Math.ceil(employees.length / RECORDS_PER_PAGE);
+
 
   if (authLoading || (!user && !authLoading)) {
     return (
@@ -160,7 +180,7 @@ export default function SuperAdminPage() {
                         <TableCell><Skeleton className="h-4 w-24" /></TableCell>
                     </TableRow>
                 ))
-              ) : companies.length > 0 ? companies.map(company => (
+              ) : paginatedCompanies.length > 0 ? paginatedCompanies.map(company => (
                 <TableRow key={company.id}>
                   <TableCell className="font-medium">{company.name}</TableCell>
                   <TableCell>{company.email}</TableCell>
@@ -171,6 +191,19 @@ export default function SuperAdminPage() {
               )}
             </TableBody>
           </Table>
+           {totalCompanyPages > 1 && (
+            <div className="flex items-center justify-between pt-4">
+                <div className="text-sm text-muted-foreground">
+                    Page {companiesPage} of {totalCompanyPages}
+                </div>
+                <Pagination>
+                    <PaginationContent>
+                        <PaginationItem><PaginationPrevious href="#" onClick={(e) => {e.preventDefault(); setCompaniesPage(p => Math.max(p - 1, 1))}} className={companiesPage === 1 ? 'pointer-events-none opacity-50' : ''}/></PaginationItem>
+                        <PaginationItem><PaginationNext href="#" onClick={(e) => {e.preventDefault(); setCompaniesPage(p => Math.min(p + 1, totalCompanyPages))}} className={companiesPage === totalCompanyPages ? 'pointer-events-none opacity-50' : ''}/></PaginationItem>
+                    </PaginationContent>
+                </Pagination>
+            </div>
+            )}
         </CardContent>
       </Card>
 
@@ -199,7 +232,7 @@ export default function SuperAdminPage() {
                         <TableCell><Skeleton className="h-4 w-24" /></TableCell>
                     </TableRow>
                 ))
-              ) : employees.length > 0 ? employees.map(employee => (
+              ) : paginatedEmployees.length > 0 ? paginatedEmployees.map(employee => (
                 <TableRow key={employee.id}>
                   <TableCell>
                     <div className="flex items-center gap-2">
@@ -219,6 +252,19 @@ export default function SuperAdminPage() {
               )}
             </TableBody>
           </Table>
+           {totalEmployeePages > 1 && (
+            <div className="flex items-center justify-between pt-4">
+                <div className="text-sm text-muted-foreground">
+                    Page {employeesPage} of {totalEmployeePages}
+                </div>
+                <Pagination>
+                    <PaginationContent>
+                        <PaginationItem><PaginationPrevious href="#" onClick={(e) => {e.preventDefault(); setEmployeesPage(p => Math.max(p - 1, 1))}} className={employeesPage === 1 ? 'pointer-events-none opacity-50' : ''}/></PaginationItem>
+                        <PaginationItem><PaginationNext href="#" onClick={(e) => {e.preventDefault(); setEmployeesPage(p => Math.min(p + 1, totalEmployeePages))}} className={employeesPage === totalEmployeePages ? 'pointer-events-none opacity-50' : ''}/></PaginationItem>
+                    </PaginationContent>
+                </Pagination>
+            </div>
+            )}
         </CardContent>
       </Card>
     </div>

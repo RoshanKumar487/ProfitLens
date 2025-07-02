@@ -27,6 +27,7 @@ import Link from 'next/link';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { deleteInvoice } from './actions';
 import { Skeleton } from '@/components/ui/skeleton';
+import { Pagination, PaginationContent, PaginationItem, PaginationPrevious, PaginationNext } from '@/components/ui/pagination';
 
 
 interface InvoiceDisplay {
@@ -39,6 +40,8 @@ interface InvoiceDisplay {
   issuedDate: Date;
 }
 
+const RECORDS_PER_PAGE = 20;
+
 export default function InvoicingPage() {
   const { user, isLoading: authIsLoading, currencySymbol } = useAuth();
   const [invoices, setInvoices] = useState<InvoiceDisplay[]>([]);
@@ -48,6 +51,7 @@ export default function InvoicingPage() {
   const { toast } = useToast();
   
   const [sortConfig, setSortConfig] = useState<{ key: keyof InvoiceDisplay; direction: 'ascending' | 'descending' }>({ key: 'issuedDate', direction: 'descending' });
+  const [currentPage, setCurrentPage] = useState(1);
 
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
   const [invoiceToDeleteId, setInvoiceToDeleteId] = useState<string | null>(null);
@@ -122,12 +126,26 @@ export default function InvoicingPage() {
     return sortableItems;
   }, [filteredInvoices, sortConfig]);
 
+  const paginatedInvoices = useMemo(() => {
+    const startIndex = (currentPage - 1) * RECORDS_PER_PAGE;
+    return sortedInvoices.slice(startIndex, startIndex + RECORDS_PER_PAGE);
+  }, [sortedInvoices, currentPage]);
+
+  const totalPages = Math.ceil(sortedInvoices.length / RECORDS_PER_PAGE);
+
+  const handlePageChange = (page: number) => {
+    if (page >= 1 && page <= totalPages) {
+      setCurrentPage(page);
+    }
+  };
+
   const requestSort = (key: keyof InvoiceDisplay) => {
     let direction: 'ascending' | 'descending' = 'ascending';
     if (sortConfig.key === key && sortConfig.direction === 'ascending') {
       direction = 'descending';
     }
     setSortConfig({ key, direction });
+    setCurrentPage(1);
   };
   
   const getSortIcon = (key: keyof InvoiceDisplay) => {
@@ -250,7 +268,7 @@ export default function InvoicingPage() {
                             <TableCell className="text-right"><Skeleton className="h-8 w-8 ml-auto" /></TableCell>
                         </TableRow>
                     ))
-                ) : sortedInvoices.map((invoice) => (
+                ) : paginatedInvoices.map((invoice) => (
                     <TableRow key={invoice.id}>
                     <TableCell className="font-medium">{invoice.invoiceNumber}</TableCell>
                     <TableCell>{invoice.clientName}</TableCell>
@@ -283,6 +301,26 @@ export default function InvoicingPage() {
                 ))}
                 </TableBody>
             </Table>
+             {totalPages > 1 && (
+              <div className="flex items-center justify-between pt-4">
+                <div className="text-sm text-muted-foreground">
+                  Showing <strong>{paginatedInvoices.length}</strong> of <strong>{sortedInvoices.length}</strong> invoices.
+                </div>
+                <Pagination>
+                  <PaginationContent>
+                    <PaginationItem>
+                      <PaginationPrevious href="#" onClick={(e) => { e.preventDefault(); handlePageChange(currentPage - 1); }} className={currentPage === 1 ? 'pointer-events-none opacity-50' : ''} />
+                    </PaginationItem>
+                    <PaginationItem>
+                      <span className="text-sm p-2">Page {currentPage} of {totalPages}</span>
+                    </PaginationItem>
+                    <PaginationItem>
+                      <PaginationNext href="#" onClick={(e) => { e.preventDefault(); handlePageChange(currentPage + 1); }} className={currentPage === totalPages ? 'pointer-events-none opacity-50' : ''}/>
+                    </PaginationItem>
+                  </PaginationContent>
+                </Pagination>
+              </div>
+            )}
         </CardContent>
       </Card>
 

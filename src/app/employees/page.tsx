@@ -39,6 +39,7 @@ import jsPDF from 'jspdf';
 import html2canvas from 'html2canvas';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Switch } from '@/components/ui/switch';
+import { Pagination, PaginationContent, PaginationItem, PaginationNext, PaginationPrevious } from '@/components/ui/pagination';
 
 interface EmployeeFirestore {
   id?: string;
@@ -89,6 +90,7 @@ export interface EmployeeDisplay extends Omit<EmployeeFirestore, 'createdAt' | '
 
 type ParsedEmployee = Omit<EmployeeFirestore, 'id' | 'createdAt' | 'updatedAt' | 'companyId' | 'addedById' | 'addedBy' | 'profilePictureUrl' | 'profilePictureStoragePath' | 'associatedFileUrl' | 'associatedFileName' | 'associatedFileStoragePath'>;
 
+const RECORDS_PER_PAGE = 20;
 
 const getInitials = (name: string = "") => {
   const names = name.split(' ');
@@ -132,21 +134,19 @@ export default function EmployeesPage() {
   const [isDraggingProfile, setIsDraggingProfile] = useState(false);
   const [isDraggingFile, setIsDraggingFile] = useState(false);
 
-  // State for bulk import
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [isImportDialogOpen, setIsImportDialogOpen] = useState(false);
   const [editableParsedEmployees, setEditableParsedEmployees] = useState<ParsedEmployee[]>([]);
   const [isImporting, setIsImporting] = useState(false);
   
-  // State for scanning
   const [isScanDialogOpen, setIsScanDialogOpen] = useState(false);
   const [isScanning, setIsScanning] = useState(false);
   const [isInitializingCamera, setIsInitializingCamera] = useState(false);
 
   const [sortConfig, setSortConfig] = useState<{ key: keyof EmployeeDisplay; direction: 'ascending' | 'descending' }>({ key: 'createdAt', direction: 'descending' });
   const [searchTerm, setSearchTerm] = useState('');
+  const [currentPage, setCurrentPage] = useState(1);
 
-  // Bio-Data Print State
   const bioDataPrintRef = useRef<HTMLDivElement>(null);
   const [isBioDataDialogOpen, setIsBioDataDialogOpen] = useState(false);
   const [employeeToPrint, setEmployeeToPrint] = useState<EmployeeDisplay | null>(null);
@@ -169,7 +169,6 @@ export default function EmployeesPage() {
   }, [employees, searchTerm]);
 
 
-  // Sorting logic
   const sortedEmployees = useMemo(() => {
     let sortableItems = [...filteredEmployees];
     if (sortConfig !== null) {
@@ -189,6 +188,19 @@ export default function EmployeesPage() {
     }
     return sortableItems;
   }, [filteredEmployees, sortConfig]);
+
+  const paginatedEmployees = useMemo(() => {
+    const startIndex = (currentPage - 1) * RECORDS_PER_PAGE;
+    return sortedEmployees.slice(startIndex, startIndex + RECORDS_PER_PAGE);
+  }, [sortedEmployees, currentPage]);
+
+  const totalPages = Math.ceil(sortedEmployees.length / RECORDS_PER_PAGE);
+
+  const handlePageChange = (page: number) => {
+    if (page >= 1 && page <= totalPages) {
+      setCurrentPage(page);
+    }
+  };
 
   const requestSort = (key: keyof EmployeeDisplay) => {
     let direction: 'ascending' | 'descending' = 'ascending';
@@ -539,7 +551,6 @@ export default function EmployeesPage() {
   const handleFileDragLeave = (e: React.DragEvent<HTMLDivElement>) => { handleDragEvents(e); setIsDraggingFile(false); };
   const handleFileDrop = (e: React.DragEvent<HTMLDivElement>) => { handleDragEvents(e); setIsDraggingFile(false); handleFileChange(e.dataTransfer as any, setAssociatedFile); };
 
-  // Bulk import handlers
   const handleImportClick = () => { fileInputRef.current?.click(); };
   const handleImportFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -583,7 +594,6 @@ export default function EmployeesPage() {
 
    const handleOpenBioDataDialog = async (employee: EmployeeDisplay) => {
     setEmployeeToPrint(employee);
-    // Fetch company details if not already fetched
     if (!companyDetails && user?.companyId) {
         const companyRef = doc(db, 'companyProfiles', user.companyId);
         const companySnap = await getDoc(companyRef);
@@ -592,8 +602,7 @@ export default function EmployeesPage() {
         }
     }
     
-    // Convert all image URLs to data URIs for reliable printing
-    setIsPrinting(true); // Use isPrinting to show a loading state
+    setIsPrinting(true); 
     setIsBioDataDialogOpen(true);
     const uris: Record<string, string | undefined> = {};
     const urlMap = {
@@ -608,7 +617,7 @@ export default function EmployeesPage() {
         }
     }
     setBioDataImageUris(uris);
-    setIsPrinting(false); // Done fetching, ready for user to click print
+    setIsPrinting(false);
   };
 
   const handlePrint = async () => {
@@ -664,7 +673,7 @@ export default function EmployeesPage() {
     try {
         const elementToPrint = bioDataPrintRef.current;
         const canvas = await html2canvas(elementToPrint, {
-            scale: 3, // Increased scale for better quality
+            scale: 3,
             useCORS: true,
             backgroundColor: '#ffffff',
         });
@@ -750,8 +759,8 @@ export default function EmployeesPage() {
             <TableCaption>{!isLoadingEmployees && sortedEmployees.length === 0 ? (searchTerm ? "No employees match your search." : "No employees found.") : "A list of your employees."}</TableCaption>
             <TableHeader><TableRow><TableHead className="w-[60px]">Avatar</TableHead><TableHead><Button variant="ghost" onClick={() => requestSort('name')} className="-ml-4 h-auto p-1 text-xs sm:text-sm">Name {getSortIcon('name')}</Button></TableHead><TableHead><Button variant="ghost" onClick={() => requestSort('position')} className="-ml-4 h-auto p-1 text-xs sm:text-sm">Position {getSortIcon('position')}</Button></TableHead><TableHead>Description</TableHead><TableHead className="text-right"><Button variant="ghost" onClick={() => requestSort('salary')} className="h-auto p-1 text-xs sm:text-sm">Salary {getSortIcon('salary')}</Button></TableHead><TableHead>File</TableHead><TableHead className="text-right w-[100px]">Actions</TableHead></TableRow></TableHeader>
             <TableBody>
-              {isLoadingEmployees && employees.length === 0 && ([...Array(3)].map((_, i) => (<TableRow key={`skel-${i}`}><TableCell><Skeleton className="h-10 w-10 rounded-full" /></TableCell><TableCell><Skeleton className="h-4 w-3/4" /></TableCell><TableCell><Skeleton className="h-4 w-1/2" /></TableCell><TableCell><Skeleton className="h-4 w-3/4" /></TableCell><TableCell className="text-right"><Skeleton className="h-4 w-1/4 ml-auto" /></TableCell><TableCell><Skeleton className="h-4 w-1/2" /></TableCell><TableCell className="text-right"><Skeleton className="h-8 w-8 ml-auto" /></TableCell></TableRow>)))}
-              {!isLoadingEmployees && sortedEmployees.map((employee) => (
+              {isLoadingEmployees && paginatedEmployees.length === 0 && ([...Array(3)].map((_, i) => (<TableRow key={`skel-${i}`}><TableCell><Skeleton className="h-10 w-10 rounded-full" /></TableCell><TableCell><Skeleton className="h-4 w-3/4" /></TableCell><TableCell><Skeleton className="h-4 w-1/2" /></TableCell><TableCell><Skeleton className="h-4 w-3/4" /></TableCell><TableCell className="text-right"><Skeleton className="h-4 w-1/4 ml-auto" /></TableCell><TableCell><Skeleton className="h-4 w-1/2" /></TableCell><TableCell className="text-right"><Skeleton className="h-8 w-8 ml-auto" /></TableCell></TableRow>)))}
+              {!isLoadingEmployees && paginatedEmployees.map((employee) => (
                 <TableRow key={employee.id}>
                   <TableCell><Avatar className="h-10 w-10"><AvatarImage src={employee.profilePictureUrl || `https://placehold.co/40x40.png?text=${getInitials(employee.name)}`} alt={employee.name} data-ai-hint="person portrait" /><AvatarFallback>{getInitials(employee.name)}</AvatarFallback></Avatar></TableCell>
                   <TableCell className="font-medium">{employee.name}</TableCell>
@@ -764,6 +773,31 @@ export default function EmployeesPage() {
               ))}
             </TableBody>
           </Table>
+          {totalPages > 1 && (
+            <div className="flex items-center justify-between pt-4">
+                <div className="text-sm text-muted-foreground">
+                    Page {currentPage} of {totalPages}
+                </div>
+                <Pagination>
+                    <PaginationContent>
+                        <PaginationItem>
+                            <PaginationPrevious
+                                href="#"
+                                onClick={(e) => { e.preventDefault(); handlePageChange(currentPage - 1); }}
+                                className={currentPage === 1 ? 'pointer-events-none opacity-50' : undefined}
+                            />
+                        </PaginationItem>
+                        <PaginationItem>
+                            <PaginationNext
+                                href="#"
+                                onClick={(e) => { e.preventDefault(); handlePageChange(currentPage + 1); }}
+                                className={currentPage === totalPages ? 'pointer-events-none opacity-50' : undefined}
+                            />
+                        </PaginationItem>
+                    </PaginationContent>
+                </Pagination>
+            </div>
+          )}
         </CardContent>
       </Card>
 

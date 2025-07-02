@@ -1,7 +1,7 @@
 
 'use client';
 
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import PageTitle from '@/components/PageTitle';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow, TableCaption } from '@/components/ui/table';
@@ -16,6 +16,7 @@ import { approveUserRequest, rejectUserRequest, updateUserRole } from './actions
 import { format } from 'date-fns';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Pagination, PaginationContent, PaginationItem, PaginationPrevious, PaginationNext } from '@/components/ui/pagination';
 
 interface AccessRequest {
   id: string;
@@ -34,6 +35,8 @@ interface CompanyUser extends DocumentData {
   role: 'admin' | 'member' | 'pending' | 'rejected';
 }
 
+const RECORDS_PER_PAGE = 20;
+
 export default function AdminPage() {
   const { user, isLoading: authLoading } = useAuth();
   const [requests, setRequests] = useState<AccessRequest[]>([]);
@@ -41,6 +44,9 @@ export default function AdminPage() {
   const [isLoading, setIsLoading] = useState(true);
   const [isProcessing, setIsProcessing] = useState<string | null>(null);
   const { toast } = useToast();
+
+  const [requestsPage, setRequestsPage] = useState(1);
+  const [usersPage, setUsersPage] = useState(1);
 
   const fetchAdminData = useCallback(async () => {
     if (!user || user.role !== 'admin' || !user.companyId) {
@@ -53,7 +59,6 @@ export default function AdminPage() {
     try {
       const companyId = user.companyId;
 
-      // Fetch Access Requests
       const requestsRef = collection(db, 'accessRequests');
       const reqQuery = query(requestsRef, where('companyId', '==', companyId), orderBy('createdAt', 'desc'));
       const reqSnapshot = await getDocs(reqQuery);
@@ -66,7 +71,6 @@ export default function AdminPage() {
       });
       setRequests(fetchedRequests);
       
-      // Fetch All Users in Company
       const usersRef = collection(db, 'users');
       const usersQuery = query(usersRef, where('companyId', '==', companyId), orderBy('displayName'));
       const usersSnapshot = await getDocs(usersQuery);
@@ -86,6 +90,20 @@ export default function AdminPage() {
       fetchAdminData();
     }
   }, [authLoading, fetchAdminData]);
+
+  // Pagination logic for requests
+  const paginatedRequests = useMemo(() => {
+    const startIndex = (requestsPage - 1) * RECORDS_PER_PAGE;
+    return requests.slice(startIndex, startIndex + RECORDS_PER_PAGE);
+  }, [requests, requestsPage]);
+  const totalRequestPages = Math.ceil(requests.length / RECORDS_PER_PAGE);
+
+  // Pagination logic for users
+  const paginatedUsers = useMemo(() => {
+    const startIndex = (usersPage - 1) * RECORDS_PER_PAGE;
+    return users.slice(startIndex, startIndex + RECORDS_PER_PAGE);
+  }, [users, usersPage]);
+  const totalUserPages = Math.ceil(users.length / RECORDS_PER_PAGE);
 
   const handleApprove = async (requestId: string, userId: string) => {
     setIsProcessing(requestId);
@@ -112,7 +130,6 @@ export default function AdminPage() {
     const result = await updateUserRole(userId, newRole);
     toast({ title: result.success ? 'Success' : 'Error', description: result.message, variant: result.success ? 'default' : 'destructive' });
     if (result.success) {
-      // Optimistically update UI
       setUsers(prev => prev.map(u => u.id === userId ? { ...u, role: newRole } : u));
     }
     setIsProcessing(null);
@@ -156,7 +173,7 @@ export default function AdminPage() {
                         <TableCaption>{requests.length === 0 ? "No access requests found." : "A list of user access requests."}</TableCaption>
                         <TableHeader><TableRow><TableHead>User</TableHead><TableHead>Email</TableHead><TableHead>Requested On</TableHead><TableHead>Status</TableHead><TableHead className="text-right">Actions</TableHead></TableRow></TableHeader>
                         <TableBody>
-                        {requests.map(req => (
+                        {paginatedRequests.map(req => (
                             <TableRow key={req.id}>
                             <TableCell className="font-medium">{req.userName}</TableCell>
                             <TableCell>{req.userEmail}</TableCell>
@@ -174,6 +191,19 @@ export default function AdminPage() {
                         ))}
                         </TableBody>
                     </Table>
+                    {totalRequestPages > 1 && (
+                      <div className="flex items-center justify-between pt-4">
+                          <div className="text-sm text-muted-foreground">
+                              Page {requestsPage} of {totalRequestPages}
+                          </div>
+                          <Pagination>
+                              <PaginationContent>
+                                  <PaginationItem><PaginationPrevious href="#" onClick={(e) => {e.preventDefault(); setRequestsPage(p => Math.max(p - 1, 1))}} className={requestsPage === 1 ? 'pointer-events-none opacity-50' : ''}/></PaginationItem>
+                                  <PaginationItem><PaginationNext href="#" onClick={(e) => {e.preventDefault(); setRequestsPage(p => Math.min(p + 1, totalRequestPages))}} className={requestsPage === totalRequestPages ? 'pointer-events-none opacity-50' : ''}/></PaginationItem>
+                              </PaginationContent>
+                          </Pagination>
+                      </div>
+                    )}
                 </CardContent>
             </Card>
         </TabsContent>
@@ -185,7 +215,7 @@ export default function AdminPage() {
                         <TableCaption>{users.length === 0 ? "No users found." : "A list of all users in your company."}</TableCaption>
                         <TableHeader><TableRow><TableHead>User</TableHead><TableHead>Email</TableHead><TableHead className="w-[150px]">Role</TableHead></TableRow></TableHeader>
                         <TableBody>
-                            {users.map(u => (
+                            {paginatedUsers.map(u => (
                                 <TableRow key={u.id}>
                                     <TableCell className="font-medium">{u.displayName}</TableCell>
                                     <TableCell>{u.email}</TableCell>
@@ -206,6 +236,19 @@ export default function AdminPage() {
                             ))}
                         </TableBody>
                     </Table>
+                     {totalUserPages > 1 && (
+                      <div className="flex items-center justify-between pt-4">
+                          <div className="text-sm text-muted-foreground">
+                              Page {usersPage} of {totalUserPages}
+                          </div>
+                          <Pagination>
+                              <PaginationContent>
+                                  <PaginationItem><PaginationPrevious href="#" onClick={(e) => {e.preventDefault(); setUsersPage(p => Math.max(p - 1, 1))}} className={usersPage === 1 ? 'pointer-events-none opacity-50' : ''}/></PaginationItem>
+                                  <PaginationItem><PaginationNext href="#" onClick={(e) => {e.preventDefault(); setUsersPage(p => Math.min(p + 1, totalUserPages))}} className={usersPage === totalUserPages ? 'pointer-events-none opacity-50' : ''}/></PaginationItem>
+                              </PaginationContent>
+                          </Pagination>
+                      </div>
+                    )}
                 </CardContent>
             </Card>
         </TabsContent>
