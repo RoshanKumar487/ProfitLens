@@ -6,11 +6,12 @@ import { cva, type VariantProps } from "class-variance-authority"
 import { cn } from "@/lib/utils"
 
 const buttonVariants = cva(
-  "inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md text-sm font-medium ring-offset-background transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 [&_svg]:pointer-events-none [&_svg]:size-4 [&_svg]:shrink-0",
+  "inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md text-sm font-medium ring-offset-background transition-all duration-150 ease-in-out focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 [&_svg]:pointer-events-none [&_svg]:size-4 [&_svg]:shrink-0",
   {
     variants: {
       variant: {
-        default: "bg-primary text-primary-foreground hover:bg-primary/90",
+        default:
+          "bg-gradient-to-b from-white to-neutral-100 text-foreground shadow-[0_4px_8px_rgba(0,0,0,0.05),inset_0_1px_0_white] border border-neutral-200/80 hover:brightness-[1.03] active:shadow-[inset_0_2px_4px_rgba(0,0,0,0.1)] active:translate-y-px dark:from-neutral-800 dark:to-neutral-900 dark:text-neutral-200 dark:shadow-[0_4px_8px_rgba(0,0,0,0.2),inset_0_1px_0_rgba(255,255,255,0.05)] dark:border-neutral-700 dark:hover:brightness-125",
         destructive:
           "bg-destructive text-destructive-foreground hover:bg-destructive/90",
         outline:

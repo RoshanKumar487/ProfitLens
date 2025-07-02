@@ -218,14 +218,14 @@ const AppShellLayout = ({ children }: { children: React.ReactNode }) => {
                         <DropdownMenu>
                             <DropdownMenuTrigger asChild>
                                 <Button
-                                    variant="ghost"
-                                    className="group hidden h-10 items-center justify-center rounded-lg bg-gradient-to-b from-primary/80 to-primary/90 p-0 text-sm font-semibold text-primary-foreground shadow-[0_4px_10px_rgba(0,0,0,0.1),inset_0_1px_0_rgba(255,255,255,0.2)] backdrop-blur-sm transition-all duration-150 ease-in-out hover:brightness-110 active:shadow-[inset_0_2px_4px_rgba(0,0,0,0.2)] sm:flex"
+                                    variant="default"
+                                    className="group hidden h-10 items-center justify-center p-0 text-sm font-semibold sm:flex"
                                 >
                                     <div className="flex items-center gap-2 px-3 py-2">
                                         <PlusCircle className="h-4 w-4" />
                                         <span>New</span>
                                     </div>
-                                    <Separator orientation="vertical" className="h-5 bg-primary-foreground/20" />
+                                    <Separator orientation="vertical" className="h-5 bg-neutral-900/10 dark:bg-white/10" />
                                     <div className="px-2 py-2">
                                         <ChevronDown className="h-4 w-4" />
                                     </div>
@@ -350,18 +350,20 @@ const AppShellLayout = ({ children }: { children: React.ReactNode }) => {
       
       {!isAuthPage && !authLoading && user && (
         <Dialog open={isAssistantOpen} onOpenChange={setIsAssistantOpen}>
-          <Tooltip>
-            <TooltipTrigger asChild>
-              <DialogTrigger asChild>
-                <Button className="fixed bottom-4 right-4 h-12 w-12 rounded-full shadow-2xl z-50 bg-gradient-to-br from-pink-400 to-purple-500 hover:scale-110 transition-transform duration-200">
-                  <Bot className="h-6 w-6" />
-                </Button>
-              </DialogTrigger>
-            </TooltipTrigger>
-            <TooltipContent side="left">
-              <p>AI Assistant</p>
-            </TooltipContent>
-          </Tooltip>
+          <TooltipProvider>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <DialogTrigger asChild>
+                  <Button className="fixed bottom-4 right-4 h-12 w-12 rounded-full shadow-2xl z-50 bg-gradient-to-br from-pink-400 to-purple-500 hover:scale-110 transition-transform duration-200">
+                    <Bot className="h-6 w-6" />
+                  </Button>
+                </DialogTrigger>
+              </TooltipTrigger>
+              <TooltipContent side="left">
+                <p>AI Assistant</p>
+              </TooltipContent>
+            </Tooltip>
+          </TooltipProvider>
           <DialogContent className="sm:max-w-2xl h-[calc(100vh-8rem)] flex flex-col p-0 gap-0">
             <DialogHeader className="p-6 pb-4">
               <DialogTitle className="flex items-center gap-2">
