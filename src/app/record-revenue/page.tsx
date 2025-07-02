@@ -13,12 +13,12 @@ import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter, DialogClose } from "@/components/ui/dialog";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
-import { CalendarIcon, TrendingUp, Save, Loader2, MoreHorizontal, Edit, Trash2, Search, ArrowUp, ArrowDown, ChevronsUpDown, PlusCircle } from 'lucide-react';
+import { CalendarIcon, TrendingUp, Save, Loader2, MoreHorizontal, Edit, Trash2, ArrowUp, ArrowDown, ChevronsUpDown, PlusCircle } from 'lucide-react';
 import { format } from 'date-fns';
 import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/contexts/AuthContext';
 import { db } from '@/lib/firebaseConfig';
-import { collection, addDoc, getDocs, query, where, orderBy, Timestamp, serverTimestamp } from 'firebase/firestore';
+import { collection, getDocs, query, where, orderBy, Timestamp, limit, startAfter, endBefore, limitToLast, type QueryDocumentSnapshot, type DocumentData } from 'firebase/firestore';
 import { updateRevenueEntry, deleteRevenueEntry, type RevenueUpdateData } from './actions';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow, TableCaption } from '@/components/ui/table';
@@ -44,6 +44,7 @@ interface RevenueEntryDisplay {
   source: string;
   description?: string;
   addedBy: string;
+  createdAt: Timestamp;
 }
 
 const RECORDS_PER_PAGE = 20;
@@ -57,18 +58,18 @@ export default function RecordRevenuePage() {
   const [isSaving, setIsSaving] = useState(false);
   const { toast } = useToast();
 
-  const [searchTerm, setSearchTerm] = useState<string>('');
-  const [sortConfig, setSortConfig] = useState<{ key: keyof RevenueEntryDisplay; direction: 'ascending' | 'descending' }>({ key: 'date', direction: 'descending' });
+  const [sortConfig, setSortConfig] = useState<{ key: keyof RevenueEntryDisplay; direction: 'desc' | 'asc' }>({ key: 'date', direction: 'desc' });
   const [currentPage, setCurrentPage] = useState(1);
+  const [firstVisible, setFirstVisible] = useState<QueryDocumentSnapshot<DocumentData> | null>(null);
+  const [lastVisible, setLastVisible] = useState<QueryDocumentSnapshot<DocumentData> | null>(null);
 
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
   const [currentRevenue, setCurrentRevenue] = useState<RevenueEntryDisplay | null>(null);
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
   const [revenueToDeleteId, setRevenueToDeleteId] = useState<string | null>(null);
 
-  const fetchRevenueEntries = useCallback(async () => {
-    if (authIsLoading) return;
-    if (!user || !user.companyId) {
+  const fetchRevenueEntries = useCallback(async (direction: 'next' | 'prev' | 'reset' = 'reset') => {
+    if (authIsLoading || !user || !user.companyId) {
       setIsLoadingEntries(false);
       setRecentEntries([]);
       return;
@@ -77,90 +78,86 @@ export default function RecordRevenuePage() {
     setIsLoadingEntries(true);
     try {
       const entriesRef = collection(db, 'revenueEntries');
-      const q = query(entriesRef, where('companyId', '==', user.companyId), orderBy('date', 'desc'));
+      let q;
+
+      const baseQuery = [
+        where('companyId', '==', user.companyId),
+        orderBy(sortConfig.key, sortConfig.direction),
+      ];
+      if (sortConfig.key !== 'createdAt') {
+        baseQuery.push(orderBy('createdAt', sortConfig.direction));
+      }
+
+      if (direction === 'next' && lastVisible) {
+        q = query(entriesRef, ...baseQuery, startAfter(lastVisible), limit(RECORDS_PER_PAGE));
+      } else if (direction === 'prev' && firstVisible) {
+        q = query(entriesRef, ...baseQuery, endBefore(firstVisible), limitToLast(RECORDS_PER_PAGE));
+      } else { // reset
+        q = query(entriesRef, ...baseQuery, limit(RECORDS_PER_PAGE));
+      }
+      
       const querySnapshot = await getDocs(q);
       
       const fetchedEntries = querySnapshot.docs.map(docSnap => {
         const data = docSnap.data() as Omit<RevenueEntryFirestore, 'id'>;
         return {
           id: docSnap.id,
+          ...data,
           date: data.date.toDate(),
-          amount: data.amount,
-          source: data.source,
-          description: data.description || '',
           addedBy: data.addedBy || 'N/A',
-        };
+        } as RevenueEntryDisplay;
       });
       setRecentEntries(fetchedEntries);
+
+      if (querySnapshot.docs.length > 0) {
+        setFirstVisible(querySnapshot.docs[0]);
+        setLastVisible(querySnapshot.docs[querySnapshot.docs.length - 1]);
+      }
     } catch (error: any) {
       toast({ title: 'Error Loading Entries', description: error.message, variant: 'destructive' });
     } finally {
       setIsLoadingEntries(false);
     }
-  }, [user, authIsLoading, toast]);
+  }, [user, authIsLoading, toast, sortConfig, lastVisible, firstVisible]);
 
   useEffect(() => {
-    fetchRevenueEntries();
-  }, [fetchRevenueEntries]);
-
-  const filteredEntries = useMemo(() => {
-    if (!searchTerm) {
-      return recentEntries;
+    if (!authIsLoading) {
+      handleSortChange('date');
     }
-    const lowercasedTerm = searchTerm.toLowerCase();
-    return recentEntries.filter(entry => 
-      entry.source.toLowerCase().includes(lowercasedTerm) ||
-      (entry.description && entry.description.toLowerCase().includes(lowercasedTerm))
-    );
-  }, [recentEntries, searchTerm]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [user, authIsLoading]);
 
-  const sortedEntries = useMemo(() => {
-    let sortableItems = [...filteredEntries];
-    if (sortConfig !== null) {
-      sortableItems.sort((a, b) => {
-        const aValue = a[sortConfig.key];
-        const bValue = b[sortConfig.key];
-        if (aValue === null || aValue === undefined) return 1;
-        if (bValue === null || bValue === undefined) return -1;
-        if (aValue < bValue) {
-          return sortConfig.direction === 'ascending' ? -1 : 1;
-        }
-        if (aValue > bValue) {
-          return sortConfig.direction === 'ascending' ? 1 : -1;
-        }
-        return 0;
-      });
+  useEffect(() => {
+    if (!authIsLoading && user) {
+        fetchRevenueEntries('reset');
     }
-    return sortableItems;
-  }, [filteredEntries, sortConfig]);
-
-  const paginatedEntries = useMemo(() => {
-    const startIndex = (currentPage - 1) * RECORDS_PER_PAGE;
-    return sortedEntries.slice(startIndex, startIndex + RECORDS_PER_PAGE);
-  }, [sortedEntries, currentPage]);
-
-  const totalPages = Math.ceil(sortedEntries.length / RECORDS_PER_PAGE);
-
-  const handlePageChange = (page: number) => {
-    if (page >= 1 && page <= totalPages) {
-      setCurrentPage(page);
-    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [sortConfig]);
+  
+  const handlePageChange = (direction: 'next' | 'prev') => {
+    let newPage = currentPage;
+    if (direction === 'next') newPage++;
+    if (direction === 'prev' && currentPage > 1) newPage--;
+    setCurrentPage(newPage);
+    fetchRevenueEntries(direction);
   };
 
-  const requestSort = (key: keyof RevenueEntryDisplay) => {
-    let direction: 'ascending' | 'descending' = 'ascending';
-    if (sortConfig.key === key && sortConfig.direction === 'ascending') {
-      direction = 'descending';
+  const handleSortChange = (key: keyof RevenueEntryDisplay) => {
+    let direction: 'desc' | 'asc' = 'desc';
+    if (sortConfig.key === key && sortConfig.direction === 'desc') {
+      direction = 'asc';
     }
-    setSortConfig({ key, direction });
     setCurrentPage(1);
+    setFirstVisible(null);
+    setLastVisible(null);
+    setSortConfig({ key, direction });
   };
   
   const getSortIcon = (key: keyof RevenueEntryDisplay) => {
     if (sortConfig.key !== key) {
         return <ChevronsUpDown className="ml-2 h-4 w-4 text-muted-foreground/50" />;
     }
-    if (sortConfig.direction === 'ascending') {
+    if (sortConfig.direction === 'asc') {
         return <ArrowUp className="ml-2 h-4 w-4" />;
     }
     return <ArrowDown className="ml-2 h-4 w-4" />;
@@ -198,7 +195,7 @@ export default function RecordRevenuePage() {
     
     if (result.success) {
         setIsEditDialogOpen(false);
-        fetchRevenueEntries();
+        fetchRevenueEntries('reset');
     }
     setIsSaving(false);
   };
@@ -215,7 +212,7 @@ export default function RecordRevenuePage() {
     toast({ title: result.success ? 'Success' : 'Error', description: result.message, variant: result.success ? 'default' : 'destructive' });
     
     if (result.success) {
-      fetchRevenueEntries();
+      fetchRevenueEntries('reset');
     }
     setRevenueToDeleteId(null);
     setIsDeleteDialogOpen(false);
@@ -248,39 +245,24 @@ export default function RecordRevenuePage() {
 
       <Card className="shadow-lg">
         <CardHeader>
-          <div className="flex flex-col sm:flex-row items-center gap-2 justify-between">
-              <div className="flex-1">
-                  <CardTitle className="font-headline">Revenue Entries</CardTitle>
-                  <CardDescription>A list of your recorded revenue entries.</CardDescription>
-              </div>
-              <div className="relative w-full sm:w-auto">
-                  <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
-                  <Input
-                  type="search"
-                  placeholder="Filter by source..."
-                  className="pl-8 sm:w-[200px] md:w-[250px]"
-                  value={searchTerm}
-                  onChange={(e) => setSearchTerm(e.target.value)}
-                  disabled={isLoadingEntries && recentEntries.length === 0}
-                  />
-              </div>
-          </div>
+            <CardTitle className="font-headline">Revenue Entries</CardTitle>
+            <CardDescription>A list of your recorded revenue entries.</CardDescription>
         </CardHeader>
         <CardContent>
           <Table>
-              <TableCaption>{!isLoadingEntries && sortedEntries.length === 0 ? "No revenue recorded yet." : "A list of your revenue entries."}</TableCaption>
+              <TableCaption>{!isLoadingEntries && recentEntries.length === 0 ? "No revenue recorded yet." : `Page ${currentPage} of revenue entries.`}</TableCaption>
               <TableHeader>
                   <TableRow>
                       <TableHead>
-                          <Button variant="ghost" onClick={() => requestSort('date')} className="-ml-4 h-auto p-1 text-xs sm:text-sm">Date {getSortIcon('date')}</Button>
+                          <Button variant="ghost" onClick={() => handleSortChange('date')} className="-ml-4 h-auto p-1 text-xs sm:text-sm">Date {getSortIcon('date')}</Button>
                       </TableHead>
                       <TableHead>
-                            <Button variant="ghost" onClick={() => requestSort('source')} className="-ml-4 h-auto p-1 text-xs sm:text-sm">Source {getSortIcon('source')}</Button>
+                            <Button variant="ghost" onClick={() => handleSortChange('source')} className="-ml-4 h-auto p-1 text-xs sm:text-sm">Source {getSortIcon('source')}</Button>
                       </TableHead>
                       <TableHead>Description</TableHead>
                       <TableHead>Added By</TableHead>
                       <TableHead className="text-right">
-                            <Button variant="ghost" onClick={() => requestSort('amount')} className="h-auto p-1 text-xs sm:text-sm">Amount {getSortIcon('amount')}</Button>
+                            <Button variant="ghost" onClick={() => handleSortChange('amount')} className="h-auto p-1 text-xs sm:text-sm">Amount {getSortIcon('amount')}</Button>
                       </TableHead>
                       <TableHead className="w-[50px] text-right">Actions</TableHead>
                   </TableRow>
@@ -297,7 +279,7 @@ export default function RecordRevenuePage() {
                     <TableCell className="text-right"><Skeleton className="h-8 w-8 ml-auto" /></TableCell>
                   </TableRow>
                 ))
-              ) : paginatedEntries.map(entry => (
+              ) : recentEntries.map(entry => (
                   <TableRow key={entry.id}>
                       <TableCell>{format(entry.date, 'PP')}</TableCell>
                       <TableCell className="font-medium">{entry.source}</TableCell>
@@ -317,26 +299,21 @@ export default function RecordRevenuePage() {
               ))}
               </TableBody>
           </Table>
-           {totalPages > 1 && (
-            <div className="flex items-center justify-between pt-4">
+           <div className="flex items-center justify-between pt-4">
               <div className="text-sm text-muted-foreground">
-                Showing <strong>{paginatedEntries.length}</strong> of <strong>{sortedEntries.length}</strong> revenue entries.
+                Page {currentPage}
               </div>
               <Pagination>
                 <PaginationContent>
                   <PaginationItem>
-                    <PaginationPrevious href="#" onClick={(e) => { e.preventDefault(); handlePageChange(currentPage - 1); }} className={currentPage === 1 ? 'pointer-events-none opacity-50' : ''} />
+                    <PaginationPrevious href="#" onClick={(e) => { e.preventDefault(); handlePageChange('prev'); }} className={currentPage === 1 ? 'pointer-events-none opacity-50' : ''} />
                   </PaginationItem>
                   <PaginationItem>
-                    <span className="text-sm p-2">Page {currentPage} of {totalPages}</span>
-                  </PaginationItem>
-                  <PaginationItem>
-                    <PaginationNext href="#" onClick={(e) => { e.preventDefault(); handlePageChange(currentPage + 1); }} className={currentPage === totalPages ? 'pointer-events-none opacity-50' : ''} />
+                    <PaginationNext href="#" onClick={(e) => { e.preventDefault(); handlePageChange('next'); }} className={recentEntries.length < RECORDS_PER_PAGE ? 'pointer-events-none opacity-50' : ''} />
                   </PaginationItem>
                 </PaginationContent>
               </Pagination>
             </div>
-          )}
         </CardContent>
       </Card>
       
@@ -401,5 +378,3 @@ export default function RecordRevenuePage() {
     </div>
   );
 }
-
-    

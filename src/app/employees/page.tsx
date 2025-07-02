@@ -14,11 +14,11 @@ import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger, DropdownMenuSeparator } from '@/components/ui/dropdown-menu';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
-import { Users2, PlusCircle, MoreHorizontal, Edit, Trash2, Loader2, Save, Camera, UploadCloud, FileText, XCircle, SwitchCamera, Upload, ArrowUp, ArrowDown, ChevronsUpDown, Search, ScanLine, Printer, Fingerprint, PenSquare, Download, Expand } from 'lucide-react';
+import { Users2, PlusCircle, MoreHorizontal, Edit, Trash2, Loader2, Save, Camera, UploadCloud, FileText, XCircle, SwitchCamera, Upload, ArrowUp, ArrowDown, ChevronsUpDown, ScanLine, Printer, Fingerprint, PenSquare, Download, Expand } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/contexts/AuthContext';
 import { db } from '@/lib/firebaseConfig';
-import { collection, doc, getDoc, getDocs, updateDoc, deleteDoc, query, where, orderBy, Timestamp, serverTimestamp } from 'firebase/firestore';
+import { collection, doc, getDoc, getDocs, updateDoc, deleteDoc, query, where, orderBy, Timestamp, serverTimestamp, limit, startAfter, endBefore, limitToLast, type QueryDocumentSnapshot, type DocumentData } from 'firebase/firestore';
 import { uploadFileToStorage, deleteFileFromStorage } from '@/lib/firebaseStorageUtils';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Badge } from '@/components/ui/badge';
@@ -81,7 +81,7 @@ interface EmployeeFirestore {
   signatureStoragePath?: string;
 }
 
-export interface EmployeeDisplay extends Omit<EmployeeFirestore, 'createdAt' | 'updatedAt' | 'companyId' | 'addedById' | 'dateOfBirth' | 'joiningDate'> {
+export interface EmployeeDisplay extends Omit<EmployeeFirestore, 'updatedAt' | 'companyId' | 'addedById' | 'dateOfBirth' | 'joiningDate'> {
   id: string;
   createdAt: Date;
   dateOfBirth?: Date;
@@ -143,9 +143,10 @@ export default function EmployeesPage() {
   const [isScanning, setIsScanning] = useState(false);
   const [isInitializingCamera, setIsInitializingCamera] = useState(false);
 
-  const [sortConfig, setSortConfig] = useState<{ key: keyof EmployeeDisplay; direction: 'ascending' | 'descending' }>({ key: 'createdAt', direction: 'descending' });
-  const [searchTerm, setSearchTerm] = useState('');
+  const [sortConfig, setSortConfig] = useState<{ key: keyof EmployeeDisplay; direction: 'desc' | 'asc' }>({ key: 'createdAt', direction: 'desc' });
   const [currentPage, setCurrentPage] = useState(1);
+  const [firstVisible, setFirstVisible] = useState<QueryDocumentSnapshot<DocumentData> | null>(null);
+  const [lastVisible, setLastVisible] = useState<QueryDocumentSnapshot<DocumentData> | null>(null);
 
   const bioDataPrintRef = useRef<HTMLDivElement>(null);
   const [isBioDataDialogOpen, setIsBioDataDialogOpen] = useState(false);
@@ -155,58 +156,91 @@ export default function EmployeesPage() {
   const [isPrinting, setIsPrinting] = useState(false);
   const [useLetterhead, setUseLetterhead] = useState(true);
 
-
-  const filteredEmployees = useMemo(() => {
-    if (!searchTerm) {
-      return employees;
+  const fetchEmployees = useCallback(async (direction: 'next' | 'prev' | 'reset' = 'reset') => {
+    if (authIsLoading || !user || !user.companyId) {
+      setIsLoadingEmployees(false);
+      setEmployees([]);
+      return;
     }
-    const lowercasedTerm = searchTerm.toLowerCase();
-    return employees.filter(employee =>
-        employee.name.toLowerCase().includes(lowercasedTerm) ||
-        employee.position.toLowerCase().includes(lowercasedTerm) ||
-        (employee.description && employee.description.toLowerCase().includes(lowercasedTerm))
-    );
-  }, [employees, searchTerm]);
+    setIsLoadingEmployees(true);
+    try {
+      const employeesRef = collection(db, 'employees');
+      
+      let q;
+      const baseQuery = [
+        where('companyId', '==', user.companyId),
+        orderBy(sortConfig.key, sortConfig.direction),
+      ];
 
+      if (sortConfig.key !== 'createdAt') {
+        baseQuery.push(orderBy('createdAt', sortConfig.direction));
+      }
 
-  const sortedEmployees = useMemo(() => {
-    let sortableItems = [...filteredEmployees];
-    if (sortConfig !== null) {
-      sortableItems.sort((a, b) => {
-        const aValue = a[sortConfig.key];
-        const bValue = b[sortConfig.key];
-        if (aValue === null || aValue === undefined) return 1;
-        if (bValue === null || bValue === undefined) return -1;
-        if (aValue < bValue) {
-          return sortConfig.direction === 'ascending' ? -1 : 1;
-        }
-        if (aValue > bValue) {
-          return sortConfig.direction === 'ascending' ? 1 : -1;
-        }
-        return 0;
+      if (direction === 'next' && lastVisible) {
+        q = query(employeesRef, ...baseQuery, startAfter(lastVisible), limit(RECORDS_PER_PAGE));
+      } else if (direction === 'prev' && firstVisible) {
+        q = query(employeesRef, ...baseQuery, endBefore(firstVisible), limitToLast(RECORDS_PER_PAGE));
+      } else { // reset
+        q = query(employeesRef, ...baseQuery, limit(RECORDS_PER_PAGE));
+      }
+
+      const querySnapshot = await getDocs(q);
+      
+      const fetchedEmployees = querySnapshot.docs.map(docSnap => {
+        const data = docSnap.data() as Omit<EmployeeFirestore, 'id'>;
+        return {
+          id: docSnap.id,
+          ...data,
+          createdAt: data.createdAt.toDate(),
+          dateOfBirth: data.dateOfBirth?.toDate(),
+          joiningDate: data.joiningDate?.toDate(),
+        } as EmployeeDisplay;
       });
+      setEmployees(fetchedEmployees);
+      
+      if (querySnapshot.docs.length > 0) {
+        setFirstVisible(querySnapshot.docs[0]);
+        setLastVisible(querySnapshot.docs[querySnapshot.docs.length - 1]);
+      }
+
+    } catch (error: any) {
+      console.error('Error fetching employees:', error);
+      toast({ title: 'Error Loading Employees', description: error.message, variant: 'destructive' });
+    } finally {
+      setIsLoadingEmployees(false);
     }
-    return sortableItems;
-  }, [filteredEmployees, sortConfig]);
+  }, [user, authIsLoading, toast, sortConfig, lastVisible, firstVisible]);
 
-  const paginatedEmployees = useMemo(() => {
-    const startIndex = (currentPage - 1) * RECORDS_PER_PAGE;
-    return sortedEmployees.slice(startIndex, startIndex + RECORDS_PER_PAGE);
-  }, [sortedEmployees, currentPage]);
-
-  const totalPages = Math.ceil(sortedEmployees.length / RECORDS_PER_PAGE);
-
-  const handlePageChange = (page: number) => {
-    if (page >= 1 && page <= totalPages) {
-      setCurrentPage(page);
+  useEffect(() => {
+    if (!authIsLoading) {
+      handleSortChange('createdAt');
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [user, authIsLoading]);
+
+  useEffect(() => {
+    if (!authIsLoading && user) {
+        fetchEmployees('reset');
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [sortConfig]);
+  
+  const handlePageChange = (direction: 'next' | 'prev') => {
+    let newPage = currentPage;
+    if (direction === 'next') newPage++;
+    if (direction === 'prev' && currentPage > 1) newPage--;
+    setCurrentPage(newPage);
+    fetchEmployees(direction);
   };
-
-  const requestSort = (key: keyof EmployeeDisplay) => {
-    let direction: 'ascending' | 'descending' = 'ascending';
-    if (sortConfig.key === key && sortConfig.direction === 'ascending') {
-      direction = 'descending';
+  
+  const handleSortChange = (key: keyof EmployeeDisplay) => {
+    let direction: 'desc' | 'asc' = 'desc';
+    if (sortConfig.key === key && sortConfig.direction === 'desc') {
+      direction = 'asc';
     }
+    setCurrentPage(1);
+    setFirstVisible(null);
+    setLastVisible(null);
     setSortConfig({ key, direction });
   };
   
@@ -214,7 +248,7 @@ export default function EmployeesPage() {
     if (sortConfig.key !== key) {
         return <ChevronsUpDown className="ml-2 h-4 w-4 text-muted-foreground/50" />;
     }
-    if (sortConfig.direction === 'ascending') {
+    if (sortConfig.direction === 'asc') {
         return <ArrowUp className="ml-2 h-4 w-4" />;
     }
     return <ArrowDown className="ml-2 h-4 w-4" />;
@@ -315,39 +349,6 @@ export default function EmployeesPage() {
       getCameraPermission();
       return () => { if(isScanDialogOpen) cleanupWebcam()};
   }, [isScanDialogOpen, cleanupWebcam, toast, showProfileWebcam]);
-
-
-  const fetchEmployees = useCallback(async () => {
-    if (authIsLoading) { setIsLoadingEmployees(true); return; }
-    if (!user || !user.companyId) { setIsLoadingEmployees(false); setEmployees([]); return; }
-    setIsLoadingEmployees(true);
-    try {
-      const employeesRef = collection(db, 'employees');
-      const q = query(employeesRef, where('companyId', '==', user.companyId));
-      const querySnapshot = await getDocs(q);
-      
-      const fetchedEmployees = querySnapshot.docs.map(docSnap => {
-        const data = docSnap.data() as Omit<EmployeeFirestore, 'id'>;
-        return {
-          id: docSnap.id,
-          ...data,
-          createdAt: data.createdAt.toDate(),
-          dateOfBirth: data.dateOfBirth?.toDate(),
-          joiningDate: data.joiningDate?.toDate(),
-        } as EmployeeDisplay;
-      });
-      setEmployees(fetchedEmployees);
-    } catch (error: any) {
-      console.error('Error fetching employees:', error);
-      toast({ title: 'Error Loading Employees', description: error.message, variant: 'destructive' });
-    } finally {
-      setIsLoadingEmployees(false);
-    }
-  }, [user, authIsLoading, toast]);
-
-  useEffect(() => {
-    fetchEmployees();
-  }, [fetchEmployees]);
   
   const resetEditFormState = useCallback(() => {
     setIsEditDialogOpen(false);
@@ -408,7 +409,7 @@ export default function EmployeesPage() {
 
         await updateDoc(employeeRef, dataToSave);
         toast({ title: "Employee Updated" });
-        fetchEmployees();
+        fetchEmployees('reset');
         resetEditFormState();
     } catch (error: any) {
         toast({ title: "Save Failed", description: error.message, variant: "destructive" });
@@ -453,7 +454,7 @@ export default function EmployeesPage() {
       }
       await deleteDoc(doc(db, 'employees', employeeToDeleteId));
       toast({ title: "Employee Deleted", variant: "destructive"});
-      fetchEmployees();
+      fetchEmployees('reset');
     } catch (error: any) {
       toast({ title: "Delete Failed", description: error.message, variant: "destructive"});
     } finally {
@@ -588,7 +589,7 @@ export default function EmployeesPage() {
     setIsImporting(true);
     const result = await bulkAddEmployees(editableParsedEmployees, user.companyId, user.uid, user.displayName || user.email || 'System');
     toast({ title: result.success ? 'Import Successful' : 'Import Failed', description: result.message, variant: result.success ? 'default' : 'destructive'});
-    if (result.success) { fetchEmployees(); setIsImportDialogOpen(false); setEditableParsedEmployees([]); }
+    if (result.success) { fetchEmployees('reset'); setIsImportDialogOpen(false); setEditableParsedEmployees([]); }
     setIsImporting(false);
   };
 
@@ -747,20 +748,14 @@ export default function EmployeesPage() {
                 <input type="file" ref={fileInputRef} onChange={handleImportFileChange} className="hidden" accept=".xlsx, .xls, .csv" />
             </div>
           </div>
-          <div className="mt-4">
-            <div className="relative w-full max-w-sm">
-                <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
-                <Input type="search" placeholder="Search by name, position..." className="pl-8" value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} disabled={isLoadingEmployees}/>
-            </div>
-          </div>
         </CardHeader>
         <CardContent>
           <Table>
-            <TableCaption>{!isLoadingEmployees && sortedEmployees.length === 0 ? (searchTerm ? "No employees match your search." : "No employees found.") : "A list of your employees."}</TableCaption>
-            <TableHeader><TableRow><TableHead className="w-[60px]">Avatar</TableHead><TableHead><Button variant="ghost" onClick={() => requestSort('name')} className="-ml-4 h-auto p-1 text-xs sm:text-sm">Name {getSortIcon('name')}</Button></TableHead><TableHead><Button variant="ghost" onClick={() => requestSort('position')} className="-ml-4 h-auto p-1 text-xs sm:text-sm">Position {getSortIcon('position')}</Button></TableHead><TableHead>Description</TableHead><TableHead className="text-right"><Button variant="ghost" onClick={() => requestSort('salary')} className="h-auto p-1 text-xs sm:text-sm">Salary {getSortIcon('salary')}</Button></TableHead><TableHead>File</TableHead><TableHead className="text-right w-[100px]">Actions</TableHead></TableRow></TableHeader>
+            <TableCaption>{!isLoadingEmployees && employees.length === 0 ? "No employees found." : `Page ${currentPage} of employees.`}</TableCaption>
+            <TableHeader><TableRow><TableHead className="w-[60px]">Avatar</TableHead><TableHead><Button variant="ghost" onClick={() => handleSortChange('name')} className="-ml-4 h-auto p-1 text-xs sm:text-sm">Name {getSortIcon('name')}</Button></TableHead><TableHead><Button variant="ghost" onClick={() => handleSortChange('position')} className="-ml-4 h-auto p-1 text-xs sm:text-sm">Position {getSortIcon('position')}</Button></TableHead><TableHead>Description</TableHead><TableHead className="text-right"><Button variant="ghost" onClick={() => handleSortChange('salary')} className="h-auto p-1 text-xs sm:text-sm">Salary {getSortIcon('salary')}</Button></TableHead><TableHead>File</TableHead><TableHead className="text-right w-[100px]">Actions</TableHead></TableRow></TableHeader>
             <TableBody>
-              {isLoadingEmployees && paginatedEmployees.length === 0 && ([...Array(3)].map((_, i) => (<TableRow key={`skel-${i}`}><TableCell><Skeleton className="h-10 w-10 rounded-full" /></TableCell><TableCell><Skeleton className="h-4 w-3/4" /></TableCell><TableCell><Skeleton className="h-4 w-1/2" /></TableCell><TableCell><Skeleton className="h-4 w-3/4" /></TableCell><TableCell className="text-right"><Skeleton className="h-4 w-1/4 ml-auto" /></TableCell><TableCell><Skeleton className="h-4 w-1/2" /></TableCell><TableCell className="text-right"><Skeleton className="h-8 w-8 ml-auto" /></TableCell></TableRow>)))}
-              {!isLoadingEmployees && paginatedEmployees.map((employee) => (
+              {isLoadingEmployees && employees.length === 0 && ([...Array(3)].map((_, i) => (<TableRow key={`skel-${i}`}><TableCell><Skeleton className="h-10 w-10 rounded-full" /></TableCell><TableCell><Skeleton className="h-4 w-3/4" /></TableCell><TableCell><Skeleton className="h-4 w-1/2" /></TableCell><TableCell><Skeleton className="h-4 w-3/4" /></TableCell><TableCell className="text-right"><Skeleton className="h-4 w-1/4 ml-auto" /></TableCell><TableCell><Skeleton className="h-4 w-1/2" /></TableCell><TableCell className="text-right"><Skeleton className="h-8 w-8 ml-auto" /></TableCell></TableRow>)))}
+              {!isLoadingEmployees && employees.map((employee) => (
                 <TableRow key={employee.id}>
                   <TableCell><Avatar className="h-10 w-10"><AvatarImage src={employee.profilePictureUrl || `https://placehold.co/40x40.png?text=${getInitials(employee.name)}`} alt={employee.name} data-ai-hint="person portrait" /><AvatarFallback>{getInitials(employee.name)}</AvatarFallback></Avatar></TableCell>
                   <TableCell className="font-medium">{employee.name}</TableCell>
@@ -773,31 +768,29 @@ export default function EmployeesPage() {
               ))}
             </TableBody>
           </Table>
-          {totalPages > 1 && (
             <div className="flex items-center justify-between pt-4">
                 <div className="text-sm text-muted-foreground">
-                    Page {currentPage} of {totalPages}
+                    Page {currentPage}
                 </div>
                 <Pagination>
                     <PaginationContent>
                         <PaginationItem>
                             <PaginationPrevious
                                 href="#"
-                                onClick={(e) => { e.preventDefault(); handlePageChange(currentPage - 1); }}
+                                onClick={(e) => { e.preventDefault(); handlePageChange('prev'); }}
                                 className={currentPage === 1 ? 'pointer-events-none opacity-50' : undefined}
                             />
                         </PaginationItem>
                         <PaginationItem>
                             <PaginationNext
                                 href="#"
-                                onClick={(e) => { e.preventDefault(); handlePageChange(currentPage + 1); }}
-                                className={currentPage === totalPages ? 'pointer-events-none opacity-50' : undefined}
+                                onClick={(e) => { e.preventDefault(); handlePageChange('next'); }}
+                                className={employees.length < RECORDS_PER_PAGE ? 'pointer-events-none opacity-50' : undefined}
                             />
                         </PaginationItem>
                     </PaginationContent>
                 </Pagination>
             </div>
-          )}
         </CardContent>
       </Card>
 

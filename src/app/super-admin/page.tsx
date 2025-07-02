@@ -1,10 +1,10 @@
 
 'use client';
 
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { db } from '@/lib/firebaseConfig';
-import { collection, query, getDocs, orderBy, Timestamp } from 'firebase/firestore';
+import { collection, query, getDocs, orderBy, Timestamp, limit, startAfter, endBefore, limitToLast, type QueryDocumentSnapshot, type DocumentData } from 'firebase/firestore';
 import PageTitle from '@/components/PageTitle';
 import DataCard from '@/components/DataCard';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
@@ -47,11 +47,78 @@ const getInitials = (name: string = "") => {
 export default function SuperAdminPage() {
   const { user, isLoading: authLoading } = useAuth();
   const [companies, setCompanies] = useState<Company[]>([]);
+  const [totalCompanies, setTotalCompanies] = useState(0);
   const [employees, setEmployees] = useState<Employee[]>([]);
+  const [totalEmployees, setTotalEmployees] = useState(0);
   const [isLoadingData, setIsLoadingData] = useState(true);
 
   const [companiesPage, setCompaniesPage] = useState(1);
+  const [companiesFirstVisible, setCompaniesFirstVisible] = useState<QueryDocumentSnapshot | null>(null);
+  const [companiesLastVisible, setCompaniesLastVisible] = useState<QueryDocumentSnapshot | null>(null);
+
   const [employeesPage, setEmployeesPage] = useState(1);
+  const [employeesFirstVisible, setEmployeesFirstVisible] = useState<QueryDocumentSnapshot | null>(null);
+  const [employeesLastVisible, setEmployeesLastVisible] = useState<QueryDocumentSnapshot | null>(null);
+
+
+  const fetchPaginatedData = useCallback(async (
+    collectionName: string,
+    orderByField: string,
+    page: number,
+    direction: 'next' | 'prev' | 'reset',
+    firstVisible: QueryDocumentSnapshot | null,
+    lastVisible: QueryDocumentSnapshot | null,
+    setData: React.Dispatch<React.SetStateAction<any[]>>,
+    setFirst: React.Dispatch<React.SetStateAction<QueryDocumentSnapshot | null>>,
+    setLast: React.Dispatch<React.SetStateAction<QueryDocumentSnapshot | null>>
+  ) => {
+    let q;
+    const baseQuery = [orderBy(orderByField, 'desc')];
+    const collectionRef = collection(db, collectionName);
+
+    if (direction === 'next' && lastVisible) {
+      q = query(collectionRef, ...baseQuery, startAfter(lastVisible), limit(RECORDS_PER_PAGE));
+    } else if (direction === 'prev' && firstVisible) {
+      q = query(collectionRef, ...baseQuery, endBefore(firstVisible), limitToLast(RECORDS_PER_PAGE));
+    } else {
+      q = query(collectionRef, ...baseQuery, limit(RECORDS_PER_PAGE));
+    }
+
+    const snapshot = await getDocs(q);
+    const fetchedData = snapshot.docs.map(doc => ({
+      id: doc.id,
+      ...doc.data(),
+      createdAt: (doc.data().createdAt as Timestamp).toDate(),
+    }));
+    
+    if (fetchedData.length > 0) {
+      setData(fetchedData);
+      setFirst(snapshot.docs[0]);
+      setLast(snapshot.docs[snapshot.docs.length - 1]);
+    }
+
+    return fetchedData;
+  }, []);
+
+  const handleCompaniesPageChange = async (direction: 'next' | 'prev') => {
+    await fetchPaginatedData('companyProfiles', 'createdAt', companiesPage, direction, companiesFirstVisible, companiesLastVisible, setCompanies, setCompaniesFirstVisible, setCompaniesLastVisible);
+    setCompaniesPage(p => direction === 'next' ? p + 1 : p - 1);
+  };
+  
+  const handleEmployeesPageChange = async (direction: 'next' | 'prev') => {
+    const fetchedEmployees = await fetchPaginatedData('employees', 'createdAt', employeesPage, direction, employeesFirstVisible, employeesLastVisible, setEmployees, setEmployeesFirstVisible, setEmployeesLastVisible);
+    setEmployeesPage(p => direction === 'next' ? p + 1 : p - 1);
+    
+    // Enrich employees with company names
+    const companyIds = [...new Set(fetchedEmployees.map(e => e.companyId))];
+    if (companyIds.length > 0) {
+      const companiesQuery = query(collection(db, 'companyProfiles'), where('__name__', 'in', companyIds));
+      const companiesSnapshot = await getDocs(companiesQuery);
+      const companyMap = new Map(companiesSnapshot.docs.map(doc => [doc.id, doc.data().name]));
+      setEmployees(prev => prev.map(e => ({...e, companyName: companyMap.get(e.companyId) || 'Unknown'})));
+    }
+  };
+
 
   useEffect(() => {
     if (!user?.isSuperAdmin) {
@@ -62,23 +129,32 @@ export default function SuperAdminPage() {
     const fetchData = async () => {
       setIsLoadingData(true);
       try {
-        const companiesQuery = query(collection(db, 'companyProfiles'), orderBy('createdAt', 'desc'));
-        const employeesQuery = query(collection(db, 'employees'), orderBy('createdAt', 'desc'));
+        const companiesCol = collection(db, 'companyProfiles');
+        const employeesCol = collection(db, 'employees');
 
-        const [companiesSnapshot, employeesSnapshot] = await Promise.all([
-          getDocs(companiesQuery),
-          getDocs(employeesQuery)
+        const [companiesSnapshot, employeesSnapshot, allCompanies, allEmployees] = await Promise.all([
+            getDocs(query(companiesCol, orderBy('createdAt', 'desc'), limit(RECORDS_PER_PAGE))),
+            getDocs(query(employeesCol, orderBy('createdAt', 'desc'), limit(RECORDS_PER_PAGE))),
+            getDocs(query(companiesCol)), // For total count
+            getDocs(query(employeesCol)) // For total count
         ]);
 
-        const fetchedCompanies = companiesSnapshot.docs.map(doc => ({
-          id: doc.id,
-          ...doc.data(),
-          createdAt: (doc.data().createdAt as Timestamp).toDate(),
-        } as Company));
+        setTotalCompanies(allCompanies.size);
+        setTotalEmployees(allEmployees.size);
+
+        if (companiesSnapshot.docs.length > 0) {
+            setCompaniesFirstVisible(companiesSnapshot.docs[0]);
+            setCompaniesLastVisible(companiesSnapshot.docs[companiesSnapshot.docs.length - 1]);
+        }
+        const fetchedCompanies = companiesSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data(), createdAt: (doc.data().createdAt as Timestamp).toDate() } as Company));
         setCompanies(fetchedCompanies);
 
         const companyMap = new Map(fetchedCompanies.map(c => [c.id, c.name]));
 
+        if (employeesSnapshot.docs.length > 0) {
+            setEmployeesFirstVisible(employeesSnapshot.docs[0]);
+            setEmployeesLastVisible(employeesSnapshot.docs[employeesSnapshot.docs.length - 1]);
+        }
         const fetchedEmployees = employeesSnapshot.docs.map(doc => {
           const data = doc.data();
           return {
@@ -101,19 +177,6 @@ export default function SuperAdminPage() {
         fetchData();
     }
   }, [user]);
-
-  // Pagination logic
-  const paginatedCompanies = useMemo(() => {
-    const startIndex = (companiesPage - 1) * RECORDS_PER_PAGE;
-    return companies.slice(startIndex, startIndex + RECORDS_PER_PAGE);
-  }, [companies, companiesPage]);
-  const totalCompanyPages = Math.ceil(companies.length / RECORDS_PER_PAGE);
-
-  const paginatedEmployees = useMemo(() => {
-    const startIndex = (employeesPage - 1) * RECORDS_PER_PAGE;
-    return employees.slice(startIndex, startIndex + RECORDS_PER_PAGE);
-  }, [employees, employeesPage]);
-  const totalEmployeePages = Math.ceil(employees.length / RECORDS_PER_PAGE);
 
 
   if (authLoading || (!user && !authLoading)) {
@@ -151,8 +214,8 @@ export default function SuperAdminPage() {
          </div>
       ) : (
         <div className="grid gap-6 md:grid-cols-2">
-            <DataCard title="Total Companies" value={companies.length.toLocaleString()} icon={Building} />
-            <DataCard title="Total Employees" value={employees.length.toLocaleString()} icon={Users} />
+            <DataCard title="Total Companies" value={totalCompanies.toLocaleString()} icon={Building} />
+            <DataCard title="Total Employees" value={totalEmployees.toLocaleString()} icon={Users} />
         </div>
       )}
       
@@ -180,7 +243,7 @@ export default function SuperAdminPage() {
                         <TableCell><Skeleton className="h-4 w-24" /></TableCell>
                     </TableRow>
                 ))
-              ) : paginatedCompanies.length > 0 ? paginatedCompanies.map(company => (
+              ) : companies.length > 0 ? companies.map(company => (
                 <TableRow key={company.id}>
                   <TableCell className="font-medium">{company.name}</TableCell>
                   <TableCell>{company.email}</TableCell>
@@ -191,19 +254,17 @@ export default function SuperAdminPage() {
               )}
             </TableBody>
           </Table>
-           {totalCompanyPages > 1 && (
             <div className="flex items-center justify-between pt-4">
                 <div className="text-sm text-muted-foreground">
-                    Page {companiesPage} of {totalCompanyPages}
+                    Page {companiesPage}
                 </div>
                 <Pagination>
                     <PaginationContent>
-                        <PaginationItem><PaginationPrevious href="#" onClick={(e) => {e.preventDefault(); setCompaniesPage(p => Math.max(p - 1, 1))}} className={companiesPage === 1 ? 'pointer-events-none opacity-50' : ''}/></PaginationItem>
-                        <PaginationItem><PaginationNext href="#" onClick={(e) => {e.preventDefault(); setCompaniesPage(p => Math.min(p + 1, totalCompanyPages))}} className={companiesPage === totalCompanyPages ? 'pointer-events-none opacity-50' : ''}/></PaginationItem>
+                        <PaginationItem><PaginationPrevious href="#" onClick={(e) => {e.preventDefault(); handleCompaniesPageChange('prev')}} className={companiesPage === 1 ? 'pointer-events-none opacity-50' : ''}/></PaginationItem>
+                        <PaginationItem><PaginationNext href="#" onClick={(e) => {e.preventDefault(); handleCompaniesPageChange('next')}} className={companies.length < RECORDS_PER_PAGE ? 'pointer-events-none opacity-50' : ''}/></PaginationItem>
                     </PaginationContent>
                 </Pagination>
             </div>
-            )}
         </CardContent>
       </Card>
 
@@ -232,7 +293,7 @@ export default function SuperAdminPage() {
                         <TableCell><Skeleton className="h-4 w-24" /></TableCell>
                     </TableRow>
                 ))
-              ) : paginatedEmployees.length > 0 ? paginatedEmployees.map(employee => (
+              ) : employees.length > 0 ? employees.map(employee => (
                 <TableRow key={employee.id}>
                   <TableCell>
                     <div className="flex items-center gap-2">
@@ -252,19 +313,17 @@ export default function SuperAdminPage() {
               )}
             </TableBody>
           </Table>
-           {totalEmployeePages > 1 && (
             <div className="flex items-center justify-between pt-4">
                 <div className="text-sm text-muted-foreground">
-                    Page {employeesPage} of {totalEmployeePages}
+                    Page {employeesPage}
                 </div>
                 <Pagination>
                     <PaginationContent>
-                        <PaginationItem><PaginationPrevious href="#" onClick={(e) => {e.preventDefault(); setEmployeesPage(p => Math.max(p - 1, 1))}} className={employeesPage === 1 ? 'pointer-events-none opacity-50' : ''}/></PaginationItem>
-                        <PaginationItem><PaginationNext href="#" onClick={(e) => {e.preventDefault(); setEmployeesPage(p => Math.min(p + 1, totalEmployeePages))}} className={employeesPage === totalEmployeePages ? 'pointer-events-none opacity-50' : ''}/></PaginationItem>
+                        <PaginationItem><PaginationPrevious href="#" onClick={(e) => {e.preventDefault(); handleEmployeesPageChange('prev')}} className={employeesPage === 1 ? 'pointer-events-none opacity-50' : ''}/></PaginationItem>
+                        <PaginationItem><PaginationNext href="#" onClick={(e) => {e.preventDefault(); handleEmployeesPageChange('next')}} className={employees.length < RECORDS_PER_PAGE ? 'pointer-events-none opacity-50' : ''}/></PaginationItem>
                     </PaginationContent>
                 </Pagination>
             </div>
-            )}
         </CardContent>
       </Card>
     </div>

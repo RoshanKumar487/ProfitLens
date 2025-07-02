@@ -17,12 +17,12 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigge
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow, TableCaption } from '@/components/ui/table';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { CalendarIcon, TrendingDown, Save, Loader2, MoreHorizontal, Edit, Trash2, Search, Upload, PlusCircle, ScanLine, Camera, ArrowUp, ArrowDown, ChevronsUpDown } from 'lucide-react';
+import { CalendarIcon, TrendingDown, Save, Loader2, MoreHorizontal, Edit, Trash2, Upload, PlusCircle, ScanLine, Camera, ArrowUp, ArrowDown, ChevronsUpDown } from 'lucide-react';
 import { format } from 'date-fns';
 import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/contexts/AuthContext';
 import { db } from '@/lib/firebaseConfig';
-import { collection, addDoc, getDocs, query, where, orderBy, Timestamp, serverTimestamp } from 'firebase/firestore';
+import { collection, getDocs, query, where, orderBy, Timestamp, limit, startAfter, endBefore, limitToLast, type QueryDocumentSnapshot, type DocumentData } from 'firebase/firestore';
 import * as xlsx from 'xlsx';
 import { updateExpenseEntry, deleteExpenseEntry, type ExpenseUpdateData, bulkAddExpenses, type ExpenseImportData } from './actions';
 import { analyzeReceipt } from '@/ai/flows/analyze-receipt-flow';
@@ -64,6 +64,7 @@ interface ExpenseEntryDisplay {
   description?: string;
   vendor?: string;
   addedBy: string;
+  createdAt: Timestamp;
 }
 
 const RECORDS_PER_PAGE = 20;
@@ -77,9 +78,10 @@ export default function RecordExpensesPage() {
   const [isSaving, setIsSaving] = useState(false);
   const { toast } = useToast();
   
-  const [searchTerm, setSearchTerm] = useState<string>('');
-  const [sortConfig, setSortConfig] = useState<{ key: keyof ExpenseEntryDisplay; direction: 'ascending' | 'descending' }>({ key: 'date', direction: 'descending' });
+  const [sortConfig, setSortConfig] = useState<{ key: keyof ExpenseEntryDisplay; direction: 'desc' | 'asc' }>({ key: 'date', direction: 'desc' });
   const [currentPage, setCurrentPage] = useState(1);
+  const [firstVisible, setFirstVisible] = useState<QueryDocumentSnapshot<DocumentData> | null>(null);
+  const [lastVisible, setLastVisible] = useState<QueryDocumentSnapshot<DocumentData> | null>(null);
 
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
   const [currentExpense, setCurrentExpense] = useState<ExpenseEntryDisplay | null>(null);
@@ -99,21 +101,34 @@ export default function RecordExpensesPage() {
   const videoRef = useRef<HTMLVideoElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
 
-
-  const fetchExpenseEntries = useCallback(async () => {
-    if (authIsLoading) return;
-    if (!user || !user.companyId) {
+  const fetchExpenseEntries = useCallback(async (direction: 'next' | 'prev' | 'reset' = 'reset') => {
+    if (authIsLoading || !user || !user.companyId) {
       setIsLoadingEntries(false);
       setRecentEntries([]);
       return;
     }
-
     setIsLoadingEntries(true);
     try {
       const entriesRef = collection(db, 'expenses');
-      const q = query(entriesRef, where('companyId', '==', user.companyId), orderBy('date', 'desc'));
-      const querySnapshot = await getDocs(q);
+      let q;
+
+      const baseQuery = [
+        where('companyId', '==', user.companyId),
+        orderBy(sortConfig.key, sortConfig.direction),
+      ];
+      if (sortConfig.key !== 'createdAt') {
+        baseQuery.push(orderBy('createdAt', sortConfig.direction));
+      }
       
+      if (direction === 'next' && lastVisible) {
+        q = query(entriesRef, ...baseQuery, startAfter(lastVisible), limit(RECORDS_PER_PAGE));
+      } else if (direction === 'prev' && firstVisible) {
+        q = query(entriesRef, ...baseQuery, endBefore(firstVisible), limitToLast(RECORDS_PER_PAGE));
+      } else { // reset
+        q = query(entriesRef, ...baseQuery, limit(RECORDS_PER_PAGE));
+      }
+
+      const querySnapshot = await getDocs(q);
       const fetchedEntries = querySnapshot.docs.map(docSnap => {
         const data = docSnap.data() as Omit<ExpenseEntryFirestore, 'id'>;
         return {
@@ -124,80 +139,61 @@ export default function RecordExpensesPage() {
           description: data.description || '',
           vendor: data.vendor || '',
           addedBy: data.addedBy || 'N/A',
+          createdAt: data.createdAt,
         };
       });
       setRecentEntries(fetchedEntries);
+
+      if (querySnapshot.docs.length > 0) {
+        setFirstVisible(querySnapshot.docs[0]);
+        setLastVisible(querySnapshot.docs[querySnapshot.docs.length - 1]);
+      }
     } catch (error: any) {
       console.error('Error fetching expense entries:', error);
       toast({ title: 'Error Loading Entries', description: error.message, variant: 'destructive' });
     } finally {
       setIsLoadingEntries(false);
     }
-  }, [user, authIsLoading, toast]);
+  }, [user, authIsLoading, toast, sortConfig, lastVisible, firstVisible]);
 
   useEffect(() => {
-    fetchExpenseEntries();
-  }, [fetchExpenseEntries]);
-
-  const filteredEntries = useMemo(() => {
-    if (!searchTerm) {
-      return recentEntries;
+    if (!authIsLoading) {
+      handleSortChange('date');
     }
-    const lowercasedTerm = searchTerm.toLowerCase();
-    return recentEntries.filter(entry => 
-      entry.category.toLowerCase().includes(lowercasedTerm) ||
-      (entry.vendor && entry.vendor.toLowerCase().includes(lowercasedTerm)) ||
-      (entry.description && entry.description.toLowerCase().includes(lowercasedTerm))
-    );
-  }, [recentEntries, searchTerm]);
-
-  const sortedEntries = useMemo(() => {
-    let sortableItems = [...filteredEntries];
-    if (sortConfig !== null) {
-        sortableItems.sort((a, b) => {
-            const aValue = a[sortConfig.key];
-            const bValue = b[sortConfig.key];
-            if (aValue === null || aValue === undefined) return 1;
-            if (bValue === null || bValue === undefined) return -1;
-            if (aValue < bValue) {
-                return sortConfig.direction === 'ascending' ? -1 : 1;
-            }
-            if (aValue > bValue) {
-                return sortConfig.direction === 'ascending' ? 1 : -1;
-            }
-            return 0;
-        });
-    }
-    return sortableItems;
-  }, [filteredEntries, sortConfig]);
-
-  const paginatedEntries = useMemo(() => {
-    const startIndex = (currentPage - 1) * RECORDS_PER_PAGE;
-    return sortedEntries.slice(startIndex, startIndex + RECORDS_PER_PAGE);
-  }, [sortedEntries, currentPage]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [user, authIsLoading]);
   
-  const totalPages = Math.ceil(sortedEntries.length / RECORDS_PER_PAGE);
-
-  const handlePageChange = (page: number) => {
-    if (page >= 1 && page <= totalPages) {
-      setCurrentPage(page);
+  useEffect(() => {
+    if (!authIsLoading && user) {
+        fetchExpenseEntries('reset');
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [sortConfig]);
+  
+  const handlePageChange = (direction: 'next' | 'prev') => {
+    let newPage = currentPage;
+    if (direction === 'next') newPage++;
+    if (direction === 'prev' && currentPage > 1) newPage--;
+    setCurrentPage(newPage);
+    fetchExpenseEntries(direction);
   };
-
-  const requestSort = (key: keyof ExpenseEntryDisplay) => {
-      let direction: 'ascending' | 'descending' = 'ascending';
-      if (sortConfig.key === key && sortConfig.direction === 'ascending') {
-          direction = 'descending';
+  
+  const handleSortChange = (key: keyof ExpenseEntryDisplay) => {
+      let direction: 'desc' | 'asc' = 'desc';
+      if (sortConfig.key === key && sortConfig.direction === 'desc') {
+          direction = 'asc';
       }
-      setSortConfig({ key, direction });
       setCurrentPage(1);
+      setFirstVisible(null);
+      setLastVisible(null);
+      setSortConfig({ key, direction });
   };
   
   const getSortIcon = (key: keyof ExpenseEntryDisplay) => {
       if (sortConfig.key !== key) {
           return <ChevronsUpDown className="ml-2 h-4 w-4 text-muted-foreground/50" />;
       }
-      if (sortConfig.direction === 'ascending') {
+      if (sortConfig.direction === 'asc') {
           return <ArrowUp className="ml-2 h-4 w-4" />;
       }
       return <ArrowDown className="ml-2 h-4 w-4" />;
@@ -236,7 +232,7 @@ export default function RecordExpensesPage() {
     
     if (result.success) {
         setIsEditDialogOpen(false);
-        fetchExpenseEntries();
+        fetchExpenseEntries('reset');
     }
     setIsSaving(false);
   };
@@ -253,7 +249,7 @@ export default function RecordExpensesPage() {
     toast({ title: result.success ? 'Success' : 'Error', description: result.message, variant: result.success ? 'default' : 'destructive' });
     
     if (result.success) {
-      fetchExpenseEntries();
+      fetchExpenseEntries('reset');
     }
     setExpenseToDeleteId(null);
     setIsDeleteDialogOpen(false);
@@ -329,7 +325,7 @@ export default function RecordExpensesPage() {
     toast({ title: result.success ? 'Import Successful' : 'Import Failed', description: result.message, variant: result.success ? 'default' : 'destructive'});
 
     if (result.success) {
-        fetchExpenseEntries();
+        fetchExpenseEntries('reset');
         setIsImportDialogOpen(false);
         setParsedExpenses([]);
     }
@@ -491,39 +487,24 @@ export default function RecordExpensesPage() {
 
       <Card className="shadow-lg">
         <CardHeader>
-          <div className="flex flex-col sm:flex-row items-center gap-2 justify-between">
-              <div className="flex-1">
-                  <CardTitle className="font-headline">Expense History</CardTitle>
-                  <CardDescription>A list of your recorded expense entries.</CardDescription>
-              </div>
-              <div className="relative w-full sm:w-auto">
-                  <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
-                  <Input
-                  type="search"
-                  placeholder="Filter by category, vendor..."
-                  className="pl-8 sm:w-[200px] md:w-[250px]"
-                  value={searchTerm}
-                  onChange={(e) => setSearchTerm(e.target.value)}
-                  disabled={isLoadingEntries && recentEntries.length === 0}
-                  />
-              </div>
-          </div>
+            <CardTitle className="font-headline">Expense History</CardTitle>
+            <CardDescription>A list of your recorded expense entries.</CardDescription>
         </CardHeader>
         <CardContent>
           <Table>
-            <TableCaption>{!isLoadingEntries && sortedEntries.length === 0 && (searchTerm ? "No expenses match your search." : 'No expenses recorded yet. Click "Record Expense" to start.')}</TableCaption>
+            <TableCaption>{!isLoadingEntries && recentEntries.length === 0 ? 'No expenses recorded yet.' : `Page ${currentPage} of expenses.`}</TableCaption>
             <TableHeader>
               <TableRow>
                 <TableHead>
-                    <Button variant="ghost" onClick={() => requestSort('date')} className="-ml-4 h-auto p-1 text-xs sm:text-sm">Date {getSortIcon('date')}</Button>
+                    <Button variant="ghost" onClick={() => handleSortChange('date')} className="-ml-4 h-auto p-1 text-xs sm:text-sm">Date {getSortIcon('date')}</Button>
                 </TableHead>
                 <TableHead>
-                    <Button variant="ghost" onClick={() => requestSort('category')} className="-ml-4 h-auto p-1 text-xs sm:text-sm">Category/Vendor {getSortIcon('category')}</Button>
+                    <Button variant="ghost" onClick={() => handleSortChange('category')} className="-ml-4 h-auto p-1 text-xs sm:text-sm">Category/Vendor {getSortIcon('category')}</Button>
                 </TableHead>
                 <TableHead>Description</TableHead>
                 <TableHead>Added By</TableHead>
                 <TableHead className="text-right">
-                    <Button variant="ghost" onClick={() => requestSort('amount')} className="h-auto p-1 text-xs sm:text-sm">Amount {getSortIcon('amount')}</Button>
+                    <Button variant="ghost" onClick={() => handleSortChange('amount')} className="h-auto p-1 text-xs sm:text-sm">Amount {getSortIcon('amount')}</Button>
                 </TableHead>
                 <TableHead className="w-[50px] text-right">Actions</TableHead>
               </TableRow>
@@ -540,7 +521,7 @@ export default function RecordExpensesPage() {
                     <TableCell className="text-right"><Skeleton className="h-8 w-8 ml-auto" /></TableCell>
                   </TableRow>
                 ))
-              ) : paginatedEntries.map(entry => (
+              ) : recentEntries.map(entry => (
                   <TableRow key={entry.id}>
                     <TableCell>{format(entry.date, 'PP')}</TableCell>
                     <TableCell>
@@ -564,26 +545,21 @@ export default function RecordExpensesPage() {
               }
             </TableBody>
           </Table>
-           {totalPages > 1 && (
-            <div className="flex items-center justify-between pt-4">
+           <div className="flex items-center justify-between pt-4">
               <div className="text-sm text-muted-foreground">
-                Showing <strong>{paginatedEntries.length}</strong> of <strong>{sortedEntries.length}</strong> expenses.
+                Page {currentPage}
               </div>
               <Pagination>
                 <PaginationContent>
                   <PaginationItem>
-                    <PaginationPrevious href="#" onClick={(e) => { e.preventDefault(); handlePageChange(currentPage - 1); }} className={currentPage === 1 ? 'pointer-events-none opacity-50' : ''} />
+                    <PaginationPrevious href="#" onClick={(e) => { e.preventDefault(); handlePageChange('prev'); }} className={currentPage === 1 ? 'pointer-events-none opacity-50' : ''} />
                   </PaginationItem>
                   <PaginationItem>
-                    <span className="text-sm p-2">Page {currentPage} of {totalPages}</span>
-                  </PaginationItem>
-                  <PaginationItem>
-                    <PaginationNext href="#" onClick={(e) => { e.preventDefault(); handlePageChange(currentPage + 1); }} className={currentPage === totalPages ? 'pointer-events-none opacity-50' : ''} />
+                    <PaginationNext href="#" onClick={(e) => { e.preventDefault(); handlePageChange('next'); }} className={recentEntries.length < RECORDS_PER_PAGE ? 'pointer-events-none opacity-50' : ''}/>
                   </PaginationItem>
                 </PaginationContent>
               </Pagination>
             </div>
-          )}
         </CardContent>
       </Card>
       
@@ -736,5 +712,3 @@ export default function RecordExpensesPage() {
     </div>
   );
 }
-
-    
