@@ -203,6 +203,13 @@ const AppShellLayout = ({ children }: { children: React.ReactNode }) => {
            <header className="sticky top-0 z-10 border-b border-sidebar-border/20 bg-sidebar/90 text-sidebar-foreground backdrop-blur-md">
               <div className="mx-auto flex h-14 max-w-7xl items-center gap-4 px-4 sm:px-6">
                 <SidebarTrigger className="md:hidden" />
+                
+                {user && user.companyName && (
+                  <div className="hidden items-center gap-2 md:flex">
+                      <Building className="h-5 w-5 flex-shrink-0 text-primary" />
+                      <p className="truncate text-lg font-semibold">{user.companyName}</p>
+                  </div>
+                )}
 
                 <div className="flex-1" />
 
