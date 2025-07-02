@@ -14,7 +14,7 @@ import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger, DropdownMenuSeparator } from '@/components/ui/dropdown-menu';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
-import { Users2, PlusCircle, MoreHorizontal, Edit, Trash2, Loader2, Save, Camera, UploadCloud, FileText, XCircle, SwitchCamera, Upload, ArrowUp, ArrowDown, ChevronsUpDown, Search, ScanLine, Printer, Fingerprint, PenSquare, Download } from 'lucide-react';
+import { Users2, PlusCircle, MoreHorizontal, Edit, Trash2, Loader2, Save, Camera, UploadCloud, FileText, XCircle, SwitchCamera, Upload, ArrowUp, ArrowDown, ChevronsUpDown, Search, ScanLine, Printer, Fingerprint, PenSquare, Download, Expand } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/contexts/AuthContext';
 import { db } from '@/lib/firebaseConfig';
@@ -702,7 +702,7 @@ export default function EmployeesPage() {
   if (!user && !authIsLoading) {
      return (
       <div className="space-y-6 p-4 sm:p-6 lg:p-8">
-        <PageTitle title="Employees" subtitle="Manage your team members." icon={Users2} />
+        <PageTitle title="Employees" subtitle="Manage your team members." />
         <Card><CardHeader><CardTitle>Access Denied</CardTitle></CardHeader><CardContent><p>Please sign in to manage employees.</p></CardContent></Card>
       </div>
     )
@@ -710,19 +710,41 @@ export default function EmployeesPage() {
 
   return (
     <div className="space-y-6 p-4 sm:p-6 lg:p-8">
-      <PageTitle title="Employees" subtitle="Manage your team members." icon={Users2}>
-        <div className="flex flex-col sm:flex-row gap-2">
-            <TooltipProvider>
-            <Tooltip><TooltipTrigger asChild><Button variant="outline" size="icon" onClick={handleImportClick} disabled={isSaving || isLoadingEmployees}><Upload className="h-4 w-4" /><span className="sr-only">Import from Excel</span></Button></TooltipTrigger><TooltipContent><p>Import from Excel</p></TooltipContent></Tooltip>
-             <Tooltip><TooltipTrigger asChild><Button variant="outline" size="icon" onClick={() => setIsScanDialogOpen(true)} disabled={isSaving || isLoadingEmployees}><ScanLine className="h-4 w-4"/><span className="sr-only">Scan Document</span></Button></TooltipTrigger><TooltipContent><p>Scan Document</p></TooltipContent></Tooltip>
-            </TooltipProvider>
-            <Button asChild disabled={isSaving || isLoadingEmployees}><Link href="/employees/new"><PlusCircle className="mr-2 h-4 w-4" /> Add Employee</Link></Button>
-            <input type="file" ref={fileInputRef} onChange={handleImportFileChange} className="hidden" accept=".xlsx, .xls, .csv" />
-        </div>
-      </PageTitle>
+      <PageTitle title="Employees" subtitle="Manage your team members." />
 
       <Card>
-        <CardHeader><div className="flex flex-col sm:flex-row items-center justify-between gap-2"><div><CardTitle>Team Members</CardTitle><CardDescription>Manage your employees' information, salaries, and associated files.</CardDescription></div><div className="relative w-full sm:w-auto"><Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" /><Input type="search" placeholder="Search by name, position..." className="pl-8 sm:w-[250px] md:w-[300px]" value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} disabled={isLoadingEmployees}/></div></div></CardHeader>
+        <CardHeader>
+          <div className="flex flex-col sm:flex-row items-center justify-between gap-2">
+            <div>
+              <CardTitle>Team Members</CardTitle>
+              <CardDescription>Manage your employees' information, salaries, and associated files.</CardDescription>
+            </div>
+            <div className="flex items-center gap-2">
+                <TooltipProvider>
+                    <Tooltip>
+                        <TooltipTrigger asChild>
+                            <Button variant="outline" size="icon" onClick={handleImportClick} disabled={isSaving || isLoadingEmployees}><Upload className="h-4 w-4" /></Button>
+                        </TooltipTrigger>
+                        <TooltipContent><p>Import from Excel</p></TooltipContent>
+                    </Tooltip>
+                    <Tooltip>
+                        <TooltipTrigger asChild>
+                            <Button variant="outline" size="icon" disabled><Expand className="h-4 w-4" /></Button>
+                        </TooltipTrigger>
+                        <TooltipContent><p>Expand View</p></TooltipContent>
+                    </Tooltip>
+                </TooltipProvider>
+                <Button asChild disabled={isSaving || isLoadingEmployees}><Link href="/employees/new"><PlusCircle className="mr-2 h-4 w-4" /> Add Employee</Link></Button>
+                <input type="file" ref={fileInputRef} onChange={handleImportFileChange} className="hidden" accept=".xlsx, .xls, .csv" />
+            </div>
+          </div>
+          <div className="mt-4">
+            <div className="relative w-full max-w-sm">
+                <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+                <Input type="search" placeholder="Search by name, position..." className="pl-8" value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} disabled={isLoadingEmployees}/>
+            </div>
+          </div>
+        </CardHeader>
         <CardContent>
           <Table>
             <TableCaption>{!isLoadingEmployees && sortedEmployees.length === 0 ? (searchTerm ? "No employees match your search." : "No employees found.") : "A list of your employees."}</TableCaption>

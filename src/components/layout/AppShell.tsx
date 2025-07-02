@@ -354,8 +354,8 @@ const AppShellLayout = ({ children }: { children: React.ReactNode }) => {
             <Tooltip>
               <TooltipTrigger asChild>
                 <DialogTrigger asChild>
-                  <Button className="fixed bottom-4 right-4 h-12 w-12 rounded-full shadow-2xl z-50 bg-gradient-to-br from-pink-400 to-purple-500 hover:scale-110 transition-transform duration-200">
-                    <Bot className="h-6 w-6" />
+                  <Button className="fixed bottom-6 right-6 h-14 w-14 rounded-full shadow-2xl z-50 bg-[#7C3AED] hover:bg-[#6D28D9] text-white hover:scale-110 transition-transform duration-200">
+                    <Bot className="h-7 w-7" />
                   </Button>
                 </DialogTrigger>
               </TooltipTrigger>
