@@ -1,4 +1,3 @@
-
 'use client';
 
 import React, { useState, FormEvent, useCallback, useRef, useEffect } from 'react';
@@ -226,7 +225,7 @@ export default function NewEmployeePage() {
                 <div className="max-w-7xl mx-auto flex justify-between items-center px-4 py-2">
                     <div className="flex items-center gap-2">
                          <Button variant="ghost" size="icon" className="h-8 w-8" asChild><Link href="/employees"><ArrowLeft className="h-4 w-4" /></Link></Button>
-                        <h1 className="text-lg font-bold truncate">Add New Employee</h1>
+                        <h1 className="text-lg font-bold truncate h-8 flex items-center">Add New Employee</h1>
                     </div>
                     <div className="flex items-center gap-2">
                         <Button variant="outline" asChild type="button"><Link href="/employees">Cancel</Link></Button>
