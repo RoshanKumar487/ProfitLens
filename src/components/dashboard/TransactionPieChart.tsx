@@ -19,12 +19,16 @@ interface Transaction {
 }
 
 const COLORS = [
-  "hsl(var(--chart-1))", 
-  "hsl(var(--chart-2))", 
-  "hsl(var(--chart-3))", 
-  "hsl(var(--chart-4))", 
+  "hsl(var(--chart-1))",
+  "hsl(var(--chart-2))",
+  "hsl(var(--chart-3))",
+  "hsl(var(--chart-4))",
   "hsl(var(--chart-5))",
-  "#0088FE", "#00C49F", "#FFBB28", "#FF8042", "#8884d8",
+  "hsl(var(--chart-6))",
+  "hsl(var(--chart-7))",
+  "hsl(var(--chart-8))",
+  "hsl(var(--chart-9))",
+  "hsl(var(--chart-10))",
 ];
 
 export default function TransactionPieChart() {
@@ -79,11 +83,20 @@ export default function TransactionPieChart() {
 
   const CustomTooltip = ({ active, payload }: any) => {
     if (active && payload && payload.length) {
+      const data = payload[0].payload;
       return (
-        <div className="p-2 text-sm bg-background/80 border rounded-md shadow-lg backdrop-blur-sm">
-          <p className="font-bold">{`${payload[0].name}`}</p>
-          <p className="text-foreground">{`Amount: ${currencySymbol}${payload[0].value.toFixed(2)}`}</p>
-          <p className="text-muted-foreground">{`(${(payload[0].percent * 100).toFixed(0)}%)`}</p>
+        <div className="rounded-lg border bg-background p-2.5 shadow-lg">
+          <div className="flex flex-col space-y-1">
+            <div className="flex items-center gap-2">
+              <div
+                className="h-2.5 w-2.5 shrink-0 rounded-[2px]"
+                style={{ backgroundColor: payload[0].fill }}
+              />
+              <p className="font-bold">{data.name}</p>
+            </div>
+            <p className="text-foreground">{`Amount: ${currencySymbol}${data.value.toFixed(2)}`}</p>
+            <p className="text-muted-foreground">{`Percentage: ${(payload[0].percent * 100).toFixed(0)}%`}</p>
+          </div>
         </div>
       );
     }
@@ -128,13 +141,14 @@ export default function TransactionPieChart() {
                   data={data}
                   cx="50%"
                   cy="50%"
-                  innerRadius={80}
+                  innerRadius={70}
                   outerRadius={120}
-                  fill="hsl(var(--primary))"
                   dataKey="value"
                   paddingAngle={2}
                   labelLine={false}
                   label={false}
+                  stroke="hsl(var(--background))"
+                  strokeWidth={2}
                 >
                   {data.map((entry, index) => (
                     <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />

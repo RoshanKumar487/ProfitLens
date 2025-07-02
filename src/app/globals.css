@@ -40,6 +40,17 @@ body {
     --success-card: 140 70% 96%;
     --danger-card: 0 80% 96%;
 
+    /* Chart Colors */
+    --chart-1: 220 90% 60%;  /* Vivid Blue */
+    --chart-2: 160 80% 45%;  /* Teal Green */
+    --chart-3: 280 85% 65%;  /* Purple */
+    --chart-4: 10 90% 65%;   /* Red-Orange */
+    --chart-5: 340 90% 70%;  /* Bright Pink */
+    --chart-6: 45 95% 55%;   /* Gold */
+    --chart-7: 200 85% 55%;  /* Sky Blue */
+    --chart-8: 300 80% 75%;  /* Lavender */
+    --chart-9: 80 70% 50%;   /* Lime Green */
+    --chart-10: 0 80% 65%;   /* Bright Red */
 
     /* Sidebar specific theme */
     --sidebar-background: 0 0% 100%;
@@ -87,6 +98,18 @@ body {
     
     --success-card: 140 80% 10%;
     --danger-card: 0 80% 10%;
+    
+    /* Chart Colors */
+    --chart-1: 220 80% 65%;
+    --chart-2: 160 70% 50%;
+    --chart-3: 280 75% 70%;
+    --chart-4: 10 80% 70%;
+    --chart-5: 340 80% 70%;
+    --chart-6: 45 85% 60%;
+    --chart-7: 200 75% 60%;
+    --chart-8: 300 70% 80%;
+    --chart-9: 80 60% 55%;
+    --chart-10: 0 70% 70%;
     
     /* Sidebar in dark mode should match the new style */
     --sidebar-background: 20 14.3% 4.1%;
