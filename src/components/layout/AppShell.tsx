@@ -21,7 +21,7 @@ import { NAV_ITEMS } from '@/lib/constants';
 import { Separator } from '@/components/ui/separator';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
-import { LogOut, Loader2, Building, LayoutTemplate, Bell, Bot, HelpCircle, User, Crown, ChevronLeft, ChevronRight, PlusCircle } from 'lucide-react';
+import { LogOut, Loader2, Building, LayoutTemplate, Bell, Bot, HelpCircle, User, Crown, ChevronLeft, ChevronRight, PlusCircle, ChevronDown, Receipt, TrendingDown, Users } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
@@ -208,17 +208,43 @@ const AppShellLayout = ({ children }: { children: React.ReactNode }) => {
 
                 {user && (
                     <div className="flex items-center gap-4">
-                        <Button
-                            asChild
-                            className={cn(
-                                "hidden sm:inline-flex items-center justify-center rounded-md border-b-[3px] border-primary/70 bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground shadow-md transition-all duration-150 ease-in-out hover:brightness-110 active:translate-y-0.5 active:border-b-0"
-                            )}
-                        >
-                            <Link href="/invoicing/new">
-                                <PlusCircle className="mr-2 h-4 w-4" />
-                                Create Invoice
-                            </Link>
-                        </Button>
+                        <DropdownMenu>
+                            <DropdownMenuTrigger asChild>
+                                <Button
+                                    variant="ghost"
+                                    className="group hidden h-10 items-center justify-center rounded-lg bg-gradient-to-b from-primary/80 to-primary/90 p-0 text-sm font-semibold text-primary-foreground shadow-[0_4px_10px_rgba(0,0,0,0.1),inset_0_1px_0_rgba(255,255,255,0.2)] backdrop-blur-sm transition-all duration-150 ease-in-out hover:brightness-110 active:shadow-[inset_0_2px_4px_rgba(0,0,0,0.2)] sm:flex"
+                                >
+                                    <div className="flex items-center gap-2 px-3 py-2">
+                                        <PlusCircle className="h-4 w-4" />
+                                        <span>New</span>
+                                    </div>
+                                    <Separator orientation="vertical" className="h-5 bg-primary-foreground/20" />
+                                    <div className="px-2 py-2">
+                                        <ChevronDown className="h-4 w-4" />
+                                    </div>
+                                </Button>
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent align="end" className="w-56">
+                                <DropdownMenuItem asChild>
+                                    <Link href="/invoicing/new" onClick={handleNavigationClick}>
+                                        <Receipt className="mr-2 h-4 w-4" />
+                                        <span>New Invoice</span>
+                                    </Link>
+                                </DropdownMenuItem>
+                                <DropdownMenuItem asChild>
+                                    <Link href="/record-expenses/new" onClick={handleNavigationClick}>
+                                        <TrendingDown className="mr-2 h-4 w-4" />
+                                        <span>New Expense</span>
+                                    </Link>
+                                </DropdownMenuItem>
+                                <DropdownMenuItem asChild>
+                                    <Link href="/employees/new" onClick={handleNavigationClick}>
+                                        <Users className="mr-2 h-4 w-4" />
+                                        <span>New Employee</span>
+                                    </Link>
+                                </DropdownMenuItem>
+                            </DropdownMenuContent>
+                        </DropdownMenu>
 
                         <DropdownMenu>
                             <DropdownMenuTrigger asChild>
