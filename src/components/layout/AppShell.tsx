@@ -21,7 +21,7 @@ import { NAV_ITEMS } from '@/lib/constants';
 import { Separator } from '@/components/ui/separator';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
-import { LogOut, Loader2, Building, LayoutTemplate, Bell, Bot, HelpCircle, User, Crown, ChevronLeft, ChevronRight } from 'lucide-react';
+import { LogOut, Loader2, Building, LayoutTemplate, Bell, Bot, HelpCircle, User, Crown, ChevronLeft, ChevronRight, PlusCircle } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
@@ -207,7 +207,19 @@ const AppShellLayout = ({ children }: { children: React.ReactNode }) => {
                 <div className="flex-1" />
 
                 {user && (
-                    <div className="flex items-center gap-2">
+                    <div className="flex items-center gap-4">
+                        <Button
+                            asChild
+                            className={cn(
+                                "hidden sm:inline-flex items-center justify-center rounded-md border-b-[3px] border-primary/70 bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground shadow-md transition-all duration-150 ease-in-out hover:brightness-110 active:translate-y-0.5 active:border-b-0"
+                            )}
+                        >
+                            <Link href="/invoicing/new">
+                                <PlusCircle className="mr-2 h-4 w-4" />
+                                Create Invoice
+                            </Link>
+                        </Button>
+
                         <DropdownMenu>
                             <DropdownMenuTrigger asChild>
                               <Button variant="ghost" size="icon" className="relative h-10 w-10 rounded-full hover:bg-sidebar-accent hover:text-sidebar-accent-foreground">
