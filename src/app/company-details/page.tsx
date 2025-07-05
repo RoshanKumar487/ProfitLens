@@ -39,6 +39,7 @@ interface CompanyDetailsFirestore {
   signatureStoragePath?: string;
   stampUrl?: string;
   stampStoragePath?: string;
+  publicCompanyId?: string;
   createdAt?: Timestamp;
   updatedAt?: Timestamp;
 }
@@ -48,15 +49,15 @@ export default function CompanyDetailsPage() {
   const [companyDetails, setCompanyDetails] = useState<Partial<CompanyDetailsFirestore>>({
     name: '', address: '', city: '', state: '', country: '', gstin: '', pan: '',
     phone: '', email: '', website: '', accountNumber: '', ifscCode: '', bankName: '', branch: '',
-    signatureUrl: '', stampUrl: '',
+    signatureUrl: '', stampUrl: '', publicCompanyId: '',
   });
   const [isFetching, setIsFetching] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
   const { toast } = useToast();
 
   const handleCopyId = () => {
-    if (user?.companyId) {
-        navigator.clipboard.writeText(user.companyId);
+    if (companyDetails.publicCompanyId) {
+        navigator.clipboard.writeText(companyDetails.publicCompanyId);
         toast({ title: 'Copied!', description: 'Company ID copied to clipboard.' });
     }
   };
@@ -96,6 +97,7 @@ export default function CompanyDetailsPage() {
             branch: data.branch || '',
             signatureUrl: data.signatureUrl || '',
             stampUrl: data.stampUrl || '',
+            publicCompanyId: data.publicCompanyId || '',
             createdAt: data.createdAt,
             updatedAt: data.updatedAt,
           });
@@ -230,12 +232,12 @@ export default function CompanyDetailsPage() {
       <Card className="max-w-2xl mx-auto">
         <CardHeader>
           <CardTitle>Company Identifier</CardTitle>
-          <CardDescription>Share this ID with new employees to ensure they join the correct company profile.</CardDescription>
+          <CardDescription>Share this 6-digit ID with new employees to ensure they join the correct company profile.</CardDescription>
         </CardHeader>
         <CardContent>
             <div className="flex items-center gap-2 p-2 border rounded-md bg-muted">
-                <Input readOnly value={user?.companyId || 'N/A'} className="bg-background font-mono text-sm" />
-                <Button type="button" size="icon" variant="outline" onClick={handleCopyId} disabled={!user?.companyId}>
+                <Input readOnly value={companyDetails.publicCompanyId || 'Not generated'} className="bg-background font-mono text-sm tracking-widest" />
+                <Button type="button" size="icon" variant="outline" onClick={handleCopyId} disabled={!companyDetails.publicCompanyId}>
                     <Copy className="h-4 w-4" />
                 </Button>
             </div>

@@ -18,7 +18,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { COUNTRIES } from '@/lib/countries';
 import { Alert, AlertTitle } from '@/components/ui/alert';
 import { cn } from '@/lib/utils';
-import { doc, getDoc } from 'firebase/firestore';
+import { doc, getDoc, collection, query, where, limit, getDocs } from 'firebase/firestore';
 import { db } from '@/lib/firebaseConfig';
 
 
@@ -104,10 +104,12 @@ export default function SignUpPage() {
     const fetchCompanyById = async (id: string) => {
         setCompanyIdStatus('loading');
         try {
-            const companyDocRef = doc(db, 'companyProfiles', id);
-            const companyDocSnap = await getDoc(companyDocRef);
+            const companiesRef = collection(db, 'companyProfiles');
+            const q = query(companiesRef, where('publicCompanyId', '==', id), limit(1));
+            const querySnapshot = await getDocs(q);
 
-            if (companyDocSnap.exists()) {
+            if (!querySnapshot.empty) {
+                const companyDocSnap = querySnapshot.docs[0];
                 const companyData = companyDocSnap.data();
                 setSelectedCompany({ id: companyDocSnap.id, name: companyData.name });
                 setCompanyName(companyData.name);
@@ -124,7 +126,7 @@ export default function SignUpPage() {
     };
 
     const trimmedId = companyIdInput.trim();
-    if (trimmedId.length > 5) { // Basic validation, Firestore IDs are longer
+    if (trimmedId.length === 6 && /^\d{6}$/.test(trimmedId)) {
         const debounce = setTimeout(() => fetchCompanyById(trimmedId), 500);
         return () => clearTimeout(debounce);
     } else {
@@ -258,18 +260,19 @@ export default function SignUpPage() {
             <h3 className="text-lg font-medium flex items-center gap-2"><Building className="h-5 w-5 text-primary" /> Company Information</h3>
 
             <div>
-              <Label htmlFor="companyId">Company ID (Optional)</Label>
+              <Label htmlFor="companyId">6-Digit Company ID (Optional)</Label>
               <div className="relative">
                 <Input
                   id="companyId"
                   value={companyIdInput}
                   onChange={(e) => setCompanyIdInput(e.target.value)}
-                  placeholder="Enter ID for a specific company"
+                  placeholder="e.g., 123456"
                   disabled={isLoading}
+                  maxLength={6}
                 />
                 {companyIdStatus === 'loading' && <Loader2 className="absolute right-2 top-1/2 -translate-y-1/2 h-4 w-4 animate-spin" />}
               </div>
-              {companyIdStatus === 'not_found' && companyIdInput.trim().length > 5 && (
+              {companyIdStatus === 'not_found' && companyIdInput.trim().length === 6 && (
                   <p className="text-xs mt-1 text-destructive flex items-center gap-1"><AlertTriangle className="h-3 w-3" /> Company ID not found.</p>
               )}
             </div>

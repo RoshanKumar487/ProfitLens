@@ -79,6 +79,13 @@
       ]
     },
     {
+      "collectionGroup": "companyProfiles",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "publicCompanyId", "order": "ASCENDING" }
+      ]
+    },
+    {
       "collectionGroup": "accessRequests",
       "queryScope": "COLLECTION_GROUP",
       "fields": [

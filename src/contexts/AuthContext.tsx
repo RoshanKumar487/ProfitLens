@@ -12,7 +12,7 @@ import {
   updateProfile,
   sendPasswordResetEmail,
 } from 'firebase/auth';
-import { doc, setDoc, serverTimestamp, getDoc, collection, addDoc, updateDoc } from 'firebase/firestore';
+import { doc, setDoc, serverTimestamp, getDoc, collection, addDoc, updateDoc, query, where, getDocs } from 'firebase/firestore';
 import { useRouter, usePathname } from 'next/navigation';
 import { useToast } from '@/hooks/use-toast';
 import { getCurrencySymbol } from '@/lib/countries';
@@ -200,8 +200,32 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         await firebaseSignOut(auth);
         return { user: firebaseUser, status: 'pending' };
       } else { 
+        const generateUniquePublicId = async (): Promise<string> => {
+            let publicId: string;
+            let isUnique = false;
+            let attempts = 0;
+            const maxAttempts = 10;
+            
+            while (!isUnique && attempts < maxAttempts) {
+                publicId = Math.floor(100000 + Math.random() * 900000).toString();
+                const q = query(collection(db, 'companyProfiles'), where('publicCompanyId', '==', publicId));
+                const snapshot = await getDocs(q);
+                isUnique = snapshot.empty;
+                attempts++;
+                if (!isUnique) {
+                  console.log(`Company ID collision for ${publicId}, attempt ${attempts}`);
+                }
+            }
+    
+            if (!isUnique) {
+                throw new Error("Could not generate a unique Company ID. Please try again later.");
+            }
+            return publicId!;
+        };
+
         const newCompanyDocRef = doc(collection(db, 'companyProfiles'));
         const companyId = newCompanyDocRef.id;
+        const publicCompanyId = await generateUniquePublicId();
 
         let signatureUrl = '';
         let signatureStoragePath = '';
@@ -225,6 +249,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
           city: companyInfo.city,
           state: companyInfo.stateOrProvince,
           country: companyInfo.country,
+          publicCompanyId: publicCompanyId,
           gstin: '', phone: '', email: firebaseUser.email || '', website: '',
           adminUserId: firebaseUser.uid,
           createdAt: serverTimestamp(),
