@@ -1,7 +1,7 @@
 
 'use client';
 
-import React, { useState, useEffect, useCallback, useMemo } from 'react';
+import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useToast } from '@/hooks/use-toast';
 import PageTitle from '@/components/PageTitle';
@@ -10,7 +10,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/com
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow, TableFooter } from '@/components/ui/table';
 import { Input } from '@/components/ui/input';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
-import { HandCoins, Loader2, Save, Calendar as CalendarIcon, Settings, Printer, PlusCircle, Trash2, Search } from 'lucide-react';
+import { HandCoins, Loader2, Save, Calendar as CalendarIcon, Settings, Printer, PlusCircle, Trash2, Search, Download } from 'lucide-react';
 import { format, startOfMonth } from 'date-fns';
 import { getPayrollDataForPeriod, savePayrollData, deletePayrollRecord } from './actions';
 import { getPayrollSettings, type PayrollSettings } from '../settings/actions';
@@ -22,11 +22,22 @@ import { TooltipProvider, Tooltip, TooltipTrigger, TooltipContent } from '@/comp
 import { v4 as uuidv4 } from 'uuid';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-
+import { Dialog, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger, DropdownMenuSeparator } from '@/components/ui/dropdown-menu';
+import { ScrollArea } from '@/components/ui/scroll-area';
+import PayslipTemplate from './PayslipTemplate';
+import { doc, getDoc } from 'firebase/firestore';
+import { db } from '@/lib/firebaseConfig';
+import { urlToDataUri } from '@/lib/utils';
+import jsPDF from 'jspdf';
+import html2canvas from 'html2canvas';
 
 interface EmployeeWithPayroll {
   id: string; // employeeId for existing, tempId for new
   name: string;
+  position?: string;
+  uan?: string;
+  joiningDate?: Date;
   profilePictureUrl?: string;
   payrollId: string | null;
   grossSalary: number;
@@ -62,6 +73,12 @@ export default function PayrollPage() {
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState<'All' | 'Pending' | 'Paid'>('All');
 
+  const payslipPrintRef = useRef<HTMLDivElement>(null);
+  const [isPayslipDialogOpen, setIsPayslipDialogOpen] = useState(false);
+  const [employeeForPayslip, setEmployeeForPayslip] = useState<EmployeeWithPayroll | null>(null);
+  const [companyDetails, setCompanyDetails] = useState<any | null>(null);
+  const [payslipImageDataUris, setPayslipImageDataUris] = useState<{ signature?: string; stamp?: string }>({});
+  const [isPrinting, setIsPrinting] = useState(false);
 
   const fetchPayrollData = useCallback(async (period: Date) => {
     if (!user?.companyId) return;
@@ -200,11 +217,7 @@ export default function PayrollPage() {
     }
     setIsSaving(false);
   };
-
-  const handlePrint = () => {
-    window.print();
-  };
-
+  
   const promptDelete = (employee: EmployeeWithPayroll) => {
     setEmployeeToDelete(employee);
   };
@@ -247,18 +260,6 @@ export default function PayrollPage() {
   }, [payrollData, searchTerm, statusFilter]);
 
   const totals = useMemo(() => {
-    const initialTotals = {
-        grossSalary: 0,
-        advances: 0,
-        otherDeductions: 0,
-        netPayment: 0,
-        customFields: {} as { [key: string]: number },
-    };
-
-    (payrollSettings?.customFields || []).forEach(field => {
-        initialTotals.customFields[field.id] = 0;
-    });
-
     return filteredData.reduce((acc, emp) => {
         const totalCustomDeductions = (payrollSettings?.customFields || []).reduce((sum, field) => sum + (emp.customFields?.[field.id] || 0), 0);
         const netPayment = (emp.grossSalary || 0) - (emp.advances || 0) - (emp.otherDeductions || 0) - totalCustomDeductions;
@@ -269,14 +270,72 @@ export default function PayrollPage() {
         acc.netPayment += netPayment;
 
         (payrollSettings?.customFields || []).forEach(field => {
-            acc.customFields[field.id] += (emp.customFields?.[field.id] || 0);
+            acc.customFields[field.id] = (acc.customFields[field.id] || 0) + (emp.customFields?.[field.id] || 0);
         });
 
         return acc;
-    }, initialTotals);
+    }, { grossSalary: 0, advances: 0, otherDeductions: 0, netPayment: 0, customFields: {} as { [key: string]: number } });
   }, [filteredData, payrollSettings]);
-  
-  
+
+  const handleOpenPayslipDialog = async (employee: EmployeeWithPayroll) => {
+    setEmployeeForPayslip(employee);
+    if (!companyDetails && user?.companyId) {
+        const companyRef = doc(db, 'companyProfiles', user.companyId);
+        const companySnap = await getDoc(companyRef);
+        if (companySnap.exists()) {
+            const companyData = companySnap.data();
+            setCompanyDetails(companyData);
+            const uris: { signature?: string; stamp?: string } = {};
+            if (companyData.signatureUrl) uris.signature = await urlToDataUri(companyData.signatureUrl);
+            if (companyData.stampUrl) uris.stamp = await urlToDataUri(companyData.stampUrl);
+            setPayslipImageDataUris(uris);
+        }
+    }
+    setIsPayslipDialogOpen(true);
+  };
+
+  const handlePrintPayslip = async () => {
+    if (!payslipPrintRef.current) return;
+    setIsPrinting(true);
+    try {
+      const elementToPrint = payslipPrintRef.current;
+      const canvas = await html2canvas(elementToPrint, { scale: 3, useCORS: true, backgroundColor: '#ffffff' });
+      const imgData = canvas.toDataURL('image/png');
+      const pdf = new jsPDF({ orientation: 'p', unit: 'mm', format: 'a4' });
+      pdf.addImage(imgData, 'PNG', 0, 0, pdf.internal.pageSize.getWidth(), pdf.internal.pageSize.getHeight());
+      const pdfBlob = pdf.output('blob');
+      const pdfUrl = URL.createObjectURL(pdfBlob);
+      const printWindow = window.open(pdfUrl);
+      if (printWindow) {
+        printWindow.onload = () => { printWindow.print(); URL.revokeObjectURL(pdfUrl); };
+      } else {
+        toast({ title: "Print Error", description: "Could not open print window.", variant: "destructive" });
+      }
+    } catch (error: any) {
+      toast({ title: "Print Failed", description: error.message, variant: "destructive" });
+    } finally {
+      setIsPrinting(false);
+    }
+  };
+
+  const handleDownloadPayslipPdf = async () => {
+    if (!payslipPrintRef.current || !employeeForPayslip) return;
+    setIsPrinting(true);
+    try {
+      const elementToPrint = payslipPrintRef.current;
+      const canvas = await html2canvas(elementToPrint, { scale: 3, useCORS: true, backgroundColor: '#ffffff' });
+      const imgData = canvas.toDataURL('image/png');
+      const pdf = new jsPDF({ orientation: 'p', unit: 'mm', format: 'a4' });
+      pdf.addImage(imgData, 'PNG', 0, 0, pdf.internal.pageSize.getWidth(), pdf.internal.pageSize.getHeight());
+      pdf.save(`Payslip-${employeeForPayslip.name}-${format(payPeriod, 'yyyy-MM')}.pdf`);
+      toast({ title: "Download Started" });
+    } catch (error: any) {
+      toast({ title: "Download Failed", description: error.message, variant: "destructive" });
+    } finally {
+      setIsPrinting(false);
+    }
+  };
+
   if (authLoading) {
       return <div className="flex justify-center items-center h-64"><Loader2 className="h-12 w-12 animate-spin text-primary" /></div>;
   }
@@ -345,11 +404,11 @@ export default function PayrollPage() {
                   </Tooltip>
                   <Tooltip>
                     <TooltipTrigger asChild>
-                        <Button variant="outline" size="icon" onClick={handlePrint}>
+                        <Button variant="outline" size="icon" onClick={handlePrintPayslip}>
                             <Printer className="h-4 w-4" />
                         </Button>
                     </TooltipTrigger>
-                    <TooltipContent><p>Print Payroll</p></TooltipContent>
+                    <TooltipContent><p>Print Payroll Sheet</p></TooltipContent>
                   </Tooltip>
                 </TooltipProvider>
                 <Button onClick={handleSaveAll} disabled={isSaving || isLoading}>
@@ -484,18 +543,22 @@ export default function PayrollPage() {
                             </Button>
                           </TableCell>
                           <TableCell className="print:hidden">
-                            <TooltipProvider>
-                                <Tooltip>
-                                <TooltipTrigger asChild>
-                                    <Button variant="ghost" size="icon" className="text-destructive" onClick={() => promptDelete(emp)} disabled={isDeleting}>
+                            <DropdownMenu>
+                                <DropdownMenuTrigger asChild>
+                                    <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive" disabled={isDeleting}>
                                         <Trash2 className="h-4 w-4" />
                                     </Button>
-                                </TooltipTrigger>
-                                <TooltipContent>
-                                    <p>{emp.payrollId ? "Delete this payroll record" : (emp.isNew ? "Remove this new row" : "No payroll record to delete")}</p>
-                                </TooltipContent>
-                                </Tooltip>
-                            </TooltipProvider>
+                                </DropdownMenuTrigger>
+                                <DropdownMenuContent align="end">
+                                    <DropdownMenuItem onClick={() => handleOpenPayslipDialog(emp)}>
+                                        <Printer className="mr-2 h-4 w-4" /> Print Payslip
+                                    </DropdownMenuItem>
+                                    <DropdownMenuSeparator />
+                                    <DropdownMenuItem onClick={() => promptDelete(emp)} className="text-destructive focus:text-destructive focus:bg-destructive/10">
+                                        <Trash2 className="mr-2 h-4 w-4" /> Delete Record
+                                    </DropdownMenuItem>
+                                </DropdownMenuContent>
+                            </DropdownMenu>
                           </TableCell>
                         </TableRow>
                     );
@@ -553,6 +616,37 @@ export default function PayrollPage() {
                 </AlertDialogFooter>
             </AlertDialogContent>
         </AlertDialog>
+
+        <Dialog open={isPayslipDialogOpen} onOpenChange={setIsPayslipDialogOpen}>
+          <DialogContent className="max-w-4xl w-full h-[95vh] flex flex-col p-0 bg-gray-100 dark:bg-background">
+            <DialogHeader className="p-4 sm:p-6 pb-2 border-b bg-background no-print">
+              <DialogTitle className="font-headline text-xl truncate">Payslip: {employeeForPayslip?.name}</DialogTitle>
+            </DialogHeader>
+            <ScrollArea className="flex-grow bg-muted p-4 sm:p-8">
+              {employeeForPayslip && companyDetails ? (
+                <PayslipTemplate
+                  ref={payslipPrintRef}
+                  employee={employeeForPayslip}
+                  payPeriod={format(payPeriod, 'yyyy-MM')}
+                  companyDetails={companyDetails}
+                  payrollSettings={payrollSettings}
+                  currencySymbol={currencySymbol}
+                  signatureDataUri={payslipImageDataUris.signature}
+                  stampDataUri={payslipImageDataUris.stamp}
+                />
+              ) : <Skeleton className="w-[210mm] h-[297mm] mx-auto bg-white" />}
+            </ScrollArea>
+            <DialogFooter className="p-4 sm:p-6 border-t bg-background no-print justify-end flex-wrap gap-2">
+              <Button type="button" variant="secondary" onClick={handleDownloadPayslipPdf} disabled={isPrinting}>
+                {isPrinting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Download className="mr-2 h-4 w-4" />} Download PDF
+              </Button>
+              <Button type="button" variant="default" onClick={handlePrintPayslip} disabled={isPrinting}>
+                {isPrinting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Printer className="mr-2 h-4 w-4" />} Print Payslip
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+
     </div>
   );
 }

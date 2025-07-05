@@ -67,6 +67,7 @@ export default function NewEmployeePage() {
     const [guarantorName, setGuarantorName] = useState('');
     const [guarantorPhone, setGuarantorPhone] = useState('');
     const [experience, setExperience] = useState('');
+    const [uan, setUan] = useState('');
 
     // Files
     const [profilePictureFile, setProfilePictureFile] = useState<File | null>(null);
@@ -179,7 +180,7 @@ export default function NewEmployeePage() {
             ]);
             
             const dataToSave = {
-                name, position, salary: salaryNum, description,
+                name, position, salary: salaryNum, description, uan,
                 companyId: user.companyId, addedById: user.uid, addedBy: user.displayName || user.email || 'System',
                 createdAt: serverTimestamp(), updatedAt: serverTimestamp(),
                 profilePictureUrl: profilePic.url, profilePictureStoragePath: profilePic.path,
@@ -282,6 +283,7 @@ export default function NewEmployeePage() {
                                 </div>
                                 <Section title="Professional Details">
                                     <DataRow label="Position"><WInput value={position} onChange={e => setPosition(e.target.value)} required disabled={isSaving}/></DataRow>
+                                    <DataRow label="UAN"><WInput value={uan} onChange={e => setUan(e.target.value)} disabled={isSaving} /></DataRow>
                                     <DataRow label="Joining Date"><WPopover date={joiningDate} setDate={setJoiningDate} /></DataRow>
                                     <DataRow label="Experience"><WInput value={experience} onChange={e => setExperience(e.target.value)} disabled={isSaving}/></DataRow>
                                     <DataRow label="Salary"><WInput type="number" value={salary} onChange={e => setSalary(e.target.value)} required disabled={isSaving} placeholder={`${currencySymbol} Salary`}/></DataRow>
@@ -320,6 +322,7 @@ export default function NewEmployeePage() {
                                 <div><Label htmlFor="name">Full Name</Label><Input id="name" value={name} onChange={(e) => setName(e.target.value)} required disabled={isSaving} /></div>
                                 <div><Label htmlFor="position">Position / Role</Label><Input id="position" value={position} onChange={(e) => setPosition(e.target.value)} required disabled={isSaving} /></div>
                                 <div><Label htmlFor="salary">Salary ({currencySymbol})</Label><Input id="salary" type="number" value={salary} onChange={(e) => setSalary(e.target.value)} required min="0" disabled={isSaving} /></div>
+                                <div><Label htmlFor="uan">UAN</Label><Input id="uan" value={uan} onChange={(e) => setUan(e.target.value)} disabled={isSaving} /></div>
                             </CardContent>
                         </Card>
                         <Card>
