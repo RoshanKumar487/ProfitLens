@@ -13,6 +13,8 @@ import { sendInvoiceEmailAction } from '../../actions';
 import InvoiceTemplateIndian from '../../InvoiceTemplateIndian';
 import InvoiceTemplateModern from '../../InvoiceTemplateModern';
 import InvoiceTemplateBusiness from '../../InvoiceTemplateBusiness';
+import InvoiceTemplateMinimalist from '../../InvoiceTemplateMinimalist';
+import InvoiceTemplateBold from '../../InvoiceTemplateBold';
 import jsPDF from 'jspdf';
 import html2canvas from 'html2canvas';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -86,7 +88,7 @@ export default function ViewInvoicePage() {
     const [imageDataUris, setImageDataUris] = useState<{ signature?: string; stamp?: string }>({});
     const [isLoadingData, setIsLoadingData] = useState(true);
     const [isProcessing, setIsProcessing] = useState(false);
-    const [template, setTemplate] = useState<'business' | 'modern' | 'simple'>('business');
+    const [template, setTemplate] = useState<'business' | 'modern' | 'simple' | 'minimalist' | 'bold'>('business');
     const [useLetterhead, setUseLetterhead] = useState(true);
     const printRef = useRef<HTMLDivElement>(null);
 
@@ -258,47 +260,30 @@ export default function ViewInvoicePage() {
     }
     
     const templateToRender = () => {
+        const commonProps = {
+            ref: printRef,
+            invoiceToView: invoice, 
+            companyProfileDetails: companyProfile, 
+            currencySymbol: currencySymbol, 
+            signatureDataUri: imageDataUris.signature,
+            stampDataUri: imageDataUris.stamp,
+            invoiceSettings: invoiceSettings,
+            letterheadTemplate: useLetterhead ? 'simple' as const : 'none' as const,
+        };
+
         switch(template) {
             case 'modern':
-                 return <InvoiceTemplateModern 
-                        ref={printRef}
-                        invoiceToView={invoice} 
-                        companyProfileDetails={companyProfile} 
-                        currencySymbol={currencySymbol} 
-                        signatureDataUri={imageDataUris.signature}
-                        stampDataUri={imageDataUris.stamp}
-                        invoiceSettings={invoiceSettings}
-                        letterheadTemplate={useLetterhead ? 'simple' : 'none'}
-                    />
+                 return <InvoiceTemplateModern {...commonProps} />
             case 'business':
-                 return <InvoiceTemplateBusiness
-                        ref={printRef}
-                        invoiceToView={invoice} 
-                        companyProfileDetails={companyProfile} 
-                        currencySymbol={currencySymbol} 
-                        invoiceSettings={invoiceSettings}
-                        letterheadTemplate={useLetterhead ? 'simple' : 'none'}
-                    />
+                 return <InvoiceTemplateBusiness {...commonProps} />
             case 'simple':
-                 return <InvoiceTemplateIndian 
-                        ref={printRef}
-                        invoiceToView={invoice} 
-                        companyProfileDetails={companyProfile} 
-                        currencySymbol={currencySymbol} 
-                        signatureDataUri={imageDataUris.signature}
-                        stampDataUri={imageDataUris.stamp}
-                        letterheadTemplate={useLetterhead ? 'simple' : 'none'}
-                        invoiceSettings={invoiceSettings}
-                    />
+                 return <InvoiceTemplateIndian {...commonProps} />
+            case 'minimalist':
+                 return <InvoiceTemplateMinimalist {...commonProps} />
+            case 'bold':
+                 return <InvoiceTemplateBold {...commonProps} />
             default:
-                return  <InvoiceTemplateBusiness
-                        ref={printRef}
-                        invoiceToView={invoice} 
-                        companyProfileDetails={companyProfile} 
-                        currencySymbol={currencySymbol} 
-                        invoiceSettings={invoiceSettings}
-                        letterheadTemplate={useLetterhead ? 'simple' : 'none'}
-                    />
+                return  <InvoiceTemplateBusiness {...commonProps} />
         }
     }
 
@@ -336,6 +321,8 @@ export default function ViewInvoicePage() {
                                 <SelectItem value="business">Business</SelectItem>
                                 <SelectItem value="modern">Modern</SelectItem>
                                 <SelectItem value="simple">Simple</SelectItem>
+                                <SelectItem value="minimalist">Minimalist</SelectItem>
+                                <SelectItem value="bold">Bold</SelectItem>
                             </SelectContent>
                         </Select>
                     </div>
