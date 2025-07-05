@@ -4,7 +4,7 @@
 import * as React from "react"
 import { Slot } from "@radix-ui/react-slot"
 import { VariantProps, cva } from "class-variance-authority"
-import { ChevronLeft, ChevronRight, PanelLeft } from "lucide-react"
+import { ChevronLeft, ChevronRight, Menu } from "lucide-react"
 import { VisuallyHidden } from "@radix-ui/react-visually-hidden"
 
 import { useIsMobile } from "@/hooks/use-mobile"
@@ -282,7 +282,7 @@ const SidebarTrigger = React.forwardRef<
   React.ComponentProps<typeof Button>
 >(({ className, children, onClick, variant = "ghost", size = "icon", ...props }, ref) => {
   const { toggleSidebar, state, isMobile } = useSidebar();
-  const Icon = isMobile ? PanelLeft : state === "expanded" ? ChevronLeft : ChevronRight;
+  const Icon = isMobile ? Menu : state === "expanded" ? ChevronLeft : ChevronRight;
 
   return (
     <Button
@@ -297,7 +297,7 @@ const SidebarTrigger = React.forwardRef<
       }}
       {...props}
     >
-      <Icon className="h-5 w-5" />
+      <Icon className="h-6 w-6" />
       {children}
       <span className="sr-only">Toggle Sidebar</span>
     </Button>
