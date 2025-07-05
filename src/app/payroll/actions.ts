@@ -22,6 +22,7 @@ export interface PayrollData {
   otherDeductions: number;
   netPayment: number;
   status: 'Pending' | 'Paid';
+  customFields?: { [key: string]: number };
 }
 
 /**
@@ -39,7 +40,11 @@ function serializeFirestoreData(data: any) {
       // Check if the value is a Firestore Timestamp
       if (value instanceof Timestamp) {
         serializedData[key] = value.toDate().toISOString();
-      } else {
+      } else if (value && typeof value === 'object' && !Array.isArray(value)) {
+        // Recursively serialize nested objects
+        serializedData[key] = serializeFirestoreData(value);
+      }
+      else {
         serializedData[key] = value;
       }
     }
@@ -64,6 +69,7 @@ export async function getPayrollDataForPeriod(companyId: string, payPeriod: stri
     const employeesWithPayroll = employeeSnapshot.docs.map(doc => {
         const employeeData = doc.data();
         const existingPayrollData = payrollsMap.get(doc.id);
+        const customFields = existingPayrollData?.customFields || {};
 
         const combinedData = {
             id: doc.id,
@@ -72,11 +78,11 @@ export async function getPayrollDataForPeriod(companyId: string, payPeriod: stri
             grossSalary: existingPayrollData ? existingPayrollData.grossSalary : (employeeData.salary || 0),
             advances: existingPayrollData ? existingPayrollData.advances : 0,
             otherDeductions: existingPayrollData ? existingPayrollData.otherDeductions : 0,
-            netPayment: existingPayrollData ? existingPayrollData.netPayment : (employeeData.salary || 0),
+            netPayment: 0, // This will be calculated on the client-side for dynamic updates
             status: existingPayrollData ? existingPayrollData.status : 'Pending',
+            customFields: customFields,
         };
         
-        // Serialize the combined data to make it safe to pass to the client component
         return serializeFirestoreData(combinedData);
     });
 
@@ -93,7 +99,7 @@ export async function savePayrollData(companyId: string, payPeriod: string, payr
 
     try {
         payrolls.forEach(data => {
-            const { employeeId, payrollId, grossSalary, advances, otherDeductions, netPayment, status } = data;
+            const { employeeId, payrollId, grossSalary, advances, otherDeductions, netPayment, status, customFields } = data;
 
             const payrollPayload = {
                 companyId,
@@ -104,6 +110,7 @@ export async function savePayrollData(companyId: string, payPeriod: string, payr
                 otherDeductions,
                 netPayment,
                 status,
+                customFields: customFields || {},
                 updatedAt: serverTimestamp(),
             };
 

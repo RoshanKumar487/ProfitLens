@@ -2,7 +2,7 @@
 'use server';
 
 import { db } from '@/lib/firebaseConfig';
-import { doc, getDoc, updateDoc } from 'firebase/firestore';
+import { doc, getDoc, updateDoc, setDoc } from 'firebase/firestore';
 
 export interface CustomItemColumn {
   id: string;
@@ -14,6 +14,16 @@ export interface InvoiceSettings {
   defaultPaymentTermsDays?: number;
   defaultHsnCode?: string;
 }
+
+export interface CustomPayrollField {
+  id: string;
+  label: string;
+}
+
+export interface PayrollSettings {
+  customFields: CustomPayrollField[];
+}
+
 
 export async function getInvoiceSettings(companyId: string): Promise<InvoiceSettings> {
   if (!companyId) {
@@ -43,12 +53,42 @@ export async function saveInvoiceSettings(
 
   try {
     const companyDocRef = doc(db, 'companyProfiles', companyId);
-    await updateDoc(companyDocRef, {
-      invoiceSettings: settings,
-    });
+    await setDoc(companyDocRef, { invoiceSettings: settings }, { merge: true });
     return { success: true, message: 'Invoice settings saved successfully.' };
   } catch (error: any) {
     console.error('Error saving invoice settings:', error);
+    return { success: false, message: `Failed to save settings: ${error.message}` };
+  }
+}
+
+export async function getPayrollSettings(companyId: string): Promise<PayrollSettings> {
+  if (!companyId) {
+    throw new Error('Company ID is required to get payroll settings.');
+  }
+  const companyDocRef = doc(db, 'companyProfiles', companyId);
+  const docSnap = await getDoc(companyDocRef);
+
+  if (docSnap.exists()) {
+    return docSnap.data().payrollSettings || { customFields: [] };
+  } else {
+    return { customFields: [] };
+  }
+}
+
+export async function savePayrollSettings(
+  companyId: string,
+  settings: PayrollSettings
+): Promise<{ success: boolean; message: string }> {
+  if (!companyId) {
+    return { success: false, message: 'Company ID is required to save settings.' };
+  }
+
+  try {
+    const companyDocRef = doc(db, 'companyProfiles', companyId);
+    await setDoc(companyDocRef, { payrollSettings: settings }, { merge: true });
+    return { success: true, message: 'Payroll settings saved successfully.' };
+  } catch (error: any) {
+    console.error('Error saving payroll settings:', error);
     return { success: false, message: `Failed to save settings: ${error.message}` };
   }
 }
