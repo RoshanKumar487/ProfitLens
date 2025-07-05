@@ -114,6 +114,10 @@ const InvoiceTemplateIndian = React.forwardRef<HTMLDivElement, InvoiceTemplatePr
 
     const primaryBgColor = stringToHslColor(companyProfileDetails.name, 40, 25);
     const customColumns = invoiceSettings?.customItemColumns || [];
+    const MIN_ROWS = 10;
+    const items = invoiceToView.items || [];
+    const emptyRowsCount = Math.max(0, MIN_ROWS - items.length);
+
 
     return (
       <div ref={ref} className="bg-white text-black font-sans text-xs w-[210mm] min-h-[297mm] mx-auto flex flex-col">
@@ -169,8 +173,8 @@ const InvoiceTemplateIndian = React.forwardRef<HTMLDivElement, InvoiceTemplatePr
                         </tr>
                     </thead>
                     <tbody>
-                        {(invoiceToView.items || []).map((item, index) => (
-                            <tr key={item.id} className="border-b border-gray-200 last:border-b-0">
+                        {items.map((item, index) => (
+                            <tr key={item.id} className="border-b border-black">
                                 <td className="p-2 border-r border-black">{index + 1}</td>
                                 <td className="p-2 border-r border-black text-left">{item.description}</td>
                                 <td className="p-2 border-r border-black">{item.hsnNo || ''}</td>
@@ -182,8 +186,19 @@ const InvoiceTemplateIndian = React.forwardRef<HTMLDivElement, InvoiceTemplatePr
                                 <td className="p-2 text-right">{currencySymbol}{(item.quantity * item.unitPrice).toFixed(2)}</td>
                             </tr>
                         ))}
-                         {/* Spacer row to push footer down */}
-                         <tr><td colSpan={6 + customColumns.length} className="py-24">&nbsp;</td></tr>
+                         {Array.from({ length: emptyRowsCount }).map((_, index) => (
+                            <tr key={`empty-${index}`} className="border-b border-black h-8">
+                                <td className="p-2 border-r border-black">&nbsp;</td>
+                                <td className="p-2 border-r border-black"></td>
+                                <td className="p-2 border-r border-black"></td>
+                                {customColumns.map(col => (
+                                    <td key={`${col.id}-empty-${index}`} className="p-2 border-r border-black"></td>
+                                ))}
+                                <td className="p-2 border-r border-black"></td>
+                                <td className="p-2 border-r border-black"></td>
+                                <td className="p-2"></td>
+                            </tr>
+                        ))}
                     </tbody>
                 </table>
              </div>

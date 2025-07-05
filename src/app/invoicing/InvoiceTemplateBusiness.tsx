@@ -73,6 +73,10 @@ const InvoiceTemplateBusiness = React.forwardRef<HTMLDivElement, InvoiceTemplate
     ].filter(Boolean).join('\n');
     
     const customColumns = invoiceSettings?.customItemColumns || [];
+    const MIN_ROWS = 12;
+    const items = invoiceToView.items || [];
+    const emptyRowsCount = Math.max(0, MIN_ROWS - items.length);
+
 
     return (
       <div ref={ref} className="bg-white text-gray-800 font-sans text-xs w-[210mm] min-h-[297mm] mx-auto flex flex-col p-8">
@@ -123,43 +127,54 @@ const InvoiceTemplateBusiness = React.forwardRef<HTMLDivElement, InvoiceTemplate
         </section>
 
         <main className="flex-grow mt-4">
-            <table className="w-full text-left text-xs">
+            <table className="w-full text-left text-xs border-l border-r border-gray-900">
                 <thead>
                     <tr style={{ backgroundColor: '#0A2B58' }} className="text-white">
-                        <th className="p-2 w-10 text-center font-normal">#</th>
-                        <th className="p-2 font-normal">Item & Description</th>
-                        <th className="p-2 w-24 font-normal">HSN No.</th>
+                        <th className="p-2 w-10 text-center font-normal border-r border-gray-500">#</th>
+                        <th className="p-2 font-normal border-r border-gray-500">Item & Description</th>
+                        <th className="p-2 w-24 font-normal border-r border-gray-500">HSN No.</th>
                         {customColumns.map(col => (
-                            <th key={col.id} className="p-2 w-24 font-normal text-right">{col.label}</th>
+                            <th key={col.id} className="p-2 w-24 font-normal text-right border-r border-gray-500">{col.label}</th>
                         ))}
-                        <th className="p-2 w-20 text-right font-normal">Qty</th>
-                        <th className="p-2 w-24 text-right font-normal">Rate</th>
+                        <th className="p-2 w-20 text-right font-normal border-r border-gray-500">Qty</th>
+                        <th className="p-2 w-24 text-right font-normal border-r border-gray-500">Rate</th>
                         <th className="p-2 w-28 text-right font-normal">Amount</th>
                     </tr>
                 </thead>
                 <tbody>
-                    {(invoiceToView.items || []).map((item, index) => (
-                        <tr key={item.id} className="border-b">
-                            <td className="p-2 text-center align-top">{index + 1}</td>
-                            <td className="p-2 align-top">
+                    {(items).map((item, index) => (
+                        <tr key={item.id} className="border-b border-gray-900">
+                            <td className="p-2 text-center align-top border-r border-gray-900">{index + 1}</td>
+                            <td className="p-2 align-top border-r border-gray-900">
                                 <p className="font-bold">{item.description}</p>
                             </td>
-                            <td className="p-2 align-top">{item.hsnNo || ''}</td>
+                            <td className="p-2 align-top border-r border-gray-900">{item.hsnNo || ''}</td>
                              {customColumns.map(col => (
-                                <td key={col.id} className="p-2 text-right align-top">{item.customFields?.[col.id] || ''}</td>
+                                <td key={col.id} className="p-2 text-right align-top border-r border-gray-900">{item.customFields?.[col.id] || ''}</td>
                             ))}
-                            <td className="p-2 text-right align-top">{item.quantity.toFixed(2)}</td>
-                            <td className="p-2 text-right align-top">{currencySymbol}{item.unitPrice.toFixed(2)}</td>
+                            <td className="p-2 text-right align-top border-r border-gray-900">{item.quantity.toFixed(2)}</td>
+                            <td className="p-2 text-right align-top border-r border-gray-900">{currencySymbol}{item.unitPrice.toFixed(2)}</td>
                             <td className="p-2 text-right align-top">{currencySymbol}{(item.quantity * item.unitPrice).toFixed(2)}</td>
                         </tr>
                     ))}
-                    {/* Spacer to push footer down */}
-                    <tr><td colSpan={6 + customColumns.length} className="pt-4">&nbsp;</td></tr>
+                    {Array.from({ length: emptyRowsCount }).map((_, index) => (
+                         <tr key={`empty-${index}`} className="border-b border-gray-900 h-8">
+                            <td className="border-r border-gray-900">&nbsp;</td>
+                            <td className="border-r border-gray-900"></td>
+                            <td className="border-r border-gray-900"></td>
+                            {customColumns.map(col => (
+                                <td key={`${col.id}-empty-${index}`} className="border-r border-gray-900"></td>
+                            ))}
+                            <td className="border-r border-gray-900"></td>
+                            <td className="border-r border-gray-900"></td>
+                            <td></td>
+                        </tr>
+                    ))}
                 </tbody>
             </table>
         </main>
         
-        <footer className="mt-auto">
+        <footer className="mt-auto pt-4">
              <div className="flex justify-end mb-2">
                 <div className="w-1/3">
                     <div className="flex justify-between py-1 border-b">
