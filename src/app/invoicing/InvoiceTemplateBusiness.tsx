@@ -22,6 +22,7 @@ interface InvoiceDisplay {
   clientName: string;
   clientEmail?: string;
   clientAddress?: string;
+  shippingAddress?: string;
   clientGstin?: string;
   subtotal: number;
   discountAmount: number;
@@ -124,11 +125,11 @@ const InvoiceTemplateBusiness = React.forwardRef<HTMLDivElement, InvoiceTemplate
              <div className="w-5/12 p-2">
                 <h3 className="text-xs text-gray-600 font-bold mb-1">Ship To</h3>
                 <p className="font-bold text-xl">{invoiceToView.clientName}</p>
-                <p className="whitespace-pre-line text-xs">{invoiceToView.clientAddress}</p>
+                <p className="whitespace-pre-line text-xs">{invoiceToView.shippingAddress || invoiceToView.clientAddress}</p>
             </div>
         </section>
 
-        <main className="mt-4">
+        <main className="mt-4 flex-grow">
             <table className="w-full text-left text-xs border-l border-r border-gray-900">
                 <thead>
                     <tr className={cn(isBlackAndWhite ? "text-black border-y-2 border-black" : "text-white")}

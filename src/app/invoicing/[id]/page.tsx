@@ -40,6 +40,7 @@ interface InvoiceDisplay {
   clientName: string;
   clientEmail?: string;
   clientAddress?: string;
+  shippingAddress?: string;
   clientGstin?: string;
   subtotal: number;
   discountType: DiscountType;
@@ -145,6 +146,7 @@ export default function EditInvoicePage() {
             clientName: invoice.clientName,
             clientEmail: invoice.clientEmail,
             clientAddress: invoice.clientAddress,
+            shippingAddress: invoice.shippingAddress,
             clientGstin: invoice.clientGstin,
             subtotal: invoice.subtotal,
             discountType: invoice.discountType,
@@ -260,8 +262,12 @@ export default function EditInvoicePage() {
                             <Input id="clientGstin" value={invoice.clientGstin || ''} onChange={(e) => handleValueChange('clientGstin', e.target.value)} disabled={isSaving} />
                         </div>
                         <div>
-                            <Label htmlFor="clientAddress">Client Address</Label>
+                            <Label htmlFor="clientAddress">Billing Address</Label>
                             <Textarea id="clientAddress" value={invoice.clientAddress || ''} onChange={(e) => handleValueChange('clientAddress', e.target.value)} disabled={isSaving} rows={3} />
+                        </div>
+                        <div>
+                            <Label htmlFor="shippingAddress">Shipping Address</Label>
+                            <Textarea id="shippingAddress" value={invoice.shippingAddress || ''} onChange={(e) => handleValueChange('shippingAddress', e.target.value)} disabled={isSaving} rows={3} placeholder="(if different from billing)" />
                         </div>
                         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
                             <div>

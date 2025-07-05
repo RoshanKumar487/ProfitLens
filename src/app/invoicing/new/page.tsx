@@ -44,6 +44,7 @@ interface InvoiceDisplay {
   clientName: string;
   clientEmail?: string;
   clientAddress?: string;
+  shippingAddress?: string;
   clientGstin?: string;
   subtotal: number;
   discountType: DiscountType;
@@ -63,6 +64,7 @@ interface ExistingClient {
   name: string;
   email?: string;
   address?: string;
+  shippingAddress?: string;
   gstin?: string;
 }
 
@@ -99,6 +101,7 @@ export default function NewInvoicePage() {
             clientName: '',
             clientEmail: '',
             clientAddress: '',
+            shippingAddress: '',
             clientGstin: '',
             notes: 'Thank you for your business. Please make the payment by the due date.',
             subtotal: 0,
@@ -175,6 +178,7 @@ export default function NewInvoicePage() {
                             name: inv.clientName,
                             email: inv.clientEmail || existingEntry?.email || '',
                             address: inv.clientAddress || existingEntry?.address || '',
+                            shippingAddress: inv.shippingAddress || existingEntry?.shippingAddress || '',
                             gstin: inv.clientGstin || existingEntry?.gstin || ''
                         });
                     }
@@ -250,6 +254,7 @@ export default function NewInvoicePage() {
             clientName: currentInvoice.clientName!,
             clientEmail: currentInvoice.clientEmail || '', 
             clientAddress: currentInvoice.clientAddress || '',
+            shippingAddress: currentInvoice.shippingAddress || '',
             clientGstin: currentInvoice.clientGstin || '',
             subtotal: currentInvoice.subtotal || 0,
             discountType: currentInvoice.discountType || 'fixed',
@@ -359,6 +364,7 @@ export default function NewInvoicePage() {
                 clientName: mostRecentInvoice.clientName,
                 clientEmail: mostRecentInvoice.clientEmail,
                 clientAddress: mostRecentInvoice.clientAddress,
+                shippingAddress: mostRecentInvoice.shippingAddress || '',
                 clientGstin: mostRecentInvoice.clientGstin,
                 items: newItems,
                 notes: mostRecentInvoice.notes || invoiceSettings?.defaultNotes,
@@ -376,7 +382,8 @@ export default function NewInvoicePage() {
                 ...defaultsToKeep, 
                 clientName: client.name, 
                 clientEmail: client.email || '', 
-                clientAddress: client.address || '', 
+                clientAddress: client.address || '',
+                shippingAddress: client.shippingAddress || '',
                 clientGstin: client.gstin || '',
                 items: [{ id: crypto.randomUUID(), description: '', hsnNo: invoiceSettings?.defaultHsnCode || '', quantity: 1, unitPrice: 0, customFields: {} }],
                 notes: invoiceSettings?.defaultNotes || 'Thank you for your business. Please make the payment by the due date.',
@@ -482,7 +489,7 @@ export default function NewInvoicePage() {
                             </div>
                         </header>
 
-                        <section className="flex border-y-2 border-gray-900">
+                        <section className="flex border-t border-b border-gray-900">
                             <div className="w-7/12 border-r border-gray-900 p-2">
                                 <table className="text-xs w-full">
                                     <tbody>
@@ -515,7 +522,13 @@ export default function NewInvoicePage() {
                                     </tbody>
                                 </table>
                             </div>
-                            <div className="w-5/12 p-2 relative">
+                            <div className="w-5/12 p-2">
+                                 {/* This space can be used for Ship To if needed, but for now we follow the design */}
+                            </div>
+                        </section>
+
+                        <section className="flex border-b border-gray-900">
+                             <div className="w-7/12 border-r border-gray-900 p-2 relative">
                                 <h3 className="text-xs text-gray-600 font-bold mb-1">Bill To</h3>
                                 <div className="relative">
                                     <Input 
@@ -540,7 +553,7 @@ export default function NewInvoicePage() {
                                 </div>
                                 <Textarea 
                                     className="whitespace-pre-line text-xs p-1 h-16 leading-tight" 
-                                    placeholder="Client Address" 
+                                    placeholder="Billing Address" 
                                     value={currentInvoice.clientAddress || ''} 
                                     onChange={(e) => setCurrentInvoice({...currentInvoice, clientAddress: e.target.value})}
                                 />
@@ -549,6 +562,15 @@ export default function NewInvoicePage() {
                                     placeholder="Client GSTIN" 
                                     value={currentInvoice.clientGstin || ''} 
                                     onChange={(e) => setCurrentInvoice({...currentInvoice, clientGstin: e.target.value})}
+                                />
+                            </div>
+                             <div className="w-5/12 p-2">
+                                <h3 className="text-xs text-gray-600 font-bold mb-1">Ship To</h3>
+                                <Textarea 
+                                    className="whitespace-pre-line text-xs p-1 h-16 leading-tight mt-[36px]" 
+                                    placeholder="Shipping Address (if different)" 
+                                    value={currentInvoice.shippingAddress || ''} 
+                                    onChange={(e) => setCurrentInvoice({...currentInvoice, shippingAddress: e.target.value})}
                                 />
                             </div>
                         </section>
@@ -665,7 +687,8 @@ export default function NewInvoicePage() {
                                 </div>
                                 <div><Label htmlFor="clientEmailMobile">Client Email</Label><Input id="clientEmailMobile" type="email" value={currentInvoice.clientEmail || ''} onChange={(e) => setCurrentInvoice({...currentInvoice, clientEmail: e.target.value})}/></div>
                                 <div><Label htmlFor="clientGstinMobile">Client GSTIN</Label><Input id="clientGstinMobile" value={currentInvoice.clientGstin || ''} onChange={(e) => setCurrentInvoice({...currentInvoice, clientGstin: e.target.value})}/></div>
-                                <div><Label htmlFor="clientAddressMobile">Client Address</Label><Textarea id="clientAddressMobile" value={currentInvoice.clientAddress || ''} onChange={(e) => setCurrentInvoice({...currentInvoice, clientAddress: e.target.value})} rows={3} /></div>
+                                <div><Label htmlFor="clientAddressMobile">Billing Address</Label><Textarea id="clientAddressMobile" value={currentInvoice.clientAddress || ''} onChange={(e) => setCurrentInvoice({...currentInvoice, clientAddress: e.target.value})} rows={3} /></div>
+                                <div><Label htmlFor="shippingAddressMobile">Shipping Address</Label><Textarea id="shippingAddressMobile" value={currentInvoice.shippingAddress || ''} onChange={(e) => setCurrentInvoice({...currentInvoice, shippingAddress: e.target.value})} rows={3} placeholder="(if different from billing)" /></div>
                             </CardContent>
                         </Card>
                         <Card>

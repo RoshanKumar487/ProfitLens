@@ -21,6 +21,7 @@ interface InvoiceDisplay {
   clientName: string;
   clientEmail?: string;
   clientAddress?: string;
+  shippingAddress?: string;
   subtotal: number;
   discountAmount: number;
   taxRate: number;
@@ -98,28 +99,35 @@ const InvoiceTemplateModern = React.forwardRef<HTMLDivElement, InvoiceTemplatePr
 
         {/* Invoice Details & Client Info */}
         <section className="grid grid-cols-2 gap-8 mb-8">
-          <div className={cn("p-4 rounded-lg", isBlackAndWhite ? "border" : "bg-slate-100")}>
-            <h3 className={cn("text-lg font-semibold border-b-2 pb-1 mb-2", isBlackAndWhite ? "text-black border-black" : "text-slate-800 border-amber-400")}>Invoice To:</h3>
-            <p className="text-2xl font-bold text-slate-700">{invoiceToView.clientName}</p>
-            <p><strong>Address:</strong> {invoiceToView.clientAddress || 'N/A'}</p>
+          <div>
+            <h3 className={cn("text-lg font-semibold border-b-2 pb-1 mb-2", isBlackAndWhite ? "text-black border-black" : "text-slate-800 border-amber-400")}>Bill To:</h3>
+            <p className="text-xl font-bold text-slate-700">{invoiceToView.clientName}</p>
+            <p className="text-sm text-slate-600 whitespace-pre-line">{invoiceToView.clientAddress || 'N/A'}</p>
           </div>
-          <div className={cn("p-4 rounded-lg", isBlackAndWhite ? "border" : "bg-slate-100")}>
-             <div className="grid grid-cols-[auto_1fr] gap-x-4 gap-y-1">
-                <span className="font-bold">Invoice No:</span><span className="font-medium text-slate-600">{invoiceToView.invoiceNumber}</span>
-                <span className="font-bold">Invoice Date:</span><span className="font-medium text-slate-600">{format(invoiceToView.issuedDate, 'dd MMM, yyyy')}</span>
-                <span className="font-bold">Due Date:</span><span className="font-medium text-slate-600">{format(invoiceToView.dueDate, 'dd MMM, yyyy')}</span>
-            </div>
-            <div className="mt-4">
-              <h3 className="font-bold text-slate-800">Payment Method:</h3>
-              <p className="text-xs text-slate-600">Bank: {companyProfileDetails.bankName || 'N/A'}</p>
-              <p className="text-xs text-slate-600">A/C: {companyProfileDetails.accountNumber || 'N/A'}</p>
-              <p className="text-xs text-slate-600">IFSC: {companyProfileDetails.ifscCode || 'N/A'}</p>
-            </div>
+          <div>
+            <h3 className={cn("text-lg font-semibold border-b-2 pb-1 mb-2", isBlackAndWhite ? "text-black border-black" : "text-slate-800 border-amber-400")}>Ship To:</h3>
+            <p className="text-xl font-bold text-slate-700">{invoiceToView.clientName}</p>
+            <p className="text-sm text-slate-600 whitespace-pre-line">{invoiceToView.shippingAddress || invoiceToView.clientAddress || 'N/A'}</p>
           </div>
         </section>
 
+        <section className="mb-8">
+            <div className={cn("p-4 rounded-lg grid grid-cols-3 gap-4", isBlackAndWhite ? "border" : "bg-slate-100")}>
+                <div className="grid grid-cols-[auto_1fr] gap-x-2">
+                    <span className="font-bold">Invoice No:</span><span className="font-medium text-slate-600">{invoiceToView.invoiceNumber}</span>
+                </div>
+                <div className="grid grid-cols-[auto_1fr] gap-x-2">
+                    <span className="font-bold">Invoice Date:</span><span className="font-medium text-slate-600">{format(invoiceToView.issuedDate, 'dd MMM, yyyy')}</span>
+                </div>
+                <div className="grid grid-cols-[auto_1fr] gap-x-2">
+                    <span className="font-bold">Due Date:</span><span className="font-medium text-slate-600">{format(invoiceToView.dueDate, 'dd MMM, yyyy')}</span>
+                </div>
+            </div>
+        </section>
+
+
         {/* Items Table */}
-        <section className="mb-4">
+        <section className="flex-grow mb-4">
           <table className="w-full text-left">
             <thead>
               <tr className={cn(isBlackAndWhite ? "text-black border-y-2 border-black" : "bg-slate-800 text-white")}>
@@ -155,6 +163,12 @@ const InvoiceTemplateModern = React.forwardRef<HTMLDivElement, InvoiceTemplatePr
             <div className="text-xs text-slate-600">
                 <h4 className="font-bold text-lg text-slate-800 mb-2">Terms & Conditions</h4>
                 <p>{invoiceToView.notes || 'Full payment is due upon receipt of this invoice. Thank you for your business.'}</p>
+                 <div className="mt-4">
+                    <h3 className="font-bold text-slate-800">Payment Method:</h3>
+                    <p className="text-xs text-slate-600">Bank: {companyProfileDetails.bankName || 'N/A'}</p>
+                    <p className="text-xs text-slate-600">A/C: {companyProfileDetails.accountNumber || 'N/A'}</p>
+                    <p className="text-xs text-slate-600">IFSC: {companyProfileDetails.ifscCode || 'N/A'}</p>
+                </div>
             </div>
 
             <div className="text-right">
