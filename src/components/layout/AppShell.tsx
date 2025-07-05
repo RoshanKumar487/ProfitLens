@@ -156,7 +156,7 @@ const AppShellLayout = ({ children }: { children: React.ReactNode }) => {
   return (
     <>
       {!isAuthPage && (
-        <Sidebar collapsible="icon" variant="sidebar" className="border-r border-sidebar-border/20 bg-sidebar backdrop-blur-md">
+        <Sidebar collapsible="icon" variant="sidebar" className="border-r border-sidebar-border/20 bg-sidebar backdrop-blur-md print:hidden">
           <SidebarHeader className="p-2">
             <Logo />
             {user && user.companyName && (
@@ -220,7 +220,7 @@ const AppShellLayout = ({ children }: { children: React.ReactNode }) => {
 
       <SidebarInset className={cn(isAuthPage && "md:!ml-0")}>
         {!isAuthPage && (
-           <header className="sticky top-0 z-10 border-b border-border bg-background/80 backdrop-blur-sm">
+           <header className="sticky top-0 z-10 border-b border-border bg-background/80 backdrop-blur-sm print:hidden">
               <div className="mx-auto flex h-14 max-w-7xl items-center gap-4 px-4 sm:px-6">
                 <SidebarTrigger className="md:hidden" />
                 
@@ -351,7 +351,7 @@ const AppShellLayout = ({ children }: { children: React.ReactNode }) => {
             </div>
           </header>
         )}
-        <main className="flex-1">
+        <main className="flex-1 print:p-0">
           {authLoading ? (
              <div className="flex justify-center items-center h-screen">
                 <Loader2 className="h-10 w-10 animate-spin text-primary" />
@@ -366,7 +366,7 @@ const AppShellLayout = ({ children }: { children: React.ReactNode }) => {
             <Tooltip>
               <TooltipTrigger asChild>
                 <DialogTrigger asChild>
-                  <Button className="fixed bottom-6 right-6 h-14 w-14 rounded-full shadow-2xl z-50 bg-[#7C3AED] hover:bg-[#6D28D9] text-white hover:scale-110 transition-transform duration-200">
+                  <Button className="fixed bottom-6 right-6 h-14 w-14 rounded-full shadow-2xl z-50 bg-[#7C3AED] hover:bg-[#6D28D9] text-white hover:scale-110 transition-transform duration-200 print:hidden">
                     <Sparkles className="h-7 w-7" />
                   </Button>
                 </DialogTrigger>

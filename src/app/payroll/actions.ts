@@ -11,6 +11,7 @@ import {
   writeBatch,
   serverTimestamp,
   Timestamp,
+  setDoc,
 } from 'firebase/firestore';
 
 export interface PayrollData {
@@ -96,10 +97,28 @@ export async function savePayrollData(companyId: string, payPeriod: string, payr
     }
 
     const batch = writeBatch(db);
+    const timestamp = serverTimestamp();
 
     try {
-        payrolls.forEach(data => {
-            const { employeeId, payrollId, grossSalary, advances, otherDeductions, netPayment, status, customFields } = data;
+        for (const data of payrolls) {
+            let employeeId = data.employeeId;
+            const { isNew, name, payrollId, grossSalary, advances, otherDeductions, netPayment, status, customFields } = data;
+
+            // If it's a new employee, create the employee document first
+            if (isNew) {
+                const newEmployeeRef = doc(collection(db, 'employees'));
+                employeeId = newEmployeeRef.id;
+                batch.set(newEmployeeRef, {
+                    name,
+                    salary: grossSalary || 0,
+                    companyId,
+                    position: 'N/A', // Default position for manually added
+                    createdAt: timestamp,
+                    updatedAt: timestamp,
+                    addedById: 'payroll_manual_add',
+                    addedBy: 'Payroll Page',
+                });
+            }
 
             const payrollPayload = {
                 companyId,
@@ -111,20 +130,20 @@ export async function savePayrollData(companyId: string, payPeriod: string, payr
                 netPayment,
                 status,
                 customFields: customFields || {},
-                updatedAt: serverTimestamp(),
+                updatedAt: timestamp,
             };
 
-            if (payrollId) {
+            if (payrollId && !isNew) { // Update existing payroll record
                 const payrollRef = doc(db, 'payrolls', payrollId);
                 batch.update(payrollRef, payrollPayload);
-            } else {
+            } else { // Create new payroll record (for new or existing employees)
                 const payrollRef = doc(collection(db, 'payrolls'));
                 batch.set(payrollRef, {
                     ...payrollPayload,
-                    createdAt: serverTimestamp(),
+                    createdAt: timestamp,
                 });
             }
-        });
+        }
 
         await batch.commit();
         return { success: true, message: "Payroll data saved successfully." };

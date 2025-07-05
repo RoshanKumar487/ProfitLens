@@ -7,10 +7,10 @@ import { useToast } from '@/hooks/use-toast';
 import PageTitle from '@/components/PageTitle';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow, TableFooter } from '@/components/ui/table';
 import { Input } from '@/components/ui/input';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
-import { HandCoins, Loader2, Save, Calendar as CalendarIcon, Settings } from 'lucide-react';
+import { HandCoins, Loader2, Save, Calendar as CalendarIcon, Settings, Printer, PlusCircle, Trash2 } from 'lucide-react';
 import { format, startOfMonth } from 'date-fns';
 import { getPayrollDataForPeriod, savePayrollData } from './actions';
 import { getPayrollSettings, type PayrollSettings } from '../settings/actions';
@@ -19,9 +19,10 @@ import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover
 import { Calendar } from '@/components/ui/calendar';
 import Link from 'next/link';
 import { TooltipProvider, Tooltip, TooltipTrigger, TooltipContent } from '@/components/ui/tooltip';
+import { v4 as uuidv4 } from 'uuid';
 
 interface EmployeeWithPayroll {
-  id: string; // employeeId
+  id: string; // employeeId for existing, tempId for new
   name: string;
   profilePictureUrl?: string;
   payrollId: string | null;
@@ -31,6 +32,7 @@ interface EmployeeWithPayroll {
   netPayment: number;
   status: 'Pending' | 'Paid';
   customFields: { [key: string]: number };
+  isNew?: boolean;
 }
 
 const getInitials = (name: string = "") => {
@@ -76,13 +78,13 @@ export default function PayrollPage() {
     }
   }, [payPeriod, user, authLoading, fetchPayrollData]);
 
-  const handleInputChange = (employeeId: string, field: 'grossSalary' | 'advances' | 'otherDeductions' | string, value: string) => {
+  const handleInputChange = (employeeId: string, field: keyof Omit<EmployeeWithPayroll, 'id' | 'isNew' | 'payrollId' | 'customFields' | 'netPayment'> | string, value: string) => {
     const numericValue = parseFloat(value) || 0;
     setPayrollData(prevData =>
       prevData.map(emp => {
         if (emp.id === employeeId) {
-          if (['grossSalary', 'advances', 'otherDeductions'].includes(field)) {
-            return { ...emp, [field]: numericValue };
+          if (['grossSalary', 'advances', 'otherDeductions', 'name'].includes(field)) {
+            return { ...emp, [field]: field === 'name' ? value : numericValue };
           } else {
             // This is a custom field
             const updatedCustomFields = { ...(emp.customFields || {}), [field]: numericValue };
@@ -93,24 +95,45 @@ export default function PayrollPage() {
       })
     );
   };
-
+  
   const handleStatusChange = (employeeId: string, newStatus: 'Pending' | 'Paid') => {
     setPayrollData(prevData =>
         prevData.map(emp => emp.id === employeeId ? { ...emp, status: newStatus } : emp)
     );
   };
+  
+  const handleAddRow = () => {
+    const newRow: EmployeeWithPayroll = {
+        id: uuidv4(),
+        isNew: true,
+        name: '',
+        payrollId: null,
+        grossSalary: 0,
+        advances: 0,
+        otherDeductions: 0,
+        netPayment: 0,
+        status: 'Pending',
+        customFields: {}
+    };
+    setPayrollData(prev => [...prev, newRow]);
+  };
+
+  const handleRemoveRow = (id: string) => {
+    setPayrollData(prev => prev.filter(emp => emp.id !== id));
+  };
+
 
   const handleSaveAll = async () => {
     if (!user?.companyId) return;
     setIsSaving(true);
     const periodString = format(payPeriod, 'yyyy-MM');
+    
     const dataToSave = payrollData.map(p => {
       const totalCustomDeductions = payrollSettings?.customFields.reduce((sum, field) => sum + (p.customFields?.[field.id] || 0), 0) || 0;
       const netPayment = (p.grossSalary || 0) - (p.advances || 0) - (p.otherDeductions || 0) - totalCustomDeductions;
-      return {
-        employeeId: p.id,
+      
+      const payload: any = {
         payrollId: p.payrollId,
-        payPeriod: periodString,
         grossSalary: p.grossSalary,
         advances: p.advances,
         otherDeductions: p.otherDeductions,
@@ -118,7 +141,22 @@ export default function PayrollPage() {
         status: p.status,
         customFields: p.customFields || {}
       };
-    });
+
+      if (p.isNew) {
+        payload.isNew = true;
+        payload.name = p.name;
+      } else {
+        payload.employeeId = p.id;
+      }
+      
+      return payload;
+    }).filter(p => !p.isNew || (p.isNew && p.name.trim() !== '')); // Filter out empty new rows
+
+    if (dataToSave.length === 0) {
+        toast({ title: "No Data to Save", description: "There are no changes or new employees to save.", variant: 'default' });
+        setIsSaving(false);
+        return;
+    }
 
     const result = await savePayrollData(user.companyId, periodString, dataToSave);
     toast({
@@ -130,6 +168,10 @@ export default function PayrollPage() {
       fetchPayrollData(payPeriod);
     }
     setIsSaving(false);
+  };
+
+  const handlePrint = () => {
+    window.print();
   };
   
   if (authLoading) {
@@ -146,11 +188,16 @@ export default function PayrollPage() {
   }
 
   return (
-    <div className="space-y-6 p-4 sm:p-6 lg:p-8">
+    <div className="space-y-6 p-4 sm:p-6 lg:p-8 print:p-0 print:space-y-0">
+      <div className="hidden print:block text-center mb-4">
+        <h1 className="text-xl font-bold">{user?.companyName}</h1>
+        <h2 className="text-lg">Payroll for {format(payPeriod, 'MMMM yyyy')}</h2>
+      </div>
+
       <PageTitle title="Employee Payroll" subtitle="Manage monthly salary, advances, and deductions." icon={HandCoins} />
 
-      <Card>
-        <CardHeader>
+      <Card className="print:shadow-none print:border-none">
+        <CardHeader className="print:hidden">
           <div className="flex flex-col sm:flex-row items-center justify-between gap-4">
             <div>
               <CardTitle>Payroll for {format(payPeriod, 'MMMM yyyy')}</CardTitle>
@@ -191,6 +238,14 @@ export default function PayrollPage() {
                       <p>Manage Custom Payroll Fields</p>
                     </TooltipContent>
                   </Tooltip>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                        <Button variant="outline" size="icon" onClick={handlePrint}>
+                            <Printer className="h-4 w-4" />
+                        </Button>
+                    </TooltipTrigger>
+                    <TooltipContent><p>Print Payroll</p></TooltipContent>
+                  </Tooltip>
                 </TooltipProvider>
                 <Button onClick={handleSaveAll} disabled={isSaving || isLoading}>
                     {isSaving ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Save className="mr-2 h-4 w-4" />}
@@ -213,6 +268,7 @@ export default function PayrollPage() {
                   ))}
                   <TableHead>Net Payment</TableHead>
                   <TableHead>Status</TableHead>
+                   <TableHead className="print:hidden">Actions</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -225,6 +281,7 @@ export default function PayrollPage() {
                       ))}
                       <TableCell><Skeleton className="h-4 w-20" /></TableCell>
                       <TableCell><Skeleton className="h-8 w-20" /></TableCell>
+                      <TableCell className="print:hidden"><Skeleton className="h-8 w-8" /></TableCell>
                     </TableRow>
                   ))
                 ) : payrollData.length > 0 ? (
@@ -235,13 +292,21 @@ export default function PayrollPage() {
                     return (
                         <TableRow key={emp.id}>
                           <TableCell className="sticky left-0 bg-background z-10">
-                            <div className="flex items-center gap-2">
-                              <Avatar>
-                                <AvatarImage src={emp.profilePictureUrl} />
-                                <AvatarFallback>{getInitials(emp.name)}</AvatarFallback>
-                              </Avatar>
-                              <span className="font-medium">{emp.name}</span>
-                            </div>
+                            {emp.isNew ? (
+                                <Input 
+                                    placeholder="Enter Employee Name" 
+                                    value={emp.name} 
+                                    onChange={e => handleInputChange(emp.id, 'name', e.target.value)} 
+                                />
+                            ) : (
+                                <div className="flex items-center gap-2">
+                                <Avatar>
+                                    <AvatarImage src={emp.profilePictureUrl} />
+                                    <AvatarFallback>{getInitials(emp.name)}</AvatarFallback>
+                                </Avatar>
+                                <span className="font-medium">{emp.name}</span>
+                                </div>
+                            )}
                           </TableCell>
                           <TableCell><Input type="number" value={emp.grossSalary} onChange={e => handleInputChange(emp.id, 'grossSalary', e.target.value)} className="w-28" /></TableCell>
                           <TableCell><Input type="number" value={emp.advances} onChange={e => handleInputChange(emp.id, 'advances', e.target.value)} className="w-28" /></TableCell>
@@ -267,17 +332,33 @@ export default function PayrollPage() {
                               {emp.status}
                             </Button>
                           </TableCell>
+                          <TableCell className="print:hidden">
+                            {emp.isNew && (
+                                <Button variant="ghost" size="icon" className="text-destructive" onClick={() => handleRemoveRow(emp.id)}>
+                                    <Trash2 className="h-4 w-4" />
+                                </Button>
+                            )}
+                          </TableCell>
                         </TableRow>
                     );
                   })
                 ) : (
                   <TableRow>
-                    <TableCell colSpan={6 + (payrollSettings?.customFields.length || 0)} className="text-center h-24">
-                      No employees found. Add employees on the Employees page.
+                    <TableCell colSpan={7 + (payrollSettings?.customFields.length || 0)} className="text-center h-24">
+                      No employees found. Add employees on the Employees page or add a new row manually.
                     </TableCell>
                   </TableRow>
                 )}
               </TableBody>
+              <TableFooter className="print:hidden">
+                <TableRow>
+                    <TableCell colSpan={7 + (payrollSettings?.customFields.length || 0)}>
+                        <Button variant="outline" size="sm" onClick={handleAddRow}>
+                            <PlusCircle className="mr-2 h-4 w-4" /> Add Employee
+                        </Button>
+                    </TableCell>
+                </TableRow>
+              </TableFooter>
             </Table>
           </div>
         </CardContent>
