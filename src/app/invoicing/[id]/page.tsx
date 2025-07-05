@@ -137,7 +137,31 @@ export default function EditInvoicePage() {
         e.preventDefault();
         if (!invoice) return;
         setIsSaving(true);
-        const result = await updateInvoice(invoiceId, invoice);
+        
+        // Manually create a plain object to pass to the server action
+        // This avoids passing complex objects like Firestore Timestamps
+        const invoicePayload = {
+            invoiceNumber: invoice.invoiceNumber,
+            clientName: invoice.clientName,
+            clientEmail: invoice.clientEmail,
+            clientAddress: invoice.clientAddress,
+            clientGstin: invoice.clientGstin,
+            subtotal: invoice.subtotal,
+            discountType: invoice.discountType,
+            discountValue: invoice.discountValue,
+            discountAmount: invoice.discountAmount,
+            taxRate: invoice.taxRate,
+            taxAmount: invoice.taxAmount,
+            amount: invoice.amount,
+            dueDate: invoice.dueDate,
+            status: invoice.status,
+            issuedDate: invoice.issuedDate,
+            items: invoice.items,
+            notes: invoice.notes,
+        };
+
+        const result = await updateInvoice(invoiceId, invoicePayload);
+        
         toast({
             title: result.success ? "Success" : "Error",
             description: result.message,
