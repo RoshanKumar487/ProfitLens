@@ -1,4 +1,3 @@
-
 'use client';
 
 import React from 'react';
@@ -73,7 +72,7 @@ const InvoiceTemplateBusiness = React.forwardRef<HTMLDivElement, InvoiceTemplate
     ].filter(Boolean).join('\n');
     
     const customColumns = invoiceSettings?.customItemColumns || [];
-    const MIN_ROWS = 12;
+    const MIN_ROWS = 5;
     const items = invoiceToView.items || [];
     const emptyRowsCount = Math.max(0, MIN_ROWS - items.length);
 

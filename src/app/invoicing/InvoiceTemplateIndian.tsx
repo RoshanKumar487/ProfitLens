@@ -1,4 +1,3 @@
-
 'use client';
 
 import React from 'react';
@@ -114,7 +113,7 @@ const InvoiceTemplateIndian = React.forwardRef<HTMLDivElement, InvoiceTemplatePr
 
     const primaryBgColor = stringToHslColor(companyProfileDetails.name, 40, 25);
     const customColumns = invoiceSettings?.customItemColumns || [];
-    const MIN_ROWS = 10;
+    const MIN_ROWS = 5;
     const items = invoiceToView.items || [];
     const emptyRowsCount = Math.max(0, MIN_ROWS - items.length);
 
