@@ -45,7 +45,7 @@ interface EmployeeWithPayroll {
   otherDeductions: number;
   netPayment: number;
   status: 'Pending' | 'Paid';
-  customFields: { [key: string]: number };
+  customFields: { [key: string]: any };
   isNew?: boolean;
 }
 
@@ -89,7 +89,23 @@ export default function PayrollPage() {
         getPayrollDataForPeriod(user.companyId, periodString),
         getPayrollSettings(user.companyId),
       ]);
-      setPayrollData(data);
+      
+      const processedData = data.map(emp => {
+        const processedCustomFields: { [key: string]: any } = {};
+        if (emp.customFields && settings.customFields) {
+            for (const field of settings.customFields) {
+                const value = emp.customFields[field.id];
+                if (field.type === 'date' && typeof value === 'string' && !isNaN(Date.parse(value))) {
+                    processedCustomFields[field.id] = new Date(value);
+                } else {
+                    processedCustomFields[field.id] = value;
+                }
+            }
+        }
+        return { ...emp, customFields: processedCustomFields };
+      });
+      
+      setPayrollData(processedData);
       setPayrollSettings(settings);
     } catch (error: any) {
       toast({ title: "Error", description: `Could not fetch payroll data: ${error.message}`, variant: "destructive" });
@@ -104,16 +120,17 @@ export default function PayrollPage() {
     }
   }, [payPeriod, user, authLoading, fetchPayrollData]);
 
-  const handleInputChange = (employeeId: string, field: keyof Omit<EmployeeWithPayroll, 'id' | 'isNew' | 'payrollId' | 'customFields' | 'netPayment'> | string, value: string) => {
-    const numericValue = parseFloat(value) || 0;
+  const handleInputChange = (employeeId: string, field: string, value: any) => {
     setPayrollData(prevData =>
       prevData.map(emp => {
         if (emp.id === employeeId) {
-          if (['grossSalary', 'advances', 'otherDeductions', 'name'].includes(field)) {
-            return { ...emp, [field]: field === 'name' ? value : numericValue };
-          } else {
-            // This is a custom field
-            const updatedCustomFields = { ...(emp.customFields || {}), [field]: numericValue };
+          if (['grossSalary', 'advances', 'otherDeductions'].includes(field)) {
+            return { ...emp, [field]: parseFloat(value) || 0 };
+          } else if (field === 'name') {
+            return { ...emp, name: value };
+          }
+          else {
+            const updatedCustomFields = { ...(emp.customFields || {}), [field]: value };
             return { ...emp, customFields: updatedCustomFields };
           }
         }
@@ -161,7 +178,6 @@ export default function PayrollPage() {
     setPayrollData(prev => {
       const insertAtIndex = prev.findIndex(p => p.id === afterEmployeeId);
       if (insertAtIndex === -1) {
-        // Fallback: if the employee ID isn't found, add to the end
         return [...prev, newRow];
       }
       const newData = [...prev];
@@ -176,29 +192,46 @@ export default function PayrollPage() {
     const periodString = format(payPeriod, 'yyyy-MM');
     
     const dataToSave = payrollData.map(p => {
-      const totalCustomDeductions = payrollSettings?.customFields.reduce((sum, field) => sum + (p.customFields?.[field.id] || 0), 0) || 0;
-      const netPayment = (p.grossSalary || 0) - (p.advances || 0) - (p.otherDeductions || 0) - totalCustomDeductions;
+        const totalCustomDeductions = (payrollSettings?.customFields || []).reduce((sum, field) => {
+            if (field.type === 'number') {
+                return sum + (Number(p.customFields?.[field.id]) || 0);
+            }
+            return sum;
+        }, 0);
+        const netPayment = (p.grossSalary || 0) - (p.advances || 0) - (p.otherDeductions || 0) - totalCustomDeductions;
       
-      const payload: any = {
-        payrollId: p.payrollId,
-        grossSalary: p.grossSalary,
-        advances: p.advances,
-        otherDeductions: p.otherDeductions,
-        netPayment: netPayment,
-        status: p.status,
-        customFields: p.customFields || {}
-      };
+        const customFieldsForSave: { [key: string]: any } = {};
+        if (p.customFields) {
+            for (const key in p.customFields) {
+                const value = p.customFields[key];
+                if (value instanceof Date) {
+                    customFieldsForSave[key] = value.toISOString();
+                } else {
+                    customFieldsForSave[key] = value;
+                }
+            }
+        }
 
-      if (p.isNew) {
-        payload.isNew = true;
-        payload.name = p.name;
-        payload.employeeId = p.id;
-      } else {
-        payload.employeeId = p.id;
-      }
+        const payload: any = {
+            payrollId: p.payrollId,
+            grossSalary: p.grossSalary,
+            advances: p.advances,
+            otherDeductions: p.otherDeductions,
+            netPayment: netPayment,
+            status: p.status,
+            customFields: customFieldsForSave,
+        };
+
+        if (p.isNew) {
+            payload.isNew = true;
+            payload.name = p.name;
+            payload.employeeId = p.id;
+        } else {
+            payload.employeeId = p.id;
+        }
       
-      return payload;
-    }).filter(p => !p.isNew || (p.isNew && p.name.trim() !== '')); // Filter out empty new rows
+        return payload;
+    }).filter(p => !p.isNew || (p.isNew && p.name.trim() !== ''));
 
     if (dataToSave.length === 0) {
         toast({ title: "No Data to Save", description: "There are no changes or new employees to save.", variant: 'default' });
@@ -225,7 +258,6 @@ export default function PayrollPage() {
   const handleConfirmDelete = async () => {
     if (!employeeToDelete) return;
   
-    // If it's a new row not yet saved, just remove from state
     if (employeeToDelete.isNew || !employeeToDelete.payrollId) {
       setPayrollData(prev => prev.filter(emp => emp.id !== employeeToDelete.id));
       setEmployeeToDelete(null);
@@ -233,7 +265,6 @@ export default function PayrollPage() {
       return;
     }
   
-    // If it has a payrollId, delete from Firestore
     setIsDeleting(true);
     const result = await deletePayrollRecord(employeeToDelete.payrollId);
     toast({
@@ -243,7 +274,6 @@ export default function PayrollPage() {
     });
   
     if (result.success) {
-      // Refetch data to ensure consistency
       fetchPayrollData(payPeriod);
     }
   
@@ -261,7 +291,12 @@ export default function PayrollPage() {
 
   const totals = useMemo(() => {
     return filteredData.reduce((acc, emp) => {
-        const totalCustomDeductions = (payrollSettings?.customFields || []).reduce((sum, field) => sum + (emp.customFields?.[field.id] || 0), 0);
+        const totalCustomDeductions = (payrollSettings?.customFields || []).reduce((sum, field) => {
+            if (field.type === 'number') {
+                return sum + (Number(emp.customFields?.[field.id]) || 0);
+            }
+            return sum;
+        }, 0);
         const netPayment = (emp.grossSalary || 0) - (emp.advances || 0) - (emp.otherDeductions || 0) - totalCustomDeductions;
         
         acc.grossSalary += emp.grossSalary || 0;
@@ -270,7 +305,9 @@ export default function PayrollPage() {
         acc.netPayment += netPayment;
 
         (payrollSettings?.customFields || []).forEach(field => {
-            acc.customFields[field.id] = (acc.customFields[field.id] || 0) + (emp.customFields?.[field.id] || 0);
+            if (field.type === 'number') {
+                acc.customFields[field.id] = (acc.customFields[field.id] || 0) + (Number(emp.customFields?.[field.id]) || 0);
+            }
         });
 
         return acc;
@@ -475,7 +512,12 @@ export default function PayrollPage() {
                   ))
                 ) : filteredData.length > 0 ? (
                   filteredData.map(emp => {
-                    const totalCustomDeductions = payrollSettings?.customFields.reduce((sum, field) => sum + (emp.customFields?.[field.id] || 0), 0) || 0;
+                    const totalCustomDeductions = (payrollSettings?.customFields || []).reduce((sum, field) => {
+                        if (field.type === 'number') {
+                            return sum + (Number(emp.customFields?.[field.id]) || 0);
+                        }
+                        return sum;
+                    }, 0);
                     const netPayment = (emp.grossSalary || 0) - (emp.advances || 0) - (emp.otherDeductions || 0) - totalCustomDeductions;
                     
                     return (
@@ -521,16 +563,41 @@ export default function PayrollPage() {
                           <TableCell><Input type="number" value={emp.grossSalary} onChange={e => handleInputChange(emp.id, 'grossSalary', e.target.value)} className="w-28" /></TableCell>
                           <TableCell><Input type="number" value={emp.advances} onChange={e => handleInputChange(emp.id, 'advances', e.target.value)} className="w-28" /></TableCell>
                           <TableCell><Input type="number" value={emp.otherDeductions} onChange={e => handleInputChange(emp.id, 'otherDeductions', e.target.value)} className="w-28" /></TableCell>
-                           {payrollSettings?.customFields.map(field => (
-                            <TableCell key={field.id}>
-                                <Input 
-                                    type="number"
-                                    value={emp.customFields?.[field.id] || ''}
-                                    onChange={e => handleInputChange(emp.id, field.id, e.target.value)}
-                                    className="w-28"
-                                />
-                            </TableCell>
-                          ))}
+                           {payrollSettings?.customFields.map(field => {
+                              const value = emp.customFields?.[field.id] ?? '';
+                              if (field.type === 'date') {
+                                return (
+                                  <TableCell key={field.id}>
+                                    <Popover>
+                                      <PopoverTrigger asChild>
+                                        <Button variant="outline" className="w-36 h-10 justify-start font-normal text-xs">
+                                          <CalendarIcon className="mr-2 h-4 w-4" />
+                                          {value instanceof Date && !isNaN(value.valueOf()) ? format(value, 'PPP') : <span>Pick a date</span>}
+                                        </Button>
+                                      </PopoverTrigger>
+                                      <PopoverContent className="w-auto p-0">
+                                        <Calendar
+                                          mode="single"
+                                          selected={value instanceof Date ? value : undefined}
+                                          onSelect={(date) => handleInputChange(emp.id, field.id, date)}
+                                          initialFocus
+                                        />
+                                      </PopoverContent>
+                                    </Popover>
+                                  </TableCell>
+                                );
+                              }
+                              return (
+                                <TableCell key={field.id}>
+                                    <Input
+                                        type={field.type === 'number' ? 'number' : 'text'}
+                                        value={value}
+                                        onChange={e => handleInputChange(emp.id, field.id, e.target.value)}
+                                        className="w-28"
+                                    />
+                                </TableCell>
+                              );
+                           })}
                           <TableCell className="font-semibold">{currencySymbol}{netPayment.toFixed(2)}</TableCell>
                           <TableCell>
                             <Button
@@ -580,7 +647,9 @@ export default function PayrollPage() {
                         <TableCell>{currencySymbol}{totals.advances.toFixed(2)}</TableCell>
                         <TableCell>{currencySymbol}{totals.otherDeductions.toFixed(2)}</TableCell>
                         {payrollSettings?.customFields.map(field => (
-                            <TableCell key={`total-${field.id}`}>{currencySymbol}{(totals.customFields[field.id] || 0).toFixed(2)}</TableCell>
+                          <TableCell key={`total-${field.id}`}>
+                            {field.type === 'number' ? `${currencySymbol}${(totals.customFields[field.id] || 0).toFixed(2)}` : ''}
+                          </TableCell>
                         ))}
                         <TableCell>{currencySymbol}{totals.netPayment.toFixed(2)}</TableCell>
                         <TableCell colSpan={2} className="print:hidden"></TableCell>

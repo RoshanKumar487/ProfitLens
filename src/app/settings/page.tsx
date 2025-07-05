@@ -19,6 +19,7 @@ import { useTheme } from 'next-themes';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Separator } from '@/components/ui/separator';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
+import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from '@/components/ui/select';
 
 export default function SettingsPage() {
   const { user, isLoading: authIsLoading } = useAuth();
@@ -29,6 +30,7 @@ export default function SettingsPage() {
   const [payrollSettings, setPayrollSettings] = useState<PayrollSettings>({ customFields: [] });
   const [newInvoiceColumnName, setNewInvoiceColumnName] = useState('');
   const [newPayrollFieldName, setNewPayrollFieldName] = useState('');
+  const [newPayrollFieldType, setNewPayrollFieldType] = useState<'number' | 'string' | 'date'>('number');
   
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
@@ -86,15 +88,27 @@ export default function SettingsPage() {
   // Payroll Settings Handlers
   const handleAddPayrollField = () => {
     if (!newPayrollFieldName.trim()) return;
-    const newField: CustomPayrollField = { id: uuidv4(), label: newPayrollFieldName.trim() };
+    const newField: CustomPayrollField = { 
+      id: uuidv4(), 
+      label: newPayrollFieldName.trim(),
+      type: newPayrollFieldType,
+    };
     setPayrollSettings(prev => ({ ...prev, customFields: [...prev.customFields, newField] }));
     setNewPayrollFieldName('');
+    setNewPayrollFieldType('number');
   };
 
   const handlePayrollFieldLabelChange = (id: string, newLabel: string) => {
     setPayrollSettings(prev => ({...prev, customFields: prev.customFields.map(f => f.id === id ? { ...f, label: newLabel } : f)}));
   };
   
+  const handlePayrollFieldTypeChange = (id: string, newType: 'number' | 'string' | 'date') => {
+    setPayrollSettings(prev => ({
+      ...prev,
+      customFields: prev.customFields.map(f => f.id === id ? { ...f, type: newType } : f)
+    }));
+  };
+
   const handleDeletePayrollField = (id: string) => {
     setPayrollSettings(prev => ({...prev, customFields: prev.customFields.filter(f => f.id !== id)}));
   };
@@ -148,13 +162,45 @@ export default function SettingsPage() {
         </Card>
         
          <Card>
-            <CardHeader><CardTitle className="flex items-center gap-2"><HandCoins className="h-5 w-5 text-primary" />Payroll Settings</CardTitle><CardDescription>Manage custom fields for your payroll records. These will appear as deduction columns.</CardDescription></CardHeader>
+            <CardHeader><CardTitle className="flex items-center gap-2"><HandCoins className="h-5 w-5 text-primary" />Payroll Settings</CardTitle><CardDescription>Manage custom fields for your payroll records. These will appear as columns.</CardDescription></CardHeader>
             <CardContent className="space-y-4">
                 <div className="space-y-2"><h3 className="text-md font-semibold text-foreground">Custom Payroll Fields</h3></div>
                 <div className="space-y-2">
-                    {payrollSettings.customFields.length > 0 ? payrollSettings.customFields.map(field => (<div key={field.id} className="flex items-center gap-2 p-2 border rounded-md bg-muted/50"><Input value={field.label} onChange={(e) => handlePayrollFieldLabelChange(field.id, e.target.value)} disabled={isSaving} className="font-medium" /><Button variant="ghost" size="icon" onClick={() => handleDeletePayrollField(field.id)} disabled={isSaving}><Trash2 className="h-4 w-4 text-destructive" /></Button></div>)) : (<p className="text-sm text-muted-foreground text-center py-4">No custom fields added.</p>)}
+                    {payrollSettings.customFields.length > 0 ? payrollSettings.customFields.map(field => (
+                        <div key={field.id} className="flex items-center gap-2 p-2 border rounded-md bg-muted/50">
+                            <Input value={field.label} onChange={(e) => handlePayrollFieldLabelChange(field.id, e.target.value)} disabled={isSaving} className="font-medium" />
+                            <Select value={field.type} onValueChange={(v) => handlePayrollFieldTypeChange(field.id, v as any)} disabled={isSaving}>
+                                <SelectTrigger className="w-[120px] h-9"><SelectValue /></SelectTrigger>
+                                <SelectContent>
+                                    <SelectItem value="number">Number</SelectItem>
+                                    <SelectItem value="string">String</SelectItem>
+                                    <SelectItem value="date">Date</SelectItem>
+                                </SelectContent>
+                            </Select>
+                            <Button variant="ghost" size="icon" onClick={() => handleDeletePayrollField(field.id)} disabled={isSaving}><Trash2 className="h-4 w-4 text-destructive" /></Button>
+                        </div>
+                    )) : (<p className="text-sm text-muted-foreground text-center py-4">No custom fields added.</p>)}
                 </div>
-                 <div className="flex items-end gap-2 pt-4 border-t"><div className="flex-grow"><Label htmlFor="new-payroll-field">New Field Name</Label><Input id="new-payroll-field" value={newPayrollFieldName} onChange={e => setNewPayrollFieldName(e.target.value)} placeholder="e.g., Health Insurance" disabled={isSaving} onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); handleAddPayrollField(); }}}/></div><Button onClick={handleAddPayrollField} disabled={isSaving}><PlusCircle className="mr-2 h-4 w-4" /> Add</Button></div>
+                 <div className="flex items-end gap-2 pt-4 border-t">
+                    <div className="flex-grow">
+                        <Label htmlFor="new-payroll-field">New Field Name</Label>
+                        <Input id="new-payroll-field" value={newPayrollFieldName} onChange={e => setNewPayrollFieldName(e.target.value)} placeholder="e.g., Health Insurance" disabled={isSaving} onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); handleAddPayrollField(); }}}/>
+                    </div>
+                    <div className="w-[120px]">
+                      <Label htmlFor="new-payroll-field-type">Type</Label>
+                      <Select value={newPayrollFieldType} onValueChange={(v) => setNewPayrollFieldType(v as any)} disabled={isSaving}>
+                        <SelectTrigger id="new-payroll-field-type" className="h-10"><SelectValue /></SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="number">Number</SelectItem>
+                          <SelectItem value="string">String</SelectItem>
+                          <SelectItem value="date">Date</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <Button onClick={handleAddPayrollField} disabled={isSaving} className="self-end h-10">
+                        <PlusCircle className="mr-2 h-4 w-4" /> Add
+                    </Button>
+                </div>
             </CardContent>
             <CardFooter className="justify-end"><Button onClick={handleSavePayrollSettings} disabled={isSaving}>{isSaving ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Save className="mr-2 h-4 w-4" />}Save Payroll Settings</Button></CardFooter>
         </Card>

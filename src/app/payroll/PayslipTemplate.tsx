@@ -16,7 +16,7 @@ interface EmployeeWithPayroll {
     grossSalary: number;
     advances: number;
     otherDeductions: number;
-    customFields: { [key: string]: number };
+    customFields: { [key: string]: number | string | Date };
 }
 
 interface CompanyDetails {
@@ -88,8 +88,15 @@ const PayslipTemplate = React.forwardRef<HTMLDivElement, PayslipTemplateProps>(
   ({ employee, payPeriod, companyDetails, payrollSettings, currencySymbol, signatureDataUri, stampDataUri }, ref) => {
     
     const grossEarnings = employee.grossSalary || 0;
+    
     const totalDeductions = (employee.advances || 0) + (employee.otherDeductions || 0) + 
-      Object.values(employee.customFields || {}).reduce((sum, val) => sum + (val || 0), 0);
+      (payrollSettings?.customFields || []).reduce((sum, field) => {
+          if (field.type === 'number') {
+              return sum + (Number(employee.customFields?.[field.id]) || 0);
+          }
+          return sum;
+      }, 0);
+
     const netSalary = grossEarnings - totalDeductions;
 
     return (
@@ -104,6 +111,19 @@ const PayslipTemplate = React.forwardRef<HTMLDivElement, PayslipTemplateProps>(
                 <DataRow label="Designation" value={employee.position || 'N/A'} />
                 <DataRow label="Date of Joining" value={employee.joiningDate ? format(employee.joiningDate, 'dd-MM-yyyy') : 'N/A'} />
                 <DataRow label="UAN" value={employee.uan || 'N/A'} />
+                 {(payrollSettings?.customFields || []).map(field => {
+                    if (field.type === 'number') return null;
+                    const value = employee.customFields?.[field.id];
+                    let displayValue: string = 'N/A';
+                    if (value) {
+                        if (field.type === 'date') {
+                            displayValue = format(new Date(value as string | Date), 'dd-MM-yyyy');
+                        } else {
+                            displayValue = value as string;
+                        }
+                    }
+                    return <DataRow key={field.id} label={field.label} value={displayValue} />
+                })}
             </tbody>
         </table>
         
@@ -128,9 +148,10 @@ const PayslipTemplate = React.forwardRef<HTMLDivElement, PayslipTemplateProps>(
                     <tbody>
                         <SalaryRow label="Advances" value={employee.advances} currencySymbol={currencySymbol} />
                         <SalaryRow label="Other Deductions" value={employee.otherDeductions} currencySymbol={currencySymbol} />
-                        {payrollSettings?.customFields.map(field => (
-                          <SalaryRow key={field.id} label={field.label} value={employee.customFields?.[field.id]} currencySymbol={currencySymbol} />
-                        ))}
+                        {payrollSettings?.customFields.map(field => {
+                           if (field.type !== 'number') return null;
+                           return <SalaryRow key={field.id} label={field.label} value={Number(employee.customFields?.[field.id]) || 0} currencySymbol={currencySymbol} />
+                        })}
                     </tbody>
                     <tfoot>
                         <tr className="font-bold bg-gray-100">

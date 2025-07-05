@@ -18,6 +18,7 @@ export interface InvoiceSettings {
 export interface CustomPayrollField {
   id: string;
   label: string;
+  type: 'number' | 'string' | 'date';
 }
 
 export interface PayrollSettings {
@@ -69,7 +70,13 @@ export async function getPayrollSettings(companyId: string): Promise<PayrollSett
   const docSnap = await getDoc(companyDocRef);
 
   if (docSnap.exists()) {
-    return docSnap.data().payrollSettings || { customFields: [] };
+    const settings = docSnap.data().payrollSettings || { customFields: [] };
+    // Add default type for backward compatibility
+    settings.customFields = settings.customFields.map((field: any) => ({
+      ...field,
+      type: field.type || 'number', // Default to 'number' if type is missing
+    }));
+    return settings;
   } else {
     return { customFields: [] };
   }
