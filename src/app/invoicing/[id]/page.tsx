@@ -1,3 +1,4 @@
+
 'use client';
 
 import React, { useState, useEffect, type FormEvent } from 'react';
@@ -26,6 +27,7 @@ import { getInvoiceSettings, type InvoiceSettings } from '@/app/settings/actions
 interface InvoiceItem {
   id: string;
   description: string;
+  hsnNo?: string;
   quantity: number;
   unitPrice: number;
   customFields?: { [key: string]: string };
@@ -148,7 +150,7 @@ export default function EditInvoicePage() {
     };
 
     const handleAddItem = () => {
-        const newItem: InvoiceItem = { id: crypto.randomUUID(), description: '', quantity: 1, unitPrice: 0, customFields: {} };
+        const newItem: InvoiceItem = { id: crypto.randomUUID(), description: '', hsnNo: '', quantity: 1, unitPrice: 0, customFields: {} };
         setInvoice(prev => prev ? ({ ...prev, items: [...(prev.items || []), newItem] }) : null);
     };
 
@@ -280,7 +282,11 @@ export default function EditInvoicePage() {
                                         <div className="space-y-1"><Label htmlFor={`item-price-${item.id}`} className="text-xs">Unit Price</Label><Input id={`item-price-${item.id}`} type="number" value={item.unitPrice} onChange={e => handleItemChange(item.id, 'unitPrice', e.target.value)} disabled={isSaving} className="w-24"/></div>
                                         <Button type="button" variant="ghost" size="icon" className="text-destructive h-8 w-8" onClick={() => handleRemoveItem(item.id)} disabled={isSaving}><Trash2 className="h-4 w-4" /></Button>
                                     </div>
-                                    <div className="grid grid-cols-2 md:grid-cols-3 gap-2">
+                                    <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
+                                        <div className="space-y-1">
+                                            <Label htmlFor={`item-hsn-${item.id}`} className="text-xs">HSN No.</Label>
+                                            <Input id={`item-hsn-${item.id}`} value={item.hsnNo || ''} onChange={e => handleItemChange(item.id, 'hsnNo', e.target.value)} disabled={isSaving} />
+                                        </div>
                                         {invoiceSettings?.customItemColumns.map(col => (
                                             <div key={col.id} className="space-y-1">
                                                 <Label htmlFor={`item-custom-${item.id}-${col.id}`} className="text-xs">{col.label}</Label>

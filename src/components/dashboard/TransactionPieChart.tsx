@@ -6,26 +6,29 @@ import Link from "next/link"
 import { Pie, PieChart, ResponsiveContainer, Cell, Tooltip } from "recharts"
 import { useAuth } from "@/contexts/AuthContext"
 import { db } from "@/lib/firebaseConfig"
-import { collection, query, where, getDocs } from "firebase/firestore"
+import { collectionGroup, query, where, getDocs, onSnapshot } from "firebase/firestore"
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Skeleton } from "@/components/ui/skeleton"
 import { Alert, AlertTitle } from "@/components/ui/alert"
 import { Info, ArrowRight } from "lucide-react"
 
-interface Expense {
-  id: string;
+interface Transaction {
   category: string;
   amount: number;
 }
 
 const COLORS = [
-  "hsl(var(--chart-1))", 
-  "hsl(var(--chart-2))", 
-  "hsl(var(--chart-3))", 
-  "hsl(var(--chart-4))", 
+  "hsl(var(--chart-1))",
+  "hsl(var(--chart-2))",
+  "hsl(var(--chart-3))",
+  "hsl(var(--chart-4))",
   "hsl(var(--chart-5))",
-  "#0088FE", "#00C49F", "#FFBB28", "#FF8042", "#8884d8",
+  "hsl(var(--chart-6))",
+  "hsl(var(--chart-7))",
+  "hsl(var(--chart-8))",
+  "hsl(var(--chart-9))",
+  "hsl(var(--chart-10))",
 ];
 
 export default function TransactionPieChart() {
@@ -40,23 +43,22 @@ export default function TransactionPieChart() {
       return;
     }
 
-    const fetchData = async () => {
-      setIsLoading(true);
-      const q = query(
-        collection(db, 'expenses'),
-        where('companyId', '==', user.companyId)
-      );
-
-      try {
-        const snapshot = await getDocs(q);
-        const expenses: Expense[] = [];
+    setIsLoading(true);
+    const q = query(
+      collectionGroup(db, 'transactions'),
+      where('companyId', '==', user.companyId),
+      where('type', '==', 'withdrawal')
+    );
+    
+    const unsubscribe = onSnapshot(q, (snapshot) => {
+        const transactions: Transaction[] = [];
         snapshot.forEach(doc => {
-            expenses.push({ id: doc.id, ...doc.data() } as Expense);
+            transactions.push(doc.data() as Transaction);
         });
 
-        const categoryTotals = expenses.reduce((acc, tx) => {
+        const categoryTotals = transactions.reduce((acc, tx) => {
             if (!acc[tx.category]) {
-            acc[tx.category] = 0;
+                acc[tx.category] = 0;
             }
             acc[tx.category] += tx.amount;
             return acc;
@@ -70,24 +72,31 @@ export default function TransactionPieChart() {
 
         const total = chartData.reduce((sum, item) => sum + item.value, 0);
         setTotalExpenses(total);
+        setIsLoading(false);
+    }, (error) => {
+        console.error("Error fetching transaction data for chart:", error);
+        setIsLoading(false);
+    });
 
-      } catch (error) {
-          console.error("Error fetching expense data for chart:", error);
-      } finally {
-          setIsLoading(false);
-      }
-    };
-
-    fetchData();
+    return () => unsubscribe();
   }, [user]);
 
   const CustomTooltip = ({ active, payload }: any) => {
     if (active && payload && payload.length) {
+      const data = payload[0].payload;
       return (
-        <div className="p-2 text-sm bg-background/80 border rounded-md shadow-lg backdrop-blur-sm">
-          <p className="font-bold">{`${payload[0].name}`}</p>
-          <p className="text-foreground">{`Amount: ${currencySymbol}${payload[0].value.toFixed(2)}`}</p>
-          <p className="text-muted-foreground">{`(${(payload[0].percent * 100).toFixed(0)}%)`}</p>
+        <div className="rounded-lg border bg-background p-2.5 shadow-lg">
+          <div className="flex flex-col space-y-1">
+            <div className="flex items-center gap-2">
+              <div
+                className="h-2.5 w-2.5 shrink-0 rounded-[2px]"
+                style={{ backgroundColor: payload[0].fill }}
+              />
+              <p className="font-bold">{data.name}</p>
+            </div>
+            <p className="text-foreground">{`Amount: ${currencySymbol}${data.value.toFixed(2)}`}</p>
+            <p className="text-muted-foreground">{`Percentage: ${(payload[0].percent * 100).toFixed(0)}%`}</p>
+          </div>
         </div>
       );
     }
@@ -100,11 +109,11 @@ export default function TransactionPieChart() {
         <div className="flex justify-between items-start">
             <div>
                 <CardTitle className="font-headline">Expense Breakdown</CardTitle>
-                <CardDescription>Breakdown of your recorded expenses by category.</CardDescription>
+                <CardDescription>Breakdown of withdrawals from your bank accounts.</CardDescription>
             </div>
             <Button asChild variant="ghost" size="sm" className="flex-shrink-0">
-                <Link href="/record-expenses">
-                    Manage Expenses
+                <Link href="/bank-accounts">
+                    Manage Accounts
                     <ArrowRight className="ml-2 h-4 w-4" />
                 </Link>
             </Button>
@@ -120,7 +129,7 @@ export default function TransactionPieChart() {
             <Alert className="border-primary/20 max-w-sm">
               <Info className="h-4 w-4 text-primary" />
               <AlertTitle>No Data Yet</AlertTitle>
-              <p className="text-xs text-muted-foreground">Use the "Record Expenses" page to log your spending. It will be visualized here.</p>
+              <p className="text-xs text-muted-foreground">Add a bank account and log some 'withdrawal' transactions. They will be visualized here.</p>
             </Alert>
           </div>
         ) : (
@@ -132,13 +141,14 @@ export default function TransactionPieChart() {
                   data={data}
                   cx="50%"
                   cy="50%"
-                  innerRadius={80}
+                  innerRadius={70}
                   outerRadius={120}
-                  fill="hsl(var(--primary))"
                   dataKey="value"
                   paddingAngle={2}
                   labelLine={false}
                   label={false}
+                  stroke="hsl(var(--background))"
+                  strokeWidth={2}
                 >
                   {data.map((entry, index) => (
                     <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />

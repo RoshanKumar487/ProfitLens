@@ -8,9 +8,7 @@ if (!admin.apps.length) {
         // The SDK will automatically look for the GOOGLE_APPLICATION_CREDENTIALS
         // environment variable or use the default service account if running in a
         // Firebase or Google Cloud Platform environment.
-        app = admin.initializeApp({
-            databaseURL: 'https://bizsight-k0icr-default-rtdb.firebaseio.com'
-        });
+        app = admin.initializeApp();
         console.log("Firebase Admin SDK initialized using environment credentials!");
     } catch (error: any) {
         console.error('Firebase Admin SDK Initialization Error:', error);

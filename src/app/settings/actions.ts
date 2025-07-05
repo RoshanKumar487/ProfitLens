@@ -11,6 +11,8 @@ export interface CustomItemColumn {
 
 export interface InvoiceSettings {
   customItemColumns: CustomItemColumn[];
+  defaultPaymentTermsDays?: number;
+  defaultHsnCode?: string;
 }
 
 export async function getInvoiceSettings(companyId: string): Promise<InvoiceSettings> {
@@ -24,10 +26,10 @@ export async function getInvoiceSettings(companyId: string): Promise<InvoiceSett
   if (docSnap.exists()) {
     const data = docSnap.data();
     // Return existing settings or default if not present
-    return data.invoiceSettings || { customItemColumns: [] };
+    return data.invoiceSettings || { customItemColumns: [], defaultPaymentTermsDays: 30, defaultHsnCode: '' };
   } else {
     // Return default settings for a company profile that might not have been saved yet
-    return { customItemColumns: [] };
+    return { customItemColumns: [], defaultPaymentTermsDays: 30, defaultHsnCode: '' };
   }
 }
 

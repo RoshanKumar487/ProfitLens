@@ -1,9 +1,10 @@
+
 'use client';
 
 import React, { useState, useEffect, useCallback } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { db } from '@/lib/firebaseConfig';
-import { collection, query, where, orderBy, getDocs, Timestamp, onSnapshot, doc } from 'firebase/firestore';
+import { collection, query, where, orderBy, getDocs, Timestamp, onSnapshot, doc, limit, startAfter, endBefore, limitToLast, type DocumentData, type QueryDocumentSnapshot } from 'firebase/firestore';
 import { format } from 'date-fns';
 import { useToast } from '@/hooks/use-toast';
 import { addBankAccount, updateBankAccount, deleteBankAccount, addTransaction, deleteTransaction, type BankAccountData, type TransactionData } from './actions';
@@ -24,6 +25,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { Banknote, PlusCircle, MoreVertical, Edit, Trash2, Loader2, Save, ArrowLeftRight, CalendarIcon, Info, HandCoins, Landmark } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Alert, AlertTitle } from '@/components/ui/alert';
+import { Pagination, PaginationContent, PaginationItem, PaginationNext, PaginationPrevious } from '@/components/ui/pagination';
 
 const TRANSACTION_CATEGORIES = [
   'Salary', 'Freelance Income', 'Investment', 'Sales', 'Refunds', // Deposits
@@ -32,6 +34,8 @@ const TRANSACTION_CATEGORIES = [
 
 type FullBankAccount = BankAccountData & { id: string, createdAt: Date };
 type FullTransaction = TransactionData & { id: string, createdAt: Date };
+
+const RECORDS_PER_PAGE = 20;
 
 export default function BankAccountsPage() {
   const { user, isLoading: authIsLoading, currencySymbol } = useAuth();
@@ -58,8 +62,13 @@ export default function BankAccountsPage() {
   const [itemToDelete, setItemToDelete] = useState<{ type: 'account' | 'transaction', id: string, accountId?: string } | null>(null);
   const [isEditing, setIsEditing] = useState(false);
 
+  // Pagination State for Transactions
+  const [txCurrentPage, setTxCurrentPage] = useState(1);
+  const [txFirstVisible, setTxFirstVisible] = useState<QueryDocumentSnapshot<DocumentData> | null>(null);
+  const [txLastVisible, setTxLastVisible] = useState<QueryDocumentSnapshot<DocumentData> | null>(null);
 
-  // Fetch initial bank accounts
+
+  // Fetch initial bank accounts (real-time)
   useEffect(() => {
     if (!user || !user.companyId) {
         setIsLoadingAccounts(false);
@@ -83,30 +92,70 @@ export default function BankAccountsPage() {
     return () => unsubscribe();
   }, [user, toast]);
 
-  // Fetch transactions when an account is selected
-  useEffect(() => {
-    if (selectedAccount) {
-      setIsLoadingTransactions(true);
-      const transQuery = query(collection(db, 'bankAccounts', selectedAccount.id, 'transactions'), orderBy('date', 'desc'));
-      const unsubscribe = onSnapshot(transQuery, (snapshot) => {
+  // Fetch transactions when an account is selected (paginated)
+  const fetchTransactions = useCallback(async (direction: 'next' | 'prev' | 'reset' = 'reset') => {
+    if (!selectedAccount) return;
+    
+    setIsLoadingTransactions(true);
+
+    let newPage = txCurrentPage;
+    if (direction === 'reset') newPage = 1;
+    if (direction === 'next') newPage++;
+    if (direction === 'prev') newPage--;
+
+    const transRef = collection(db, 'bankAccounts', selectedAccount.id, 'transactions');
+    const baseQuery = [orderBy('date', 'desc')];
+    let q;
+
+    if (direction === 'next' && txLastVisible) {
+        q = query(transRef, ...baseQuery, startAfter(txLastVisible), limit(RECORDS_PER_PAGE));
+    } else if (direction === 'prev' && txFirstVisible) {
+        q = query(transRef, ...baseQuery, endBefore(txFirstVisible), limitToLast(RECORDS_PER_PAGE));
+    } else { // reset
+        q = query(transRef, ...baseQuery, limit(RECORDS_PER_PAGE));
+    }
+
+    try {
+        const snapshot = await getDocs(q);
         const fetchedTransactions = snapshot.docs.map(doc => ({
             ...doc.data(),
             id: doc.id,
             date: (doc.data().date as Timestamp).toDate(),
             createdAt: (doc.data().createdAt as Timestamp).toDate(),
         } as FullTransaction));
+
         setTransactions(fetchedTransactions);
+
+        if (snapshot.docs.length > 0) {
+            setTxFirstVisible(snapshot.docs[0]);
+            setTxLastVisible(snapshot.docs[snapshot.docs.length - 1]);
+        }
+        setTxCurrentPage(newPage);
+
+    } catch(error) {
+        console.error("Error fetching transactions: ", error);
+        toast({ variant: 'destructive', title: "Error", description: "Could not load transactions for this account." });
+    } finally {
         setIsLoadingTransactions(false);
-      }, (error) => {
-          console.error("Error fetching transactions: ", error);
-          toast({ variant: 'destructive', title: "Error", description: "Could not load transactions for this account." });
-          setIsLoadingTransactions(false);
-      });
-      return () => unsubscribe();
+    }
+  }, [selectedAccount, toast, txCurrentPage, txFirstVisible, txLastVisible]);
+
+  useEffect(() => {
+    if (selectedAccount) {
+      setTxCurrentPage(1);
+      setTxFirstVisible(null);
+      setTxLastVisible(null);
+      fetchTransactions('reset');
     } else {
         setTransactions([]);
     }
-  }, [selectedAccount, toast]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedAccount]);
+
+  const handleTxPageChange = (direction: 'next' | 'prev') => {
+    fetchTransactions(direction);
+  };
+
 
   // Handle Account Form
   const handleOpenAccountDialog = (account?: FullBankAccount) => {
@@ -180,6 +229,7 @@ export default function BankAccountsPage() {
     toast({ title: result.success ? 'Success' : 'Error', description: result.message, variant: result.success ? 'default' : 'destructive' });
     if (result.success) {
         setIsTransactionDialogOpen(false);
+        fetchTransactions('reset');
         // Find and update the selected account's balance in the local state for immediate UI update
         setAccounts(prevAccounts => prevAccounts.map(acc => {
             if (acc.id === selectedAccount.id) {
@@ -205,9 +255,15 @@ export default function BankAccountsPage() {
     setIsSaving(true);
     
     const { type, id, accountId } = itemToDelete;
-    const result = type === 'account' 
-      ? await deleteBankAccount(id)
-      : await deleteTransaction(accountId!, id);
+    let result;
+    if (type === 'account') {
+        result = await deleteBankAccount(id);
+    } else {
+        result = await deleteTransaction(accountId!, id);
+        if(result.success) {
+            fetchTransactions('reset');
+        }
+    }
 
     toast({ title: result.success ? 'Success' : 'Error', description: result.message, variant: result.success ? 'default' : 'destructive' });
     
@@ -230,7 +286,7 @@ export default function BankAccountsPage() {
     return (
       <div className="p-4 sm:p-6 lg:p-8">
         <PageTitle title="Bank Accounts" icon={Banknote} />
-        <Card><CardHeader><CardTitle>Access Denied</CardTitle><CardContent><p>Please sign in to manage bank accounts.</p></CardContent></CardHeader></Card>
+        <Card><CardHeader><CardTitle>Access Denied</CardTitle></CardHeader><CardContent><p>Please sign in to manage bank accounts.</p></CardContent></Card>
       </div>
     );
   }
@@ -304,8 +360,9 @@ export default function BankAccountsPage() {
                             {[...Array(3)].map((_, i) => <Skeleton key={i} className="h-12 w-full" />)}
                         </div>
                     ) : (
+                        <>
                         <Table>
-                            <TableCaption>{transactions.length === 0 ? "No transactions for this account." : "A list of recent transactions."}</TableCaption>
+                            <TableCaption>{transactions.length === 0 ? "No transactions for this account." : `Page ${txCurrentPage} of transactions.`}</TableCaption>
                             <TableHeader>
                                 <TableRow>
                                     <TableHead>Date</TableHead>
@@ -333,6 +390,18 @@ export default function BankAccountsPage() {
                                 ))}
                             </TableBody>
                         </Table>
+                         <div className="flex items-center justify-between pt-4">
+                            <div className="text-sm text-muted-foreground">
+                                Page {txCurrentPage}
+                            </div>
+                            <Pagination>
+                                <PaginationContent>
+                                    <PaginationItem><PaginationPrevious href="#" onClick={(e) => { e.preventDefault(); handleTxPageChange('prev'); }} className={txCurrentPage === 1 ? 'pointer-events-none opacity-50' : ''}/></PaginationItem>
+                                    <PaginationItem><PaginationNext href="#" onClick={(e) => { e.preventDefault(); handleTxPageChange('next'); }} className={transactions.length < RECORDS_PER_PAGE ? 'pointer-events-none opacity-50' : ''}/></PaginationItem>
+                                </PaginationContent>
+                            </Pagination>
+                         </div>
+                        </>
                     )}
                 </CardContent>
             </Card>
@@ -414,9 +483,7 @@ export default function BankAccountsPage() {
                         <div>
                             <Label htmlFor="txDate">Date</Label>
                              <Popover>
-                                <PopoverTrigger asChild>
-                                <Button variant="outline" className="w-full justify-start text-left font-normal"><CalendarIcon className="mr-2 h-4 w-4" />{currentTransaction.date ? format(currentTransaction.date, 'PPP') : <span>Pick a date</span>}</Button>
-                                </PopoverTrigger>
+                                <PopoverTrigger asChild><Button variant="outline" className="w-full justify-start text-left font-normal"><CalendarIcon className="mr-2 h-4 w-4" />{currentTransaction.date ? format(currentTransaction.date, 'PPP') : <span>Pick a date</span>}</Button></PopoverTrigger>
                                 <PopoverContent className="w-auto p-0"><Calendar mode="single" selected={currentTransaction.date} onSelect={(d) => setCurrentTransaction({...currentTransaction, date: d})} initialFocus /></PopoverContent>
                             </Popover>
                         </div>

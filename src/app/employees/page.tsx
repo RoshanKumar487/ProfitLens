@@ -14,11 +14,11 @@ import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger, DropdownMenuSeparator } from '@/components/ui/dropdown-menu';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
-import { Users2, PlusCircle, MoreHorizontal, Edit, Trash2, Loader2, Save, Camera, UploadCloud, FileText, XCircle, SwitchCamera, Upload, ArrowUp, ArrowDown, ChevronsUpDown, Search, ScanLine, Printer, Fingerprint, PenSquare, Download } from 'lucide-react';
+import { Users2, PlusCircle, MoreHorizontal, Edit, Trash2, Loader2, Save, Camera, UploadCloud, FileText, XCircle, SwitchCamera, Upload, ArrowUp, ArrowDown, ChevronsUpDown, ScanLine, Printer, Fingerprint, PenSquare, Download, Expand } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/contexts/AuthContext';
 import { db } from '@/lib/firebaseConfig';
-import { collection, doc, getDoc, getDocs, updateDoc, deleteDoc, query, where, orderBy, Timestamp, serverTimestamp } from 'firebase/firestore';
+import { collection, doc, getDoc, getDocs, updateDoc, deleteDoc, query, where, orderBy, Timestamp, serverTimestamp, limit, startAfter, endBefore, limitToLast, type QueryDocumentSnapshot, type DocumentData } from 'firebase/firestore';
 import { uploadFileToStorage, deleteFileFromStorage } from '@/lib/firebaseStorageUtils';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Badge } from '@/components/ui/badge';
@@ -39,6 +39,7 @@ import jsPDF from 'jspdf';
 import html2canvas from 'html2canvas';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Switch } from '@/components/ui/switch';
+import { Pagination, PaginationContent, PaginationItem, PaginationNext, PaginationPrevious } from '@/components/ui/pagination';
 
 interface EmployeeFirestore {
   id?: string;
@@ -80,7 +81,7 @@ interface EmployeeFirestore {
   signatureStoragePath?: string;
 }
 
-export interface EmployeeDisplay extends Omit<EmployeeFirestore, 'createdAt' | 'updatedAt' | 'companyId' | 'addedById' | 'dateOfBirth' | 'joiningDate'> {
+export interface EmployeeDisplay extends Omit<EmployeeFirestore, 'updatedAt' | 'companyId' | 'addedById' | 'dateOfBirth' | 'joiningDate'> {
   id: string;
   createdAt: Date;
   dateOfBirth?: Date;
@@ -89,6 +90,7 @@ export interface EmployeeDisplay extends Omit<EmployeeFirestore, 'createdAt' | '
 
 type ParsedEmployee = Omit<EmployeeFirestore, 'id' | 'createdAt' | 'updatedAt' | 'companyId' | 'addedById' | 'addedBy' | 'profilePictureUrl' | 'profilePictureStoragePath' | 'associatedFileUrl' | 'associatedFileName' | 'associatedFileStoragePath'>;
 
+const RECORDS_PER_PAGE = 20;
 
 const getInitials = (name: string = "") => {
   const names = name.split(' ');
@@ -132,21 +134,20 @@ export default function EmployeesPage() {
   const [isDraggingProfile, setIsDraggingProfile] = useState(false);
   const [isDraggingFile, setIsDraggingFile] = useState(false);
 
-  // State for bulk import
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [isImportDialogOpen, setIsImportDialogOpen] = useState(false);
   const [editableParsedEmployees, setEditableParsedEmployees] = useState<ParsedEmployee[]>([]);
   const [isImporting, setIsImporting] = useState(false);
   
-  // State for scanning
   const [isScanDialogOpen, setIsScanDialogOpen] = useState(false);
   const [isScanning, setIsScanning] = useState(false);
   const [isInitializingCamera, setIsInitializingCamera] = useState(false);
 
-  const [sortConfig, setSortConfig] = useState<{ key: keyof EmployeeDisplay; direction: 'ascending' | 'descending' }>({ key: 'createdAt', direction: 'descending' });
-  const [searchTerm, setSearchTerm] = useState('');
+  const [sortConfig, setSortConfig] = useState<{ key: keyof EmployeeDisplay; direction: 'desc' | 'asc' }>({ key: 'createdAt', direction: 'desc' });
+  const [currentPage, setCurrentPage] = useState(1);
+  const [firstVisible, setFirstVisible] = useState<QueryDocumentSnapshot<DocumentData> | null>(null);
+  const [lastVisible, setLastVisible] = useState<QueryDocumentSnapshot<DocumentData> | null>(null);
 
-  // Bio-Data Print State
   const bioDataPrintRef = useRef<HTMLDivElement>(null);
   const [isBioDataDialogOpen, setIsBioDataDialogOpen] = useState(false);
   const [employeeToPrint, setEmployeeToPrint] = useState<EmployeeDisplay | null>(null);
@@ -155,46 +156,91 @@ export default function EmployeesPage() {
   const [isPrinting, setIsPrinting] = useState(false);
   const [useLetterhead, setUseLetterhead] = useState(true);
 
-
-  const filteredEmployees = useMemo(() => {
-    if (!searchTerm) {
-      return employees;
+  const fetchEmployees = useCallback(async (direction: 'next' | 'prev' | 'reset' = 'reset') => {
+    if (authIsLoading || !user || !user.companyId) {
+      setIsLoadingEmployees(false);
+      setEmployees([]);
+      return;
     }
-    const lowercasedTerm = searchTerm.toLowerCase();
-    return employees.filter(employee =>
-        employee.name.toLowerCase().includes(lowercasedTerm) ||
-        employee.position.toLowerCase().includes(lowercasedTerm) ||
-        (employee.description && employee.description.toLowerCase().includes(lowercasedTerm))
-    );
-  }, [employees, searchTerm]);
+    setIsLoadingEmployees(true);
+    try {
+      const employeesRef = collection(db, 'employees');
+      
+      let q;
+      const baseQuery = [
+        where('companyId', '==', user.companyId),
+        orderBy(sortConfig.key, sortConfig.direction),
+      ];
 
+      if (sortConfig.key !== 'createdAt') {
+        baseQuery.push(orderBy('createdAt', sortConfig.direction));
+      }
 
-  // Sorting logic
-  const sortedEmployees = useMemo(() => {
-    let sortableItems = [...filteredEmployees];
-    if (sortConfig !== null) {
-      sortableItems.sort((a, b) => {
-        const aValue = a[sortConfig.key];
-        const bValue = b[sortConfig.key];
-        if (aValue === null || aValue === undefined) return 1;
-        if (bValue === null || bValue === undefined) return -1;
-        if (aValue < bValue) {
-          return sortConfig.direction === 'ascending' ? -1 : 1;
-        }
-        if (aValue > bValue) {
-          return sortConfig.direction === 'ascending' ? 1 : -1;
-        }
-        return 0;
+      if (direction === 'next' && lastVisible) {
+        q = query(employeesRef, ...baseQuery, startAfter(lastVisible), limit(RECORDS_PER_PAGE));
+      } else if (direction === 'prev' && firstVisible) {
+        q = query(employeesRef, ...baseQuery, endBefore(firstVisible), limitToLast(RECORDS_PER_PAGE));
+      } else { // reset
+        q = query(employeesRef, ...baseQuery, limit(RECORDS_PER_PAGE));
+      }
+
+      const querySnapshot = await getDocs(q);
+      
+      const fetchedEmployees = querySnapshot.docs.map(docSnap => {
+        const data = docSnap.data() as Omit<EmployeeFirestore, 'id'>;
+        return {
+          id: docSnap.id,
+          ...data,
+          createdAt: data.createdAt.toDate(),
+          dateOfBirth: data.dateOfBirth?.toDate(),
+          joiningDate: data.joiningDate?.toDate(),
+        } as EmployeeDisplay;
       });
-    }
-    return sortableItems;
-  }, [filteredEmployees, sortConfig]);
+      setEmployees(fetchedEmployees);
+      
+      if (querySnapshot.docs.length > 0) {
+        setFirstVisible(querySnapshot.docs[0]);
+        setLastVisible(querySnapshot.docs[querySnapshot.docs.length - 1]);
+      }
 
-  const requestSort = (key: keyof EmployeeDisplay) => {
-    let direction: 'ascending' | 'descending' = 'ascending';
-    if (sortConfig.key === key && sortConfig.direction === 'ascending') {
-      direction = 'descending';
+    } catch (error: any) {
+      console.error('Error fetching employees:', error);
+      toast({ title: 'Error Loading Employees', description: error.message, variant: 'destructive' });
+    } finally {
+      setIsLoadingEmployees(false);
     }
+  }, [user, authIsLoading, toast, sortConfig, lastVisible, firstVisible]);
+
+  useEffect(() => {
+    if (!authIsLoading) {
+      handleSortChange('createdAt');
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [user, authIsLoading]);
+
+  useEffect(() => {
+    if (!authIsLoading && user) {
+        fetchEmployees('reset');
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [sortConfig]);
+  
+  const handlePageChange = (direction: 'next' | 'prev') => {
+    let newPage = currentPage;
+    if (direction === 'next') newPage++;
+    if (direction === 'prev' && currentPage > 1) newPage--;
+    setCurrentPage(newPage);
+    fetchEmployees(direction);
+  };
+  
+  const handleSortChange = (key: keyof EmployeeDisplay) => {
+    let direction: 'desc' | 'asc' = 'desc';
+    if (sortConfig.key === key && sortConfig.direction === 'desc') {
+      direction = 'asc';
+    }
+    setCurrentPage(1);
+    setFirstVisible(null);
+    setLastVisible(null);
     setSortConfig({ key, direction });
   };
   
@@ -202,7 +248,7 @@ export default function EmployeesPage() {
     if (sortConfig.key !== key) {
         return <ChevronsUpDown className="ml-2 h-4 w-4 text-muted-foreground/50" />;
     }
-    if (sortConfig.direction === 'ascending') {
+    if (sortConfig.direction === 'asc') {
         return <ArrowUp className="ml-2 h-4 w-4" />;
     }
     return <ArrowDown className="ml-2 h-4 w-4" />;
@@ -303,39 +349,6 @@ export default function EmployeesPage() {
       getCameraPermission();
       return () => { if(isScanDialogOpen) cleanupWebcam()};
   }, [isScanDialogOpen, cleanupWebcam, toast, showProfileWebcam]);
-
-
-  const fetchEmployees = useCallback(async () => {
-    if (authIsLoading) { setIsLoadingEmployees(true); return; }
-    if (!user || !user.companyId) { setIsLoadingEmployees(false); setEmployees([]); return; }
-    setIsLoadingEmployees(true);
-    try {
-      const employeesRef = collection(db, 'employees');
-      const q = query(employeesRef, where('companyId', '==', user.companyId));
-      const querySnapshot = await getDocs(q);
-      
-      const fetchedEmployees = querySnapshot.docs.map(docSnap => {
-        const data = docSnap.data() as Omit<EmployeeFirestore, 'id'>;
-        return {
-          id: docSnap.id,
-          ...data,
-          createdAt: data.createdAt.toDate(),
-          dateOfBirth: data.dateOfBirth?.toDate(),
-          joiningDate: data.joiningDate?.toDate(),
-        } as EmployeeDisplay;
-      });
-      setEmployees(fetchedEmployees);
-    } catch (error: any) {
-      console.error('Error fetching employees:', error);
-      toast({ title: 'Error Loading Employees', description: error.message, variant: 'destructive' });
-    } finally {
-      setIsLoadingEmployees(false);
-    }
-  }, [user, authIsLoading, toast]);
-
-  useEffect(() => {
-    fetchEmployees();
-  }, [fetchEmployees]);
   
   const resetEditFormState = useCallback(() => {
     setIsEditDialogOpen(false);
@@ -396,7 +409,7 @@ export default function EmployeesPage() {
 
         await updateDoc(employeeRef, dataToSave);
         toast({ title: "Employee Updated" });
-        fetchEmployees();
+        fetchEmployees('reset');
         resetEditFormState();
     } catch (error: any) {
         toast({ title: "Save Failed", description: error.message, variant: "destructive" });
@@ -441,7 +454,7 @@ export default function EmployeesPage() {
       }
       await deleteDoc(doc(db, 'employees', employeeToDeleteId));
       toast({ title: "Employee Deleted", variant: "destructive"});
-      fetchEmployees();
+      fetchEmployees('reset');
     } catch (error: any) {
       toast({ title: "Delete Failed", description: error.message, variant: "destructive"});
     } finally {
@@ -539,7 +552,6 @@ export default function EmployeesPage() {
   const handleFileDragLeave = (e: React.DragEvent<HTMLDivElement>) => { handleDragEvents(e); setIsDraggingFile(false); };
   const handleFileDrop = (e: React.DragEvent<HTMLDivElement>) => { handleDragEvents(e); setIsDraggingFile(false); handleFileChange(e.dataTransfer as any, setAssociatedFile); };
 
-  // Bulk import handlers
   const handleImportClick = () => { fileInputRef.current?.click(); };
   const handleImportFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -577,13 +589,12 @@ export default function EmployeesPage() {
     setIsImporting(true);
     const result = await bulkAddEmployees(editableParsedEmployees, user.companyId, user.uid, user.displayName || user.email || 'System');
     toast({ title: result.success ? 'Import Successful' : 'Import Failed', description: result.message, variant: result.success ? 'default' : 'destructive'});
-    if (result.success) { fetchEmployees(); setIsImportDialogOpen(false); setEditableParsedEmployees([]); }
+    if (result.success) { fetchEmployees('reset'); setIsImportDialogOpen(false); setEditableParsedEmployees([]); }
     setIsImporting(false);
   };
 
    const handleOpenBioDataDialog = async (employee: EmployeeDisplay) => {
     setEmployeeToPrint(employee);
-    // Fetch company details if not already fetched
     if (!companyDetails && user?.companyId) {
         const companyRef = doc(db, 'companyProfiles', user.companyId);
         const companySnap = await getDoc(companyRef);
@@ -592,8 +603,7 @@ export default function EmployeesPage() {
         }
     }
     
-    // Convert all image URLs to data URIs for reliable printing
-    setIsPrinting(true); // Use isPrinting to show a loading state
+    setIsPrinting(true); 
     setIsBioDataDialogOpen(true);
     const uris: Record<string, string | undefined> = {};
     const urlMap = {
@@ -608,7 +618,7 @@ export default function EmployeesPage() {
         }
     }
     setBioDataImageUris(uris);
-    setIsPrinting(false); // Done fetching, ready for user to click print
+    setIsPrinting(false);
   };
 
   const handlePrint = async () => {
@@ -664,7 +674,7 @@ export default function EmployeesPage() {
     try {
         const elementToPrint = bioDataPrintRef.current;
         const canvas = await html2canvas(elementToPrint, {
-            scale: 3, // Increased scale for better quality
+            scale: 3,
             useCORS: true,
             backgroundColor: '#ffffff',
         });
@@ -702,7 +712,7 @@ export default function EmployeesPage() {
   if (!user && !authIsLoading) {
      return (
       <div className="space-y-6 p-4 sm:p-6 lg:p-8">
-        <PageTitle title="Employees" subtitle="Manage your team members." icon={Users2} />
+        <PageTitle title="Employees" subtitle="Manage your team members." />
         <Card><CardHeader><CardTitle>Access Denied</CardTitle></CardHeader><CardContent><p>Please sign in to manage employees.</p></CardContent></Card>
       </div>
     )
@@ -710,26 +720,42 @@ export default function EmployeesPage() {
 
   return (
     <div className="space-y-6 p-4 sm:p-6 lg:p-8">
-      <PageTitle title="Employees" subtitle="Manage your team members." icon={Users2}>
-        <div className="flex flex-col sm:flex-row gap-2">
-            <TooltipProvider>
-            <Tooltip><TooltipTrigger asChild><Button variant="outline" size="icon" onClick={handleImportClick} disabled={isSaving || isLoadingEmployees}><Upload className="h-4 w-4" /><span className="sr-only">Import from Excel</span></Button></TooltipTrigger><TooltipContent><p>Import from Excel</p></TooltipContent></Tooltip>
-             <Tooltip><TooltipTrigger asChild><Button variant="outline" size="icon" onClick={() => setIsScanDialogOpen(true)} disabled={isSaving || isLoadingEmployees}><ScanLine className="h-4 w-4"/><span className="sr-only">Scan Document</span></Button></TooltipTrigger><TooltipContent><p>Scan Document</p></TooltipContent></Tooltip>
-            </TooltipProvider>
-            <Button asChild disabled={isSaving || isLoadingEmployees}><Link href="/employees/new"><PlusCircle className="mr-2 h-4 w-4" /> Add Employee</Link></Button>
-            <input type="file" ref={fileInputRef} onChange={handleImportFileChange} className="hidden" accept=".xlsx, .xls, .csv" />
-        </div>
-      </PageTitle>
+      <PageTitle title="Employees" subtitle="Manage your team members." />
 
       <Card>
-        <CardHeader><div className="flex flex-col sm:flex-row items-center justify-between gap-2"><div><CardTitle>Team Members</CardTitle><CardDescription>Manage your employees' information, salaries, and associated files.</CardDescription></div><div className="relative w-full sm:w-auto"><Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" /><Input type="search" placeholder="Search by name, position..." className="pl-8 sm:w-[250px] md:w-[300px]" value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} disabled={isLoadingEmployees}/></div></div></CardHeader>
+        <CardHeader>
+          <div className="flex flex-col sm:flex-row items-center justify-between gap-2">
+            <div>
+              <CardTitle>Team Members</CardTitle>
+              <CardDescription>Manage your employees' information, salaries, and associated files.</CardDescription>
+            </div>
+            <div className="flex items-center gap-2">
+                <TooltipProvider>
+                    <Tooltip>
+                        <TooltipTrigger asChild>
+                            <Button variant="outline" size="icon" onClick={handleImportClick} disabled={isSaving || isLoadingEmployees}><Upload className="h-4 w-4" /></Button>
+                        </TooltipTrigger>
+                        <TooltipContent><p>Import from Excel</p></TooltipContent>
+                    </Tooltip>
+                    <Tooltip>
+                        <TooltipTrigger asChild>
+                            <Button variant="outline" size="icon" disabled><Expand className="h-4 w-4" /></Button>
+                        </TooltipTrigger>
+                        <TooltipContent><p>Expand View</p></TooltipContent>
+                    </Tooltip>
+                </TooltipProvider>
+                <Button asChild disabled={isSaving || isLoadingEmployees}><Link href="/employees/new"><PlusCircle className="mr-2 h-4 w-4" /> Add Employee</Link></Button>
+                <input type="file" ref={fileInputRef} onChange={handleImportFileChange} className="hidden" accept=".xlsx, .xls, .csv" />
+            </div>
+          </div>
+        </CardHeader>
         <CardContent>
           <Table>
-            <TableCaption>{!isLoadingEmployees && sortedEmployees.length === 0 ? (searchTerm ? "No employees match your search." : "No employees found.") : "A list of your employees."}</TableCaption>
-            <TableHeader><TableRow><TableHead className="w-[60px]">Avatar</TableHead><TableHead><Button variant="ghost" onClick={() => requestSort('name')} className="-ml-4 h-auto p-1 text-xs sm:text-sm">Name {getSortIcon('name')}</Button></TableHead><TableHead><Button variant="ghost" onClick={() => requestSort('position')} className="-ml-4 h-auto p-1 text-xs sm:text-sm">Position {getSortIcon('position')}</Button></TableHead><TableHead>Description</TableHead><TableHead className="text-right"><Button variant="ghost" onClick={() => requestSort('salary')} className="h-auto p-1 text-xs sm:text-sm">Salary {getSortIcon('salary')}</Button></TableHead><TableHead>File</TableHead><TableHead className="text-right w-[100px]">Actions</TableHead></TableRow></TableHeader>
+            <TableCaption>{!isLoadingEmployees && employees.length === 0 ? "No employees found." : `Page ${currentPage} of employees.`}</TableCaption>
+            <TableHeader><TableRow><TableHead className="w-[60px]">Avatar</TableHead><TableHead><Button variant="ghost" onClick={() => handleSortChange('name')} className="-ml-4 h-auto p-1 text-xs sm:text-sm">Name {getSortIcon('name')}</Button></TableHead><TableHead><Button variant="ghost" onClick={() => handleSortChange('position')} className="-ml-4 h-auto p-1 text-xs sm:text-sm">Position {getSortIcon('position')}</Button></TableHead><TableHead>Description</TableHead><TableHead className="text-right"><Button variant="ghost" onClick={() => handleSortChange('salary')} className="h-auto p-1 text-xs sm:text-sm">Salary {getSortIcon('salary')}</Button></TableHead><TableHead>File</TableHead><TableHead className="text-right w-[100px]">Actions</TableHead></TableRow></TableHeader>
             <TableBody>
               {isLoadingEmployees && employees.length === 0 && ([...Array(3)].map((_, i) => (<TableRow key={`skel-${i}`}><TableCell><Skeleton className="h-10 w-10 rounded-full" /></TableCell><TableCell><Skeleton className="h-4 w-3/4" /></TableCell><TableCell><Skeleton className="h-4 w-1/2" /></TableCell><TableCell><Skeleton className="h-4 w-3/4" /></TableCell><TableCell className="text-right"><Skeleton className="h-4 w-1/4 ml-auto" /></TableCell><TableCell><Skeleton className="h-4 w-1/2" /></TableCell><TableCell className="text-right"><Skeleton className="h-8 w-8 ml-auto" /></TableCell></TableRow>)))}
-              {!isLoadingEmployees && sortedEmployees.map((employee) => (
+              {!isLoadingEmployees && employees.map((employee) => (
                 <TableRow key={employee.id}>
                   <TableCell><Avatar className="h-10 w-10"><AvatarImage src={employee.profilePictureUrl || `https://placehold.co/40x40.png?text=${getInitials(employee.name)}`} alt={employee.name} data-ai-hint="person portrait" /><AvatarFallback>{getInitials(employee.name)}</AvatarFallback></Avatar></TableCell>
                   <TableCell className="font-medium">{employee.name}</TableCell>
@@ -742,6 +768,29 @@ export default function EmployeesPage() {
               ))}
             </TableBody>
           </Table>
+            <div className="flex items-center justify-between pt-4">
+                <div className="text-sm text-muted-foreground">
+                    Page {currentPage}
+                </div>
+                <Pagination>
+                    <PaginationContent>
+                        <PaginationItem>
+                            <PaginationPrevious
+                                href="#"
+                                onClick={(e) => { e.preventDefault(); handlePageChange('prev'); }}
+                                className={currentPage === 1 ? 'pointer-events-none opacity-50' : undefined}
+                            />
+                        </PaginationItem>
+                        <PaginationItem>
+                            <PaginationNext
+                                href="#"
+                                onClick={(e) => { e.preventDefault(); handlePageChange('next'); }}
+                                className={employees.length < RECORDS_PER_PAGE ? 'pointer-events-none opacity-50' : undefined}
+                            />
+                        </PaginationItem>
+                    </PaginationContent>
+                </Pagination>
+            </div>
         </CardContent>
       </Card>
 

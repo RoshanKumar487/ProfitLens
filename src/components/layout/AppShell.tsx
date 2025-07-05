@@ -15,12 +15,13 @@ import {
   SidebarTrigger,
   SidebarInset,
   useSidebar,
+  SidebarFooter,
 } from '@/components/ui/sidebar';
 import { NAV_ITEMS } from '@/lib/constants';
 import { Separator } from '@/components/ui/separator';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
-import { LogOut, Loader2, Building, LayoutTemplate, Bell, Bot, HelpCircle } from 'lucide-react';
+import { LogOut, Loader2, Building, LayoutTemplate, Bell, Bot, HelpCircle, User, Crown, ChevronLeft, ChevronRight, PlusCircle, ChevronDown, Receipt, TrendingDown, Users, Sparkles } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
@@ -40,11 +41,12 @@ interface Notification {
 
 const AppShellLayout = ({ children }: { children: React.ReactNode }) => {
   const pathname = usePathname();
-  const { isMobile, setOpenMobile } = useSidebar();
+  const { isMobile, setOpenMobile, toggleSidebar, state } = useSidebar();
   const { user, signOut, isLoading: authLoading } = useAuth(); 
   const [isAssistantOpen, setIsAssistantOpen] = React.useState(false);
   const [pendingRequestCount, setPendingRequestCount] = React.useState(0);
   const [notifications, setNotifications] = React.useState<Notification[]>([]);
+  const CollapseIcon = state === 'expanded' ? ChevronLeft : ChevronRight;
   
   React.useEffect(() => {
     if (user?.role !== 'admin' || !user?.companyId) {
@@ -106,27 +108,36 @@ const AppShellLayout = ({ children }: { children: React.ReactNode }) => {
       if (item.href === '/admin') {
         return user?.role === 'admin';
       }
+      if (item.href === '/super-admin') {
+        return user?.isSuperAdmin;
+      }
       return true;
     });
   }, [user]);
+  
+  const Logo = () => (
+    <Button
+      variant="ghost"
+      className="h-12 w-full justify-start gap-3 px-4 text-lg font-bold hover:bg-sidebar-accent hover:text-sidebar-accent-foreground group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:h-11 group-data-[collapsible=icon]:w-11 group-data-[collapsible=icon]:px-0"
+      asChild
+    >
+      <Link href="/">
+        <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-gradient-to-br from-blue-500 to-indigo-600 text-white shadow-lg">
+          <span className="text-base font-black">BS</span>
+        </div>
+        <h1 className="text-xl font-headline font-bold text-sidebar-foreground group-data-[collapsible=icon]:hidden">
+          BizSight
+        </h1>
+      </Link>
+    </Button>
+  );
 
   return (
     <>
       {!isAuthPage && (
-        <Sidebar collapsible="icon" variant="sidebar" className="border-r">
+        <Sidebar collapsible="icon" variant="sidebar" className="border-r border-sidebar-border/20 bg-sidebar backdrop-blur-md">
           <SidebarHeader className="p-2">
-            <Button
-              variant="ghost"
-              className="h-12 w-full justify-start gap-3 px-3 group-data-[collapsible=icon]:justify-center"
-              asChild
-            >
-             <Link href="/">
-                <LayoutTemplate className="h-7 w-7 shrink-0 text-primary" />
-                <h1 className="text-xl font-headline font-bold text-sidebar-foreground group-data-[collapsible=icon]:hidden">
-                  ProfitLens
-                </h1>
-              </Link>
-            </Button>
+            <Logo />
             {user && user.companyName && (
               <div className="mt-1 px-2 group-data-[collapsible=icon]:hidden">
                 <div className="flex items-center gap-2 rounded-md bg-primary/10 p-2 shadow-inner">
@@ -136,7 +147,7 @@ const AppShellLayout = ({ children }: { children: React.ReactNode }) => {
               </div>
             )}
           </SidebarHeader>
-          <Separator className="bg-sidebar-border" />
+          <Separator className="bg-sidebar-border/50" />
           <SidebarContent className="p-2">
             <SidebarMenu>
               {visibleNavItems.map((item) => (
@@ -162,102 +173,161 @@ const AppShellLayout = ({ children }: { children: React.ReactNode }) => {
               ))}
             </SidebarMenu>
           </SidebarContent>
+            <SidebarFooter className="mt-auto hidden p-2 md:block">
+              <TooltipProvider delayDuration={0}>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Button
+                      variant="ghost"
+                      className="h-10 w-full justify-start group-data-[collapsible=icon]:h-10 group-data-[collapsible=icon]:w-10 group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:px-0 px-2"
+                      onClick={toggleSidebar}
+                    >
+                      <CollapseIcon className="size-5 shrink-0" />
+                      <span className="group-data-[collapsible=icon]:hidden">
+                        {state === 'expanded' ? 'Collapse' : 'Expand'}
+                      </span>
+                    </Button>
+                  </TooltipTrigger>
+                  <TooltipContent side="right" hidden={state === "expanded"}>
+                    Expand sidebar
+                  </TooltipContent>
+                </Tooltip>
+              </TooltipProvider>
+          </SidebarFooter>
         </Sidebar>
       )}
 
       <SidebarInset className={cn(isAuthPage && "md:!ml-0")}>
         {!isAuthPage && (
-           <header className="sticky top-0 z-10 flex h-14 items-center gap-4 border-b bg-background/80 px-4 backdrop-blur-sm sm:h-16 sm:px-6">
-              <div className="flex items-center gap-4">
-                  {/* Mobile trigger */}
-                  <SidebarTrigger variant="outline" size="icon" className="md:hidden" />
-                  
-                  {/* Brand logo/name */}
-                  <Link href="/" onClick={handleNavigationClick} className="flex items-center gap-2">
-                      <LayoutTemplate className="h-6 w-6 text-primary" />
-                      <span className="font-bold text-lg text-foreground">ProfitLens</span>
-                  </Link>
-              </div>
+           <header className="sticky top-0 z-10 border-b border-border bg-background/80 backdrop-blur-sm">
+              <div className="mx-auto flex h-14 max-w-7xl items-center gap-4 px-4 sm:px-6">
+                <SidebarTrigger className="md:hidden" />
+                
+                {user && user.companyName && (
+                  <div className="hidden items-center gap-2 md:flex">
+                      <Building className="h-5 w-5 flex-shrink-0 text-primary" />
+                      <p className="truncate text-lg font-semibold">{user.companyName}</p>
+                  </div>
+                )}
 
-              <div className="flex-1" />
+                <div className="flex-1" />
 
-              {user && (
-                  <div className="flex items-center gap-2">
-                      <DropdownMenu>
-                          <DropdownMenuTrigger asChild>
-                            <Button variant="ghost" size="icon" className="relative h-10 w-10 rounded-full">
-                                <Bell className="h-5 w-5" />
-                                {pendingRequestCount > 0 && (
-                                    <Badge variant="destructive" className="absolute top-1 right-1 h-5 w-5 p-0 flex items-center justify-center text-xs rounded-full">
-                                    {pendingRequestCount}
-                                    </Badge>
-                                )}
-                            </Button>
-                          </DropdownMenuTrigger>
-                          <DropdownMenuContent className="w-80" align="end">
-                            <DropdownMenuLabel>Notifications</DropdownMenuLabel>
-                            <DropdownMenuSeparator />
-                            {notifications.length > 0 ? (
-                                notifications.map((notif) => (
-                                <DropdownMenuItem key={notif.id} asChild>
-                                    <Link href="/admin" className="cursor-pointer" onClick={handleNavigationClick}>
-                                    <div className="flex flex-col">
-                                        <p className="text-sm font-medium">
-                                        <span className="font-bold">{notif.userName}</span> requested to join.
-                                        </p>
-                                        <p className="text-xs text-muted-foreground">
-                                        {formatDistanceToNow(notif.createdAt.toDate(), { addSuffix: true })}
-                                        </p>
-                                    </div>
+                {user && (
+                    <div className="flex items-center gap-4">
+                        <DropdownMenu>
+                            <DropdownMenuTrigger asChild>
+                                <Button variant="default">
+                                    <PlusCircle className="mr-2 h-4 w-4" />
+                                    New
+                                    <ChevronDown className="ml-2 h-4 w-4" />
+                                </Button>
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent align="end" className="w-56">
+                                <DropdownMenuItem asChild>
+                                    <Link href="/invoicing/new" onClick={handleNavigationClick}>
+                                        <Receipt className="mr-2 h-4 w-4" />
+                                        <span>New Invoice</span>
                                     </Link>
                                 </DropdownMenuItem>
-                                ))
-                            ) : (
-                                <div className="p-4 text-sm text-center text-muted-foreground">
-                                    You have no new notifications.
-                                </div>
-                            )}
-                          </DropdownMenuContent>
-                      </DropdownMenu>
+                                <DropdownMenuItem asChild>
+                                    <Link href="/record-expenses/new" onClick={handleNavigationClick}>
+                                        <TrendingDown className="mr-2 h-4 w-4" />
+                                        <span>New Expense</span>
+                                    </Link>
+                                </DropdownMenuItem>
+                                <DropdownMenuItem asChild>
+                                    <Link href="/employees/new" onClick={handleNavigationClick}>
+                                        <Users className="mr-2 h-4 w-4" />
+                                        <span>New Employee</span>
+                                    </Link>
+                                </DropdownMenuItem>
+                            </DropdownMenuContent>
+                        </DropdownMenu>
 
-                      <DropdownMenu>
-                          <DropdownMenuTrigger asChild>
-                            <Button variant="ghost" className="relative h-10 w-10 rounded-full">
-                                  <Avatar className="h-10 w-10">
-                                      <AvatarFallback className="bg-muted text-muted-foreground font-semibold">
-                                          {getInitials(user.displayName)}
-                                      </AvatarFallback>
-                                  </Avatar>
-                            </Button>
-                          </DropdownMenuTrigger>
-                          <DropdownMenuContent className="w-56" align="end" forceMount>
-                              <DropdownMenuLabel className="font-normal">
-                                <div className="flex flex-col space-y-1">
-                                  <p className="text-sm font-medium leading-none">{user.displayName}</p>
-                                  <p className="text-xs leading-none text-muted-foreground">{user.email}</p>
-                                </div>
-                              </DropdownMenuLabel>
+                        <DropdownMenu>
+                            <DropdownMenuTrigger asChild>
+                              <Button variant="ghost" size="icon" className="relative h-10 w-10 rounded-full hover:bg-accent hover:text-accent-foreground">
+                                  <Bell className="h-5 w-5" />
+                                  {pendingRequestCount > 0 && (
+                                      <Badge variant="destructive" className="absolute top-1 right-1 h-5 w-5 p-0 flex items-center justify-center text-xs rounded-full">
+                                      {pendingRequestCount}
+                                      </Badge>
+                                  )}
+                              </Button>
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent className="w-80" align="end">
+                              <DropdownMenuLabel>Notifications</DropdownMenuLabel>
                               <DropdownMenuSeparator />
-                              <DropdownMenuItem asChild>
-                                  <Link href="/company-details" className="cursor-pointer">
-                                      <Building className="mr-2 h-4 w-4" />
-                                      <span>Company Details</span>
+                              {notifications.length > 0 ? (
+                                  notifications.map((notif) => (
+                                  <DropdownMenuItem key={notif.id} asChild>
+                                      <Link href="/admin" className="cursor-pointer" onClick={handleNavigationClick}>
+                                      <div className="flex flex-col">
+                                          <p className="text-sm font-medium">
+                                          <span className="font-bold">{notif.userName}</span> requested to join.
+                                          </p>
+                                          <p className="text-xs text-muted-foreground">
+                                          {formatDistanceToNow(notif.createdAt.toDate(), { addSuffix: true })}
+                                          </p>
+                                      </div>
+                                      </Link>
+                                  </DropdownMenuItem>
+                                  ))
+                              ) : (
+                                  <div className="p-4 text-sm text-center text-muted-foreground">
+                                      You have no new notifications.
+                                  </div>
+                              )}
+                            </DropdownMenuContent>
+                        </DropdownMenu>
+
+                        <DropdownMenu>
+                            <DropdownMenuTrigger asChild>
+                              <Button variant="ghost" className="relative h-10 w-10 rounded-full hover:bg-accent hover:text-accent-foreground">
+                                    <Avatar className="h-10 w-10 border-2 border-primary/50">
+                                        <AvatarFallback className="bg-muted text-muted-foreground font-semibold">
+                                            {getInitials(user.displayName)}
+                                        </AvatarFallback>
+                                    </Avatar>
+                              </Button>
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent className="w-56" align="end" forceMount>
+                                <DropdownMenuLabel className="font-normal">
+                                  <div className="flex flex-col space-y-1">
+                                    <p className="text-sm font-medium leading-none">{user.displayName}</p>
+                                    <p className="text-xs leading-none text-muted-foreground">{user.email}</p>
+                                  </div>
+                                </DropdownMenuLabel>
+                                <DropdownMenuSeparator />
+                                 {user.isSuperAdmin && (
+                                   <DropdownMenuItem asChild>
+                                      <Link href="/super-admin" className="cursor-pointer">
+                                          <Crown className="mr-2 h-4 w-4" />
+                                          <span>Super Admin</span>
+                                      </Link>
+                                  </DropdownMenuItem>
+                                 )}
+                                <DropdownMenuItem asChild>
+                                    <Link href="/company-details" className="cursor-pointer">
+                                        <Building className="mr-2 h-4 w-4" />
+                                        <span>Company Details</span>
+                                    </Link>
+                                </DropdownMenuItem>
+                                <DropdownMenuItem asChild>
+                                  <Link href="/guide" className="cursor-pointer">
+                                    <HelpCircle className="mr-2 h-4 w-4" />
+                                    <span>Guide</span>
                                   </Link>
-                              </DropdownMenuItem>
-                              <DropdownMenuItem asChild>
-                                <Link href="/guide" className="cursor-pointer">
-                                  <HelpCircle className="mr-2 h-4 w-4" />
-                                  <span>Guide</span>
-                                </Link>
-                              </DropdownMenuItem>
-                              <DropdownMenuSeparator />
-                              <DropdownMenuItem onClick={signOut} className="text-destructive focus:text-destructive cursor-pointer">
-                                <LogOut className="mr-2 h-4 w-4" /> Sign Out
-                              </DropdownMenuItem>
-                        </DropdownMenuContent>
-                      </DropdownMenu>
-                  </div>
-              )}
+                                </DropdownMenuItem>
+                                <DropdownMenuSeparator />
+                                <DropdownMenuItem onClick={signOut} className="text-destructive focus:text-destructive cursor-pointer">
+                                  <LogOut className="mr-2 h-4 w-4" /> Sign Out
+                                </DropdownMenuItem>
+                          </DropdownMenuContent>
+                        </DropdownMenu>
+                    </div>
+                )}
+            </div>
           </header>
         )}
         <main className="flex-1">
@@ -271,18 +341,20 @@ const AppShellLayout = ({ children }: { children: React.ReactNode }) => {
       
       {!isAuthPage && !authLoading && user && (
         <Dialog open={isAssistantOpen} onOpenChange={setIsAssistantOpen}>
-          <Tooltip>
-            <TooltipTrigger asChild>
-              <DialogTrigger asChild>
-                <Button className="fixed bottom-4 right-4 h-10 w-10 rounded-full shadow-2xl z-50">
-                  <Bot className="h-5 w-5" />
-                </Button>
-              </DialogTrigger>
-            </TooltipTrigger>
-            <TooltipContent side="left">
-              <p>AI Assistant</p>
-            </TooltipContent>
-          </Tooltip>
+          <TooltipProvider>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <DialogTrigger asChild>
+                  <Button className="fixed bottom-6 right-6 h-14 w-14 rounded-full shadow-2xl z-50 bg-[#7C3AED] hover:bg-[#6D28D9] text-white hover:scale-110 transition-transform duration-200">
+                    <Sparkles className="h-7 w-7" />
+                  </Button>
+                </DialogTrigger>
+              </TooltipTrigger>
+              <TooltipContent side="left">
+                <p>AI Assistant</p>
+              </TooltipContent>
+            </Tooltip>
+          </TooltipProvider>
           <DialogContent className="sm:max-w-2xl h-[calc(100vh-8rem)] flex flex-col p-0 gap-0">
             <DialogHeader className="p-6 pb-4">
               <DialogTitle className="flex items-center gap-2">

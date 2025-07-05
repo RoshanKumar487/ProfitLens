@@ -1,6 +1,6 @@
 
 import type { LucideIcon } from 'lucide-react';
-import { LayoutDashboard, TrendingUp, TrendingDown, Sparkles, Receipt, Users, FileBarChart, Shield, Banknote, Settings, LayoutGrid } from 'lucide-react';
+import { LayoutDashboard, TrendingUp, TrendingDown, Sparkles, Receipt, Users, FileBarChart, Shield, Banknote, Settings, LayoutGrid, Crown } from 'lucide-react';
 
 export interface NavItem {
   label: string;
@@ -77,5 +77,11 @@ export const NAV_ITEMS: NavItem[] = [
     href: '/admin',
     icon: Shield,
     description: 'Manage user access requests and assign roles to your team members.'
+  },
+  {
+    label: 'Super Admin',
+    href: '/super-admin',
+    icon: Crown,
+    description: 'Manage all companies and users across the platform.',
   }
 ];

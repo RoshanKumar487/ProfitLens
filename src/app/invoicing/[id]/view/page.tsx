@@ -27,6 +27,7 @@ import { Switch } from '@/components/ui/switch';
 interface InvoiceItem {
   id: string;
   description: string;
+  hsnNo?: string;
   quantity: number;
   unitPrice: number;
   customFields?: { [key: string]: string };
@@ -85,7 +86,7 @@ export default function ViewInvoicePage() {
     const [imageDataUris, setImageDataUris] = useState<{ signature?: string; stamp?: string }>({});
     const [isLoadingData, setIsLoadingData] = useState(true);
     const [isProcessing, setIsProcessing] = useState(false);
-    const [template, setTemplate] = useState<'simple' | 'modern' | 'business'>('business');
+    const [template, setTemplate] = useState<'business' | 'modern' | 'simple'>('business');
     const [useLetterhead, setUseLetterhead] = useState(true);
     const printRef = useRef<HTMLDivElement>(null);
 
@@ -255,6 +256,51 @@ export default function ViewInvoicePage() {
             </div>
         )
     }
+    
+    const templateToRender = () => {
+        switch(template) {
+            case 'modern':
+                 return <InvoiceTemplateModern 
+                        ref={printRef}
+                        invoiceToView={invoice} 
+                        companyProfileDetails={companyProfile} 
+                        currencySymbol={currencySymbol} 
+                        signatureDataUri={imageDataUris.signature}
+                        stampDataUri={imageDataUris.stamp}
+                        invoiceSettings={invoiceSettings}
+                        letterheadTemplate={useLetterhead ? 'simple' : 'none'}
+                    />
+            case 'business':
+                 return <InvoiceTemplateBusiness
+                        ref={printRef}
+                        invoiceToView={invoice} 
+                        companyProfileDetails={companyProfile} 
+                        currencySymbol={currencySymbol} 
+                        invoiceSettings={invoiceSettings}
+                        letterheadTemplate={useLetterhead ? 'simple' : 'none'}
+                    />
+            case 'simple':
+                 return <InvoiceTemplateIndian 
+                        ref={printRef}
+                        invoiceToView={invoice} 
+                        companyProfileDetails={companyProfile} 
+                        currencySymbol={currencySymbol} 
+                        signatureDataUri={imageDataUris.signature}
+                        stampDataUri={imageDataUris.stamp}
+                        letterheadTemplate={useLetterhead ? 'simple' : 'none'}
+                        invoiceSettings={invoiceSettings}
+                    />
+            default:
+                return  <InvoiceTemplateBusiness
+                        ref={printRef}
+                        invoiceToView={invoice} 
+                        companyProfileDetails={companyProfile} 
+                        currencySymbol={currencySymbol} 
+                        invoiceSettings={invoiceSettings}
+                        letterheadTemplate={useLetterhead ? 'simple' : 'none'}
+                    />
+        }
+    }
 
     return (
       <div className="w-full">
@@ -287,9 +333,9 @@ export default function ViewInvoicePage() {
                                 <SelectValue placeholder="Select a template" />
                             </SelectTrigger>
                             <SelectContent>
-                                <SelectItem value="simple">Simple</SelectItem>
-                                <SelectItem value="modern">Modern</SelectItem>
                                 <SelectItem value="business">Business</SelectItem>
+                                <SelectItem value="modern">Modern</SelectItem>
+                                <SelectItem value="simple">Simple</SelectItem>
                             </SelectContent>
                         </Select>
                     </div>
@@ -308,38 +354,7 @@ export default function ViewInvoicePage() {
 
         <main className="w-full bg-muted py-8">
             <div className="bg-white shadow-lg mx-auto">
-                 {template === 'modern' ? (
-                     <InvoiceTemplateModern 
-                        ref={printRef}
-                        invoiceToView={invoice} 
-                        companyProfileDetails={companyProfile} 
-                        currencySymbol={currencySymbol} 
-                        signatureDataUri={imageDataUris.signature}
-                        stampDataUri={imageDataUris.stamp}
-                        invoiceSettings={invoiceSettings}
-                        letterheadTemplate={useLetterhead ? 'simple' : 'none'}
-                    />
-                 ) : template === 'business' ? (
-                     <InvoiceTemplateBusiness
-                        ref={printRef}
-                        invoiceToView={invoice} 
-                        companyProfileDetails={companyProfile} 
-                        currencySymbol={currencySymbol} 
-                        invoiceSettings={invoiceSettings}
-                        letterheadTemplate={useLetterhead ? 'simple' : 'none'}
-                    />
-                 ) : (
-                    <InvoiceTemplateIndian 
-                        ref={printRef}
-                        invoiceToView={invoice} 
-                        companyProfileDetails={companyProfile} 
-                        currencySymbol={currencySymbol} 
-                        signatureDataUri={imageDataUris.signature}
-                        stampDataUri={imageDataUris.stamp}
-                        letterheadTemplate={useLetterhead ? 'simple' : 'none'}
-                        invoiceSettings={invoiceSettings}
-                    />
-                 )}
+                 {templateToRender()}
             </div>
         </main>
       </div>
