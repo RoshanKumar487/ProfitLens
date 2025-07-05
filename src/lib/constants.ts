@@ -1,6 +1,6 @@
 
 import type { LucideIcon } from 'lucide-react';
-import { LayoutDashboard, TrendingUp, TrendingDown, Sparkles, Receipt, Users, FileBarChart, Shield, Banknote, Settings, LayoutGrid, Crown } from 'lucide-react';
+import { LayoutDashboard, TrendingUp, TrendingDown, Sparkles, Receipt, Users, FileBarChart, Shield, Banknote, Settings, LayoutGrid, Crown, HandCoins } from 'lucide-react';
 
 export interface NavItem {
   label: string;
@@ -53,6 +53,12 @@ export const NAV_ITEMS: NavItem[] = [
     icon: Banknote,
     description: 'Manually track bank accounts and categorize transactions.',
     sidebar: false,
+  },
+  {
+    label: 'Payroll',
+    href: '/payroll',
+    icon: HandCoins,
+    description: 'Manage employee monthly payments, advances, and deductions.',
   },
   {
     label: 'Employees',

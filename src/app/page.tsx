@@ -44,9 +44,9 @@ export default function MyToolsPage() {
   const { user } = useAuth();
 
   // Explicitly define which tools appear on this page.
-  const toolHrefs = ['/reports', '/settings', '/admin', '/bank-accounts'];
+  const toolHrefs = ['/reports', '/settings', '/admin', '/bank-accounts', '/payroll'];
   const accessibleTools = NAV_ITEMS.filter(item => {
-    if (item.href === '/admin') {
+    if (item.href === '/admin' || item.href === '/payroll') {
       return user?.role === 'admin' && toolHrefs.includes(item.href);
     }
     return toolHrefs.includes(item.href);

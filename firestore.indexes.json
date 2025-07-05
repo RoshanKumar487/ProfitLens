@@ -110,6 +110,14 @@
         { "fieldPath": "companyId", "order": "ASCENDING" },
         { "fieldPath": "type", "order": "ASCENDING" }
       ]
+    },
+    {
+      "collectionGroup": "payrolls",
+      "queryScope": "COLLECTION_GROUP",
+      "fields": [
+        { "fieldPath": "companyId", "order": "ASCENDING" },
+        { "fieldPath": "payPeriod", "order": "ASCENDING" }
+      ]
     }
   ],
   "fieldOverrides": []

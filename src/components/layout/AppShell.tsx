@@ -105,7 +105,7 @@ const AppShellLayout = ({ children }: { children: React.ReactNode }) => {
       if (item.sidebar === false) {
         return false;
       }
-      if (item.href === '/admin') {
+      if (item.href === '/admin' || item.href === '/payroll') {
         return user?.role === 'admin';
       }
       if (item.href === '/super-admin') {
