@@ -128,7 +128,7 @@ const AppShellLayout = ({ children }: { children: React.ReactNode }) => {
           viewBox="0 0 24 24"
           fill="none"
           xmlns="http://www.w3.org/2000/svg"
-          className="h-7 w-7 rounded-lg shadow-lg"
+          className="h-7 w-7"
         >
           <defs>
             <linearGradient id="logoGradient" x1="0" y1="0" x2="1" y2="1">
@@ -137,17 +137,16 @@ const AppShellLayout = ({ children }: { children: React.ReactNode }) => {
             </linearGradient>
           </defs>
           <path
-            d="M4 4H14C17.3137 4 20 6.68629 20 10V14C20 17.3137 17.3137 20 14 20H4V4Z"
+            d="M22 2L15 22L11 13L2 9L22 2Z"
             fill="url(#logoGradient)"
-          />
-          <path
-            d="M4 10H12C14.2091 10 16 11.7909 16 14V14C16 16.2091 14.2091 18 12 18H4V10Z"
-            fill="white"
-            fillOpacity="0.3"
+            stroke="url(#logoGradient)"
+            strokeWidth="1"
+            strokeLinecap="round"
+            strokeLinejoin="round"
           />
         </svg>
         <h1 className="text-xl font-headline font-bold text-sidebar-foreground group-data-[collapsible=icon]:hidden">
-          BizSight
+          InvoPilot
         </h1>
       </Link>
     </Button>

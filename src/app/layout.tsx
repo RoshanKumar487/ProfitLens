@@ -8,8 +8,8 @@ import { AuthProvider } from '@/contexts/AuthContext'; // Import AuthProvider
 import { ThemeProvider } from 'next-themes';
 
 export const metadata: Metadata = {
-  title: 'BizSight',
-  description: 'Your Business Insights Dashboard',
+  title: 'InvoPilot',
+  description: 'Your Invoicing and Business Pilot',
 };
 
 export default function RootLayout({
