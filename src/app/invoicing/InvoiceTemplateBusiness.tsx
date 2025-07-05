@@ -72,9 +72,7 @@ const InvoiceTemplateBusiness = React.forwardRef<HTMLDivElement, InvoiceTemplate
     ].filter(Boolean).join('\n');
     
     const customColumns = invoiceSettings?.customItemColumns || [];
-    const MIN_ROWS = 5;
     const items = invoiceToView.items || [];
-    const emptyRowsCount = Math.max(0, MIN_ROWS - items.length);
 
 
     return (
@@ -154,19 +152,6 @@ const InvoiceTemplateBusiness = React.forwardRef<HTMLDivElement, InvoiceTemplate
                             <td className="p-2 text-right align-top border-r border-gray-900">{item.quantity.toFixed(2)}</td>
                             <td className="p-2 text-right align-top border-r border-gray-900">{currencySymbol}{item.unitPrice.toFixed(2)}</td>
                             <td className="p-2 text-right align-top">{currencySymbol}{(item.quantity * item.unitPrice).toFixed(2)}</td>
-                        </tr>
-                    ))}
-                    {Array.from({ length: emptyRowsCount }).map((_, index) => (
-                         <tr key={`empty-${index}`} className="border-b border-gray-900 h-8">
-                            <td className="border-r border-gray-900">&nbsp;</td>
-                            <td className="border-r border-gray-900"></td>
-                            <td className="border-r border-gray-900"></td>
-                            {customColumns.map(col => (
-                                <td key={`${col.id}-empty-${index}`} className="border-r border-gray-900"></td>
-                            ))}
-                            <td className="border-r border-gray-900"></td>
-                            <td className="border-r border-gray-900"></td>
-                            <td></td>
                         </tr>
                     ))}
                 </tbody>

@@ -113,9 +113,7 @@ const InvoiceTemplateIndian = React.forwardRef<HTMLDivElement, InvoiceTemplatePr
 
     const primaryBgColor = stringToHslColor(companyProfileDetails.name, 40, 25);
     const customColumns = invoiceSettings?.customItemColumns || [];
-    const MIN_ROWS = 5;
     const items = invoiceToView.items || [];
-    const emptyRowsCount = Math.max(0, MIN_ROWS - items.length);
 
 
     return (
@@ -183,19 +181,6 @@ const InvoiceTemplateIndian = React.forwardRef<HTMLDivElement, InvoiceTemplatePr
                                 <td className="p-2 border-r border-black">{item.quantity}</td>
                                 <td className="p-2 border-r border-black text-right">{currencySymbol}{item.unitPrice.toFixed(2)}</td>
                                 <td className="p-2 text-right">{currencySymbol}{(item.quantity * item.unitPrice).toFixed(2)}</td>
-                            </tr>
-                        ))}
-                         {Array.from({ length: emptyRowsCount }).map((_, index) => (
-                            <tr key={`empty-${index}`} className="border-b border-black h-8">
-                                <td className="p-2 border-r border-black">&nbsp;</td>
-                                <td className="p-2 border-r border-black"></td>
-                                <td className="p-2 border-r border-black"></td>
-                                {customColumns.map(col => (
-                                    <td key={`${col.id}-empty-${index}`} className="p-2 border-r border-black"></td>
-                                ))}
-                                <td className="p-2 border-r border-black"></td>
-                                <td className="p-2 border-r border-black"></td>
-                                <td className="p-2"></td>
                             </tr>
                         ))}
                     </tbody>
