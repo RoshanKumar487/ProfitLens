@@ -234,59 +234,33 @@ const AppShellLayout = ({ children }: { children: React.ReactNode }) => {
 
                 {user && (
                     <div className="flex items-center gap-2">
-                        {/* Desktop Buttons */}
-                        <div className="hidden md:flex items-center gap-2">
-                            <Button size="sm" asChild>
-                                <Link href="/invoicing/new" onClick={handleNavigationClick}>
-                                    <Receipt />
-                                    <span>New Invoice</span>
-                                </Link>
-                            </Button>
-                            <Button size="sm" asChild>
-                                <Link href="/record-expenses/new" onClick={handleNavigationClick}>
-                                    <TrendingDown />
-                                    <span>New Expense</span>
-                                </Link>
-                            </Button>
-                            <Button size="sm" asChild>
-                                <Link href="/employees/new" onClick={handleNavigationClick}>
-                                    <Users />
-                                    <span>New Employee</span>
-                                </Link>
-                            </Button>
-                        </div>
-                        
-                        {/* Mobile Dropdown */}
-                        <div className="md:hidden">
-                            <DropdownMenu>
-                                <DropdownMenuTrigger asChild>
-                                    <Button variant="default" size="icon">
-                                        <PlusCircle />
-                                    </Button>
-                                </DropdownMenuTrigger>
-                                <DropdownMenuContent align="end" className="w-56">
-                                    <DropdownMenuItem asChild>
-                                        <Link href="/invoicing/new" onClick={handleNavigationClick}>
-                                            <Receipt className="mr-2 h-4 w-4" />
-                                            <span>New Invoice</span>
-                                        </Link>
-                                    </DropdownMenuItem>
-                                    <DropdownMenuItem asChild>
-                                        <Link href="/record-expenses/new" onClick={handleNavigationClick}>
-                                            <TrendingDown className="mr-2 h-4 w-4" />
-                                            <span>New Expense</span>
-                                        </Link>
-                                    </DropdownMenuItem>
-                                    <DropdownMenuItem asChild>
-                                        <Link href="/employees/new" onClick={handleNavigationClick}>
-                                            <Users className="mr-2 h-4 w-4" />
-                                            <span>New Employee</span>
-                                        </Link>
-                                    </DropdownMenuItem>
-                                </DropdownMenuContent>
-                            </DropdownMenu>
-                        </div>
-
+                        <DropdownMenu>
+                            <DropdownMenuTrigger asChild>
+                                <Button variant="default" size="icon">
+                                    <PlusCircle className="h-5 w-5" />
+                                </Button>
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent align="end" className="w-56">
+                                <DropdownMenuItem asChild>
+                                    <Link href="/invoicing/new" onClick={handleNavigationClick}>
+                                        <Receipt className="mr-2 h-4 w-4" />
+                                        <span>New Invoice</span>
+                                    </Link>
+                                </DropdownMenuItem>
+                                <DropdownMenuItem asChild>
+                                    <Link href="/record-expenses/new" onClick={handleNavigationClick}>
+                                        <TrendingDown className="mr-2 h-4 w-4" />
+                                        <span>New Expense</span>
+                                    </Link>
+                                </DropdownMenuItem>
+                                <DropdownMenuItem asChild>
+                                    <Link href="/employees/new" onClick={handleNavigationClick}>
+                                        <Users className="mr-2 h-4 w-4" />
+                                        <span>New Employee</span>
+                                    </Link>
+                                </DropdownMenuItem>
+                            </DropdownMenuContent>
+                        </DropdownMenu>
 
                         <DropdownMenu>
                             <DropdownMenuTrigger asChild>
