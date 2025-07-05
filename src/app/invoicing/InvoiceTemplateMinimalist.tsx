@@ -3,7 +3,7 @@
 
 import React from 'react';
 import { format } from 'date-fns';
-import { stringToHslColor } from '@/lib/utils';
+import { stringToHslColor, cn } from '@/lib/utils';
 import type { InvoiceSettings } from '../settings/actions';
 
 // Interface definitions mirrored for component props
@@ -60,10 +60,11 @@ interface InvoiceTemplateProps {
   stampDataUri?: string;
   invoiceSettings: InvoiceSettings | null;
   letterheadTemplate: 'none' | 'simple';
+  isBlackAndWhite?: boolean;
 }
 
 const InvoiceTemplateMinimalist = React.forwardRef<HTMLDivElement, InvoiceTemplateProps>(
-  ({ invoiceToView, companyProfileDetails, currencySymbol, signatureDataUri, invoiceSettings }, ref) => {
+  ({ invoiceToView, companyProfileDetails, currencySymbol, signatureDataUri, invoiceSettings, isBlackAndWhite }, ref) => {
     
     const accentColor = stringToHslColor(companyProfileDetails.name, 60, 55);
 
@@ -126,7 +127,7 @@ const InvoiceTemplateMinimalist = React.forwardRef<HTMLDivElement, InvoiceTempla
             <tbody>
               {(invoiceToView.items || []).map((item) => (
                 <tr key={item.id}>
-                  <td className="py-3 border-b border-gray-100">{item.description}</td>
+                  <td className="py-3 border-b border-gray-100 font-semibold">{item.description}</td>
                   {customColumns.map(col => (
                     <td key={col.id} className="py-3 border-b border-gray-100 text-right">{item.customFields?.[col.id] || ''}</td>
                   ))}
@@ -144,7 +145,7 @@ const InvoiceTemplateMinimalist = React.forwardRef<HTMLDivElement, InvoiceTempla
             <div className="flex justify-end">
                  <div className="w-1/2 sm:w-1/3">
                     <div className="flex justify-between text-sm">
-                        <span className="text-gray-600">Subtotal</span>
+                        <span className="text-gray-600 font-semibold">Subtotal</span>
                         <span className="text-gray-800">{currencySymbol}{invoiceToView.subtotal.toFixed(2)}</span>
                     </div>
                      {invoiceToView.discountAmount > 0 && (
@@ -154,13 +155,13 @@ const InvoiceTemplateMinimalist = React.forwardRef<HTMLDivElement, InvoiceTempla
                       </div>
                     )}
                     <div className="flex justify-between text-sm mt-1">
-                        <span className="text-gray-600">Tax ({invoiceToView.taxRate}%)</span>
+                        <span className="text-gray-600 font-semibold">Tax ({invoiceToView.taxRate}%)</span>
                         <span className="text-gray-800">{currencySymbol}{invoiceToView.taxAmount.toFixed(2)}</span>
                     </div>
                      <div className="border-t my-2"></div>
                     <div className="flex justify-between text-base font-bold">
-                        <span style={{ color: accentColor }}>Total</span>
-                        <span style={{ color: accentColor }}>{currencySymbol}{invoiceToView.amount.toFixed(2)}</span>
+                        <span style={{ color: isBlackAndWhite ? 'black' : accentColor }}>Total</span>
+                        <span style={{ color: isBlackAndWhite ? 'black' : accentColor }}>{currencySymbol}{invoiceToView.amount.toFixed(2)}</span>
                     </div>
                  </div>
             </div>

@@ -1,8 +1,10 @@
+
 'use client';
 
 import React from 'react';
 import { format } from 'date-fns';
 import type { InvoiceSettings } from '../settings/actions';
+import { cn } from '@/lib/utils';
 
 // Interface definitions mirrored for component props
 interface InvoiceItem {
@@ -58,10 +60,11 @@ interface InvoiceTemplateProps {
   stampDataUri?: string;
   invoiceSettings: InvoiceSettings | null;
   letterheadTemplate: 'none' | 'simple';
+  isBlackAndWhite?: boolean;
 }
 
 const InvoiceTemplateModern = React.forwardRef<HTMLDivElement, InvoiceTemplateProps>(
-  ({ invoiceToView, companyProfileDetails, currencySymbol, signatureDataUri, invoiceSettings }, ref) => {
+  ({ invoiceToView, companyProfileDetails, currencySymbol, signatureDataUri, invoiceSettings, isBlackAndWhite }, ref) => {
     
     const fullCompanyAddress = [
       companyProfileDetails.address,
@@ -77,27 +80,30 @@ const InvoiceTemplateModern = React.forwardRef<HTMLDivElement, InvoiceTemplatePr
       <div ref={ref} className="bg-white text-gray-800 font-sans text-sm w-[210mm] min-h-[297mm] mx-auto flex flex-col p-8">
         {/* Header Section */}
         <header className="relative mb-8">
-          <div className="bg-slate-800 text-white p-6 pl-8 rounded-tr-[50px]">
-            <h1 className="text-4xl font-bold uppercase tracking-wider text-amber-400">{companyProfileDetails.name}</h1>
-            <p className="text-slate-300 text-sm mt-2">{fullCompanyAddress}</p>
-            <div className="flex gap-4 text-xs text-slate-300 mt-1">
+          <div className={cn("text-white p-6 pl-8 rounded-tr-[50px]", isBlackAndWhite ? "bg-transparent !text-black border-2 border-black" : "bg-slate-800")}>
+            <h1 className={cn("text-4xl font-bold uppercase tracking-wider", isBlackAndWhite ? "" : "text-amber-400")}>{companyProfileDetails.name}</h1>
+            <p className={cn("mt-2", isBlackAndWhite ? "text-gray-600" : "text-slate-300")}>{fullCompanyAddress}</p>
+            <div className={cn("flex gap-4 text-xs mt-1", isBlackAndWhite ? "text-gray-600" : "text-slate-300")}>
                 <p><strong>Phone:</strong> {companyProfileDetails.phone || 'N/A'}</p>
                 <p><strong>Email:</strong> {companyProfileDetails.email || 'N/A'}</p>
             </div>
           </div>
-          <div className="absolute top-0 right-0 h-full w-2/5 bg-amber-400 rounded-tl-[50px] rounded-br-[50px] flex items-center justify-center">
-            <h2 className="text-5xl font-bold text-white -rotate-15 transform">INVOICE</h2>
+          <div className={cn(
+            "absolute top-0 right-0 h-full w-2/5 rounded-tl-[50px] rounded-br-[50px] flex items-center justify-center",
+             isBlackAndWhite ? "bg-transparent" : "bg-amber-400"
+          )}>
+            <h2 className={cn("text-5xl font-bold -rotate-15 transform", isBlackAndWhite ? "text-black" : "text-white")}>INVOICE</h2>
           </div>
         </header>
 
         {/* Invoice Details & Client Info */}
         <section className="grid grid-cols-2 gap-8 mb-8">
-          <div className="bg-slate-100 p-4 rounded-lg">
-            <h3 className="text-lg font-semibold text-slate-800 border-b-2 border-amber-400 pb-1 mb-2">Invoice To:</h3>
+          <div className={cn("p-4 rounded-lg", isBlackAndWhite ? "border" : "bg-slate-100")}>
+            <h3 className={cn("text-lg font-semibold border-b-2 pb-1 mb-2", isBlackAndWhite ? "text-black border-black" : "text-slate-800 border-amber-400")}>Invoice To:</h3>
             <p className="text-2xl font-bold text-slate-700">{invoiceToView.clientName}</p>
             <p><strong>Address:</strong> {invoiceToView.clientAddress || 'N/A'}</p>
           </div>
-          <div className="bg-slate-100 p-4 rounded-lg">
+          <div className={cn("p-4 rounded-lg", isBlackAndWhite ? "border" : "bg-slate-100")}>
              <div className="grid grid-cols-[auto_1fr] gap-x-4 gap-y-1">
                 <span className="font-bold">Invoice No:</span><span className="font-medium text-slate-600">{invoiceToView.invoiceNumber}</span>
                 <span className="font-bold">Invoice Date:</span><span className="font-medium text-slate-600">{format(invoiceToView.issuedDate, 'dd MMM, yyyy')}</span>
@@ -116,15 +122,15 @@ const InvoiceTemplateModern = React.forwardRef<HTMLDivElement, InvoiceTemplatePr
         <section className="mb-4 flex-grow">
           <table className="w-full text-left">
             <thead>
-              <tr className="bg-slate-800 text-white">
-                <th className="p-3 w-2/5 rounded-l-lg">Product Description</th>
-                <th className="p-3 text-center">HSN</th>
+              <tr className={cn(isBlackAndWhite ? "text-black border-y-2 border-black" : "bg-slate-800 text-white")}>
+                <th className={cn("p-3 w-2/5 font-semibold", isBlackAndWhite ? "" : "rounded-l-lg")}>Product Description</th>
+                <th className="p-3 text-center font-semibold">HSN</th>
                 {customColumns.map(col => (
-                  <th key={col.id} className="p-3 text-center">{col.label}</th>
+                  <th key={col.id} className="p-3 text-center font-semibold">{col.label}</th>
                 ))}
-                <th className="p-3 text-right">Price</th>
-                <th className="p-3 text-right">QTY</th>
-                <th className="p-3 text-right rounded-r-lg">Total</th>
+                <th className="p-3 text-right font-semibold">Price</th>
+                <th className="p-3 text-right font-semibold">QTY</th>
+                <th className={cn("p-3 text-right font-semibold", isBlackAndWhite ? "" : "rounded-r-lg")}>Total</th>
               </tr>
             </thead>
             <tbody>
@@ -166,7 +172,7 @@ const InvoiceTemplateModern = React.forwardRef<HTMLDivElement, InvoiceTemplatePr
                     <span className="font-semibold">Tax ({invoiceToView.taxRate}%):</span>
                     <span>{currencySymbol}{invoiceToView.taxAmount.toFixed(2)}</span>
                 </div>
-                <div className="grid grid-cols-2 py-2 mt-2 bg-slate-800 text-white rounded-lg">
+                <div className={cn("grid grid-cols-2 py-2 mt-2", isBlackAndWhite ? "border-t-2 border-black" : "bg-slate-800 text-white rounded-lg")}>
                     <span className="font-bold text-xl pl-4">Grand Total:</span>
                     <span className="font-bold text-xl pr-4">{currencySymbol}{invoiceToView.amount.toFixed(2)}</span>
                 </div>
@@ -175,7 +181,7 @@ const InvoiceTemplateModern = React.forwardRef<HTMLDivElement, InvoiceTemplatePr
 
         {/* Footer */}
         <footer className="mt-16 pt-8 flex justify-between items-end border-t-2 border-slate-200">
-           <p className="font-bold text-lg text-amber-500">Thanks For Your Business</p>
+           <p className={cn("font-bold text-lg", isBlackAndWhite ? "text-black" : "text-amber-500")}>Thanks For Your Business</p>
            <div className="w-48 text-center">
              {signatureDataUri ? (
                 // eslint-disable-next-line @next/next/no-img-element

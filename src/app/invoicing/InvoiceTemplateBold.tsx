@@ -3,7 +3,7 @@
 
 import React from 'react';
 import { format } from 'date-fns';
-import { stringToHslColor } from '@/lib/utils';
+import { stringToHslColor, cn } from '@/lib/utils';
 import type { InvoiceSettings } from '../settings/actions';
 
 // Interface definitions mirrored for component props
@@ -60,11 +60,12 @@ interface InvoiceTemplateProps {
   stampDataUri?: string;
   invoiceSettings: InvoiceSettings | null;
   letterheadTemplate: 'none' | 'simple';
+  isBlackAndWhite?: boolean;
 }
 
 
 const InvoiceTemplateBold = React.forwardRef<HTMLDivElement, InvoiceTemplateProps>(
-  ({ invoiceToView, companyProfileDetails, currencySymbol, signatureDataUri, invoiceSettings }, ref) => {
+  ({ invoiceToView, companyProfileDetails, currencySymbol, signatureDataUri, invoiceSettings, isBlackAndWhite }, ref) => {
     
     const primaryColor = stringToHslColor(companyProfileDetails.name, 45, 55);
     const customColumns = invoiceSettings?.customItemColumns || [];
@@ -73,12 +74,17 @@ const InvoiceTemplateBold = React.forwardRef<HTMLDivElement, InvoiceTemplateProp
       <div ref={ref} className="bg-white text-gray-800 font-sans text-sm w-[210mm] min-h-[297mm] mx-auto flex flex-col">
         
         {/* Header */}
-        <header className="p-8 text-white" style={{ backgroundColor: primaryColor }}>
+        <header
+          className={cn("p-8", isBlackAndWhite ? "text-black border-b-2 border-black" : "text-white")}
+          style={{ backgroundColor: isBlackAndWhite ? 'transparent' : primaryColor }}
+        >
           <div className="flex justify-between items-center">
             <h1 className="text-4xl font-extrabold uppercase tracking-tight">{companyProfileDetails.name}</h1>
             <h2 className="text-3xl font-light uppercase">Invoice</h2>
           </div>
-          <p className="text-sm mt-1 opacity-80">{companyProfileDetails.email} | {companyProfileDetails.phone}</p>
+          <p className={cn("text-sm mt-1", isBlackAndWhite ? "text-gray-600" : "opacity-80")}>
+            {companyProfileDetails.email} | {companyProfileDetails.phone}
+          </p>
         </header>
 
         {/* Invoice & Client Details */}
@@ -98,18 +104,21 @@ const InvoiceTemplateBold = React.forwardRef<HTMLDivElement, InvoiceTemplateProp
         </section>
 
         {/* Items Table */}
-        <section className="flex-grow px-8">
+        <section className="px-8 flex-grow">
           <table className="w-full text-left">
             <thead>
-              <tr style={{ backgroundColor: primaryColor }} className="text-white text-sm uppercase">
-                <th className="p-3 w-10">#</th>
-                <th className="p-3 w-2/5">Item</th>
+              <tr 
+                className={cn("text-sm uppercase", isBlackAndWhite ? "text-black border-b-2 border-t-2 border-black" : "text-white")}
+                style={{ backgroundColor: isBlackAndWhite ? 'transparent' : primaryColor }}
+              >
+                <th className="p-3 w-10 font-semibold">#</th>
+                <th className="p-3 w-2/5 font-semibold">Item</th>
                 {customColumns.map(col => (
-                  <th key={col.id} className="p-3 text-right">{col.label}</th>
+                  <th key={col.id} className="p-3 text-right font-semibold">{col.label}</th>
                 ))}
-                <th className="p-3 text-right">Qty</th>
-                <th className="p-3 text-right">Price</th>
-                <th className="p-3 text-right">Total</th>
+                <th className="p-3 text-right font-semibold">Qty</th>
+                <th className="p-3 text-right font-semibold">Price</th>
+                <th className="p-3 text-right font-semibold">Total</th>
               </tr>
             </thead>
             <tbody>
@@ -130,7 +139,7 @@ const InvoiceTemplateBold = React.forwardRef<HTMLDivElement, InvoiceTemplateProp
         </section>
         
         {/* Footer */}
-        <footer className="mt-auto">
+        <footer className="mt-8">
             <div className="p-8 grid grid-cols-2 gap-8 items-end">
                 <div className="text-sm text-gray-600">
                     <h4 className="font-bold text-base text-gray-800 mb-2">Thank you!</h4>
@@ -153,13 +162,18 @@ const InvoiceTemplateBold = React.forwardRef<HTMLDivElement, InvoiceTemplateProp
                     </div>
                 </div>
             </div>
-            <div style={{ backgroundColor: primaryColor }} className="text-white p-8 flex justify-between items-center">
+            <div 
+                className={cn("p-8 flex justify-between items-center", isBlackAndWhite ? "text-black border-t-2 border-black" : "text-white")}
+                style={{ backgroundColor: isBlackAndWhite ? 'transparent' : primaryColor }}
+            >
                 <div className="text-sm">
                     <p className="font-bold">Payment Details</p>
-                    <p className="opacity-80">Bank: {companyProfileDetails.bankName || 'N/A'}, A/C: {companyProfileDetails.accountNumber || 'N/A'}</p>
+                    <p className={cn(isBlackAndWhite ? "text-gray-700" : "opacity-80")}>
+                        Bank: {companyProfileDetails.bankName || 'N/A'}, A/C: {companyProfileDetails.accountNumber || 'N/A'}
+                    </p>
                 </div>
                 <div className="text-right">
-                    <p className="text-lg opacity-80">Total Amount</p>
+                    <p className={cn("text-lg", isBlackAndWhite ? "text-gray-700" : "opacity-80")}>Total Amount</p>
                     <p className="text-4xl font-bold">{currencySymbol}{invoiceToView.amount.toFixed(2)}</p>
                 </div>
             </div>

@@ -5,6 +5,7 @@ import React from 'react';
 import { format } from 'date-fns';
 import type { InvoiceSettings } from '../settings/actions';
 import Letterhead from '@/components/Letterhead';
+import { cn } from '@/lib/utils';
 
 // Interface definitions mirrored from invoicing/page.tsx for component props
 interface InvoiceItem {
@@ -59,11 +60,12 @@ interface InvoiceTemplateProps {
   currencySymbol: string;
   invoiceSettings: InvoiceSettings | null;
   letterheadTemplate: 'none' | 'simple';
+  isBlackAndWhite?: boolean;
 }
 
 
 const InvoiceTemplateBusiness = React.forwardRef<HTMLDivElement, InvoiceTemplateProps>(
-  ({ invoiceToView, companyProfileDetails, currencySymbol, invoiceSettings, letterheadTemplate }, ref) => {
+  ({ invoiceToView, companyProfileDetails, currencySymbol, invoiceSettings, letterheadTemplate, isBlackAndWhite }, ref) => {
     
     const fullCompanyAddress = [
         companyProfileDetails.address,
@@ -126,19 +128,20 @@ const InvoiceTemplateBusiness = React.forwardRef<HTMLDivElement, InvoiceTemplate
             </div>
         </section>
 
-        <main className="mt-4">
+        <main className="mt-4 flex-grow">
             <table className="w-full text-left text-xs border-l border-r border-gray-900">
                 <thead>
-                    <tr style={{ backgroundColor: '#0A2B58' }} className="text-white">
-                        <th className="p-2 w-10 text-center font-normal border-r border-gray-500">#</th>
-                        <th className="p-2 font-normal border-r border-gray-500">Item & Description</th>
-                        <th className="p-2 w-24 font-normal border-r border-gray-500">HSN No.</th>
+                    <tr className={cn(isBlackAndWhite ? "text-black border-y-2 border-black" : "text-white")}
+                        style={{ backgroundColor: isBlackAndWhite ? 'transparent' : '#0A2B58' }}>
+                        <th className="p-2 w-10 text-center font-bold border-r border-gray-500">#</th>
+                        <th className="p-2 font-bold border-r border-gray-500">Item & Description</th>
+                        <th className="p-2 w-24 font-bold border-r border-gray-500">HSN No.</th>
                         {customColumns.map(col => (
-                            <th key={col.id} className="p-2 w-24 font-normal text-right border-r border-gray-500">{col.label}</th>
+                            <th key={col.id} className="p-2 w-24 font-bold text-right border-r border-gray-500">{col.label}</th>
                         ))}
-                        <th className="p-2 w-20 text-right font-normal border-r border-gray-500">Qty</th>
-                        <th className="p-2 w-24 text-right font-normal border-r border-gray-500">Rate</th>
-                        <th className="p-2 w-28 text-right font-normal">Amount</th>
+                        <th className="p-2 w-20 text-right font-bold border-r border-gray-500">Qty</th>
+                        <th className="p-2 w-24 text-right font-bold border-r border-gray-500">Rate</th>
+                        <th className="p-2 w-28 text-right font-bold">Amount</th>
                     </tr>
                 </thead>
                 <tbody>
@@ -165,8 +168,8 @@ const InvoiceTemplateBusiness = React.forwardRef<HTMLDivElement, InvoiceTemplate
              <div className="flex justify-end mb-2">
                 <div className="w-1/3">
                     <div className="flex justify-between py-1 border-b">
-                        <span>Sub Total</span>
-                        <span className="text-right">{currencySymbol}{invoiceToView.subtotal.toFixed(2)}</span>
+                        <span className='font-semibold'>Sub Total</span>
+                        <span className="text-right font-semibold">{currencySymbol}{invoiceToView.subtotal.toFixed(2)}</span>
                     </div>
                 </div>
             </div>
@@ -180,15 +183,15 @@ const InvoiceTemplateBusiness = React.forwardRef<HTMLDivElement, InvoiceTemplate
                 <div className="w-1/3">
                     <table className="w-full text-sm font-bold">
                         <tbody>
-                            <tr style={{backgroundColor: '#EBF4FF'}} className="text-black">
+                            <tr style={{backgroundColor: isBlackAndWhite ? 'transparent' : '#EBF4FF'}} className={cn(isBlackAndWhite && "border-b border-black")}>
                                 <td className="p-2">Tax Rate</td>
                                 <td className="p-2 text-right">{invoiceToView.taxRate.toFixed(2)}%</td>
                             </tr>
-                            <tr style={{backgroundColor: '#EBF4FF'}} className="text-black">
+                            <tr style={{backgroundColor: isBlackAndWhite ? 'transparent' : '#EBF4FF'}} className={cn(isBlackAndWhite && "border-b border-black")}>
                                 <td className="p-2">Total</td>
                                 <td className="p-2 text-right">{currencySymbol}{invoiceToView.amount.toFixed(2)}</td>
                             </tr>
-                            <tr style={{backgroundColor: '#0A2B58'}} className="text-white">
+                            <tr style={{backgroundColor: isBlackAndWhite ? 'transparent' : '#0A2B58'}} className={cn(isBlackAndWhite ? "text-black border-t-2 border-black" : "text-white")}>
                                 <td className="p-2">Balance Due</td>
                                 <td className="p-2 text-right">{currencySymbol}{invoiceToView.amount.toFixed(2)}</td>
                             </tr>

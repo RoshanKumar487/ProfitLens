@@ -18,7 +18,7 @@ import InvoiceTemplateBold from '../../InvoiceTemplateBold';
 import jsPDF from 'jspdf';
 import html2canvas from 'html2canvas';
 import { Skeleton } from '@/components/ui/skeleton';
-import { urlToDataUri } from '@/lib/utils';
+import { urlToDataUri, cn } from '@/lib/utils';
 import Link from 'next/link';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -90,6 +90,7 @@ export default function ViewInvoicePage() {
     const [isProcessing, setIsProcessing] = useState(false);
     const [template, setTemplate] = useState<'business' | 'modern' | 'simple' | 'minimalist' | 'bold'>('business');
     const [useLetterhead, setUseLetterhead] = useState(true);
+    const [isBlackAndWhite, setIsBlackAndWhite] = useState(false);
     const printRef = useRef<HTMLDivElement>(null);
 
     const fetchAllData = useCallback(async () => {
@@ -269,6 +270,7 @@ export default function ViewInvoicePage() {
             stampDataUri: imageDataUris.stamp,
             invoiceSettings: invoiceSettings,
             letterheadTemplate: useLetterhead ? 'simple' as const : 'none' as const,
+            isBlackAndWhite: isBlackAndWhite,
         };
 
         switch(template) {
@@ -312,6 +314,10 @@ export default function ViewInvoicePage() {
                          <div className="flex items-center gap-2">
                             <Switch id="use-letterhead" checked={useLetterhead} onCheckedChange={setUseLetterhead} disabled={isProcessing} />
                             <Label htmlFor="use-letterhead" className="cursor-pointer">Letterhead</Label>
+                        </div>
+                         <div className="flex items-center gap-2">
+                            <Switch id="b-and-w" checked={isBlackAndWhite} onCheckedChange={setIsBlackAndWhite} disabled={isProcessing} />
+                            <Label htmlFor="b-and-w" className="cursor-pointer">B&W</Label>
                         </div>
                          <Select value={template} onValueChange={(value) => setTemplate(value as any)} disabled={isProcessing}>
                             <SelectTrigger className="w-[180px]" id="template-select">
