@@ -18,6 +18,9 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { COUNTRIES } from '@/lib/countries';
 import { Alert, AlertTitle } from '@/components/ui/alert';
 import { cn } from '@/lib/utils';
+import { doc, getDoc } from 'firebase/firestore';
+import { db } from '@/lib/firebaseConfig';
+
 
 export default function SignUpPage() {
   // User fields
@@ -39,6 +42,10 @@ export default function SignUpPage() {
   const [isSearching, setIsSearching] = useState(false);
   const [showCompanyList, setShowCompanyList] = useState(false);
 
+  // New state for joining by ID
+  const [companyIdInput, setCompanyIdInput] = useState('');
+  const [companyIdStatus, setCompanyIdStatus] = useState<'idle' | 'loading' | 'found' | 'not_found'>('idle');
+
   // New state for signature and stamp
   const [signatureFile, setSignatureFile] = useState<File | null>(null);
   const [stampFile, setStampFile] = useState<File | null>(null);
@@ -58,9 +65,16 @@ export default function SignUpPage() {
     }
   }, [searchParams]);
 
-  const isNewCompany = useMemo(() => !selectedCompany, [selectedCompany]);
+  const isNewCompany = useMemo(() => !selectedCompany && companyIdStatus !== 'found', [selectedCompany, companyIdStatus]);
 
+  // Effect for searching company by NAME
   useEffect(() => {
+    // If an ID is being used, disable name search
+    if (companyIdInput.trim().length > 0) {
+      setShowCompanyList(false);
+      return;
+    }
+
     if (companyName.trim().length < 1) {
       setCompanyList([]);
       setShowCompanyList(false);
@@ -83,14 +97,53 @@ export default function SignUpPage() {
     }, 300);
 
     return () => clearTimeout(timer);
-  }, [companyName, selectedCompany]);
+  }, [companyName, selectedCompany, companyIdInput]);
+
+  // Effect for fetching company by ID
+  useEffect(() => {
+    const fetchCompanyById = async (id: string) => {
+        setCompanyIdStatus('loading');
+        try {
+            const companyDocRef = doc(db, 'companyProfiles', id);
+            const companyDocSnap = await getDoc(companyDocRef);
+
+            if (companyDocSnap.exists()) {
+                const companyData = companyDocSnap.data();
+                setSelectedCompany({ id: companyDocSnap.id, name: companyData.name });
+                setCompanyName(companyData.name);
+                setShowCompanyList(false);
+                setCompanyIdStatus('found');
+            } else {
+                setCompanyIdStatus('not_found');
+                setSelectedCompany(null);
+            }
+        } catch (error) {
+            console.error("Error fetching company by ID:", error);
+            setCompanyIdStatus('not_found');
+        }
+    };
+
+    const trimmedId = companyIdInput.trim();
+    if (trimmedId.length > 5) { // Basic validation, Firestore IDs are longer
+        const debounce = setTimeout(() => fetchCompanyById(trimmedId), 500);
+        return () => clearTimeout(debounce);
+    } else {
+        // If the ID field is cleared and was previously found, reset the state.
+        if (companyIdStatus === 'found') {
+            setSelectedCompany(null);
+            setCompanyName('');
+        }
+        setCompanyIdStatus('idle');
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [companyIdInput]);
 
 
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
     setPageError(null);
-    if (!displayName || !email || !password || !confirmPassword || !companyName) {
-      setPageError("Your name, email, password, and company name are required.");
+    if (!displayName || !email || !password || !confirmPassword || (companyIdStatus !== 'found' && !companyName)) {
+      setPageError("Your name, email, password, and company information are required.");
       return;
     }
     if (isNewCompany && (!companyAddress || !city || !state || !country)) {
@@ -204,6 +257,29 @@ export default function SignUpPage() {
             <Separator className="my-6" />
             <h3 className="text-lg font-medium flex items-center gap-2"><Building className="h-5 w-5 text-primary" /> Company Information</h3>
 
+            <div>
+              <Label htmlFor="companyId">Company ID (Optional)</Label>
+              <div className="relative">
+                <Input
+                  id="companyId"
+                  value={companyIdInput}
+                  onChange={(e) => setCompanyIdInput(e.target.value)}
+                  placeholder="Enter ID for a specific company"
+                  disabled={isLoading}
+                />
+                {companyIdStatus === 'loading' && <Loader2 className="absolute right-2 top-1/2 -translate-y-1/2 h-4 w-4 animate-spin" />}
+              </div>
+              {companyIdStatus === 'not_found' && companyIdInput.trim().length > 5 && (
+                  <p className="text-xs mt-1 text-destructive flex items-center gap-1"><AlertTriangle className="h-3 w-3" /> Company ID not found.</p>
+              )}
+            </div>
+
+            <div className="relative flex items-center justify-center my-2">
+              <Separator className="flex-1" />
+              <span className="px-4 text-xs text-muted-foreground bg-card">OR</span>
+              <Separator className="flex-1" />
+            </div>
+
             <div className="relative">
               <Label htmlFor="companyName">Company Name</Label>
               <div className="flex items-center gap-2">
@@ -215,7 +291,7 @@ export default function SignUpPage() {
                   placeholder="Type to find your company..."
                   required
                   autoComplete="off"
-                  disabled={isLoading}
+                  disabled={isLoading || companyIdStatus === 'found'}
                 />
                  {isSearching && <Loader2 className="h-4 w-4 animate-spin" />}
               </div>
@@ -230,7 +306,7 @@ export default function SignUpPage() {
                   </CardContent>
                 </Card>
               )}
-               {selectedCompany && (
+               {(selectedCompany || companyIdStatus === 'found') && (
                  <p className="text-xs mt-1 text-green-600 flex items-center gap-1"><CheckCircle className="h-3 w-3" /> You are requesting to join an existing company.</p>
                )}
             </div>
