@@ -17,6 +17,7 @@ import { Separator } from '@/components/ui/separator';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { COUNTRIES } from '@/lib/countries';
 import Image from 'next/image';
+import { Skeleton } from '@/components/ui/skeleton';
 
 
 interface CompanyDetailsFirestore {
