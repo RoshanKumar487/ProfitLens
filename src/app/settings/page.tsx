@@ -9,7 +9,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Settings, PlusCircle, Trash2, Loader2, Save, Info, Palette } from 'lucide-react';
+import { Settings, PlusCircle, Trash2, Loader2, Save, Info, Palette, Database } from 'lucide-react';
 import { getInvoiceSettings, saveInvoiceSettings, type InvoiceSettings, type CustomItemColumn } from './actions';
 import { v4 as uuidv4 } from 'uuid';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -17,6 +17,7 @@ import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { useTheme } from 'next-themes';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Separator } from '@/components/ui/separator';
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 
 export default function SettingsPage() {
   const { user, isLoading: authIsLoading } = useAuth();
@@ -252,6 +253,47 @@ export default function SettingsPage() {
                 </RadioGroup>
             </CardContent>
         </Card>
+
+        <Card>
+            <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                    <Database className="h-5 w-5 text-primary" />
+                    Data Backup & Integrations
+                </CardTitle>
+                <CardDescription>
+                    Configure automatic backups of your company data to external services.
+                </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+                <div className="flex items-center justify-between rounded-lg border p-4">
+                    <div className="flex items-center gap-3">
+                        <svg role="img" viewBox="0 0 24 24" className="h-8 w-8 text-gray-500" fill="currentColor" xmlns="http://www.w3.org/2000/svg"><title>Google Drive</title><path d="M2.203 17.585l3.983-6.9L2.203 3.785h7.965l3.983 6.9-3.983 6.9H2.203zM13.882 24l4.03-6.9-4.03-6.9h8.013L22 17.1l-4.105 6.9h-4.013zm-6.22-9.712l-3.983-6.9h7.965l4.029 6.9-4.029 6.9H3.679l3.983-6.9z"/></svg>
+                        <div>
+                            <h3 className="font-semibold">Google Drive Backup</h3>
+                            <p className="text-xs text-muted-foreground">Not connected</p>
+                        </div>
+                    </div>
+                    <TooltipProvider>
+                        <Tooltip>
+                            <TooltipTrigger asChild>
+                                <Button variant="outline" disabled>Connect</Button>
+                            </TooltipTrigger>
+                            <TooltipContent>
+                                <p>This feature requires backend setup.</p>
+                            </TooltipContent>
+                        </Tooltip>
+                    </TooltipProvider>
+                </div>
+                <Alert>
+                    <Info className="h-4 w-4" />
+                    <AlertTitle>Feature in Development</AlertTitle>
+                    <AlertDescription>
+                        Automatic weekly backups are a planned feature. A full integration requires secure, server-side handling of authentication and scheduled tasks which needs to be set up separately.
+                    </AlertDescription>
+                </Alert>
+            </CardContent>
+        </Card>
+
       </div>
 
     </div>
