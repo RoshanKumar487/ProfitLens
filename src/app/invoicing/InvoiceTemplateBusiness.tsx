@@ -1,3 +1,4 @@
+
 'use client';
 
 import React from 'react';
@@ -88,6 +89,8 @@ const InvoiceTemplateBusiness = React.forwardRef<HTMLDivElement, InvoiceTemplate
             <div>
                 <h1 className="text-xl font-bold text-gray-900">{companyProfileDetails.name}</h1>
                 <p className="whitespace-pre-line text-xs text-gray-600">{fullCompanyAddress}</p>
+                <p className="text-xs text-gray-600">Phone: {companyProfileDetails.phone || 'N/A'}</p>
+                <p className="text-xs text-gray-600">Email: {companyProfileDetails.email || 'N/A'}</p>
             </div>
             <div className="text-right">
                 <h2 className="text-4xl font-light text-gray-700 tracking-widest">INVOICE</h2>
@@ -158,7 +161,7 @@ const InvoiceTemplateBusiness = React.forwardRef<HTMLDivElement, InvoiceTemplate
             </table>
         </main>
         
-        <footer className="mt-8 pt-4">
+        <footer className="mt-auto pt-4">
              <div className="flex justify-end mb-2">
                 <div className="w-1/3">
                     <div className="flex justify-between py-1 border-b">

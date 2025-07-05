@@ -1,3 +1,4 @@
+
 'use client';
 
 import React from 'react';
@@ -127,6 +128,7 @@ const InvoiceTemplateIndian = React.forwardRef<HTMLDivElement, InvoiceTemplatePr
                     <h1 className="text-2xl font-bold uppercase tracking-wider text-gray-800">{companyProfileDetails.name}</h1>
                     <p className="text-sm text-gray-600">{fullCompanyAddress}</p>
                     <p className="text-sm text-gray-600">GSTIN: {companyProfileDetails.gstin} | PAN: {companyProfileDetails.pan || 'N/A'}</p>
+                    <p className="text-sm text-gray-600">Phone: {companyProfileDetails.phone || 'N/A'} | Email: {companyProfileDetails.email || 'N/A'}</p>
                 </header>
             )}
             
