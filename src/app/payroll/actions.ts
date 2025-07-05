@@ -10,6 +10,7 @@ import {
   where,
   writeBatch,
   serverTimestamp,
+  Timestamp,
 } from 'firebase/firestore';
 
 export interface PayrollData {
@@ -21,6 +22,29 @@ export interface PayrollData {
   otherDeductions: number;
   netPayment: number;
   status: 'Pending' | 'Paid';
+}
+
+/**
+ * Converts a Firestore document's data into a plain JavaScript object,
+ * ensuring that any Firestore Timestamp objects are converted to ISO date strings,
+ * which are safe to pass from Server to Client Components.
+ * @param data The data object from a Firestore document.
+ * @returns A new object with Timestamps serialized.
+ */
+function serializeFirestoreData(data: any) {
+  const serializedData: { [key: string]: any } = {};
+  for (const key in data) {
+    if (Object.prototype.hasOwnProperty.call(data, key)) {
+      const value = data[key];
+      // Check if the value is a Firestore Timestamp
+      if (value instanceof Timestamp) {
+        serializedData[key] = value.toDate().toISOString();
+      } else {
+        serializedData[key] = value;
+      }
+    }
+  }
+  return serializedData;
 }
 
 export async function getPayrollDataForPeriod(companyId: string, payPeriod: string): Promise<any[]> {
@@ -38,30 +62,22 @@ export async function getPayrollDataForPeriod(companyId: string, payPeriod: stri
     const payrollsMap = new Map(payrollSnapshot.docs.map(doc => [doc.data().employeeId, { id: doc.id, ...doc.data() }]));
 
     const employeesWithPayroll = employeeSnapshot.docs.map(doc => {
-        const employee = { id: doc.id, ...doc.data() };
-        const existingPayroll = payrollsMap.get(employee.id);
+        const employeeData = doc.data();
+        const existingPayrollData = payrollsMap.get(doc.id);
 
-        if (existingPayroll) {
-            return {
-                ...employee,
-                payrollId: existingPayroll.id,
-                grossSalary: existingPayroll.grossSalary,
-                advances: existingPayroll.advances,
-                otherDeductions: existingPayroll.otherDeductions,
-                netPayment: existingPayroll.netPayment,
-                status: existingPayroll.status,
-            };
-        } else {
-            return {
-                ...employee,
-                payrollId: null,
-                grossSalary: employee.salary || 0,
-                advances: 0,
-                otherDeductions: 0,
-                netPayment: employee.salary || 0,
-                status: 'Pending',
-            };
-        }
+        const combinedData = {
+            id: doc.id,
+            ...employeeData,
+            payrollId: existingPayrollData ? existingPayrollData.id : null,
+            grossSalary: existingPayrollData ? existingPayrollData.grossSalary : (employeeData.salary || 0),
+            advances: existingPayrollData ? existingPayrollData.advances : 0,
+            otherDeductions: existingPayrollData ? existingPayrollData.otherDeductions : 0,
+            netPayment: existingPayrollData ? existingPayrollData.netPayment : (employeeData.salary || 0),
+            status: existingPayrollData ? existingPayrollData.status : 'Pending',
+        };
+        
+        // Serialize the combined data to make it safe to pass to the client component
+        return serializeFirestoreData(combinedData);
     });
 
     return employeesWithPayroll;
