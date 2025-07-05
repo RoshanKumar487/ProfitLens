@@ -1,7 +1,7 @@
 
 'use client';
 
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useToast } from '@/hooks/use-toast';
 import PageTitle from '@/components/PageTitle';
@@ -10,7 +10,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/com
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow, TableFooter } from '@/components/ui/table';
 import { Input } from '@/components/ui/input';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
-import { HandCoins, Loader2, Save, Calendar as CalendarIcon, Settings, Printer, PlusCircle, Trash2 } from 'lucide-react';
+import { HandCoins, Loader2, Save, Calendar as CalendarIcon, Settings, Printer, PlusCircle, Trash2, Search } from 'lucide-react';
 import { format, startOfMonth } from 'date-fns';
 import { getPayrollDataForPeriod, savePayrollData, deletePayrollRecord } from './actions';
 import { getPayrollSettings, type PayrollSettings } from '../settings/actions';
@@ -21,6 +21,8 @@ import Link from 'next/link';
 import { TooltipProvider, Tooltip, TooltipTrigger, TooltipContent } from '@/components/ui/tooltip';
 import { v4 as uuidv4 } from 'uuid';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+
 
 interface EmployeeWithPayroll {
   id: string; // employeeId for existing, tempId for new
@@ -56,6 +58,10 @@ export default function PayrollPage() {
   const [isSaving, setIsSaving] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
   const [employeeToDelete, setEmployeeToDelete] = useState<EmployeeWithPayroll | null>(null);
+
+  const [searchTerm, setSearchTerm] = useState('');
+  const [statusFilter, setStatusFilter] = useState<'All' | 'Pending' | 'Paid'>('All');
+
 
   const fetchPayrollData = useCallback(async (period: Date) => {
     if (!user?.companyId) return;
@@ -205,6 +211,45 @@ export default function PayrollPage() {
     setIsDeleting(false);
     setEmployeeToDelete(null);
   };
+
+  const filteredData = useMemo(() => {
+    return payrollData.filter(emp => {
+      const nameMatch = emp.isNew || emp.name.toLowerCase().includes(searchTerm.toLowerCase());
+      const statusMatch = statusFilter === 'All' || emp.status === statusFilter;
+      return nameMatch && statusMatch;
+    });
+  }, [payrollData, searchTerm, statusFilter]);
+
+  const totals = useMemo(() => {
+    const initialTotals = {
+        grossSalary: 0,
+        advances: 0,
+        otherDeductions: 0,
+        netPayment: 0,
+        customFields: {} as { [key: string]: number },
+    };
+
+    (payrollSettings?.customFields || []).forEach(field => {
+        initialTotals.customFields[field.id] = 0;
+    });
+
+    return filteredData.reduce((acc, emp) => {
+        const totalCustomDeductions = (payrollSettings?.customFields || []).reduce((sum, field) => sum + (emp.customFields?.[field.id] || 0), 0);
+        const netPayment = (emp.grossSalary || 0) - (emp.advances || 0) - (emp.otherDeductions || 0) - totalCustomDeductions;
+        
+        acc.grossSalary += emp.grossSalary || 0;
+        acc.advances += emp.advances || 0;
+        acc.otherDeductions += emp.otherDeductions || 0;
+        acc.netPayment += netPayment;
+
+        (payrollSettings?.customFields || []).forEach(field => {
+            acc.customFields[field.id] += (emp.customFields?.[field.id] || 0);
+        });
+
+        return acc;
+    }, initialTotals);
+  }, [filteredData, payrollSettings]);
+  
   
   if (authLoading) {
       return <div className="flex justify-center items-center h-64"><Loader2 className="h-12 w-12 animate-spin text-primary" /></div>;
@@ -285,6 +330,29 @@ export default function PayrollPage() {
                 </Button>
             </div>
           </div>
+            <div className="flex flex-col sm:flex-row items-center gap-4 pt-4 border-t mt-4">
+                <div className="relative w-full sm:flex-1">
+                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                    <Input
+                        placeholder="Search employee by name..."
+                        value={searchTerm}
+                        onChange={(e) => setSearchTerm(e.target.value)}
+                        className="pl-10"
+                    />
+                </div>
+                <div className="w-full sm:w-auto">
+                    <Select value={statusFilter} onValueChange={(value) => setStatusFilter(value as any)}>
+                        <SelectTrigger className="w-full sm:w-[180px]">
+                            <SelectValue placeholder="Filter by Status" />
+                        </SelectTrigger>
+                        <SelectContent>
+                            <SelectItem value="All">All Statuses</SelectItem>
+                            <SelectItem value="Pending">Pending</SelectItem>
+                            <SelectItem value="Paid">Paid</SelectItem>
+                        </SelectContent>
+                    </Select>
+                </div>
+            </div>
         </CardHeader>
         <CardContent>
           <div className="overflow-x-auto">
@@ -316,8 +384,8 @@ export default function PayrollPage() {
                       <TableCell className="print:hidden"><Skeleton className="h-8 w-8" /></TableCell>
                     </TableRow>
                   ))
-                ) : payrollData.length > 0 ? (
-                  payrollData.map(emp => {
+                ) : filteredData.length > 0 ? (
+                  filteredData.map(emp => {
                     const totalCustomDeductions = payrollSettings?.customFields.reduce((sum, field) => sum + (emp.customFields?.[field.id] || 0), 0) || 0;
                     const netPayment = (emp.grossSalary || 0) - (emp.advances || 0) - (emp.otherDeductions || 0) - totalCustomDeductions;
                     
@@ -368,7 +436,7 @@ export default function PayrollPage() {
                             <TooltipProvider>
                                 <Tooltip>
                                 <TooltipTrigger asChild>
-                                    <Button variant="ghost" size="icon" className="text-destructive" onClick={() => promptDelete(emp)} disabled={emp.isNew}>
+                                    <Button variant="ghost" size="icon" className="text-destructive" onClick={() => promptDelete(emp)} disabled={isDeleting}>
                                         <Trash2 className="h-4 w-4" />
                                     </Button>
                                 </TooltipTrigger>
@@ -384,21 +452,32 @@ export default function PayrollPage() {
                 ) : (
                   <TableRow>
                     <TableCell colSpan={7 + (payrollSettings?.customFields.length || 0)} className="text-center h-24">
-                      No employees found. Add employees on the Employees page or add a new row manually.
+                      {searchTerm || statusFilter !== 'All' ? 'No employees match your filters.' : 'No employees found. Add employees on the Employees page or add a new row manually.'}
                     </TableCell>
                   </TableRow>
                 )}
               </TableBody>
-              <TableFooter className="print:hidden">
-                <TableRow>
-                    <TableCell colSpan={7 + (payrollSettings?.customFields.length || 0)}>
-                        <Button variant="outline" size="sm" onClick={handleAddRow}>
-                            <PlusCircle className="mr-2 h-4 w-4" /> Add Employee
-                        </Button>
-                    </TableCell>
-                </TableRow>
-              </TableFooter>
+              {filteredData.length > 0 && (
+                <TableFooter>
+                    <TableRow className="font-bold bg-muted/50">
+                        <TableCell className="sticky left-0 bg-muted/50 z-10">Totals</TableCell>
+                        <TableCell>{currencySymbol}{totals.grossSalary.toFixed(2)}</TableCell>
+                        <TableCell>{currencySymbol}{totals.advances.toFixed(2)}</TableCell>
+                        <TableCell>{currencySymbol}{totals.otherDeductions.toFixed(2)}</TableCell>
+                        {payrollSettings?.customFields.map(field => (
+                            <TableCell key={`total-${field.id}`}>{currencySymbol}{(totals.customFields[field.id] || 0).toFixed(2)}</TableCell>
+                        ))}
+                        <TableCell>{currencySymbol}{totals.netPayment.toFixed(2)}</TableCell>
+                        <TableCell colSpan={2} className="print:hidden"></TableCell>
+                    </TableRow>
+                </TableFooter>
+              )}
             </Table>
+          </div>
+           <div className="pt-4 print:hidden">
+            <Button variant="outline" size="sm" onClick={handleAddRow}>
+                <PlusCircle className="mr-2 h-4 w-4" /> Add Employee Row
+            </Button>
           </div>
         </CardContent>
       </Card>
