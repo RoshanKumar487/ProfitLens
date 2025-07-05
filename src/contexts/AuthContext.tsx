@@ -93,7 +93,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         const idToken = await firebaseUser.getIdToken();
         setCookie('firebaseIdToken', idToken, 1);
 
-        const isSuperAdmin = firebaseUser.email === 'roshankumar70975@gmail.com';
+        const isSuperAdmin = firebaseUser.email === 'testuser1@gmail.com';
         
         // A super admin might not have a user document, so we allow them to proceed.
         if (userDocSnap.exists() || isSuperAdmin) {
@@ -259,7 +259,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     setAuthError(null);
     try {
       const userCredential = await signInWithEmailAndPassword(auth, email, password);
-      const isSuperAdmin = userCredential.user.email === 'roshankumar70975@gmail.com';
+      const isSuperAdmin = userCredential.user.email === 'testuser1@gmail.com';
 
       if (!isSuperAdmin) {
         const userDocRef = doc(db, 'users', userCredential.user.uid);

@@ -146,7 +146,7 @@ const AppShellLayout = ({ children }: { children: React.ReactNode }) => {
           />
         </svg>
         <h1 className="text-xl font-headline font-bold text-sidebar-foreground group-data-[collapsible=icon]:hidden">
-          BizSight
+          InvoPilot
         </h1>
       </Link>
     </Button>
