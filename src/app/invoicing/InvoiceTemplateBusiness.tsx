@@ -123,7 +123,7 @@ const InvoiceTemplateBusiness = React.forwardRef<HTMLDivElement, InvoiceTemplate
             </div>
         </section>
 
-        <main className="flex-grow mt-4">
+        <main className="mt-4">
             <table className="w-full text-left text-xs border-l border-r border-gray-900">
                 <thead>
                     <tr style={{ backgroundColor: '#0A2B58' }} className="text-white">
@@ -158,7 +158,7 @@ const InvoiceTemplateBusiness = React.forwardRef<HTMLDivElement, InvoiceTemplate
             </table>
         </main>
         
-        <footer className="mt-auto pt-4">
+        <footer className="mt-8 pt-4">
              <div className="flex justify-end mb-2">
                 <div className="w-1/3">
                     <div className="flex justify-between py-1 border-b">

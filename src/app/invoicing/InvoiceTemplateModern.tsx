@@ -1,4 +1,3 @@
-
 'use client';
 
 import React from 'react';
@@ -117,7 +116,7 @@ const InvoiceTemplateModern = React.forwardRef<HTMLDivElement, InvoiceTemplatePr
         </section>
 
         {/* Items Table */}
-        <section className="flex-grow mb-8">
+        <section className="mb-4">
           <table className="w-full text-left">
             <thead>
               <tr className="bg-slate-800 text-white">
@@ -149,7 +148,7 @@ const InvoiceTemplateModern = React.forwardRef<HTMLDivElement, InvoiceTemplatePr
         </section>
 
         {/* Totals Section */}
-        <section className="grid grid-cols-2 gap-8 items-start">
+        <section className="grid grid-cols-2 gap-8 items-start mt-auto pt-8">
             <div className="text-xs text-slate-600">
                 <h4 className="font-bold text-lg text-slate-800 mb-2">Terms & Conditions</h4>
                 <p>{invoiceToView.notes || 'Full payment is due upon receipt of this invoice. Thank you for your business.'}</p>

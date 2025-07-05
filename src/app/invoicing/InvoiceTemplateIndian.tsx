@@ -154,7 +154,7 @@ const InvoiceTemplateIndian = React.forwardRef<HTMLDivElement, InvoiceTemplatePr
             </table>
 
             {/* Items Table */}
-            <div className="flex-grow">
+            <div className="flex-shrink-0">
                 <table className="w-full border-collapse border border-black text-center text-sm">
                     <thead className="bg-gray-100">
                         <tr className="border-b border-black">
@@ -188,7 +188,7 @@ const InvoiceTemplateIndian = React.forwardRef<HTMLDivElement, InvoiceTemplatePr
              </div>
 
             {/* Footer */}
-            <footer className="mt-auto">
+            <footer className="mt-auto pt-4">
                 <div className="grid grid-cols-[60%_40%] border border-black">
                      <div className="p-2 border-r border-black">
                         <p className="font-bold">Amount in Words:</p>
