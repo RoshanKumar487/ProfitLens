@@ -212,7 +212,7 @@ export default function NewEmployeePage() {
     const DataRow = ({ label, children }: { label: string; children: React.ReactNode }) => (
       <div className="grid grid-cols-[120px_1fr] items-center gap-x-2 text-xs">
         <Label className="text-gray-600 font-medium text-right">{label}:</Label>
-        <div>{children}</div>
+        {children}
       </div>
     );
     const WInput = (props: React.ComponentProps<typeof Input>) => <Input className="h-6 text-xs p-1" {...props} />;
@@ -276,7 +276,7 @@ export default function NewEmployeePage() {
                             <div className="col-span-1 space-y-6">
                                 <div className="flex justify-center">
                                     <div className="relative w-40 h-48 border-2 border-dashed bg-gray-50 flex items-center justify-center text-gray-400 p-1">
-                                        <Input type="file" accept="image/*" onChange={(e) => handleFileChange(e, setProfilePictureFile, setProfilePicturePreview)} className="absolute w-40 h-48 opacity-0 cursor-pointer" disabled={isSaving}/>
+                                        <Input type="file" accept="image/*" onChange={(e) => handleFileChange(e, setProfilePictureFile, setProfilePicturePreview)} className="absolute w-full h-full opacity-0 cursor-pointer" disabled={isSaving}/>
                                         {profilePicturePreview ? <Image src={profilePicturePreview} alt="Profile Preview" width={160} height={192} className="object-cover w-full h-full"/> : <span>Passport Photo</span>}
                                     </div>
                                 </div>
@@ -298,14 +298,14 @@ export default function NewEmployeePage() {
                              <div>
                                 <p className="font-semibold text-gray-700">Left Thumb Impression</p>
                                 <div className="relative w-24 h-24 mt-2 border border-dashed bg-gray-50 flex items-center justify-center">
-                                    <Input type="file" accept="image/*" onChange={(e) => handleFileChange(e, setLeftThumbImpressionFile, setLeftThumbImpressionPreview)} className="absolute w-24 h-24 opacity-0 cursor-pointer" disabled={isSaving}/>
+                                    <Input type="file" accept="image/*" onChange={(e) => handleFileChange(e, setLeftThumbImpressionFile, setLeftThumbImpressionPreview)} className="absolute w-full h-full opacity-0 cursor-pointer" disabled={isSaving}/>
                                     {leftThumbImpressionPreview ? <Image src={leftThumbImpressionPreview} alt="Thumb Preview" width={96} height={96} className="object-contain"/> : <span className="text-xs text-gray-400">Thumb</span>}
                                 </div>
                             </div>
                             <div className="text-left">
                                 <p className="font-semibold text-gray-700">Employee Signature</p>
                                 <div className="relative w-48 h-24 mt-2 border border-dashed bg-gray-50 flex items-center justify-center p-2">
-                                     <Input type="file" accept="image/*" onChange={(e) => handleFileChange(e, setSignatureFile, setSignaturePreview)} className="absolute w-48 h-24 opacity-0 cursor-pointer" disabled={isSaving}/>
+                                     <Input type="file" accept="image/*" onChange={(e) => handleFileChange(e, setSignatureFile, setSignaturePreview)} className="absolute w-full h-full opacity-0 cursor-pointer" disabled={isSaving}/>
                                     {signaturePreview ? <Image src={signaturePreview} alt="Signature Preview" width={192} height={96} className="object-contain h-full w-full"/> : <span className="text-xs text-gray-400">Signature</span>}
                                 </div>
                             </div>
