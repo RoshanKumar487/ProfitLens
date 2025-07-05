@@ -122,9 +122,30 @@ const AppShellLayout = ({ children }: { children: React.ReactNode }) => {
       asChild
     >
       <Link href="/">
-        <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-gradient-to-br from-blue-500 to-indigo-600 text-white shadow-lg">
-          <span className="text-base font-black">BS</span>
-        </div>
+        <svg
+          width="28"
+          height="28"
+          viewBox="0 0 24 24"
+          fill="none"
+          xmlns="http://www.w3.org/2000/svg"
+          className="h-7 w-7 rounded-lg shadow-lg"
+        >
+          <defs>
+            <linearGradient id="logoGradient" x1="0" y1="0" x2="1" y2="1">
+              <stop offset="0%" stopColor="#3B82F6" />
+              <stop offset="100%" stopColor="#4F46E5" />
+            </linearGradient>
+          </defs>
+          <path
+            d="M4 4H14C17.3137 4 20 6.68629 20 10V14C20 17.3137 17.3137 20 14 20H4V4Z"
+            fill="url(#logoGradient)"
+          />
+          <path
+            d="M4 10H12C14.2091 10 16 11.7909 16 14V14C16 16.2091 14.2091 18 12 18H4V10Z"
+            fill="white"
+            fillOpacity="0.3"
+          />
+        </svg>
         <h1 className="text-xl font-headline font-bold text-sidebar-foreground group-data-[collapsible=icon]:hidden">
           BizSight
         </h1>
@@ -179,7 +200,7 @@ const AppShellLayout = ({ children }: { children: React.ReactNode }) => {
                   <TooltipTrigger asChild>
                     <Button
                       variant="ghost"
-                      className="h-10 w-full justify-start group-data-[collapsible=icon]:h-10 group-data-[collapsible=icon]:w-10 group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:px-0 px-2"
+                      className="h-10 w-full justify-start group-data-[collapsible=icon]:h-10 group-data-[collapsible=icon]:w-10 group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:px-0"
                       onClick={toggleSidebar}
                     >
                       <CollapseIcon className="size-5 shrink-0" />

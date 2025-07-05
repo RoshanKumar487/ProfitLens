@@ -8,7 +8,7 @@ import { AuthProvider } from '@/contexts/AuthContext'; // Import AuthProvider
 import { ThemeProvider } from 'next-themes';
 
 export const metadata: Metadata = {
-  title: 'ProfitLens',
+  title: 'BizSight',
   description: 'Your Business Insights Dashboard',
 };
 
