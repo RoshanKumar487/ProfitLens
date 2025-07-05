@@ -79,18 +79,15 @@ const InvoiceTemplateModern = React.forwardRef<HTMLDivElement, InvoiceTemplatePr
         <header className="relative mb-8">
           <div className="bg-slate-800 text-white p-6 pl-8 rounded-tr-[50px]">
             <h1 className="text-4xl font-bold uppercase tracking-wider text-amber-400">{companyProfileDetails.name}</h1>
-            <p className="text-slate-300 text-sm">Your Tagline Here</p>
+            <p className="text-slate-300 text-sm mt-2">{fullCompanyAddress}</p>
+            <div className="flex gap-4 text-xs text-slate-300 mt-1">
+                <p><strong>Phone:</strong> {companyProfileDetails.phone || 'N/A'}</p>
+                <p><strong>Email:</strong> {companyProfileDetails.email || 'N/A'}</p>
+            </div>
           </div>
           <div className="absolute top-0 right-0 h-full w-2/5 bg-amber-400 rounded-tl-[50px] rounded-br-[50px] flex items-center justify-center">
             <h2 className="text-5xl font-bold text-white -rotate-15 transform">INVOICE</h2>
           </div>
-           <div className="mt-4 flex justify-between items-center text-xs">
-              <p>{fullCompanyAddress}</p>
-              <div className="flex gap-4">
-                <p><strong>Phone:</strong> {companyProfileDetails.phone || 'N/A'}</p>
-                <p><strong>Email:</strong> {companyProfileDetails.email || 'N/A'}</p>
-              </div>
-           </div>
         </header>
 
         {/* Invoice Details & Client Info */}
@@ -116,7 +113,7 @@ const InvoiceTemplateModern = React.forwardRef<HTMLDivElement, InvoiceTemplatePr
         </section>
 
         {/* Items Table */}
-        <section className="mb-4">
+        <section className="mb-4 flex-grow">
           <table className="w-full text-left">
             <thead>
               <tr className="bg-slate-800 text-white">
@@ -189,6 +186,7 @@ const InvoiceTemplateModern = React.forwardRef<HTMLDivElement, InvoiceTemplatePr
              <p className="border-t-2 border-slate-800 pt-1 text-sm font-semibold">Authorize Signature</p>
            </div>
         </footer>
+        <div className="h-16 w-full mt-4"></div>
       </div>
     );
   }
