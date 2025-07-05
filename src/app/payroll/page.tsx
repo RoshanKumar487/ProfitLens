@@ -145,6 +145,7 @@ export default function PayrollPage() {
       if (p.isNew) {
         payload.isNew = true;
         payload.name = p.name;
+        payload.employeeId = p.id;
       } else {
         payload.employeeId = p.id;
       }
@@ -333,11 +334,18 @@ export default function PayrollPage() {
                             </Button>
                           </TableCell>
                           <TableCell className="print:hidden">
-                            {emp.isNew && (
-                                <Button variant="ghost" size="icon" className="text-destructive" onClick={() => handleRemoveRow(emp.id)}>
-                                    <Trash2 className="h-4 w-4" />
-                                </Button>
-                            )}
+                            <TooltipProvider>
+                                <Tooltip>
+                                <TooltipTrigger asChild>
+                                    <Button variant="ghost" size="icon" className="text-destructive" onClick={() => handleRemoveRow(emp.id)}>
+                                        <Trash2 className="h-4 w-4" />
+                                    </Button>
+                                </TooltipTrigger>
+                                <TooltipContent>
+                                    <p>Remove from this payroll</p>
+                                </TooltipContent>
+                                </Tooltip>
+                            </TooltipProvider>
                           </TableCell>
                         </TableRow>
                     );

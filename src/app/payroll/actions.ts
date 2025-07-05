@@ -107,7 +107,7 @@ export async function savePayrollData(companyId: string, payPeriod: string, payr
             // If it's a new employee, create the employee document first
             if (isNew) {
                 const newEmployeeRef = doc(collection(db, 'employees'));
-                employeeId = newEmployeeRef.id;
+                employeeId = newEmployeeRef.id; // Use the new ID for the payroll record
                 batch.set(newEmployeeRef, {
                     name,
                     salary: grossSalary || 0,
