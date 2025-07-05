@@ -135,8 +135,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
           console.log(`AuthContext: User authenticated. UID: ${firebaseUser.uid}, Role: ${appUser.role}, SuperAdmin: ${appUser.isSuperAdmin}`);
           
           const authPages = ['/auth/signin', '/auth/signup', '/auth/forgot-password'];
-          if (authPages.includes(pathname) || pathname === '/') {
-            router.push('/dashboard');
+          if (authPages.includes(pathname)) {
+            router.push('/');
           }
         } else {
           setUser(null);
