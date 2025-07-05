@@ -12,7 +12,7 @@ import { useToast } from '@/hooks/use-toast';
 import { Building, Loader2, Save, Image as ImageIcon, Copy } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { db } from '@/lib/firebaseConfig';
-import { doc, getDoc, setDoc, Timestamp } from 'firebase/firestore';
+import { doc, getDoc, setDoc, Timestamp, collection, query, where, getDocs, updateDoc } from 'firebase/firestore';
 import { Separator } from '@/components/ui/separator';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { COUNTRIES } from '@/lib/countries';
@@ -79,7 +79,54 @@ export default function CompanyDetailsPage() {
         const docSnap = await getDoc(docRef);
 
         if (docSnap.exists()) {
-          const data = docSnap.data() as Partial<CompanyDetailsFirestore>;
+          let data = docSnap.data() as Partial<CompanyDetailsFirestore>;
+
+          if (!data.publicCompanyId) {
+            console.log("Generating missing publicCompanyId for company:", user.companyId);
+            try {
+              const generateUniquePublicId = async (): Promise<string> => {
+                let publicId: string = '';
+                let isUnique = false;
+                let attempts = 0;
+                const maxAttempts = 10;
+                
+                while (!isUnique && attempts < maxAttempts) {
+                    publicId = Math.floor(100000 + Math.random() * 900000).toString();
+                    const q = query(collection(db, 'companyProfiles'), where('publicCompanyId', '==', publicId));
+                    const snapshot = await getDocs(q);
+                    isUnique = snapshot.empty;
+                    if (!isUnique) {
+                      console.warn(`Company ID collision for ${publicId}, attempt ${attempts + 1}`);
+                    }
+                    attempts++;
+                }
+        
+                if (!isUnique) {
+                    throw new Error("Could not generate a unique Company ID. Please try again later.");
+                }
+                return publicId;
+              };
+              
+              const newPublicId = await generateUniquePublicId();
+              
+              await updateDoc(docRef, { publicCompanyId: newPublicId });
+              data = { ...data, publicCompanyId: newPublicId };
+
+              toast({
+                title: 'Company ID Generated',
+                description: `A new 6-digit Company ID has been generated for your company.`,
+              });
+
+            } catch (idError: any) {
+               console.error("Failed to generate and save unique public ID:", idError);
+               toast({
+                 title: 'Error Generating ID',
+                 description: idError.message || 'Could not generate a unique company ID.',
+                 variant: 'destructive',
+               });
+            }
+          }
+
           setCompanyDetails({
             name: data.name || '',
             address: data.address || '',
