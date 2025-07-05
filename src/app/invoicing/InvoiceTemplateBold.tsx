@@ -104,7 +104,7 @@ const InvoiceTemplateBold = React.forwardRef<HTMLDivElement, InvoiceTemplateProp
         </section>
 
         {/* Items Table */}
-        <section className="px-8 flex-grow">
+        <section className="px-8">
           <table className="w-full text-left">
             <thead>
               <tr 
@@ -139,7 +139,7 @@ const InvoiceTemplateBold = React.forwardRef<HTMLDivElement, InvoiceTemplateProp
         </section>
         
         {/* Footer */}
-        <footer className="mt-8">
+        <footer className="mt-auto pt-8">
             <div className="p-8 grid grid-cols-2 gap-8 items-end">
                 <div className="text-sm text-gray-600">
                     <h4 className="font-bold text-base text-gray-800 mb-2">Thank you!</h4>
@@ -178,6 +178,7 @@ const InvoiceTemplateBold = React.forwardRef<HTMLDivElement, InvoiceTemplateProp
                 </div>
             </div>
         </footer>
+        <div className="h-16 w-full mt-4"></div>
       </div>
     );
   }

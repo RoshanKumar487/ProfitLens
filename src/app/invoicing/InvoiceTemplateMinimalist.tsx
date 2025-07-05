@@ -111,7 +111,7 @@ const InvoiceTemplateMinimalist = React.forwardRef<HTMLDivElement, InvoiceTempla
         </section>
 
         {/* Items Table */}
-        <section className="flex-grow">
+        <section>
           <table className="w-full text-left">
             <thead>
               <tr className="border-b border-gray-300">
@@ -169,7 +169,7 @@ const InvoiceTemplateMinimalist = React.forwardRef<HTMLDivElement, InvoiceTempla
                 <p>Thank you for your business. Please make payment by {format(invoiceToView.dueDate, 'dd MMM, yyyy')}.</p>
             </div>
         </footer>
-
+        <div className="h-16 w-full mt-4"></div>
       </div>
     );
   }

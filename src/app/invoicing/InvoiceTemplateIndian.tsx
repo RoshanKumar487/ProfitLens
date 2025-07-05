@@ -119,10 +119,10 @@ const InvoiceTemplateIndian = React.forwardRef<HTMLDivElement, InvoiceTemplatePr
 
     return (
       <div ref={ref} className="bg-white text-black font-sans text-xs w-[210mm] min-h-[297mm] mx-auto flex flex-col">
-          {letterheadTemplate === 'simple' && <Letterhead companyDetails={companyProfileDetails} />}
-
           <div className="flex-grow flex flex-col p-4 space-y-4">
-            {letterheadTemplate === 'none' && (
+            {letterheadTemplate === 'simple' ? (
+                <Letterhead companyDetails={companyProfileDetails} />
+            ) : (
                 <header className="text-center space-y-2">
                     <div className="w-full h-24">{/* Blank space for letterhead */}</div>
                     <h1 className="text-2xl font-bold uppercase tracking-wider text-gray-800">{companyProfileDetails.name}</h1>
@@ -156,7 +156,7 @@ const InvoiceTemplateIndian = React.forwardRef<HTMLDivElement, InvoiceTemplatePr
             </table>
 
             {/* Items Table */}
-            <div className="flex-shrink-0 flex-grow">
+            <div className="flex-shrink-0">
                 <table className="w-full border-collapse border border-black text-center text-sm">
                     <thead>
                         <tr className="border-b border-black font-bold" style={{ backgroundColor: isBlackAndWhite ? 'transparent' : '#f3f4f6' }}>

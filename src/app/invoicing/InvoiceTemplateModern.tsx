@@ -119,7 +119,7 @@ const InvoiceTemplateModern = React.forwardRef<HTMLDivElement, InvoiceTemplatePr
         </section>
 
         {/* Items Table */}
-        <section className="mb-4 flex-grow">
+        <section className="mb-4">
           <table className="w-full text-left">
             <thead>
               <tr className={cn(isBlackAndWhite ? "text-black border-y-2 border-black" : "bg-slate-800 text-white")}>

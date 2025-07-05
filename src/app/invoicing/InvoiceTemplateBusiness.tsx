@@ -128,7 +128,7 @@ const InvoiceTemplateBusiness = React.forwardRef<HTMLDivElement, InvoiceTemplate
             </div>
         </section>
 
-        <main className="mt-4 flex-grow">
+        <main className="mt-4">
             <table className="w-full text-left text-xs border-l border-r border-gray-900">
                 <thead>
                     <tr className={cn(isBlackAndWhite ? "text-black border-y-2 border-black" : "text-white")}
