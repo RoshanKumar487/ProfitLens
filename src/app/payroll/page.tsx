@@ -127,6 +127,32 @@ export default function PayrollPage() {
     setPayrollData(prev => [...prev, newRow]);
   };
 
+  const handleInsertRow = (afterEmployeeId: string) => {
+    const newRow: EmployeeWithPayroll = {
+      id: uuidv4(),
+      isNew: true,
+      name: '',
+      payrollId: null,
+      grossSalary: 0,
+      advances: 0,
+      otherDeductions: 0,
+      netPayment: 0,
+      status: 'Pending',
+      customFields: {},
+    };
+
+    setPayrollData(prev => {
+      const insertAtIndex = prev.findIndex(p => p.id === afterEmployeeId);
+      if (insertAtIndex === -1) {
+        // Fallback: if the employee ID isn't found, add to the end
+        return [...prev, newRow];
+      }
+      const newData = [...prev];
+      newData.splice(insertAtIndex + 1, 0, newRow);
+      return newData;
+    });
+  };
+
   const handleSaveAll = async () => {
     if (!user?.companyId) return;
     setIsSaving(true);
@@ -264,6 +290,8 @@ export default function PayrollPage() {
     );
   }
 
+  const columnCount = 8 + (payrollSettings?.customFields.length || 0);
+
   return (
     <div className="space-y-6 p-4 sm:p-6 lg:p-8 print:p-0 print:space-y-0">
       <div className="hidden print:block text-center mb-4">
@@ -359,6 +387,7 @@ export default function PayrollPage() {
             <Table>
               <TableHeader>
                 <TableRow>
+                  <TableHead className="w-8 p-0 print:hidden"></TableHead>
                   <TableHead className="w-[250px] sticky left-0 bg-background z-10">Employee</TableHead>
                   <TableHead>Gross Salary</TableHead>
                   <TableHead>Advances</TableHead>
@@ -375,6 +404,7 @@ export default function PayrollPage() {
                 {isLoading ? (
                   [...Array(3)].map((_, i) => (
                     <TableRow key={i}>
+                      <TableCell className="print:hidden"></TableCell>
                       <TableCell className="sticky left-0 bg-background z-10"><div className="flex items-center gap-2"><Skeleton className="h-10 w-10 rounded-full" /><Skeleton className="h-4 w-32" /></div></TableCell>
                       {[...Array(3 + (payrollSettings?.customFields.length || 0))].map((_, j) => (
                           <TableCell key={j}><Skeleton className="h-8 w-24" /></TableCell>
@@ -390,7 +420,28 @@ export default function PayrollPage() {
                     const netPayment = (emp.grossSalary || 0) - (emp.advances || 0) - (emp.otherDeductions || 0) - totalCustomDeductions;
                     
                     return (
-                        <TableRow key={emp.id}>
+                        <TableRow key={emp.id} className="group">
+                          <TableCell className="p-0 print:hidden">
+                            <div className="flex items-center justify-center">
+                              <TooltipProvider>
+                                <Tooltip>
+                                  <TooltipTrigger asChild>
+                                    <Button
+                                        variant="ghost"
+                                        size="icon"
+                                        className="h-6 w-6 rounded-full opacity-0 group-hover:opacity-100 transition-opacity"
+                                        onClick={() => handleInsertRow(emp.id)}
+                                    >
+                                        <PlusCircle className="h-4 w-4" />
+                                    </Button>
+                                  </TooltipTrigger>
+                                  <TooltipContent side="right">
+                                    <p>Insert row below</p>
+                                  </TooltipContent>
+                                </Tooltip>
+                              </TooltipProvider>
+                            </div>
+                          </TableCell>
                           <TableCell className="sticky left-0 bg-background z-10">
                             {emp.isNew ? (
                                 <Input 
@@ -451,7 +502,7 @@ export default function PayrollPage() {
                   })
                 ) : (
                   <TableRow>
-                    <TableCell colSpan={7 + (payrollSettings?.customFields.length || 0)} className="text-center h-24">
+                    <TableCell colSpan={columnCount} className="text-center h-24">
                       {searchTerm || statusFilter !== 'All' ? 'No employees match your filters.' : 'No employees found. Add employees on the Employees page or add a new row manually.'}
                     </TableCell>
                   </TableRow>
@@ -460,6 +511,7 @@ export default function PayrollPage() {
               {filteredData.length > 0 && (
                 <TableFooter>
                     <TableRow className="font-bold bg-muted/50">
+                        <TableCell className="print:hidden"></TableCell>
                         <TableCell className="sticky left-0 bg-muted/50 z-10">Totals</TableCell>
                         <TableCell>{currencySymbol}{totals.grossSalary.toFixed(2)}</TableCell>
                         <TableCell>{currencySymbol}{totals.advances.toFixed(2)}</TableCell>
