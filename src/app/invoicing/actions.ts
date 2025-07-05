@@ -30,7 +30,6 @@ interface InvoiceData {
   clientName: string;
   clientEmail?: string;
   clientAddress?: string;
-  shippingAddress?: string;
   clientGstin?: string;
   subtotal: number;
   discountType: 'fixed' | 'percentage';
@@ -59,7 +58,6 @@ export async function createInvoice(invoiceData: Omit<InvoiceData, 'id'>, compan
   try {
     const invoicePayload = {
       ...invoiceData,
-      shippingAddress: invoiceData.shippingAddress || '',
       companyId: companyId,
       issuedDate: Timestamp.fromDate(new Date(invoiceData.issuedDate)),
       dueDate: Timestamp.fromDate(new Date(invoiceData.dueDate)),

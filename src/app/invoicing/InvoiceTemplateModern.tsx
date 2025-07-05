@@ -21,7 +21,6 @@ interface InvoiceDisplay {
   clientName: string;
   clientEmail?: string;
   clientAddress?: string;
-  shippingAddress?: string;
   subtotal: number;
   discountAmount: number;
   taxRate: number;
@@ -104,25 +103,13 @@ const InvoiceTemplateModern = React.forwardRef<HTMLDivElement, InvoiceTemplatePr
             <p className="text-xl font-bold text-slate-700">{invoiceToView.clientName}</p>
             <p className="text-sm text-slate-600 whitespace-pre-line">{invoiceToView.clientAddress || 'N/A'}</p>
           </div>
-          <div>
-            <h3 className={cn("text-lg font-semibold border-b-2 pb-1 mb-2", isBlackAndWhite ? "text-black border-black" : "text-slate-800 border-amber-400")}>Ship To:</h3>
-            <p className="text-xl font-bold text-slate-700">{invoiceToView.clientName}</p>
-            <p className="text-sm text-slate-600 whitespace-pre-line">{invoiceToView.shippingAddress || invoiceToView.clientAddress || 'N/A'}</p>
+          <div className="text-right">
+              <div className="grid grid-cols-[auto_1fr] gap-x-4 gap-y-1 text-sm justify-end">
+                  <span className="font-bold">Invoice No:</span><span className="font-medium text-slate-600">{invoiceToView.invoiceNumber}</span>
+                  <span className="font-bold">Invoice Date:</span><span className="font-medium text-slate-600">{format(invoiceToView.issuedDate, 'dd MMM, yyyy')}</span>
+                  <span className="font-bold">Due Date:</span><span className="font-medium text-slate-600">{format(invoiceToView.dueDate, 'dd MMM, yyyy')}</span>
+              </div>
           </div>
-        </section>
-
-        <section className="mb-8">
-            <div className={cn("p-4 rounded-lg grid grid-cols-3 gap-4", isBlackAndWhite ? "border" : "bg-slate-100")}>
-                <div className="grid grid-cols-[auto_1fr] gap-x-2">
-                    <span className="font-bold">Invoice No:</span><span className="font-medium text-slate-600">{invoiceToView.invoiceNumber}</span>
-                </div>
-                <div className="grid grid-cols-[auto_1fr] gap-x-2">
-                    <span className="font-bold">Invoice Date:</span><span className="font-medium text-slate-600">{format(invoiceToView.issuedDate, 'dd MMM, yyyy')}</span>
-                </div>
-                <div className="grid grid-cols-[auto_1fr] gap-x-2">
-                    <span className="font-bold">Due Date:</span><span className="font-medium text-slate-600">{format(invoiceToView.dueDate, 'dd MMM, yyyy')}</span>
-                </div>
-            </div>
         </section>
 
 

@@ -40,7 +40,6 @@ interface InvoiceDisplay {
   clientName: string;
   clientEmail?: string;
   clientAddress?: string;
-  shippingAddress?: string;
   clientGstin?: string;
   subtotal: number;
   discountType: DiscountType;
@@ -139,30 +138,9 @@ export default function EditInvoicePage() {
         if (!invoice) return;
         setIsSaving(true);
         
-        // Manually create a plain object to pass to the server action
-        // This avoids passing complex objects like Firestore Timestamps
-        const invoicePayload = {
-            invoiceNumber: invoice.invoiceNumber,
-            clientName: invoice.clientName,
-            clientEmail: invoice.clientEmail,
-            clientAddress: invoice.clientAddress,
-            shippingAddress: invoice.shippingAddress,
-            clientGstin: invoice.clientGstin,
-            subtotal: invoice.subtotal,
-            discountType: invoice.discountType,
-            discountValue: invoice.discountValue,
-            discountAmount: invoice.discountAmount,
-            taxRate: invoice.taxRate,
-            taxAmount: invoice.taxAmount,
-            amount: invoice.amount,
-            dueDate: invoice.dueDate,
-            status: invoice.status,
-            issuedDate: invoice.issuedDate,
-            items: invoice.items,
-            notes: invoice.notes,
-        };
+        const { id, ...invoicePayload } = invoice;
 
-        const result = await updateInvoice(invoiceId, invoicePayload);
+        const result = await updateInvoice(id, invoicePayload);
         
         toast({
             title: result.success ? "Success" : "Error",
@@ -264,10 +242,6 @@ export default function EditInvoicePage() {
                         <div>
                             <Label htmlFor="clientAddress">Billing Address</Label>
                             <Textarea id="clientAddress" value={invoice.clientAddress || ''} onChange={(e) => handleValueChange('clientAddress', e.target.value)} disabled={isSaving} rows={3} />
-                        </div>
-                        <div>
-                            <Label htmlFor="shippingAddress">Shipping Address</Label>
-                            <Textarea id="shippingAddress" value={invoice.shippingAddress || ''} onChange={(e) => handleValueChange('shippingAddress', e.target.value)} disabled={isSaving} rows={3} placeholder="(if different from billing)" />
                         </div>
                         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
                             <div>

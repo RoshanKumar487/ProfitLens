@@ -41,7 +41,6 @@ interface InvoiceDisplay {
   clientName: string;
   clientEmail?: string;
   clientAddress?: string;
-  shippingAddress?: string;
   clientGstin?: string;
   subtotal: number;
   discountType: 'fixed' | 'percentage';
