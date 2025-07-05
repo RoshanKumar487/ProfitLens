@@ -284,7 +284,7 @@ export default function NewEmployeePage() {
                                     <DataRow label="Position"><WInput value={position} onChange={e => setPosition(e.target.value)} required disabled={isSaving}/></DataRow>
                                     <DataRow label="Joining Date"><WPopover date={joiningDate} setDate={setJoiningDate} /></DataRow>
                                     <DataRow label="Experience"><WInput value={experience} onChange={e => setExperience(e.target.value)} disabled={isSaving}/></DataRow>
-                                    <DataRow label="Salary"><WInput type="number" value={salary} onChange={e => setSalary(e.target.value)} required disabled={isSaving} placeholder={`${currencySymbol} Annual`}/></DataRow>
+                                    <DataRow label="Salary"><WInput type="number" value={salary} onChange={e => setSalary(e.target.value)} required disabled={isSaving} placeholder={`${currencySymbol} Salary`}/></DataRow>
                                 </Section>
                                 <Section title="Physical Attributes">
                                     <DataRow label="Height"><WInput value={height} onChange={e => setHeight(e.target.value)} disabled={isSaving}/></DataRow>
@@ -319,7 +319,7 @@ export default function NewEmployeePage() {
                             <CardContent className="space-y-4">
                                 <div><Label htmlFor="name">Full Name</Label><Input id="name" value={name} onChange={(e) => setName(e.target.value)} required disabled={isSaving} /></div>
                                 <div><Label htmlFor="position">Position / Role</Label><Input id="position" value={position} onChange={(e) => setPosition(e.target.value)} required disabled={isSaving} /></div>
-                                <div><Label htmlFor="salary">Annual Salary ({currencySymbol})</Label><Input id="salary" type="number" value={salary} onChange={(e) => setSalary(e.target.value)} required min="0" disabled={isSaving} /></div>
+                                <div><Label htmlFor="salary">Salary ({currencySymbol})</Label><Input id="salary" type="number" value={salary} onChange={(e) => setSalary(e.target.value)} required min="0" disabled={isSaving} /></div>
                             </CardContent>
                         </Card>
                         <Card>

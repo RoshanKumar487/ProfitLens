@@ -1,3 +1,4 @@
+
 /**
  * @fileOverview Tools for the AI Assistant to interact with the application's data.
  */
@@ -9,7 +10,7 @@ import * as service from '@/services/ai-assistant-service';
 const EmployeeSchema = z.object({
     name: z.string().describe("The full name of the employee."),
     position: z.string().describe("The job title or position of the employee."),
-    salary: z.number().describe("The annual salary of the employee as a number."),
+    salary: z.number().describe("The salary of the employee as a number."),
     description: z.string().optional().describe("Any additional notes or description."),
 });
 
