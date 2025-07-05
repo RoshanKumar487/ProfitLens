@@ -12,6 +12,7 @@ import {
   serverTimestamp,
   Timestamp,
   setDoc,
+  deleteDoc,
 } from 'firebase/firestore';
 
 export interface PayrollData {
@@ -150,5 +151,20 @@ export async function savePayrollData(companyId: string, payPeriod: string, payr
     } catch (error: any) {
         console.error("Error saving payroll data:", error);
         return { success: false, message: `Failed to save payroll data: ${error.message}` };
+    }
+}
+
+export async function deletePayrollRecord(payrollId: string): Promise<{ success: boolean; message: string }> {
+    if (!payrollId) {
+        return { success: false, message: "Payroll ID is required." };
+    }
+
+    try {
+        const payrollRef = doc(db, 'payrolls', payrollId);
+        await deleteDoc(payrollRef);
+        return { success: true, message: "Payroll record deleted successfully." };
+    } catch (error: any) {
+        console.error("Error deleting payroll record:", error);
+        return { success: false, message: `Failed to delete payroll record: ${error.message}` };
     }
 }

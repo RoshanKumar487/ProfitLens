@@ -12,7 +12,7 @@ import { Input } from '@/components/ui/input';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { HandCoins, Loader2, Save, Calendar as CalendarIcon, Settings, Printer, PlusCircle, Trash2 } from 'lucide-react';
 import { format, startOfMonth } from 'date-fns';
-import { getPayrollDataForPeriod, savePayrollData } from './actions';
+import { getPayrollDataForPeriod, savePayrollData, deletePayrollRecord } from './actions';
 import { getPayrollSettings, type PayrollSettings } from '../settings/actions';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
@@ -20,6 +20,7 @@ import { Calendar } from '@/components/ui/calendar';
 import Link from 'next/link';
 import { TooltipProvider, Tooltip, TooltipTrigger, TooltipContent } from '@/components/ui/tooltip';
 import { v4 as uuidv4 } from 'uuid';
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 
 interface EmployeeWithPayroll {
   id: string; // employeeId for existing, tempId for new
@@ -53,6 +54,8 @@ export default function PayrollPage() {
   const [payrollSettings, setPayrollSettings] = useState<PayrollSettings | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
+  const [employeeToDelete, setEmployeeToDelete] = useState<EmployeeWithPayroll | null>(null);
 
   const fetchPayrollData = useCallback(async (period: Date) => {
     if (!user?.companyId) return;
@@ -118,11 +121,6 @@ export default function PayrollPage() {
     setPayrollData(prev => [...prev, newRow]);
   };
 
-  const handleRemoveRow = (id: string) => {
-    setPayrollData(prev => prev.filter(emp => emp.id !== id));
-  };
-
-
   const handleSaveAll = async () => {
     if (!user?.companyId) return;
     setIsSaving(true);
@@ -173,6 +171,39 @@ export default function PayrollPage() {
 
   const handlePrint = () => {
     window.print();
+  };
+
+  const promptDelete = (employee: EmployeeWithPayroll) => {
+    setEmployeeToDelete(employee);
+  };
+  
+  const handleConfirmDelete = async () => {
+    if (!employeeToDelete) return;
+  
+    // If it's a new row not yet saved, just remove from state
+    if (employeeToDelete.isNew || !employeeToDelete.payrollId) {
+      setPayrollData(prev => prev.filter(emp => emp.id !== employeeToDelete.id));
+      setEmployeeToDelete(null);
+      toast({ title: "Row Removed", description: `${employeeToDelete.name || 'New employee'} has been removed from this payroll view.` });
+      return;
+    }
+  
+    // If it has a payrollId, delete from Firestore
+    setIsDeleting(true);
+    const result = await deletePayrollRecord(employeeToDelete.payrollId);
+    toast({
+      title: result.success ? "Record Deleted" : "Error",
+      description: result.message,
+      variant: result.success ? "default" : "destructive"
+    });
+  
+    if (result.success) {
+      // Refetch data to ensure consistency
+      fetchPayrollData(payPeriod);
+    }
+  
+    setIsDeleting(false);
+    setEmployeeToDelete(null);
   };
   
   if (authLoading) {
@@ -337,12 +368,12 @@ export default function PayrollPage() {
                             <TooltipProvider>
                                 <Tooltip>
                                 <TooltipTrigger asChild>
-                                    <Button variant="ghost" size="icon" className="text-destructive" onClick={() => handleRemoveRow(emp.id)}>
+                                    <Button variant="ghost" size="icon" className="text-destructive" onClick={() => promptDelete(emp)} disabled={emp.isNew}>
                                         <Trash2 className="h-4 w-4" />
                                     </Button>
                                 </TooltipTrigger>
                                 <TooltipContent>
-                                    <p>Remove from this payroll</p>
+                                    <p>{emp.payrollId ? "Delete this payroll record" : (emp.isNew ? "Remove this new row" : "No payroll record to delete")}</p>
                                 </TooltipContent>
                                 </Tooltip>
                             </TooltipProvider>
@@ -371,6 +402,26 @@ export default function PayrollPage() {
           </div>
         </CardContent>
       </Card>
+        <AlertDialog open={!!employeeToDelete} onOpenChange={(open) => !open && setEmployeeToDelete(null)}>
+            <AlertDialogContent>
+                <AlertDialogHeader>
+                    <AlertDialogTitle>Are you sure?</AlertDialogTitle>
+                    <AlertDialogDescription>
+                        {employeeToDelete?.isNew ? (
+                          <>This will remove <strong>{employeeToDelete?.name || 'this new row'}</strong> from the current payroll view. No data will be deleted.</>
+                        ) : (
+                          <>This will permanently delete the payroll record for <strong>{employeeToDelete?.name}</strong> for this month. This action cannot be undone.</>
+                        )}
+                    </AlertDialogDescription>
+                </AlertDialogHeader>
+                <AlertDialogFooter>
+                    <AlertDialogCancel onClick={() => setEmployeeToDelete(null)} disabled={isDeleting}>Cancel</AlertDialogCancel>
+                    <AlertDialogAction onClick={handleConfirmDelete} disabled={isDeleting} className={employeeToDelete?.isNew ? "" : "bg-destructive hover:bg-destructive/90"}>
+                        {isDeleting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : (employeeToDelete?.isNew ? 'Remove' : 'Delete')}
+                    </AlertDialogAction>
+                </AlertDialogFooter>
+            </AlertDialogContent>
+        </AlertDialog>
     </div>
   );
 }
