@@ -1,3 +1,4 @@
+
 'use server';
 
 import { db } from '@/lib/firebaseConfig';
@@ -13,6 +14,7 @@ import {
   setDoc,
   deleteDoc,
 } from 'firebase/firestore';
+import nodemailer from 'nodemailer';
 
 export interface PayrollData {
   id?: string; // Existing payroll document ID
@@ -33,6 +35,16 @@ export interface PayrollData {
   netPayment: number;
   status: 'Pending' | 'Paid';
   customFields?: { [key: string]: number | string | Date };
+}
+
+export interface SendPayslipEmailPayload {
+  to: string;
+  subject: string;
+  htmlBody: string;
+  attachment: {
+    filename: string;
+    content: string; // base64
+  };
 }
 
 /**
@@ -176,4 +188,50 @@ export async function deletePayrollRecord(payrollId: string): Promise<{ success:
         console.error("Error deleting payroll record:", error);
         return { success: false, message: `Failed to delete payroll record: ${error.message}` };
     }
+}
+
+export async function sendPayslipEmail(payload: SendPayslipEmailPayload): Promise<{ success: boolean; message: string }> {
+  const { to, subject, htmlBody, attachment } = payload;
+
+  if (!process.env.SMTP_HOST || !process.env.SMTP_PORT || !process.env.SMTP_USER || !process.env.SMTP_PASS || !process.env.SMTP_FROM_EMAIL) {
+    console.error('SMTP environment variables are not fully configured.');
+    return { success: false, message: 'Email server not configured. Please contact administrator.' };
+  }
+
+  const transporter = nodemailer.createTransport({
+    host: process.env.SMTP_HOST,
+    port: parseInt(process.env.SMTP_PORT, 10),
+    secure: process.env.SMTP_SECURE === 'true',
+    auth: {
+      user: process.env.SMTP_USER,
+      pass: process.env.SMTP_PASS,
+    },
+    tls: {
+        rejectUnauthorized: process.env.NODE_ENV === 'production', 
+    }
+  });
+
+  const mailOptions = {
+    from: `"${process.env.SMTP_FROM_NAME || 'ProfitLens'}" <${process.env.SMTP_FROM_EMAIL}>`,
+    to: to,
+    subject: subject,
+    html: htmlBody,
+    attachments: [
+      {
+        filename: attachment.filename,
+        content: attachment.content,
+        encoding: 'base64',
+        contentType: 'application/pdf'
+      }
+    ]
+  };
+
+  try {
+    const info = await transporter.sendMail(mailOptions);
+    console.log(`Payslip email sent to ${to}: ${info.messageId}`);
+    return { success: true, message: 'Payslip email sent successfully!' };
+  } catch (error: any) {
+    console.error(`Error sending payslip email to ${to}:`, error);
+    return { success: false, message: `Failed to send email: ${error.message}` };
+  }
 }
