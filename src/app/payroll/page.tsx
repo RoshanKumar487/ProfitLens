@@ -92,48 +92,6 @@ export default function PayrollPage() {
   const [payslipImageDataUris, setPayslipImageDataUris] = useState<{ signature?: string; stamp?: string }>({});
   const [isPrinting, setIsPrinting] = useState(false);
 
-  // Auto-calculation effect
-  useEffect(() => {
-    if (!payrollSettings || payrollData.length === 0) return;
-
-    setPayrollData(prevData =>
-      prevData.map(emp => {
-        const workingDays = emp.workingDays > 0 ? emp.workingDays : 1;
-        const presentDays = emp.presentDays || 0;
-        
-        // Salary Calculation
-        const proratedSalary = (emp.baseSalary / workingDays) * presentDays;
-        const overtimePay = (emp.otHours || 0) * (payrollSettings.overtimeRatePerHour || 0);
-        const grossEarnings = proratedSalary + overtimePay;
-        
-        // Deduction Calculation
-        const pfContribution = proratedSalary * ((payrollSettings.pfPercentage || 0) / 100);
-        const esiContribution = grossEarnings * ((payrollSettings.esiPercentage || 0) / 100);
-        
-        const customNumericDeductions = (payrollSettings.customFields || []).reduce((sum, field) => {
-            if (field.type === 'number') {
-                return sum + (Number(emp.customFields?.[field.id]) || 0);
-            }
-            return sum;
-        }, 0);
-        
-        const totalDeductions = (emp.advances || 0) + (emp.otherDeductions || 0) + pfContribution + esiContribution + customNumericDeductions;
-        const netPayment = grossEarnings - totalDeductions;
-
-        return { 
-          ...emp,
-          proratedSalary,
-          overtimePay,
-          grossEarnings,
-          pfContribution,
-          esiContribution,
-          totalDeductions,
-          netPayment,
-        };
-      })
-    );
-  }, [payrollData.map(p => p.presentDays), payrollData.map(p => p.otHours), payrollSettings]);
-
   const fetchPayrollData = useCallback(async (period: Date) => {
     if (!user?.companyId) return;
     setIsLoading(true);
@@ -182,6 +140,49 @@ export default function PayrollPage() {
       fetchPayrollData(payPeriod);
     }
   }, [payPeriod, user, authLoading, fetchPayrollData]);
+
+  const filteredAndCalculatedData = useMemo(() => {
+    if (!payrollSettings) return [];
+
+    return payrollData
+      .map(emp => {
+        const workingDays = emp.workingDays > 0 ? emp.workingDays : 1;
+        const presentDays = emp.presentDays || 0;
+        
+        const proratedSalary = (emp.baseSalary / workingDays) * presentDays;
+        const overtimePay = (emp.otHours || 0) * (payrollSettings.overtimeRatePerHour || 0);
+        const grossEarnings = proratedSalary + overtimePay;
+        
+        const pfContribution = proratedSalary * ((payrollSettings.pfPercentage || 0) / 100);
+        const esiContribution = grossEarnings * ((payrollSettings.esiPercentage || 0) / 100);
+        
+        const customNumericDeductions = (payrollSettings.customFields || []).reduce((sum, field) => {
+            if (field.type === 'number') {
+                return sum + (Number(emp.customFields?.[field.id]) || 0);
+            }
+            return sum;
+        }, 0);
+        
+        const totalDeductions = (emp.advances || 0) + (emp.otherDeductions || 0) + pfContribution + esiContribution + customNumericDeductions;
+        const netPayment = grossEarnings - totalDeductions;
+
+        return { 
+          ...emp,
+          proratedSalary,
+          overtimePay,
+          grossEarnings,
+          pfContribution,
+          esiContribution,
+          totalDeductions,
+          netPayment,
+        };
+      })
+      .filter(emp => {
+        const nameMatch = emp.isNew || emp.name.toLowerCase().includes(searchTerm.toLowerCase());
+        const statusMatch = statusFilter === 'All' || emp.status === statusFilter;
+        return nameMatch && statusMatch;
+      });
+  }, [payrollData, payrollSettings, searchTerm, statusFilter]);
 
   const handleInputChange = (employeeId: string, field: keyof EmployeeWithPayroll, value: any) => {
     setPayrollData(prevData =>
@@ -349,16 +350,8 @@ export default function PayrollPage() {
     setEmployeeToDelete(null);
   };
 
-  const filteredData = useMemo(() => {
-    return payrollData.filter(emp => {
-      const nameMatch = emp.isNew || emp.name.toLowerCase().includes(searchTerm.toLowerCase());
-      const statusMatch = statusFilter === 'All' || emp.status === statusFilter;
-      return nameMatch && statusMatch;
-    });
-  }, [payrollData, searchTerm, statusFilter]);
-
   const totals = useMemo(() => {
-    return filteredData.reduce((acc, emp) => {
+    return filteredAndCalculatedData.reduce((acc, emp) => {
         acc.baseSalary += emp.baseSalary || 0;
         acc.presentDays += emp.presentDays || 0;
         acc.otHours += emp.otHours || 0;
@@ -381,7 +374,7 @@ export default function PayrollPage() {
         presentDays: 0, otHours: 0, // Count fields
         customFields: {} as { [key: string]: number } 
     });
-  }, [filteredData, payrollSettings]);
+  }, [filteredAndCalculatedData, payrollSettings]);
 
   const handleOpenPayslipDialog = async (employee: EmployeeWithPayroll) => {
     setEmployeeForPayslip(employee);
@@ -584,8 +577,8 @@ export default function PayrollPage() {
                       <TableCell className="print:hidden"><Skeleton className="h-8 w-8" /></TableCell>
                     </TableRow>
                   ))
-                ) : filteredData.length > 0 ? (
-                  filteredData.map(emp => (
+                ) : filteredAndCalculatedData.length > 0 ? (
+                  filteredAndCalculatedData.map(emp => (
                     <TableRow key={emp.id} className="group">
                       <TableCell className="p-0 print:hidden"><div className="flex items-center justify-center"><TooltipProvider><Tooltip><TooltipTrigger asChild><Button variant="ghost" size="icon" className="h-6 w-6 rounded-full opacity-0 group-hover:opacity-100 transition-opacity" onClick={() => handleInsertRow(emp.id)}><PlusCircle className="h-4 w-4" /></Button></TooltipTrigger><TooltipContent side="right"><p>Insert row below</p></TooltipContent></Tooltip></TooltipProvider></div></TableCell>
                       <TableCell className="sticky left-0 bg-background z-10">{emp.isNew ? (<Input placeholder="Enter Employee Name" value={emp.name} onChange={e => handleInputChange(emp.id, 'name', e.target.value)} />) : (<div className="flex items-center gap-2"><Avatar><AvatarImage src={emp.profilePictureUrl} /><AvatarFallback>{getInitials(emp.name)}</AvatarFallback></Avatar><span className="font-medium">{emp.name}</span></div>)}</TableCell>
@@ -613,7 +606,7 @@ export default function PayrollPage() {
                   <TableRow><TableCell colSpan={columnCount} className="text-center h-24">{searchTerm || statusFilter !== 'All' ? 'No employees match your filters.' : 'No employees found. Add employees on the Employees page or add a new row manually.'}</TableCell></TableRow>
                 )}
               </TableBody>
-              {filteredData.length > 0 && (
+              {filteredAndCalculatedData.length > 0 && (
                 <TableFooter>
                     <TableRow className="font-bold bg-muted/50">
                         <TableCell className="print:hidden"></TableCell>
