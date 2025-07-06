@@ -6,7 +6,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { useToast } from '@/hooks/use-toast';
 import PageTitle from '@/components/PageTitle';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
+import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow, TableFooter } from '@/components/ui/table';
 import { Input } from '@/components/ui/input';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
@@ -98,21 +98,18 @@ export default function PayrollPage() {
   const [isSendingEmail, setIsSendingEmail] = useState(false);
 
   const fetchPayrollData = useCallback(async (period: Date) => {
-    if (!user?.companyId) return;
+    if (!user?.companyId || payrollSettings === null) return;
     setIsLoading(true);
     try {
       const periodString = format(period, 'yyyy-MM');
-      const [data, settings] = await Promise.all([
-        getPayrollDataForPeriod(user.companyId, periodString),
-        getPayrollSettings(user.companyId),
-      ]);
+      const data = await getPayrollDataForPeriod(user.companyId, periodString);
       
       const daysInMonth = getDaysInMonth(period);
 
       const processedData = data.map(emp => {
         const processedCustomFields: { [key: string]: any } = {};
-        if (emp.customFields && settings.customFields) {
-            for (const field of settings.customFields) {
+        if (emp.customFields && payrollSettings.customFields) {
+            for (const field of payrollSettings.customFields) {
                 const value = emp.customFields[field.id];
                 if (field.type === 'date' && typeof value === 'string' && !isNaN(Date.parse(value))) {
                     processedCustomFields[field.id] = new Date(value);
@@ -132,19 +129,34 @@ export default function PayrollPage() {
       });
       
       setPayrollData(processedData);
-      setPayrollSettings(settings);
     } catch (error: any) {
       toast({ title: "Error", description: `Could not fetch payroll data: ${error.message}`, variant: "destructive" });
     } finally {
       setIsLoading(false);
     }
+  }, [user?.companyId, toast, payrollSettings]);
+
+  const fetchSettings = useCallback(async () => {
+    if (!user?.companyId) return;
+    try {
+      const settings = await getPayrollSettings(user.companyId);
+      setPayrollSettings(settings);
+    } catch (error: any) {
+      toast({ title: "Error", description: `Could not fetch payroll settings: ${error.message}`, variant: "destructive" });
+    }
   }, [user?.companyId, toast]);
 
   useEffect(() => {
     if (!authLoading && user) {
+      fetchSettings();
+    }
+  }, [user, authLoading, fetchSettings]);
+
+  useEffect(() => {
+    if (payrollSettings !== null) {
       fetchPayrollData(payPeriod);
     }
-  }, [payPeriod, user, authLoading, fetchPayrollData]);
+  }, [payPeriod, payrollSettings, fetchPayrollData]);
 
   const filteredAndCalculatedData = useMemo(() => {
     if (!payrollSettings) return [];
@@ -621,7 +633,7 @@ export default function PayrollPage() {
             </div>
         </CardHeader>
         <CardContent>
-          <div className="overflow-auto" style={{maxHeight: 'calc(100vh - 420px)'}}>
+          <div className="overflow-auto relative" style={{maxHeight: 'calc(100vh - 420px)'}}>
             <Table>
               <TableHeader>
                 <TableRow className="sticky top-0 bg-card z-10">
