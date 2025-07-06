@@ -625,8 +625,8 @@ export default function PayrollPage() {
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead className="w-8 p-0 print:hidden"></TableHead>
-                  <TableHead className="w-[250px] sticky left-0 bg-background z-10">Employee</TableHead>
+                  <TableHead className="w-8 p-0 print:hidden sticky left-0 bg-background z-10"></TableHead>
+                  <TableHead className="w-[250px] sticky left-[2rem] bg-background z-10">Employee</TableHead>
                   <TableHead>Base Salary</TableHead>
                   <TableHead>Working Days</TableHead>
                   <TableHead>Present Days</TableHead>
@@ -656,8 +656,8 @@ export default function PayrollPage() {
                 ) : filteredAndCalculatedData.length > 0 ? (
                   filteredAndCalculatedData.map(emp => (
                     <TableRow key={emp.id} className="group">
-                      <TableCell className="p-0 print:hidden"><div className="flex items-center justify-center"><TooltipProvider><Tooltip><TooltipTrigger asChild><Button variant="ghost" size="icon" className="h-6 w-6 rounded-full opacity-0 group-hover:opacity-100 transition-opacity" onClick={() => handleInsertRow(emp.id)}><PlusCircle className="h-4 w-4" /></Button></TooltipTrigger><TooltipContent side="right"><p>Insert row below</p></TooltipContent></Tooltip></TooltipProvider></div></TableCell>
-                      <TableCell className="sticky left-0 bg-background z-10">{emp.isNew ? (<Input placeholder="Enter Employee Name" value={emp.name} onChange={e => handleInputChange(emp.id, 'name', e.target.value)} />) : (<div className="flex items-center gap-2"><Avatar><AvatarImage src={emp.profilePictureUrl} /><AvatarFallback>{getInitials(emp.name)}</AvatarFallback></Avatar><span className="font-medium">{emp.name}</span></div>)}</TableCell>
+                      <TableCell className="p-0 print:hidden sticky left-0 bg-background group-hover:bg-muted/50 z-10"><div className="flex items-center justify-center"><TooltipProvider><Tooltip><TooltipTrigger asChild><Button variant="ghost" size="icon" className="h-6 w-6 rounded-full opacity-0 group-hover:opacity-100 transition-opacity" onClick={() => handleInsertRow(emp.id)}><PlusCircle className="h-4 w-4" /></Button></TooltipTrigger><TooltipContent side="right"><p>Insert row below</p></TooltipContent></Tooltip></TooltipProvider></div></TableCell>
+                      <TableCell className="sticky left-[2rem] bg-background group-hover:bg-muted/50 z-10">{emp.isNew ? (<Input placeholder="Enter Employee Name" value={emp.name} onChange={e => handleInputChange(emp.id, 'name', e.target.value)} />) : (<div className="flex items-center gap-2"><Avatar><AvatarImage src={emp.profilePictureUrl} /><AvatarFallback>{getInitials(emp.name)}</AvatarFallback></Avatar><span className="font-medium">{emp.name}</span></div>)}</TableCell>
                       <TableCell><Input type="number" value={emp.baseSalary} onChange={e => handleInputChange(emp.id, 'baseSalary', e.target.value)} className="w-28" /></TableCell>
                       <TableCell><Input type="number" value={emp.workingDays} onChange={e => handleInputChange(emp.id, 'workingDays', e.target.value)} className="w-24" /></TableCell>
                       <TableCell><Input type="number" value={emp.presentDays} onChange={e => handleInputChange(emp.id, 'presentDays', e.target.value)} className="w-24" /></TableCell>
@@ -685,8 +685,8 @@ export default function PayrollPage() {
               {filteredAndCalculatedData.length > 0 && (
                 <TableFooter>
                     <TableRow className="font-bold bg-muted/50">
-                        <TableCell className="print:hidden"></TableCell>
-                        <TableCell className="sticky left-0 bg-muted/50 z-10">Totals</TableCell>
+                        <TableCell className="print:hidden sticky left-0 bg-muted/50 z-10"></TableCell>
+                        <TableCell className="sticky left-[2rem] bg-muted/50 z-10">Totals</TableCell>
                         <TableCell>{currencySymbol}{totals.baseSalary.toFixed(2)}</TableCell>
                         <TableCell></TableCell>
                         <TableCell>{totals.presentDays}</TableCell>
