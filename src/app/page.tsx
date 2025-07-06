@@ -3,13 +3,13 @@
 
 import React, { useState, useRef, useEffect, useMemo } from 'react';
 import PageTitle from '@/components/PageTitle';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { NAV_ITEMS } from '@/lib/constants';
 import Link from 'next/link';
 import { LayoutGrid, Download, Calendar as CalendarIcon, Loader2 } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
+import { Card } from '@/components/ui/card';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Calendar } from '@/components/ui/calendar';
 import { format, startOfMonth } from 'date-fns';
@@ -24,34 +24,20 @@ import jsPDF from 'jspdf';
 import html2canvas from 'html2canvas';
 
 const ToolCard = ({ item, isEnabled }: { item: (typeof NAV_ITEMS)[0]; isEnabled: boolean }) => {
-  const CardContentWrapper = isEnabled ? Link : 'div';
+  const CardWrapper = isEnabled ? Link : 'div';
   return (
-    <Card
-      className={cn(
-        'group relative flex h-full transform flex-col justify-between overflow-hidden transition-all duration-300 ease-out hover:shadow-2xl',
-        isEnabled ? 'hover:-translate-y-2 hover:shadow-primary/20' : 'bg-muted/50 text-muted-foreground'
-      )}
-    >
-      <CardContentWrapper
-        href={isEnabled ? item.href : '#'}
-        className={cn(!isEnabled && 'cursor-not-allowed')}
-      >
-        <CardHeader>
-          <div className="mb-4 flex h-12 w-12 items-center justify-center rounded-lg bg-primary/10 text-primary">
-            <item.icon className="h-6 w-6" />
-          </div>
-          <CardTitle className="font-headline text-xl">{item.label}</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <p className="text-sm text-muted-foreground">{item.description}</p>
-        </CardContent>
-      </CardContentWrapper>
-      {!isEnabled && (
-        <div className="absolute inset-0 bg-background/60" />
-      )}
-    </Card>
+    <CardWrapper href={isEnabled ? item.href : '#'} className={cn(!isEnabled && 'pointer-events-none opacity-60')}>
+      <div className="h-full rounded-lg border bg-card p-5 text-card-foreground shadow-sm transition-all duration-200 hover:border-primary/50 hover:shadow-lg">
+        <div className="mb-4 flex h-12 w-12 items-center justify-center rounded-full bg-gradient-to-br from-orange-400 to-red-500">
+          <item.icon className="h-6 w-6 text-white" />
+        </div>
+        <h3 className="text-base font-semibold text-foreground">{item.label}</h3>
+        <p className="mt-1 text-sm text-muted-foreground">{item.description}</p>
+      </div>
+    </CardWrapper>
   );
 };
+
 
 function PayslipDownloaderCard() {
     const { user, currencySymbol, isLoading: authLoading } = useAuth();
@@ -70,7 +56,6 @@ function PayslipDownloaderCard() {
         toast({ title: 'Starting Download...', description: 'Preparing payslips. This may take a moment.' });
 
         try {
-            // 1. Fetch all data
             const periodString = format(selectedMonth, 'yyyy-MM');
             const companyDocRef = doc(db, 'companyProfiles', user.companyId);
             
@@ -94,7 +79,6 @@ function PayslipDownloaderCard() {
             if (companyDetails.signatureUrl) uris.signature = await urlToDataUri(companyDetails.signatureUrl);
             if (companyDetails.stampUrl) uris.stamp = await urlToDataUri(companyDetails.stampUrl);
             
-            // 2. Prepare props for each payslip
             const propsList = employeesWithPayroll.map(employee => ({
                 employee: {
                   ...employee,
@@ -109,7 +93,6 @@ function PayslipDownloaderCard() {
             }));
 
             setPayslipPropsList(propsList);
-            // The useEffect will trigger the PDF generation now.
 
         } catch (error: any) {
             console.error("Error preparing payslips:", error);
@@ -118,7 +101,6 @@ function PayslipDownloaderCard() {
         }
     };
     
-    // This effect runs after the payslips are rendered off-screen
     useEffect(() => {
         if (payslipPropsList.length > 0 && payslipContainerRef.current) {
             const generatePdf = async () => {
@@ -133,7 +115,7 @@ function PayslipDownloaderCard() {
                 
                 for (let i = 0; i < payslipElements.length; i++) {
                     const canvas = await html2canvas(payslipElements[i] as HTMLElement, {
-                        scale: 2, // Higher scale for better quality
+                        scale: 2,
                         useCORS: true,
                         backgroundColor: '#ffffff',
                     });
@@ -147,27 +129,25 @@ function PayslipDownloaderCard() {
                 pdf.save(`Payslips_${format(selectedMonth, 'yyyy-MM')}.pdf`);
                 toast({ title: 'Download Complete', description: `${payslipElements.length} payslips have been downloaded.` });
 
-                // Cleanup
                 setPayslipPropsList([]);
                 setIsDownloading(false);
             };
 
-            // Timeout to ensure DOM has updated
             setTimeout(generatePdf, 100);
         }
     }, [payslipPropsList, selectedMonth, toast]);
 
     return (
         <>
-            <Card className="flex flex-col justify-between">
-                <CardHeader>
-                    <div className="mb-4 flex h-12 w-12 items-center justify-center rounded-lg bg-primary/10 text-primary">
-                        <Download className="h-6 w-6" />
+            <Card className="h-full p-5 flex flex-col hover:border-primary/50 hover:shadow-lg transition-all duration-200">
+                <div className="flex-grow">
+                     <div className="mb-4 flex h-12 w-12 items-center justify-center rounded-full bg-gradient-to-br from-orange-400 to-red-500">
+                        <Download className="h-6 w-6 text-white" />
                     </div>
-                    <CardTitle className="font-headline text-xl">Download Payslips</CardTitle>
-                    <CardDescription className="text-sm text-muted-foreground">Download all paid employee payslips for a selected month in a single PDF file.</CardDescription>
-                </CardHeader>
-                <CardContent className="flex flex-col gap-4">
+                    <h3 className="text-base font-semibold text-foreground">Download Payslips</h3>
+                    <p className="mt-1 text-sm text-muted-foreground">Download all paid employee payslips for a selected month in a single PDF file.</p>
+                </div>
+                <div className="mt-4 flex flex-col gap-2">
                      <Popover>
                         <PopoverTrigger asChild>
                             <Button variant="outline" className="w-full justify-start font-normal" disabled={isDownloading}>
@@ -187,11 +167,11 @@ function PayslipDownloaderCard() {
                             />
                         </PopoverContent>
                     </Popover>
-                    <Button onClick={handlePrepareAndDownload} disabled={isDownloading || authLoading}>
-                        {isDownloading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Download className="mr-2 h-4 w-4" />}
-                        {isDownloading ? 'Generating PDF...' : 'Download Payslips'}
+                    <Button onClick={handlePrepareAndDownload} disabled={isDownloading || authLoading} size="sm">
+                        {isDownloading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
+                        {isDownloading ? 'Generating...' : 'Download'}
                     </Button>
-                </CardContent>
+                </div>
             </Card>
 
             <div style={{ position: 'fixed', left: '-9999px', top: 0, zIndex: -100, background: 'white' }}>
@@ -206,7 +186,6 @@ function PayslipDownloaderCard() {
 export default function MyToolsPage() {
   const { user } = useAuth();
 
-  // Explicitly define which tools appear on this page.
   const toolHrefs = ['/reports', '/settings', '/admin', '/bank-accounts', '/payroll'];
   const accessibleTools = NAV_ITEMS.filter(item => {
     if (item.href === '/admin' || item.href === '/payroll') {
@@ -222,11 +201,17 @@ export default function MyToolsPage() {
         subtitle="Your central hub for managing all aspects of your business."
         icon={LayoutGrid}
       />
-      <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
-        {accessibleTools.map(item => (
-          <ToolCard key={item.href} item={item} isEnabled={true} />
-        ))}
-         {user?.role === 'admin' && <PayslipDownloaderCard />}
+      <div className="space-y-6">
+        <div>
+          <h2 className="text-xl font-semibold tracking-tight text-foreground">Build</h2>
+          <p className="text-sm text-muted-foreground">Accelerate app development</p>
+        </div>
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+          {accessibleTools.map(item => (
+            <ToolCard key={item.href} item={item} isEnabled={true} />
+          ))}
+          {user?.role === 'admin' && <PayslipDownloaderCard />}
+        </div>
       </div>
     </div>
   );
