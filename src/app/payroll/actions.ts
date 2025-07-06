@@ -1,4 +1,3 @@
-
 'use server';
 
 import { db } from '@/lib/firebaseConfig';
@@ -22,7 +21,7 @@ export interface PayrollData {
   baseSalary: number;
   workingDays: number;
   presentDays: number;
-  otHours: number;
+  otDays: number;
   advances: number;
   otherDeductions: number;
   pfContribution?: number;
@@ -91,7 +90,7 @@ export async function getPayrollDataForPeriod(companyId: string, payPeriod: stri
             otherDeductions: existingPayrollData ? existingPayrollData.otherDeductions : 0,
             workingDays: existingPayrollData?.workingDays,
             presentDays: existingPayrollData?.presentDays,
-            otHours: existingPayrollData?.otHours,
+            otDays: existingPayrollData?.otDays,
             netPayment: existingPayrollData?.netPayment || 0,
             status: existingPayrollData ? existingPayrollData.status : 'Pending',
             customFields: customFields,

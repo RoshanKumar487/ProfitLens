@@ -1,4 +1,3 @@
-
 'use client';
 
 import React, { useState, useEffect, useCallback } from 'react';
@@ -28,7 +27,7 @@ export default function SettingsPage() {
   const { theme, setTheme } = useTheme();
   
   const [invoiceSettings, setInvoiceSettings] = useState<InvoiceSettings>({ customItemColumns: [], defaultPaymentTermsDays: 30, defaultHsnCode: '', defaultNotes: '' });
-  const [payrollSettings, setPayrollSettings] = useState<PayrollSettings>({ customFields: [], pfPercentage: 0, esiPercentage: 0, overtimeRatePerHour: 0 });
+  const [payrollSettings, setPayrollSettings] = useState<PayrollSettings>({ customFields: [], pfPercentage: 0, esiPercentage: 0 });
   const [newInvoiceColumnName, setNewInvoiceColumnName] = useState('');
   const [newPayrollFieldName, setNewPayrollFieldName] = useState('');
   const [newPayrollFieldType, setNewPayrollFieldType] = useState<'number' | 'string' | 'date'>('number');
@@ -163,12 +162,11 @@ export default function SettingsPage() {
          <Card>
             <CardHeader><CardTitle className="flex items-center gap-2"><HandCoins className="h-5 w-5 text-primary" />Payroll Settings</CardTitle><CardDescription>Manage rates and custom fields for your payroll records.</CardDescription></CardHeader>
             <CardContent className="space-y-4">
-                <div className="space-y-2"><h3 className="text-md font-semibold text-foreground">Calculation Rates</h3></div>
+                <div className="space-y-2"><h3 className="text-md font-semibold text-foreground">Statutory Contribution Rates</h3></div>
                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                     <div className="space-y-2"><Label htmlFor="pf-percentage">PF Contribution (%)</Label><Input id="pf-percentage" type="number" min="0" step="0.01" value={payrollSettings.pfPercentage ?? 0} onChange={(e) => setPayrollSettings(p => ({...p, pfPercentage: parseFloat(e.target.value) || 0}))} disabled={isSaving} /></div>
                     <div className="space-y-2"><Label htmlFor="esi-percentage">ESI Contribution (%)</Label><Input id="esi-percentage" type="number" min="0" step="0.01" value={payrollSettings.esiPercentage ?? 0} onChange={(e) => setPayrollSettings(p => ({...p, esiPercentage: parseFloat(e.target.value) || 0}))} disabled={isSaving} /></div>
                  </div>
-                 <div className="space-y-2"><Label htmlFor="ot-rate">Overtime Rate (per hour)</Label><Input id="ot-rate" type="number" min="0" step="0.5" value={payrollSettings.overtimeRatePerHour ?? 0} onChange={(e) => setPayrollSettings(p => ({...p, overtimeRatePerHour: parseFloat(e.target.value) || 0}))} disabled={isSaving} /></div>
                 <Separator />
                 <div className="space-y-2"><h3 className="text-md font-semibold text-foreground">Custom Payroll Fields</h3></div>
                 <div className="space-y-2">

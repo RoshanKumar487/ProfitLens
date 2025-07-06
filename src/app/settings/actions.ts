@@ -1,4 +1,3 @@
-
 'use server';
 
 import { db } from '@/lib/firebaseConfig';
@@ -26,7 +25,6 @@ export interface PayrollSettings {
   customFields: CustomPayrollField[];
   pfPercentage?: number;
   esiPercentage?: number;
-  overtimeRatePerHour?: number;
 }
 
 
@@ -82,7 +80,7 @@ export async function getPayrollSettings(companyId: string): Promise<PayrollSett
     }));
     return settings;
   } else {
-    return { customFields: [], pfPercentage: 0, esiPercentage: 0, overtimeRatePerHour: 0 };
+    return { customFields: [], pfPercentage: 0, esiPercentage: 0 };
   }
 }
 

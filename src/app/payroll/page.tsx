@@ -1,4 +1,3 @@
-
 'use client';
 
 import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
@@ -43,7 +42,7 @@ interface EmployeeWithPayroll {
   baseSalary: number; // Base salary from employee record
   workingDays: number;
   presentDays: number;
-  otHours: number;
+  otDays: number;
   advances: number;
   otherDeductions: number;
   status: 'Pending' | 'Paid';
@@ -121,7 +120,7 @@ export default function PayrollPage() {
           baseSalary: emp.salary, // Rename for clarity
           workingDays: emp.workingDays || daysInMonth,
           presentDays: emp.presentDays || daysInMonth,
-          otHours: emp.otHours || 0,
+          otDays: emp.otDays || 0,
           customFields: processedCustomFields 
         };
       });
@@ -149,8 +148,9 @@ export default function PayrollPage() {
         const workingDays = emp.workingDays > 0 ? emp.workingDays : 1;
         const presentDays = emp.presentDays || 0;
         
-        const proratedSalary = (emp.baseSalary / workingDays) * presentDays;
-        const overtimePay = (emp.otHours || 0) * (payrollSettings.overtimeRatePerHour || 0);
+        const dailyRate = workingDays > 0 ? (emp.baseSalary / workingDays) : 0;
+        const proratedSalary = dailyRate * presentDays;
+        const overtimePay = (emp.otDays || 0) * dailyRate;
         const grossEarnings = proratedSalary + overtimePay;
         
         const pfContribution = proratedSalary * ((payrollSettings.pfPercentage || 0) / 100);
@@ -188,7 +188,7 @@ export default function PayrollPage() {
     setPayrollData(prevData =>
       prevData.map(emp => {
         if (emp.id === employeeId) {
-          if (['baseSalary', 'workingDays', 'presentDays', 'otHours', 'advances', 'otherDeductions'].includes(field as string)) {
+          if (['baseSalary', 'workingDays', 'presentDays', 'otDays', 'advances', 'otherDeductions'].includes(field as string)) {
             return { ...emp, [field]: parseFloat(value) || 0 };
           } else if (field === 'name') {
             return { ...emp, name: value };
@@ -218,7 +218,7 @@ export default function PayrollPage() {
         baseSalary: 0,
         workingDays: getDaysInMonth(payPeriod),
         presentDays: getDaysInMonth(payPeriod),
-        otHours: 0,
+        otDays: 0,
         advances: 0,
         otherDeductions: 0,
         status: 'Pending',
@@ -236,7 +236,7 @@ export default function PayrollPage() {
       baseSalary: 0,
       workingDays: getDaysInMonth(payPeriod),
       presentDays: getDaysInMonth(payPeriod),
-      otHours: 0,
+      otDays: 0,
       advances: 0,
       otherDeductions: 0,
       status: 'Pending',
@@ -276,7 +276,7 @@ export default function PayrollPage() {
             baseSalary: p.baseSalary,
             workingDays: p.workingDays,
             presentDays: p.presentDays,
-            otHours: p.otHours,
+            otDays: p.otDays,
             advances: p.advances,
             otherDeductions: p.otherDeductions,
             status: p.status,
@@ -354,7 +354,7 @@ export default function PayrollPage() {
     return filteredAndCalculatedData.reduce((acc, emp) => {
         acc.baseSalary += emp.baseSalary || 0;
         acc.presentDays += emp.presentDays || 0;
-        acc.otHours += emp.otHours || 0;
+        acc.otDays += emp.otDays || 0;
         acc.grossEarnings += emp.grossEarnings || 0;
         acc.advances += emp.advances || 0;
         acc.otherDeductions += emp.otherDeductions || 0;
@@ -371,7 +371,7 @@ export default function PayrollPage() {
         return acc;
     }, { 
         baseSalary: 0, grossEarnings: 0, advances: 0, otherDeductions: 0, pfContribution: 0, esiContribution: 0, totalDeductions: 0, netPayment: 0,
-        presentDays: 0, otHours: 0, // Count fields
+        presentDays: 0, otDays: 0, // Count fields
         customFields: {} as { [key: string]: number } 
     });
   }, [filteredAndCalculatedData, payrollSettings]);
@@ -554,7 +554,7 @@ export default function PayrollPage() {
                   <TableHead>Base Salary</TableHead>
                   <TableHead>Working Days</TableHead>
                   <TableHead>Present Days</TableHead>
-                  <TableHead>OT Hours</TableHead>
+                  <TableHead>OT Days</TableHead>
                   <TableHead>Gross Earnings</TableHead>
                   <TableHead>Advances</TableHead>
                   <TableHead>Other Deductions</TableHead>
@@ -585,7 +585,7 @@ export default function PayrollPage() {
                       <TableCell><Input type="number" value={emp.baseSalary} onChange={e => handleInputChange(emp.id, 'baseSalary', e.target.value)} className="w-28" /></TableCell>
                       <TableCell><Input type="number" value={emp.workingDays} onChange={e => handleInputChange(emp.id, 'workingDays', e.target.value)} className="w-24" /></TableCell>
                       <TableCell><Input type="number" value={emp.presentDays} onChange={e => handleInputChange(emp.id, 'presentDays', e.target.value)} className="w-24" /></TableCell>
-                      <TableCell><Input type="number" value={emp.otHours} onChange={e => handleInputChange(emp.id, 'otHours', e.target.value)} className="w-24" /></TableCell>
+                      <TableCell><Input type="number" value={emp.otDays} onChange={e => handleInputChange(emp.id, 'otDays', e.target.value)} className="w-24" step="0.1" /></TableCell>
                       <TableCell className="font-semibold">{currencySymbol}{emp.grossEarnings?.toFixed(2) || '0.00'}</TableCell>
                       <TableCell><Input type="number" value={emp.advances} onChange={e => handleInputChange(emp.id, 'advances', e.target.value)} className="w-28" /></TableCell>
                       <TableCell><Input type="number" value={emp.otherDeductions} onChange={e => handleInputChange(emp.id, 'otherDeductions', e.target.value)} className="w-28" /></TableCell>
@@ -614,7 +614,7 @@ export default function PayrollPage() {
                         <TableCell>{currencySymbol}{totals.baseSalary.toFixed(2)}</TableCell>
                         <TableCell></TableCell>
                         <TableCell>{totals.presentDays}</TableCell>
-                        <TableCell>{totals.otHours}</TableCell>
+                        <TableCell>{totals.otDays}</TableCell>
                         <TableCell>{currencySymbol}{totals.grossEarnings.toFixed(2)}</TableCell>
                         <TableCell>{currencySymbol}{totals.advances.toFixed(2)}</TableCell>
                         <TableCell>{currencySymbol}{totals.otherDeductions.toFixed(2)}</TableCell>
