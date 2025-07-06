@@ -10,7 +10,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/com
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow, TableFooter } from '@/components/ui/table';
 import { Input } from '@/components/ui/input';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
-import { HandCoins, Loader2, Save, Calendar as CalendarIcon, Settings, Printer, PlusCircle, Trash2, Search, Download } from 'lucide-react';
+import { HandCoins, Loader2, Save, Calendar as CalendarIcon, Settings, Printer, PlusCircle, Trash2, Search, Download, MoreHorizontal } from 'lucide-react';
 import { format, startOfMonth, getDaysInMonth } from 'date-fns';
 import { getPayrollDataForPeriod, savePayrollData, deletePayrollRecord } from './actions';
 import { getPayrollSettings, type PayrollSettings } from '../settings/actions';
