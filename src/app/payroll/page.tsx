@@ -11,7 +11,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow, TableFoo
 import { Input } from '@/components/ui/input';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { HandCoins, Loader2, Save, Calendar as CalendarIcon, Settings, Printer, PlusCircle, Trash2, Search, Download } from 'lucide-react';
-import { format, startOfMonth } from 'date-fns';
+import { format, startOfMonth, getDaysInMonth } from 'date-fns';
 import { getPayrollDataForPeriod, savePayrollData, deletePayrollRecord } from './actions';
 import { getPayrollSettings, type PayrollSettings } from '../settings/actions';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -40,14 +40,26 @@ interface EmployeeWithPayroll {
   joiningDate?: Date;
   profilePictureUrl?: string;
   payrollId: string | null;
-  grossSalary: number;
+  baseSalary: number; // Base salary from employee record
+  workingDays: number;
+  presentDays: number;
+  otHours: number;
   advances: number;
   otherDeductions: number;
-  netPayment: number;
   status: 'Pending' | 'Paid';
   customFields: { [key: string]: any };
   isNew?: boolean;
+
+  // Calculated fields, not stored in DB but computed on client
+  proratedSalary?: number;
+  overtimePay?: number;
+  grossEarnings?: number;
+  pfContribution?: number;
+  esiContribution?: number;
+  totalDeductions?: number;
+  netPayment?: number;
 }
+
 
 const getInitials = (name: string = "") => {
   const names = name.split(' ');
@@ -80,6 +92,48 @@ export default function PayrollPage() {
   const [payslipImageDataUris, setPayslipImageDataUris] = useState<{ signature?: string; stamp?: string }>({});
   const [isPrinting, setIsPrinting] = useState(false);
 
+  // Auto-calculation effect
+  useEffect(() => {
+    if (!payrollSettings || payrollData.length === 0) return;
+
+    setPayrollData(prevData =>
+      prevData.map(emp => {
+        const workingDays = emp.workingDays > 0 ? emp.workingDays : 1;
+        const presentDays = emp.presentDays || 0;
+        
+        // Salary Calculation
+        const proratedSalary = (emp.baseSalary / workingDays) * presentDays;
+        const overtimePay = (emp.otHours || 0) * (payrollSettings.overtimeRatePerHour || 0);
+        const grossEarnings = proratedSalary + overtimePay;
+        
+        // Deduction Calculation
+        const pfContribution = proratedSalary * ((payrollSettings.pfPercentage || 0) / 100);
+        const esiContribution = grossEarnings * ((payrollSettings.esiPercentage || 0) / 100);
+        
+        const customNumericDeductions = (payrollSettings.customFields || []).reduce((sum, field) => {
+            if (field.type === 'number') {
+                return sum + (Number(emp.customFields?.[field.id]) || 0);
+            }
+            return sum;
+        }, 0);
+        
+        const totalDeductions = (emp.advances || 0) + (emp.otherDeductions || 0) + pfContribution + esiContribution + customNumericDeductions;
+        const netPayment = grossEarnings - totalDeductions;
+
+        return { 
+          ...emp,
+          proratedSalary,
+          overtimePay,
+          grossEarnings,
+          pfContribution,
+          esiContribution,
+          totalDeductions,
+          netPayment,
+        };
+      })
+    );
+  }, [payrollData.map(p => p.presentDays), payrollData.map(p => p.otHours), payrollSettings]);
+
   const fetchPayrollData = useCallback(async (period: Date) => {
     if (!user?.companyId) return;
     setIsLoading(true);
@@ -90,6 +144,8 @@ export default function PayrollPage() {
         getPayrollSettings(user.companyId),
       ]);
       
+      const daysInMonth = getDaysInMonth(period);
+
       const processedData = data.map(emp => {
         const processedCustomFields: { [key: string]: any } = {};
         if (emp.customFields && settings.customFields) {
@@ -102,7 +158,14 @@ export default function PayrollPage() {
                 }
             }
         }
-        return { ...emp, customFields: processedCustomFields };
+        return { 
+          ...emp, 
+          baseSalary: emp.salary, // Rename for clarity
+          workingDays: emp.workingDays || daysInMonth,
+          presentDays: emp.presentDays || daysInMonth,
+          otHours: emp.otHours || 0,
+          customFields: processedCustomFields 
+        };
       });
       
       setPayrollData(processedData);
@@ -120,11 +183,11 @@ export default function PayrollPage() {
     }
   }, [payPeriod, user, authLoading, fetchPayrollData]);
 
-  const handleInputChange = (employeeId: string, field: string, value: any) => {
+  const handleInputChange = (employeeId: string, field: keyof EmployeeWithPayroll, value: any) => {
     setPayrollData(prevData =>
       prevData.map(emp => {
         if (emp.id === employeeId) {
-          if (['grossSalary', 'advances', 'otherDeductions'].includes(field)) {
+          if (['baseSalary', 'workingDays', 'presentDays', 'otHours', 'advances', 'otherDeductions'].includes(field as string)) {
             return { ...emp, [field]: parseFloat(value) || 0 };
           } else if (field === 'name') {
             return { ...emp, name: value };
@@ -151,10 +214,12 @@ export default function PayrollPage() {
         isNew: true,
         name: '',
         payrollId: null,
-        grossSalary: 0,
+        baseSalary: 0,
+        workingDays: getDaysInMonth(payPeriod),
+        presentDays: getDaysInMonth(payPeriod),
+        otHours: 0,
         advances: 0,
         otherDeductions: 0,
-        netPayment: 0,
         status: 'Pending',
         customFields: {}
     };
@@ -167,10 +232,12 @@ export default function PayrollPage() {
       isNew: true,
       name: '',
       payrollId: null,
-      grossSalary: 0,
+      baseSalary: 0,
+      workingDays: getDaysInMonth(payPeriod),
+      presentDays: getDaysInMonth(payPeriod),
+      otHours: 0,
       advances: 0,
       otherDeductions: 0,
-      netPayment: 0,
       status: 'Pending',
       customFields: {},
     };
@@ -192,14 +259,6 @@ export default function PayrollPage() {
     const periodString = format(payPeriod, 'yyyy-MM');
     
     const dataToSave = payrollData.map(p => {
-        const totalCustomDeductions = (payrollSettings?.customFields || []).reduce((sum, field) => {
-            if (field.type === 'number') {
-                return sum + (Number(p.customFields?.[field.id]) || 0);
-            }
-            return sum;
-        }, 0);
-        const netPayment = (p.grossSalary || 0) - (p.advances || 0) - (p.otherDeductions || 0) - totalCustomDeductions;
-      
         const customFieldsForSave: { [key: string]: any } = {};
         if (p.customFields) {
             for (const key in p.customFields) {
@@ -211,15 +270,24 @@ export default function PayrollPage() {
                 }
             }
         }
-
         const payload: any = {
             payrollId: p.payrollId,
-            grossSalary: p.grossSalary,
+            baseSalary: p.baseSalary,
+            workingDays: p.workingDays,
+            presentDays: p.presentDays,
+            otHours: p.otHours,
             advances: p.advances,
             otherDeductions: p.otherDeductions,
-            netPayment: netPayment,
             status: p.status,
             customFields: customFieldsForSave,
+            // Save calculated values for historical accuracy
+            proratedSalary: p.proratedSalary,
+            overtimePay: p.overtimePay,
+            grossEarnings: p.grossEarnings,
+            pfContribution: p.pfContribution,
+            esiContribution: p.esiContribution,
+            totalDeductions: p.totalDeductions,
+            netPayment: p.netPayment,
         };
 
         if (p.isNew) {
@@ -291,27 +359,28 @@ export default function PayrollPage() {
 
   const totals = useMemo(() => {
     return filteredData.reduce((acc, emp) => {
-        const totalCustomDeductions = (payrollSettings?.customFields || []).reduce((sum, field) => {
-            if (field.type === 'number') {
-                return sum + (Number(emp.customFields?.[field.id]) || 0);
-            }
-            return sum;
-        }, 0);
-        const netPayment = (emp.grossSalary || 0) - (emp.advances || 0) - (emp.otherDeductions || 0) - totalCustomDeductions;
-        
-        acc.grossSalary += emp.grossSalary || 0;
+        acc.baseSalary += emp.baseSalary || 0;
+        acc.presentDays += emp.presentDays || 0;
+        acc.otHours += emp.otHours || 0;
+        acc.grossEarnings += emp.grossEarnings || 0;
         acc.advances += emp.advances || 0;
         acc.otherDeductions += emp.otherDeductions || 0;
-        acc.netPayment += netPayment;
+        acc.pfContribution += emp.pfContribution || 0;
+        acc.esiContribution += emp.esiContribution || 0;
+        acc.totalDeductions += emp.totalDeductions || 0;
+        acc.netPayment += emp.netPayment || 0;
 
         (payrollSettings?.customFields || []).forEach(field => {
             if (field.type === 'number') {
                 acc.customFields[field.id] = (acc.customFields[field.id] || 0) + (Number(emp.customFields?.[field.id]) || 0);
             }
         });
-
         return acc;
-    }, { grossSalary: 0, advances: 0, otherDeductions: 0, netPayment: 0, customFields: {} as { [key: string]: number } });
+    }, { 
+        baseSalary: 0, grossEarnings: 0, advances: 0, otherDeductions: 0, pfContribution: 0, esiContribution: 0, totalDeductions: 0, netPayment: 0,
+        presentDays: 0, otHours: 0, // Count fields
+        customFields: {} as { [key: string]: number } 
+    });
   }, [filteredData, payrollSettings]);
 
   const handleOpenPayslipDialog = async (employee: EmployeeWithPayroll) => {
@@ -390,7 +459,7 @@ export default function PayrollPage() {
     );
   }
 
-  const columnCount = 8 + (payrollSettings?.customFields.length || 0);
+  const columnCount = 13 + (payrollSettings?.customFields.length || 0);
 
   return (
     <div className="space-y-6 p-4 sm:p-6 lg:p-8 print:p-0 print:space-y-0">
@@ -440,7 +509,7 @@ export default function PayrollPage() {
                       </Button>
                     </TooltipTrigger>
                     <TooltipContent>
-                      <p>Manage Custom Payroll Fields</p>
+                      <p>Manage Payroll Settings</p>
                     </TooltipContent>
                   </Tooltip>
                   <Tooltip>
@@ -489,12 +558,17 @@ export default function PayrollPage() {
                 <TableRow>
                   <TableHead className="w-8 p-0 print:hidden"></TableHead>
                   <TableHead className="w-[250px] sticky left-0 bg-background z-10">Employee</TableHead>
-                  <TableHead>Gross Salary</TableHead>
+                  <TableHead>Base Salary</TableHead>
+                  <TableHead>Working Days</TableHead>
+                  <TableHead>Present Days</TableHead>
+                  <TableHead>OT Hours</TableHead>
+                  <TableHead>Gross Earnings</TableHead>
                   <TableHead>Advances</TableHead>
                   <TableHead>Other Deductions</TableHead>
-                  {payrollSettings?.customFields.map(field => (
-                    <TableHead key={field.id}>{field.label}</TableHead>
-                  ))}
+                  <TableHead>PF</TableHead>
+                  <TableHead>ESI</TableHead>
+                  {payrollSettings?.customFields.map(field => field.type === 'number' && <TableHead key={field.id}>{field.label}</TableHead>)}
+                  <TableHead>Total Deductions</TableHead>
                   <TableHead>Net Payment</TableHead>
                   <TableHead>Status</TableHead>
                    <TableHead className="print:hidden">Actions</TableHead>
@@ -506,140 +580,37 @@ export default function PayrollPage() {
                     <TableRow key={i}>
                       <TableCell className="print:hidden"></TableCell>
                       <TableCell className="sticky left-0 bg-background z-10"><div className="flex items-center gap-2"><Skeleton className="h-10 w-10 rounded-full" /><Skeleton className="h-4 w-32" /></div></TableCell>
-                      {[...Array(3 + (payrollSettings?.customFields.length || 0))].map((_, j) => (
-                          <TableCell key={j}><Skeleton className="h-8 w-24" /></TableCell>
-                      ))}
-                      <TableCell><Skeleton className="h-4 w-20" /></TableCell>
-                      <TableCell><Skeleton className="h-8 w-20" /></TableCell>
+                      {[...Array(columnCount-3)].map((_, j) => (<TableCell key={j}><Skeleton className="h-8 w-24" /></TableCell>))}
                       <TableCell className="print:hidden"><Skeleton className="h-8 w-8" /></TableCell>
                     </TableRow>
                   ))
                 ) : filteredData.length > 0 ? (
-                  filteredData.map(emp => {
-                    const totalCustomDeductions = (payrollSettings?.customFields || []).reduce((sum, field) => {
-                        if (field.type === 'number') {
-                            return sum + (Number(emp.customFields?.[field.id]) || 0);
-                        }
-                        return sum;
-                    }, 0);
-                    const netPayment = (emp.grossSalary || 0) - (emp.advances || 0) - (emp.otherDeductions || 0) - totalCustomDeductions;
-                    
-                    return (
-                        <TableRow key={emp.id} className="group">
-                          <TableCell className="p-0 print:hidden">
-                            <div className="flex items-center justify-center">
-                              <TooltipProvider>
-                                <Tooltip>
-                                  <TooltipTrigger asChild>
-                                    <Button
-                                        variant="ghost"
-                                        size="icon"
-                                        className="h-6 w-6 rounded-full opacity-0 group-hover:opacity-100 transition-opacity"
-                                        onClick={() => handleInsertRow(emp.id)}
-                                    >
-                                        <PlusCircle className="h-4 w-4" />
-                                    </Button>
-                                  </TooltipTrigger>
-                                  <TooltipContent side="right">
-                                    <p>Insert row below</p>
-                                  </TooltipContent>
-                                </Tooltip>
-                              </TooltipProvider>
-                            </div>
-                          </TableCell>
-                          <TableCell className="sticky left-0 bg-background z-10">
-                            {emp.isNew ? (
-                                <Input 
-                                    placeholder="Enter Employee Name" 
-                                    value={emp.name} 
-                                    onChange={e => handleInputChange(emp.id, 'name', e.target.value)} 
-                                />
-                            ) : (
-                                <div className="flex items-center gap-2">
-                                <Avatar>
-                                    <AvatarImage src={emp.profilePictureUrl} />
-                                    <AvatarFallback>{getInitials(emp.name)}</AvatarFallback>
-                                </Avatar>
-                                <span className="font-medium">{emp.name}</span>
-                                </div>
-                            )}
-                          </TableCell>
-                          <TableCell><Input type="number" value={emp.grossSalary} onChange={e => handleInputChange(emp.id, 'grossSalary', e.target.value)} className="w-28" /></TableCell>
-                          <TableCell><Input type="number" value={emp.advances} onChange={e => handleInputChange(emp.id, 'advances', e.target.value)} className="w-28" /></TableCell>
-                          <TableCell><Input type="number" value={emp.otherDeductions} onChange={e => handleInputChange(emp.id, 'otherDeductions', e.target.value)} className="w-28" /></TableCell>
-                           {payrollSettings?.customFields.map(field => {
-                              const value = emp.customFields?.[field.id] ?? '';
-                              if (field.type === 'date') {
-                                return (
-                                  <TableCell key={field.id}>
-                                    <Popover>
-                                      <PopoverTrigger asChild>
-                                        <Button variant="outline" className="w-36 h-10 justify-start font-normal text-xs">
-                                          <CalendarIcon className="mr-2 h-4 w-4" />
-                                          {value instanceof Date && !isNaN(value.valueOf()) ? format(value, 'PPP') : <span>Pick a date</span>}
-                                        </Button>
-                                      </PopoverTrigger>
-                                      <PopoverContent className="w-auto p-0">
-                                        <Calendar
-                                          mode="single"
-                                          selected={value instanceof Date ? value : undefined}
-                                          onSelect={(date) => handleInputChange(emp.id, field.id, date)}
-                                          initialFocus
-                                        />
-                                      </PopoverContent>
-                                    </Popover>
-                                  </TableCell>
-                                );
-                              }
-                              return (
-                                <TableCell key={field.id}>
-                                    <Input
-                                        type={field.type === 'number' ? 'number' : 'text'}
-                                        value={value}
-                                        onChange={e => handleInputChange(emp.id, field.id, e.target.value)}
-                                        className="w-28"
-                                    />
-                                </TableCell>
-                              );
-                           })}
-                          <TableCell className="font-semibold">{currencySymbol}{netPayment.toFixed(2)}</TableCell>
-                          <TableCell>
-                            <Button
-                              variant={emp.status === 'Paid' ? 'default' : 'secondary'}
-                              size="sm"
-                              onClick={() => handleStatusChange(emp.id, emp.status === 'Paid' ? 'Pending' : 'Paid')}
-                              className="w-20"
-                            >
-                              {emp.status}
-                            </Button>
-                          </TableCell>
-                          <TableCell className="print:hidden">
-                            <DropdownMenu>
-                                <DropdownMenuTrigger asChild>
-                                    <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive" disabled={isDeleting}>
-                                        <Trash2 className="h-4 w-4" />
-                                    </Button>
-                                </DropdownMenuTrigger>
-                                <DropdownMenuContent align="end">
-                                    <DropdownMenuItem onClick={() => handleOpenPayslipDialog(emp)}>
-                                        <Printer className="mr-2 h-4 w-4" /> Print Payslip
-                                    </DropdownMenuItem>
-                                    <DropdownMenuSeparator />
-                                    <DropdownMenuItem onClick={() => promptDelete(emp)} className="text-destructive focus:text-destructive focus:bg-destructive/10">
-                                        <Trash2 className="mr-2 h-4 w-4" /> Delete Record
-                                    </DropdownMenuItem>
-                                </DropdownMenuContent>
-                            </DropdownMenu>
-                          </TableCell>
-                        </TableRow>
-                    );
-                  })
+                  filteredData.map(emp => (
+                    <TableRow key={emp.id} className="group">
+                      <TableCell className="p-0 print:hidden"><div className="flex items-center justify-center"><TooltipProvider><Tooltip><TooltipTrigger asChild><Button variant="ghost" size="icon" className="h-6 w-6 rounded-full opacity-0 group-hover:opacity-100 transition-opacity" onClick={() => handleInsertRow(emp.id)}><PlusCircle className="h-4 w-4" /></Button></TooltipTrigger><TooltipContent side="right"><p>Insert row below</p></TooltipContent></Tooltip></TooltipProvider></div></TableCell>
+                      <TableCell className="sticky left-0 bg-background z-10">{emp.isNew ? (<Input placeholder="Enter Employee Name" value={emp.name} onChange={e => handleInputChange(emp.id, 'name', e.target.value)} />) : (<div className="flex items-center gap-2"><Avatar><AvatarImage src={emp.profilePictureUrl} /><AvatarFallback>{getInitials(emp.name)}</AvatarFallback></Avatar><span className="font-medium">{emp.name}</span></div>)}</TableCell>
+                      <TableCell><Input type="number" value={emp.baseSalary} onChange={e => handleInputChange(emp.id, 'baseSalary', e.target.value)} className="w-28" /></TableCell>
+                      <TableCell><Input type="number" value={emp.workingDays} onChange={e => handleInputChange(emp.id, 'workingDays', e.target.value)} className="w-24" /></TableCell>
+                      <TableCell><Input type="number" value={emp.presentDays} onChange={e => handleInputChange(emp.id, 'presentDays', e.target.value)} className="w-24" /></TableCell>
+                      <TableCell><Input type="number" value={emp.otHours} onChange={e => handleInputChange(emp.id, 'otHours', e.target.value)} className="w-24" /></TableCell>
+                      <TableCell className="font-semibold">{currencySymbol}{emp.grossEarnings?.toFixed(2) || '0.00'}</TableCell>
+                      <TableCell><Input type="number" value={emp.advances} onChange={e => handleInputChange(emp.id, 'advances', e.target.value)} className="w-28" /></TableCell>
+                      <TableCell><Input type="number" value={emp.otherDeductions} onChange={e => handleInputChange(emp.id, 'otherDeductions', e.target.value)} className="w-28" /></TableCell>
+                      <TableCell className="text-sm">{currencySymbol}{emp.pfContribution?.toFixed(2) || '0.00'}</TableCell>
+                      <TableCell className="text-sm">{currencySymbol}{emp.esiContribution?.toFixed(2) || '0.00'}</TableCell>
+                       {payrollSettings?.customFields.map(field => {
+                          if (field.type !== 'number') return null;
+                          const value = emp.customFields?.[field.id] ?? '';
+                          return (<TableCell key={field.id}><Input type="number" value={value} onChange={e => handleInputChange(emp.id, field.id, e.target.value)} className="w-28" /></TableCell>);
+                       })}
+                      <TableCell className="font-semibold">{currencySymbol}{emp.totalDeductions?.toFixed(2) || '0.00'}</TableCell>
+                      <TableCell className="font-bold text-lg">{currencySymbol}{emp.netPayment?.toFixed(2) || '0.00'}</TableCell>
+                      <TableCell><Button variant={emp.status === 'Paid' ? 'default' : 'secondary'} size="sm" onClick={() => handleStatusChange(emp.id, emp.status === 'Paid' ? 'Pending' : 'Paid')} className="w-20">{emp.status}</Button></TableCell>
+                      <TableCell className="print:hidden"><DropdownMenu><DropdownMenuTrigger asChild><Button variant="ghost" size="icon" className="h-8 w-8"><MoreHorizontal className="h-4 w-4" /></Button></DropdownMenuTrigger><DropdownMenuContent align="end"><DropdownMenuItem onClick={() => handleOpenPayslipDialog(emp)}><Printer className="mr-2 h-4 w-4" /> Print Payslip</DropdownMenuItem><DropdownMenuSeparator /><DropdownMenuItem onClick={() => promptDelete(emp)} className="text-destructive focus:text-destructive focus:bg-destructive/10"><Trash2 className="mr-2 h-4 w-4" /> Delete Record</DropdownMenuItem></DropdownMenuContent></DropdownMenu></TableCell>
+                    </TableRow>
+                  ))
                 ) : (
-                  <TableRow>
-                    <TableCell colSpan={columnCount} className="text-center h-24">
-                      {searchTerm || statusFilter !== 'All' ? 'No employees match your filters.' : 'No employees found. Add employees on the Employees page or add a new row manually.'}
-                    </TableCell>
-                  </TableRow>
+                  <TableRow><TableCell colSpan={columnCount} className="text-center h-24">{searchTerm || statusFilter !== 'All' ? 'No employees match your filters.' : 'No employees found. Add employees on the Employees page or add a new row manually.'}</TableCell></TableRow>
                 )}
               </TableBody>
               {filteredData.length > 0 && (
@@ -647,14 +618,17 @@ export default function PayrollPage() {
                     <TableRow className="font-bold bg-muted/50">
                         <TableCell className="print:hidden"></TableCell>
                         <TableCell className="sticky left-0 bg-muted/50 z-10">Totals</TableCell>
-                        <TableCell>{currencySymbol}{totals.grossSalary.toFixed(2)}</TableCell>
+                        <TableCell>{currencySymbol}{totals.baseSalary.toFixed(2)}</TableCell>
+                        <TableCell></TableCell>
+                        <TableCell>{totals.presentDays}</TableCell>
+                        <TableCell>{totals.otHours}</TableCell>
+                        <TableCell>{currencySymbol}{totals.grossEarnings.toFixed(2)}</TableCell>
                         <TableCell>{currencySymbol}{totals.advances.toFixed(2)}</TableCell>
                         <TableCell>{currencySymbol}{totals.otherDeductions.toFixed(2)}</TableCell>
-                        {payrollSettings?.customFields.map(field => (
-                          <TableCell key={`total-${field.id}`}>
-                            {field.type === 'number' ? `${currencySymbol}${(totals.customFields[field.id] || 0).toFixed(2)}` : ''}
-                          </TableCell>
-                        ))}
+                        <TableCell>{currencySymbol}{totals.pfContribution.toFixed(2)}</TableCell>
+                        <TableCell>{currencySymbol}{totals.esiContribution.toFixed(2)}</TableCell>
+                        {payrollSettings?.customFields.map(field => field.type === 'number' && <TableCell key={`total-${field.id}`}>{currencySymbol}{(totals.customFields[field.id] || 0).toFixed(2)}</TableCell>)}
+                        <TableCell>{currencySymbol}{totals.totalDeductions.toFixed(2)}</TableCell>
                         <TableCell>{currencySymbol}{totals.netPayment.toFixed(2)}</TableCell>
                         <TableCell colSpan={2} className="print:hidden"></TableCell>
                     </TableRow>
@@ -662,64 +636,27 @@ export default function PayrollPage() {
               )}
             </Table>
           </div>
-           <div className="pt-4 print:hidden">
-            <Button variant="outline" size="sm" onClick={handleAddRow}>
-                <PlusCircle className="mr-2 h-4 w-4" /> Add Employee Row
-            </Button>
-          </div>
+           <div className="pt-4 print:hidden"><Button variant="outline" size="sm" onClick={handleAddRow}><PlusCircle className="mr-2 h-4 w-4" /> Add Employee Row</Button></div>
         </CardContent>
       </Card>
         <AlertDialog open={!!employeeToDelete} onOpenChange={(open) => !open && setEmployeeToDelete(null)}>
             <AlertDialogContent>
-                <AlertDialogHeader>
-                    <AlertDialogTitle>Are you sure?</AlertDialogTitle>
-                    <AlertDialogDescription>
-                        {employeeToDelete?.isNew ? (
-                          <>This will remove <strong>{employeeToDelete?.name || 'this new row'}</strong> from the current payroll view. No data will be deleted.</>
-                        ) : (
-                          <>This will permanently delete the payroll record for <strong>{employeeToDelete?.name}</strong> for this month. This action cannot be undone.</>
-                        )}
-                    </AlertDialogDescription>
-                </AlertDialogHeader>
-                <AlertDialogFooter>
-                    <AlertDialogCancel onClick={() => setEmployeeToDelete(null)} disabled={isDeleting}>Cancel</AlertDialogCancel>
-                    <AlertDialogAction onClick={handleConfirmDelete} disabled={isDeleting} className={employeeToDelete?.isNew ? "" : "bg-destructive hover:bg-destructive/90"}>
-                        {isDeleting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : (employeeToDelete?.isNew ? 'Remove' : 'Delete')}
-                    </AlertDialogAction>
-                </AlertDialogFooter>
+                <AlertDialogHeader><AlertDialogTitle>Are you sure?</AlertDialogTitle><AlertDialogDescription>{employeeToDelete?.isNew ? (<>This will remove <strong>{employeeToDelete?.name || 'this new row'}</strong> from the current payroll view. No data will be deleted.</>) : (<>This will permanently delete the payroll record for <strong>{employeeToDelete?.name}</strong> for this month. This action cannot be undone.</>)}</AlertDialogDescription></AlertDialogHeader>
+                <AlertDialogFooter><AlertDialogCancel onClick={() => setEmployeeToDelete(null)} disabled={isDeleting}>Cancel</AlertDialogCancel><AlertDialogAction onClick={handleConfirmDelete} disabled={isDeleting} className={employeeToDelete?.isNew ? "" : "bg-destructive hover:bg-destructive/90"}>{isDeleting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : (employeeToDelete?.isNew ? 'Remove' : 'Delete')}</AlertDialogAction></AlertDialogFooter>
             </AlertDialogContent>
         </AlertDialog>
-
         <Dialog open={isPayslipDialogOpen} onOpenChange={setIsPayslipDialogOpen}>
           <DialogContent className="max-w-4xl w-full h-[95vh] flex flex-col p-0 bg-gray-100 dark:bg-background">
-            <DialogHeader className="p-4 sm:p-6 pb-2 border-b bg-background no-print">
-              <DialogTitle className="font-headline text-xl truncate">Payslip: {employeeForPayslip?.name}</DialogTitle>
-            </DialogHeader>
+            <DialogHeader className="p-4 sm:p-6 pb-2 border-b bg-background no-print"><DialogTitle className="font-headline text-xl truncate">Payslip: {employeeForPayslip?.name}</DialogTitle></DialogHeader>
             <ScrollArea className="flex-grow bg-muted p-4 sm:p-8">
-              {employeeForPayslip && companyDetails ? (
-                <PayslipTemplate
-                  ref={payslipPrintRef}
-                  employee={employeeForPayslip}
-                  payPeriod={format(payPeriod, 'yyyy-MM')}
-                  companyDetails={companyDetails}
-                  payrollSettings={payrollSettings}
-                  currencySymbol={currencySymbol}
-                  signatureDataUri={payslipImageDataUris.signature}
-                  stampDataUri={payslipImageDataUris.stamp}
-                />
-              ) : <Skeleton className="w-[210mm] h-[297mm] mx-auto bg-white" />}
+              {employeeForPayslip && companyDetails ? (<PayslipTemplate ref={payslipPrintRef} employee={employeeForPayslip} payPeriod={format(payPeriod, 'yyyy-MM')} companyDetails={companyDetails} payrollSettings={payrollSettings} currencySymbol={currencySymbol} signatureDataUri={payslipImageDataUris.signature} stampDataUri={payslipImageDataUris.stamp}/>) : <Skeleton className="w-[210mm] h-[297mm] mx-auto bg-white" />}
             </ScrollArea>
             <DialogFooter className="p-4 sm:p-6 border-t bg-background no-print justify-end flex-wrap gap-2">
-              <Button type="button" variant="secondary" onClick={handleDownloadPayslipPdf} disabled={isPrinting}>
-                {isPrinting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Download className="mr-2 h-4 w-4" />} Download PDF
-              </Button>
-              <Button type="button" variant="default" onClick={handlePrintPayslip} disabled={isPrinting}>
-                {isPrinting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Printer className="mr-2 h-4 w-4" />} Print Payslip
-              </Button>
+              <Button type="button" variant="secondary" onClick={handleDownloadPayslipPdf} disabled={isPrinting}>{isPrinting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Download className="mr-2 h-4 w-4" />} Download PDF</Button>
+              <Button type="button" variant="default" onClick={handlePrintPayslip} disabled={isPrinting}>{isPrinting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Printer className="mr-2 h-4 w-4" />} Print Payslip</Button>
             </DialogFooter>
           </DialogContent>
         </Dialog>
-
     </div>
   );
 }

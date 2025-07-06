@@ -13,6 +13,7 @@ export interface InvoiceSettings {
   customItemColumns: CustomItemColumn[];
   defaultPaymentTermsDays?: number;
   defaultHsnCode?: string;
+  defaultNotes?: string;
 }
 
 export interface CustomPayrollField {
@@ -23,6 +24,9 @@ export interface CustomPayrollField {
 
 export interface PayrollSettings {
   customFields: CustomPayrollField[];
+  pfPercentage?: number;
+  esiPercentage?: number;
+  overtimeRatePerHour?: number;
 }
 
 
@@ -37,10 +41,10 @@ export async function getInvoiceSettings(companyId: string): Promise<InvoiceSett
   if (docSnap.exists()) {
     const data = docSnap.data();
     // Return existing settings or default if not present
-    return data.invoiceSettings || { customItemColumns: [], defaultPaymentTermsDays: 30, defaultHsnCode: '' };
+    return data.invoiceSettings || { customItemColumns: [], defaultPaymentTermsDays: 30, defaultHsnCode: '', defaultNotes: '' };
   } else {
     // Return default settings for a company profile that might not have been saved yet
-    return { customItemColumns: [], defaultPaymentTermsDays: 30, defaultHsnCode: '' };
+    return { customItemColumns: [], defaultPaymentTermsDays: 30, defaultHsnCode: '', defaultNotes: '' };
   }
 }
 
@@ -78,7 +82,7 @@ export async function getPayrollSettings(companyId: string): Promise<PayrollSett
     }));
     return settings;
   } else {
-    return { customFields: [] };
+    return { customFields: [], pfPercentage: 0, esiPercentage: 0, overtimeRatePerHour: 0 };
   }
 }
 

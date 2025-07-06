@@ -19,12 +19,21 @@ export interface PayrollData {
   id?: string; // Existing payroll document ID
   employeeId: string;
   payPeriod: string; // YYYY-MM format
-  grossSalary: number;
+  baseSalary: number;
+  workingDays: number;
+  presentDays: number;
+  otHours: number;
   advances: number;
   otherDeductions: number;
+  pfContribution?: number;
+  esiContribution?: number;
+  overtimePay?: number;
+  proratedSalary?: number;
+  grossEarnings?: number;
+  totalDeductions?: number;
   netPayment: number;
   status: 'Pending' | 'Paid';
-  customFields?: { [key: string]: number };
+  customFields?: { [key: string]: number | string | Date };
 }
 
 /**
@@ -77,10 +86,13 @@ export async function getPayrollDataForPeriod(companyId: string, payPeriod: stri
             id: doc.id,
             ...employeeData,
             payrollId: existingPayrollData ? existingPayrollData.id : null,
-            grossSalary: existingPayrollData ? existingPayrollData.grossSalary : (employeeData.salary || 0),
+            baseSalary: existingPayrollData ? existingPayrollData.baseSalary : (employeeData.salary || 0),
             advances: existingPayrollData ? existingPayrollData.advances : 0,
             otherDeductions: existingPayrollData ? existingPayrollData.otherDeductions : 0,
-            netPayment: 0, // This will be calculated on the client-side for dynamic updates
+            workingDays: existingPayrollData?.workingDays,
+            presentDays: existingPayrollData?.presentDays,
+            otHours: existingPayrollData?.otHours,
+            netPayment: existingPayrollData?.netPayment || 0,
             status: existingPayrollData ? existingPayrollData.status : 'Pending',
             customFields: customFields,
         };
@@ -103,7 +115,7 @@ export async function savePayrollData(companyId: string, payPeriod: string, payr
     try {
         for (const data of payrolls) {
             let employeeId = data.employeeId;
-            const { isNew, name, payrollId, grossSalary, advances, otherDeductions, netPayment, status, customFields } = data;
+            const { isNew, name, payrollId, ...payrollFields } = data;
 
             // If it's a new employee, create the employee document first
             if (isNew) {
@@ -111,7 +123,7 @@ export async function savePayrollData(companyId: string, payPeriod: string, payr
                 employeeId = newEmployeeRef.id; // Use the new ID for the payroll record
                 batch.set(newEmployeeRef, {
                     name,
-                    salary: grossSalary || 0,
+                    salary: payrollFields.baseSalary || 0,
                     companyId,
                     position: 'N/A', // Default position for manually added
                     createdAt: timestamp,
@@ -125,14 +137,12 @@ export async function savePayrollData(companyId: string, payPeriod: string, payr
                 companyId,
                 employeeId,
                 payPeriod,
-                grossSalary,
-                advances,
-                otherDeductions,
-                netPayment,
-                status,
-                customFields: customFields || {},
+                ...payrollFields,
                 updatedAt: timestamp,
             };
+            // remove fields that shouldn't be saved
+            delete payrollPayload.isNew;
+            delete payrollPayload.name;
 
             if (payrollId && !isNew) { // Update existing payroll record
                 const payrollRef = doc(db, 'payrolls', payrollId);

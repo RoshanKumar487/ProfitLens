@@ -9,7 +9,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Settings, PlusCircle, Trash2, Loader2, Save, Info, Palette, Database, HandCoins } from 'lucide-react';
+import { Settings, PlusCircle, Trash2, Loader2, Save, Info, Palette, Database, HandCoins, Receipt } from 'lucide-react';
 import { getInvoiceSettings, saveInvoiceSettings, type InvoiceSettings, type CustomItemColumn } from './actions';
 import { getPayrollSettings, savePayrollSettings, type PayrollSettings, type CustomPayrollField } from './actions';
 import { v4 as uuidv4 } from 'uuid';
@@ -20,14 +20,15 @@ import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Separator } from '@/components/ui/separator';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from '@/components/ui/select';
+import { Textarea } from '@/components/ui/textarea';
 
 export default function SettingsPage() {
   const { user, isLoading: authIsLoading } = useAuth();
   const { toast } = useToast();
   const { theme, setTheme } = useTheme();
   
-  const [invoiceSettings, setInvoiceSettings] = useState<InvoiceSettings>({ customItemColumns: [], defaultPaymentTermsDays: 30, defaultHsnCode: '' });
-  const [payrollSettings, setPayrollSettings] = useState<PayrollSettings>({ customFields: [] });
+  const [invoiceSettings, setInvoiceSettings] = useState<InvoiceSettings>({ customItemColumns: [], defaultPaymentTermsDays: 30, defaultHsnCode: '', defaultNotes: '' });
+  const [payrollSettings, setPayrollSettings] = useState<PayrollSettings>({ customFields: [], pfPercentage: 0, esiPercentage: 0, overtimeRatePerHour: 0 });
   const [newInvoiceColumnName, setNewInvoiceColumnName] = useState('');
   const [newPayrollFieldName, setNewPayrollFieldName] = useState('');
   const [newPayrollFieldType, setNewPayrollFieldType] = useState<'number' | 'string' | 'date'>('number');
@@ -144,13 +145,11 @@ export default function SettingsPage() {
 
       <div className="grid gap-6 md:grid-cols-1 lg:grid-cols-2 xl:grid-cols-3">
         <Card>
-            <CardHeader>
-                <CardTitle>Invoice Settings</CardTitle>
-                <CardDescription>Manage default values and custom fields for your invoices.</CardDescription>
-            </CardHeader>
+            <CardHeader><CardTitle className="flex items-center gap-2"><Receipt className="h-5 w-5 text-primary"/>Invoice Settings</CardTitle><CardDescription>Manage default values and custom fields for your invoices.</CardDescription></CardHeader>
             <CardContent className="space-y-4">
                 <div className="space-y-2"><Label htmlFor="payment-terms">Default Payment Terms (Days)</Label><Input id="payment-terms" type="number" value={invoiceSettings.defaultPaymentTermsDays ?? 30} onChange={(e) => setInvoiceSettings(prev => ({...prev, defaultPaymentTermsDays: parseInt(e.target.value, 10) || 0}))} disabled={isSaving} placeholder="e.g., 30" /><p className="text-xs text-muted-foreground mt-1">Sets the default due date for new invoices.</p></div>
                 <div className="space-y-2"><Label htmlFor="hsn-code">Default HSN Code</Label><Input id="hsn-code" value={invoiceSettings.defaultHsnCode ?? ''} onChange={(e) => setInvoiceSettings(prev => ({...prev, defaultHsnCode: e.target.value}))} disabled={isSaving} placeholder="Enter a default HSN code" /><p className="text-xs text-muted-foreground mt-1">This HSN code will be pre-filled for new items.</p></div>
+                <div className="space-y-2"><Label htmlFor="default-notes">Default Notes/Terms</Label><Textarea id="default-notes" value={invoiceSettings.defaultNotes ?? ''} onChange={(e) => setInvoiceSettings(prev => ({...prev, defaultNotes: e.target.value}))} disabled={isSaving} placeholder="e.g., Thank you for your business." rows={3} /><p className="text-xs text-muted-foreground mt-1">This text will appear by default on new invoices.</p></div>
                 <Separator className="my-4" />
                 <div className="space-y-2"><h3 className="text-md font-semibold text-foreground">Custom Item Columns</h3><p className="text-sm text-muted-foreground">Add or remove custom columns for your invoice items.</p></div>
                 <div className="space-y-2">
@@ -162,8 +161,15 @@ export default function SettingsPage() {
         </Card>
         
          <Card>
-            <CardHeader><CardTitle className="flex items-center gap-2"><HandCoins className="h-5 w-5 text-primary" />Payroll Settings</CardTitle><CardDescription>Manage custom fields for your payroll records. These will appear as columns.</CardDescription></CardHeader>
+            <CardHeader><CardTitle className="flex items-center gap-2"><HandCoins className="h-5 w-5 text-primary" />Payroll Settings</CardTitle><CardDescription>Manage rates and custom fields for your payroll records.</CardDescription></CardHeader>
             <CardContent className="space-y-4">
+                <div className="space-y-2"><h3 className="text-md font-semibold text-foreground">Calculation Rates</h3></div>
+                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div className="space-y-2"><Label htmlFor="pf-percentage">PF Contribution (%)</Label><Input id="pf-percentage" type="number" min="0" step="0.01" value={payrollSettings.pfPercentage ?? 0} onChange={(e) => setPayrollSettings(p => ({...p, pfPercentage: parseFloat(e.target.value) || 0}))} disabled={isSaving} /></div>
+                    <div className="space-y-2"><Label htmlFor="esi-percentage">ESI Contribution (%)</Label><Input id="esi-percentage" type="number" min="0" step="0.01" value={payrollSettings.esiPercentage ?? 0} onChange={(e) => setPayrollSettings(p => ({...p, esiPercentage: parseFloat(e.target.value) || 0}))} disabled={isSaving} /></div>
+                 </div>
+                 <div className="space-y-2"><Label htmlFor="ot-rate">Overtime Rate (per hour)</Label><Input id="ot-rate" type="number" min="0" step="0.5" value={payrollSettings.overtimeRatePerHour ?? 0} onChange={(e) => setPayrollSettings(p => ({...p, overtimeRatePerHour: parseFloat(e.target.value) || 0}))} disabled={isSaving} /></div>
+                <Separator />
                 <div className="space-y-2"><h3 className="text-md font-semibold text-foreground">Custom Payroll Fields</h3></div>
                 <div className="space-y-2">
                     {payrollSettings.customFields.length > 0 ? payrollSettings.customFields.map(field => (

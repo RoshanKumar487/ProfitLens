@@ -13,9 +13,16 @@ interface EmployeeWithPayroll {
     position?: string;
     uan?: string;
     joiningDate?: Date;
-    grossSalary: number;
+    baseSalary: number;
+    proratedSalary?: number;
+    overtimePay?: number;
+    grossEarnings?: number;
     advances: number;
     otherDeductions: number;
+    pfContribution?: number;
+    esiContribution?: number;
+    totalDeductions?: number;
+    netPayment?: number;
     customFields: { [key: string]: number | string | Date };
 }
 
@@ -87,17 +94,9 @@ const SalaryRow: React.FC<{ label: string; value?: number; currencySymbol: strin
 const PayslipTemplate = React.forwardRef<HTMLDivElement, PayslipTemplateProps>(
   ({ employee, payPeriod, companyDetails, payrollSettings, currencySymbol, signatureDataUri, stampDataUri }, ref) => {
     
-    const grossEarnings = employee.grossSalary || 0;
-    
-    const totalDeductions = (employee.advances || 0) + (employee.otherDeductions || 0) + 
-      (payrollSettings?.customFields || []).reduce((sum, field) => {
-          if (field.type === 'number') {
-              return sum + (Number(employee.customFields?.[field.id]) || 0);
-          }
-          return sum;
-      }, 0);
-
-    const netSalary = grossEarnings - totalDeductions;
+    const grossEarnings = employee.grossEarnings || 0;
+    const totalDeductions = employee.totalDeductions || 0;
+    const netSalary = employee.netPayment || 0;
 
     return (
       <div ref={ref} className="bg-white text-black font-sans text-sm w-[210mm] min-h-[297mm] mx-auto flex flex-col p-6">
@@ -132,7 +131,8 @@ const PayslipTemplate = React.forwardRef<HTMLDivElement, PayslipTemplateProps>(
                 <h3 className="font-bold text-center bg-gray-200 p-2 border-b">Earnings</h3>
                 <table className="w-full">
                     <tbody>
-                        <SalaryRow label="Gross Salary" value={grossEarnings} currencySymbol={currencySymbol} />
+                        <SalaryRow label="Basic Salary" value={employee.baseSalary} currencySymbol={currencySymbol} />
+                        <SalaryRow label="Overtime Pay" value={employee.overtimePay} currencySymbol={currencySymbol} />
                     </tbody>
                     <tfoot>
                         <tr className="font-bold bg-gray-100">
@@ -146,6 +146,8 @@ const PayslipTemplate = React.forwardRef<HTMLDivElement, PayslipTemplateProps>(
                 <h3 className="font-bold text-center bg-gray-200 p-2 border-b">Deductions</h3>
                  <table className="w-full">
                     <tbody>
+                        <SalaryRow label="Provident Fund (PF)" value={employee.pfContribution} currencySymbol={currencySymbol} />
+                        <SalaryRow label="ESI" value={employee.esiContribution} currencySymbol={currencySymbol} />
                         <SalaryRow label="Advances" value={employee.advances} currencySymbol={currencySymbol} />
                         <SalaryRow label="Other Deductions" value={employee.otherDeductions} currencySymbol={currencySymbol} />
                         {payrollSettings?.customFields.map(field => {
