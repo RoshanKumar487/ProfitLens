@@ -694,31 +694,31 @@ export default function PayrollPage() {
                   <TableRow><TableCell colSpan={columnCount} className="text-center h-24">{searchTerm || statusFilter !== 'All' ? 'No employees match your filters.' : 'No employees found. Add employees on the Employees page or add a new row manually.'}</TableCell></TableRow>
                 )}
               </TableBody>
-              {filteredAndCalculatedData.length > 0 && (
-                <TableFooter>
-                    <TableRow className="font-bold bg-muted/50 sticky bottom-0">
-                        <TableCell className="print:hidden"></TableCell>
-                        <TableCell>Totals</TableCell>
-                        <TableCell>{currencySymbol}{totals.baseSalary.toFixed(2)}</TableCell>
-                        <TableCell></TableCell>
-                        <TableCell>{totals.presentDays}</TableCell>
-                        <TableCell>{totals.otDays}</TableCell>
-                        <TableCell>{currencySymbol}{totals.grossEarnings.toFixed(2)}</TableCell>
-                        <TableCell>{currencySymbol}{totals.advances.toFixed(2)}</TableCell>
-                        <TableCell>{currencySymbol}{totals.otherDeductions.toFixed(2)}</TableCell>
-                        <TableCell>{currencySymbol}{totals.pfContribution.toFixed(2)}</TableCell>
-                        <TableCell>{currencySymbol}{totals.esiContribution.toFixed(2)}</TableCell>
-                        {payrollSettings?.customFields.map(field => field.type === 'number' && <TableCell key={`total-${field.id}`}>{currencySymbol}{(totals.customFields[field.id] || 0).toFixed(2)}</TableCell>)}
-                        <TableCell>{currencySymbol}{totals.totalDeductions.toFixed(2)}</TableCell>
-                        <TableCell>{currencySymbol}{totals.netPayment.toFixed(2)}</TableCell>
-                        <TableCell colSpan={2} className="print:hidden"></TableCell>
-                    </TableRow>
-                </TableFooter>
-              )}
+              <TableFooter>
+                  <TableRow className="font-bold bg-muted/50 sticky bottom-0">
+                      <TableCell className="print:hidden"></TableCell>
+                      <TableCell>Totals</TableCell>
+                      <TableCell>{currencySymbol}{totals.baseSalary.toFixed(2)}</TableCell>
+                      <TableCell></TableCell>
+                      <TableCell>{totals.presentDays}</TableCell>
+                      <TableCell>{totals.otDays}</TableCell>
+                      <TableCell>{currencySymbol}{totals.grossEarnings.toFixed(2)}</TableCell>
+                      <TableCell>{currencySymbol}{totals.advances.toFixed(2)}</TableCell>
+                      <TableCell>{currencySymbol}{totals.otherDeductions.toFixed(2)}</TableCell>
+                      <TableCell>{currencySymbol}{totals.pfContribution.toFixed(2)}</TableCell>
+                      <TableCell>{currencySymbol}{totals.esiContribution.toFixed(2)}</TableCell>
+                      {payrollSettings?.customFields.map(field => field.type === 'number' && <TableCell key={`total-${field.id}`}>{currencySymbol}{(totals.customFields[field.id] || 0).toFixed(2)}</TableCell>)}
+                      <TableCell>{currencySymbol}{totals.totalDeductions.toFixed(2)}</TableCell>
+                      <TableCell>{currencySymbol}{totals.netPayment.toFixed(2)}</TableCell>
+                      <TableCell colSpan={2} className="print:hidden"></TableCell>
+                  </TableRow>
+              </TableFooter>
             </Table>
           </div>
-           <div className="pt-4 print:hidden"><Button variant="outline" size="sm" onClick={handleAddRow}><PlusCircle className="mr-2 h-4 w-4" /> Add Employee Row</Button></div>
         </CardContent>
+        <CardFooter className="pt-4 print:hidden">
+          <Button variant="outline" size="sm" onClick={handleAddRow}><PlusCircle className="mr-2 h-4 w-4" /> Add Employee Row</Button>
+        </CardFooter>
       </Card>
         <AlertDialog open={!!employeeToDelete} onOpenChange={(open) => !open && setEmployeeToDelete(null)}>
             <AlertDialogContent>
