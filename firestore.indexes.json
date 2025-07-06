@@ -79,6 +79,13 @@
       ]
     },
     {
+      "collectionGroup": "companyProfiles",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "publicCompanyId", "order": "ASCENDING" }
+      ]
+    },
+    {
       "collectionGroup": "accessRequests",
       "queryScope": "COLLECTION_GROUP",
       "fields": [
@@ -109,6 +116,14 @@
       "fields": [
         { "fieldPath": "companyId", "order": "ASCENDING" },
         { "fieldPath": "type", "order": "ASCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "payrolls",
+      "queryScope": "COLLECTION_GROUP",
+      "fields": [
+        { "fieldPath": "companyId", "order": "ASCENDING" },
+        { "fieldPath": "payPeriod", "order": "ASCENDING" }
       ]
     }
   ],

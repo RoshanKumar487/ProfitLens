@@ -5,6 +5,7 @@ import React from 'react';
 import { format } from 'date-fns';
 import type { InvoiceSettings } from '../settings/actions';
 import Letterhead from '@/components/Letterhead';
+import { cn } from '@/lib/utils';
 
 // Interface definitions mirrored from invoicing/page.tsx for component props
 interface InvoiceItem {
@@ -59,11 +60,12 @@ interface InvoiceTemplateProps {
   currencySymbol: string;
   invoiceSettings: InvoiceSettings | null;
   letterheadTemplate: 'none' | 'simple';
+  isBlackAndWhite?: boolean;
 }
 
 
 const InvoiceTemplateBusiness = React.forwardRef<HTMLDivElement, InvoiceTemplateProps>(
-  ({ invoiceToView, companyProfileDetails, currencySymbol, invoiceSettings, letterheadTemplate }, ref) => {
+  ({ invoiceToView, companyProfileDetails, currencySymbol, invoiceSettings, letterheadTemplate, isBlackAndWhite }, ref) => {
     
     const fullCompanyAddress = [
         companyProfileDetails.address,
@@ -73,6 +75,8 @@ const InvoiceTemplateBusiness = React.forwardRef<HTMLDivElement, InvoiceTemplate
     ].filter(Boolean).join('\n');
     
     const customColumns = invoiceSettings?.customItemColumns || [];
+    const items = invoiceToView.items || [];
+
 
     return (
       <div ref={ref} className="bg-white text-gray-800 font-sans text-xs w-[210mm] min-h-[297mm] mx-auto flex flex-col p-8">
@@ -87,6 +91,8 @@ const InvoiceTemplateBusiness = React.forwardRef<HTMLDivElement, InvoiceTemplate
             <div>
                 <h1 className="text-xl font-bold text-gray-900">{companyProfileDetails.name}</h1>
                 <p className="whitespace-pre-line text-xs text-gray-600">{fullCompanyAddress}</p>
+                <p className="text-xs text-gray-600">Phone: {companyProfileDetails.phone || 'N/A'}</p>
+                <p className="text-xs text-gray-600">Email: {companyProfileDetails.email || 'N/A'}</p>
             </div>
             <div className="text-right">
                 <h2 className="text-4xl font-light text-gray-700 tracking-widest">INVOICE</h2>
@@ -110,61 +116,55 @@ const InvoiceTemplateBusiness = React.forwardRef<HTMLDivElement, InvoiceTemplate
         </section>
 
         <section className="flex border-b border-gray-900">
-            <div className="w-7/12 border-r border-gray-900 p-2">
+            <div className="w-full p-2">
                 <h3 className="text-xs text-gray-600 font-bold mb-1">Bill To</h3>
-                <p className="font-bold text-xl">{invoiceToView.clientName}</p>
-                <p className="whitespace-pre-line text-xs">{invoiceToView.clientAddress}</p>
-            </div>
-             <div className="w-5/12 p-2">
-                <h3 className="text-xs text-gray-600 font-bold mb-1">Ship To</h3>
                 <p className="font-bold text-xl">{invoiceToView.clientName}</p>
                 <p className="whitespace-pre-line text-xs">{invoiceToView.clientAddress}</p>
             </div>
         </section>
 
-        <main className="flex-grow mt-4">
-            <table className="w-full text-left text-xs">
+        <main className="mt-4 flex-grow">
+            <table className="w-full text-left text-xs border-l border-r border-gray-900">
                 <thead>
-                    <tr style={{ backgroundColor: '#0A2B58' }} className="text-white">
-                        <th className="p-2 w-10 text-center font-normal">#</th>
-                        <th className="p-2 font-normal">Item & Description</th>
-                        <th className="p-2 w-24 font-normal">HSN No.</th>
+                    <tr className={cn(isBlackAndWhite ? "text-black border-y-2 border-black" : "text-white")}
+                        style={{ backgroundColor: isBlackAndWhite ? 'transparent' : '#0A2B58' }}>
+                        <th className="p-2 w-10 text-center font-bold border-r border-gray-500">#</th>
+                        <th className="p-2 font-bold border-r border-gray-500">Item & Description</th>
+                        <th className="p-2 w-24 font-bold border-r border-gray-500">HSN No.</th>
                         {customColumns.map(col => (
-                            <th key={col.id} className="p-2 w-24 font-normal text-right">{col.label}</th>
+                            <th key={col.id} className="p-2 w-24 font-bold text-right border-r border-gray-500">{col.label}</th>
                         ))}
-                        <th className="p-2 w-20 text-right font-normal">Qty</th>
-                        <th className="p-2 w-24 text-right font-normal">Rate</th>
-                        <th className="p-2 w-28 text-right font-normal">Amount</th>
+                        <th className="p-2 w-20 text-right font-bold border-r border-gray-500">Qty</th>
+                        <th className="p-2 w-24 text-right font-bold border-r border-gray-500">Rate</th>
+                        <th className="p-2 w-28 text-right font-bold">Amount</th>
                     </tr>
                 </thead>
                 <tbody>
-                    {(invoiceToView.items || []).map((item, index) => (
-                        <tr key={item.id} className="border-b">
-                            <td className="p-2 text-center align-top">{index + 1}</td>
-                            <td className="p-2 align-top">
+                    {(items).map((item, index) => (
+                        <tr key={item.id} className="border-b border-gray-900">
+                            <td className="p-2 text-center align-top border-r border-gray-900">{index + 1}</td>
+                            <td className="p-2 align-top border-r border-gray-900">
                                 <p className="font-bold">{item.description}</p>
                             </td>
-                            <td className="p-2 align-top">{item.hsnNo || ''}</td>
+                            <td className="p-2 align-top border-r border-gray-900">{item.hsnNo || ''}</td>
                              {customColumns.map(col => (
-                                <td key={col.id} className="p-2 text-right align-top">{item.customFields?.[col.id] || ''}</td>
+                                <td key={col.id} className="p-2 text-right align-top border-r border-gray-900">{item.customFields?.[col.id] || ''}</td>
                             ))}
-                            <td className="p-2 text-right align-top">{item.quantity.toFixed(2)}</td>
-                            <td className="p-2 text-right align-top">{currencySymbol}{item.unitPrice.toFixed(2)}</td>
+                            <td className="p-2 text-right align-top border-r border-gray-900">{item.quantity.toFixed(2)}</td>
+                            <td className="p-2 text-right align-top border-r border-gray-900">{currencySymbol}{item.unitPrice.toFixed(2)}</td>
                             <td className="p-2 text-right align-top">{currencySymbol}{(item.quantity * item.unitPrice).toFixed(2)}</td>
                         </tr>
                     ))}
-                    {/* Spacer to push footer down */}
-                    <tr><td colSpan={6 + customColumns.length} className="pt-4">&nbsp;</td></tr>
                 </tbody>
             </table>
         </main>
         
-        <footer className="mt-auto">
+        <footer className="mt-auto pt-4">
              <div className="flex justify-end mb-2">
                 <div className="w-1/3">
                     <div className="flex justify-between py-1 border-b">
-                        <span>Sub Total</span>
-                        <span className="text-right">{currencySymbol}{invoiceToView.subtotal.toFixed(2)}</span>
+                        <span className='font-semibold'>Sub Total</span>
+                        <span className="text-right font-semibold">{currencySymbol}{invoiceToView.subtotal.toFixed(2)}</span>
                     </div>
                 </div>
             </div>
@@ -178,15 +178,15 @@ const InvoiceTemplateBusiness = React.forwardRef<HTMLDivElement, InvoiceTemplate
                 <div className="w-1/3">
                     <table className="w-full text-sm font-bold">
                         <tbody>
-                            <tr style={{backgroundColor: '#EBF4FF'}} className="text-black">
+                            <tr style={{backgroundColor: isBlackAndWhite ? 'transparent' : '#EBF4FF'}} className={cn(isBlackAndWhite && "border-b border-black")}>
                                 <td className="p-2">Tax Rate</td>
                                 <td className="p-2 text-right">{invoiceToView.taxRate.toFixed(2)}%</td>
                             </tr>
-                            <tr style={{backgroundColor: '#EBF4FF'}} className="text-black">
+                            <tr style={{backgroundColor: isBlackAndWhite ? 'transparent' : '#EBF4FF'}} className={cn(isBlackAndWhite && "border-b border-black")}>
                                 <td className="p-2">Total</td>
                                 <td className="p-2 text-right">{currencySymbol}{invoiceToView.amount.toFixed(2)}</td>
                             </tr>
-                            <tr style={{backgroundColor: '#0A2B58'}} className="text-white">
+                            <tr style={{backgroundColor: isBlackAndWhite ? 'transparent' : '#0A2B58'}} className={cn(isBlackAndWhite ? "text-black border-t-2 border-black" : "text-white")}>
                                 <td className="p-2">Balance Due</td>
                                 <td className="p-2 text-right">{currencySymbol}{invoiceToView.amount.toFixed(2)}</td>
                             </tr>

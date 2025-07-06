@@ -9,14 +9,15 @@ import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Button } from '@/components/ui/button';
 import { useToast } from '@/hooks/use-toast';
-import { Building, Loader2, Save, Image as ImageIcon } from 'lucide-react';
+import { Building, Loader2, Save, Image as ImageIcon, Copy } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { db } from '@/lib/firebaseConfig';
-import { doc, getDoc, setDoc, Timestamp } from 'firebase/firestore';
+import { doc, getDoc, setDoc, Timestamp, collection, query, where, getDocs, updateDoc } from 'firebase/firestore';
 import { Separator } from '@/components/ui/separator';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { COUNTRIES } from '@/lib/countries';
 import Image from 'next/image';
+import { Skeleton } from '@/components/ui/skeleton';
 
 
 interface CompanyDetailsFirestore {
@@ -38,6 +39,7 @@ interface CompanyDetailsFirestore {
   signatureStoragePath?: string;
   stampUrl?: string;
   stampStoragePath?: string;
+  publicCompanyId?: string;
   createdAt?: Timestamp;
   updatedAt?: Timestamp;
 }
@@ -47,11 +49,18 @@ export default function CompanyDetailsPage() {
   const [companyDetails, setCompanyDetails] = useState<Partial<CompanyDetailsFirestore>>({
     name: '', address: '', city: '', state: '', country: '', gstin: '', pan: '',
     phone: '', email: '', website: '', accountNumber: '', ifscCode: '', bankName: '', branch: '',
-    signatureUrl: '', stampUrl: '',
+    signatureUrl: '', stampUrl: '', publicCompanyId: '',
   });
   const [isFetching, setIsFetching] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
   const { toast } = useToast();
+
+  const handleCopyId = () => {
+    if (companyDetails.publicCompanyId) {
+        navigator.clipboard.writeText(companyDetails.publicCompanyId);
+        toast({ title: 'Copied!', description: 'Company ID copied to clipboard.' });
+    }
+  };
 
   useEffect(() => {
     const fetchCompanyDetails = async () => {
@@ -70,7 +79,54 @@ export default function CompanyDetailsPage() {
         const docSnap = await getDoc(docRef);
 
         if (docSnap.exists()) {
-          const data = docSnap.data() as Partial<CompanyDetailsFirestore>;
+          let data = docSnap.data() as Partial<CompanyDetailsFirestore>;
+
+          if (!data.publicCompanyId) {
+            console.log("Generating missing publicCompanyId for company:", user.companyId);
+            try {
+              const generateUniquePublicId = async (): Promise<string> => {
+                let publicId: string = '';
+                let isUnique = false;
+                let attempts = 0;
+                const maxAttempts = 10;
+                
+                while (!isUnique && attempts < maxAttempts) {
+                    publicId = Math.floor(100000 + Math.random() * 900000).toString();
+                    const q = query(collection(db, 'companyProfiles'), where('publicCompanyId', '==', publicId));
+                    const snapshot = await getDocs(q);
+                    isUnique = snapshot.empty;
+                    if (!isUnique) {
+                      console.warn(`Company ID collision for ${publicId}, attempt ${attempts + 1}`);
+                    }
+                    attempts++;
+                }
+        
+                if (!isUnique) {
+                    throw new Error("Could not generate a unique Company ID. Please try again later.");
+                }
+                return publicId;
+              };
+              
+              const newPublicId = await generateUniquePublicId();
+              
+              await updateDoc(docRef, { publicCompanyId: newPublicId });
+              data = { ...data, publicCompanyId: newPublicId };
+
+              toast({
+                title: 'Company ID Generated',
+                description: `A new 6-digit Company ID has been generated for your company.`,
+              });
+
+            } catch (idError: any) {
+               console.error("Failed to generate and save unique public ID:", idError);
+               toast({
+                 title: 'Error Generating ID',
+                 description: idError.message || 'Could not generate a unique company ID.',
+                 variant: 'destructive',
+               });
+            }
+          }
+
           setCompanyDetails({
             name: data.name || '',
             address: data.address || '',
@@ -88,6 +144,7 @@ export default function CompanyDetailsPage() {
             branch: data.branch || '',
             signatureUrl: data.signatureUrl || '',
             stampUrl: data.stampUrl || '',
+            publicCompanyId: data.publicCompanyId || '',
             createdAt: data.createdAt,
             updatedAt: data.updatedAt,
           });
@@ -171,6 +228,15 @@ export default function CompanyDetailsPage() {
       <div className="space-y-6 p-4 sm:p-6 lg:p-8">
         <PageTitle title="Company Details" subtitle="Manage your business information." icon={Building} />
         <Card className="max-w-2xl mx-auto">
+            <CardHeader>
+                <Skeleton className="h-6 w-1/2" />
+                <Skeleton className="h-4 w-3/4 mt-2" />
+            </CardHeader>
+             <CardContent>
+                <Skeleton className="h-10 w-full" />
+            </CardContent>
+        </Card>
+        <Card className="max-w-2xl mx-auto">
           <CardHeader>
             <CardTitle className="font-headline">Business Information</CardTitle>
             <CardDescription>Loading company details...</CardDescription>
@@ -209,6 +275,21 @@ export default function CompanyDetailsPage() {
   return (
     <div className="space-y-6 p-4 sm:p-6 lg:p-8">
       <PageTitle title="Company Details" subtitle="Manage your business information." icon={Building} />
+
+      <Card className="max-w-2xl mx-auto">
+        <CardHeader>
+          <CardTitle>Company Identifier</CardTitle>
+          <CardDescription>Share this 6-digit ID with new employees to ensure they join the correct company profile.</CardDescription>
+        </CardHeader>
+        <CardContent>
+            <div className="flex items-center gap-2 p-2 border rounded-md bg-muted">
+                <Input readOnly value={companyDetails.publicCompanyId || 'Not generated'} className="bg-background font-mono text-sm tracking-widest" />
+                <Button type="button" size="icon" variant="outline" onClick={handleCopyId} disabled={!companyDetails.publicCompanyId}>
+                    <Copy className="h-4 w-4" />
+                </Button>
+            </div>
+        </CardContent>
+      </Card>
 
       <Card className="max-w-2xl mx-auto">
         <CardHeader>

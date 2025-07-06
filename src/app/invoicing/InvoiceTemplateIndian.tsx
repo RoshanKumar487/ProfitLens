@@ -4,7 +4,7 @@
 import React from 'react';
 import { format } from 'date-fns';
 import Letterhead from '@/components/Letterhead';
-import { stringToHslColor } from '@/lib/utils';
+import { stringToHslColor, cn } from '@/lib/utils';
 import type { InvoiceSettings } from '../settings/actions';
 
 // Interface definitions mirrored from invoicing/page.tsx for component props
@@ -62,6 +62,7 @@ interface InvoiceTemplateProps {
   stampDataUri?: string;
   letterheadTemplate: 'none' | 'simple';
   invoiceSettings: InvoiceSettings | null;
+  isBlackAndWhite?: boolean;
 }
 
 const numberToWords = (num: number): string => {
@@ -99,7 +100,7 @@ const numberToWords = (num: number): string => {
 };
 
 const InvoiceTemplateIndian = React.forwardRef<HTMLDivElement, InvoiceTemplateProps>(
-  ({ invoiceToView, companyProfileDetails, currencySymbol, signatureDataUri, stampDataUri, letterheadTemplate, invoiceSettings }, ref) => {
+  ({ invoiceToView, companyProfileDetails, currencySymbol, signatureDataUri, stampDataUri, letterheadTemplate, invoiceSettings, isBlackAndWhite }, ref) => {
     
     const amountInWords = numberToWords(Math.floor(invoiceToView.amount));
     const subtotal = (invoiceToView.items || []).reduce((acc, item) => acc + (item.quantity * item.unitPrice), 0);
@@ -109,23 +110,25 @@ const InvoiceTemplateIndian = React.forwardRef<HTMLDivElement, InvoiceTemplatePr
         companyProfileDetails.address,
         companyProfileDetails.city,
         companyProfileDetails.state,
-        companyProfileDetails.country
+        companyProfileDetails.country,
     ].filter(Boolean).join(', ');
 
-    const primaryBgColor = stringToHslColor(companyProfileDetails.name, 40, 25);
     const customColumns = invoiceSettings?.customItemColumns || [];
+    const items = invoiceToView.items || [];
+
 
     return (
       <div ref={ref} className="bg-white text-black font-sans text-xs w-[210mm] min-h-[297mm] mx-auto flex flex-col">
-          {letterheadTemplate === 'simple' && <Letterhead companyDetails={companyProfileDetails} />}
-
           <div className="flex-grow flex flex-col p-4 space-y-4">
-            {letterheadTemplate === 'none' && (
+            {letterheadTemplate === 'simple' ? (
+                <Letterhead companyDetails={companyProfileDetails} />
+            ) : (
                 <header className="text-center space-y-2">
                     <div className="w-full h-24">{/* Blank space for letterhead */}</div>
                     <h1 className="text-2xl font-bold uppercase tracking-wider text-gray-800">{companyProfileDetails.name}</h1>
                     <p className="text-sm text-gray-600">{fullCompanyAddress}</p>
                     <p className="text-sm text-gray-600">GSTIN: {companyProfileDetails.gstin} | PAN: {companyProfileDetails.pan || 'N/A'}</p>
+                    <p className="text-sm text-gray-600">Phone: {companyProfileDetails.phone || 'N/A'} | Email: {companyProfileDetails.email || 'N/A'}</p>
                 </header>
             )}
             
@@ -137,7 +140,7 @@ const InvoiceTemplateIndian = React.forwardRef<HTMLDivElement, InvoiceTemplatePr
                     <tr>
                         <td className="w-1/2 p-2 align-top border border-black">
                             <p className="font-bold">Bill To:</p>
-                            <p className="font-bold text-xl">{invoiceToView.clientName}</p>
+                            <p className="font-bold text-base">{invoiceToView.clientName}</p>
                             <p className="whitespace-pre-line">{invoiceToView.clientAddress}</p>
                             <p className="mt-2">GSTIN: {invoiceToView.clientGstin || 'N/A'}</p>
                         </td>
@@ -153,10 +156,10 @@ const InvoiceTemplateIndian = React.forwardRef<HTMLDivElement, InvoiceTemplatePr
             </table>
 
             {/* Items Table */}
-            <div className="flex-grow">
+            <div className="flex-shrink-0">
                 <table className="w-full border-collapse border border-black text-center text-sm">
-                    <thead className="bg-gray-100">
-                        <tr className="border-b border-black">
+                    <thead>
+                        <tr className="border-b border-black font-bold" style={{ backgroundColor: isBlackAndWhite ? 'transparent' : '#f3f4f6' }}>
                             <th className="p-2 border-r border-black w-10">#</th>
                             <th className="p-2 border-r border-black text-left">Item Description</th>
                             <th className="p-2 border-r border-black w-24">HSN No.</th>
@@ -169,31 +172,29 @@ const InvoiceTemplateIndian = React.forwardRef<HTMLDivElement, InvoiceTemplatePr
                         </tr>
                     </thead>
                     <tbody>
-                        {(invoiceToView.items || []).map((item, index) => (
-                            <tr key={item.id} className="border-b border-gray-200 last:border-b-0">
+                        {items.map((item, index) => (
+                            <tr key={item.id} className="border-b border-black">
                                 <td className="p-2 border-r border-black">{index + 1}</td>
-                                <td className="p-2 border-r border-black text-left">{item.description}</td>
+                                <td className="p-2 border-r border-black text-left font-semibold">{item.description}</td>
                                 <td className="p-2 border-r border-black">{item.hsnNo || ''}</td>
                                 {customColumns.map(col => (
                                     <td key={col.id} className="p-2 border-r border-black">{item.customFields?.[col.id] || ''}</td>
                                 ))}
                                 <td className="p-2 border-r border-black">{item.quantity}</td>
                                 <td className="p-2 border-r border-black text-right">{currencySymbol}{item.unitPrice.toFixed(2)}</td>
-                                <td className="p-2 text-right">{currencySymbol}{(item.quantity * item.unitPrice).toFixed(2)}</td>
+                                <td className="p-2 text-right font-semibold">{currencySymbol}{(item.quantity * item.unitPrice).toFixed(2)}</td>
                             </tr>
                         ))}
-                         {/* Spacer row to push footer down */}
-                         <tr><td colSpan={6 + customColumns.length} className="py-24">&nbsp;</td></tr>
                     </tbody>
                 </table>
              </div>
 
             {/* Footer */}
-            <footer className="mt-auto">
+            <footer className="mt-auto pt-4">
                 <div className="grid grid-cols-[60%_40%] border border-black">
                      <div className="p-2 border-r border-black">
                         <p className="font-bold">Amount in Words:</p>
-                        <p>{amountInWords} Only.</p>
+                        <p className="font-semibold">{amountInWords} Only.</p>
                         <br/>
                         <p className="font-bold">Bank Details:</p>
                         <p>Bank: {companyProfileDetails.bankName || 'N/A'}</p>
@@ -205,8 +206,8 @@ const InvoiceTemplateIndian = React.forwardRef<HTMLDivElement, InvoiceTemplatePr
                          <table className="w-full border-collapse text-sm">
                             <tbody>
                                 <tr className="border-b border-black">
-                                    <td className="p-2">Subtotal</td>
-                                    <td className="p-2 text-right">{currencySymbol}{subtotal.toFixed(2)}</td>
+                                    <td className="p-2 font-semibold">Subtotal</td>
+                                    <td className="p-2 text-right font-semibold">{currencySymbol}{subtotal.toFixed(2)}</td>
                                 </tr>
                                 <tr className="border-b border-black">
                                     <td className="p-2">CGST ({invoiceToView.taxRate / 2}%)</td>
@@ -216,7 +217,7 @@ const InvoiceTemplateIndian = React.forwardRef<HTMLDivElement, InvoiceTemplatePr
                                     <td className="p-2">SGST ({invoiceToView.taxRate / 2}%)</td>
                                     <td className="p-2 text-right">{currencySymbol}{sgstAmount > 0 ? sgstAmount.toFixed(2) : '0.00'}</td>
                                 </tr>
-                                <tr className="bg-gray-100 font-bold">
+                                <tr className="font-bold" style={{ backgroundColor: isBlackAndWhite ? 'transparent' : '#f3f4f6' }}>
                                     <td className="p-2">Grand Total</td>
                                     <td className="p-2 text-right">{currencySymbol}{invoiceToView.amount.toFixed(2)}</td>
                                 </tr>
@@ -237,11 +238,12 @@ const InvoiceTemplateIndian = React.forwardRef<HTMLDivElement, InvoiceTemplatePr
                                 // eslint-disable-next-line @next/next/no-img-element
                                 <img src={signatureDataUri} alt="Signature" className="max-h-16 max-w-full object-contain" crossOrigin="anonymous" />
                             )}
-                             <p className="border-t border-black w-full pt-1 mt-2">Authorised Signatory</p>
+                             <p className="border-t border-black w-full pt-1 mt-2 font-semibold">Authorised Signatory</p>
                         </div>
                         <p className="font-bold">For {companyProfileDetails.name}</p>
                     </div>
                 </div>
+                 <div className="h-16 w-full mt-4"></div>
             </footer>
           </div>
       </div>

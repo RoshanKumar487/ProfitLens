@@ -137,7 +137,11 @@ export default function EditInvoicePage() {
         e.preventDefault();
         if (!invoice) return;
         setIsSaving(true);
-        const result = await updateInvoice(invoiceId, invoice);
+        
+        const { id, ...invoicePayload } = invoice;
+
+        const result = await updateInvoice(id, invoicePayload);
+        
         toast({
             title: result.success ? "Success" : "Error",
             description: result.message,
@@ -236,7 +240,7 @@ export default function EditInvoicePage() {
                             <Input id="clientGstin" value={invoice.clientGstin || ''} onChange={(e) => handleValueChange('clientGstin', e.target.value)} disabled={isSaving} />
                         </div>
                         <div>
-                            <Label htmlFor="clientAddress">Client Address</Label>
+                            <Label htmlFor="clientAddress">Billing Address</Label>
                             <Textarea id="clientAddress" value={invoice.clientAddress || ''} onChange={(e) => handleValueChange('clientAddress', e.target.value)} disabled={isSaving} rows={3} />
                         </div>
                         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">

@@ -67,6 +67,7 @@ export default function NewEmployeePage() {
     const [guarantorName, setGuarantorName] = useState('');
     const [guarantorPhone, setGuarantorPhone] = useState('');
     const [experience, setExperience] = useState('');
+    const [uan, setUan] = useState('');
 
     // Files
     const [profilePictureFile, setProfilePictureFile] = useState<File | null>(null);
@@ -179,7 +180,7 @@ export default function NewEmployeePage() {
             ]);
             
             const dataToSave = {
-                name, position, salary: salaryNum, description,
+                name, position, salary: salaryNum, description, uan,
                 companyId: user.companyId, addedById: user.uid, addedBy: user.displayName || user.email || 'System',
                 createdAt: serverTimestamp(), updatedAt: serverTimestamp(),
                 profilePictureUrl: profilePic.url, profilePictureStoragePath: profilePic.path,
@@ -212,7 +213,7 @@ export default function NewEmployeePage() {
     const DataRow = ({ label, children }: { label: string; children: React.ReactNode }) => (
       <div className="grid grid-cols-[120px_1fr] items-center gap-x-2 text-xs">
         <Label className="text-gray-600 font-medium text-right">{label}:</Label>
-        <div>{children}</div>
+        {children}
       </div>
     );
     const WInput = (props: React.ComponentProps<typeof Input>) => <Input className="h-6 text-xs p-1" {...props} />;
@@ -275,16 +276,17 @@ export default function NewEmployeePage() {
 
                             <div className="col-span-1 space-y-6">
                                 <div className="flex justify-center">
-                                    <div className="w-40 h-48 border-2 border-dashed bg-gray-50 flex items-center justify-center text-gray-400 p-1">
-                                        <Input type="file" accept="image/*" onChange={(e) => handleFileChange(e, setProfilePictureFile, setProfilePicturePreview)} className="absolute w-40 h-48 opacity-0 cursor-pointer" disabled={isSaving}/>
+                                    <div className="relative w-40 h-48 border-2 border-dashed bg-gray-50 flex items-center justify-center text-gray-400 p-1">
+                                        <Input type="file" accept="image/*" onChange={(e) => handleFileChange(e, setProfilePictureFile, setProfilePicturePreview)} className="absolute w-full h-full opacity-0 cursor-pointer" disabled={isSaving}/>
                                         {profilePicturePreview ? <Image src={profilePicturePreview} alt="Profile Preview" width={160} height={192} className="object-cover w-full h-full"/> : <span>Passport Photo</span>}
                                     </div>
                                 </div>
                                 <Section title="Professional Details">
                                     <DataRow label="Position"><WInput value={position} onChange={e => setPosition(e.target.value)} required disabled={isSaving}/></DataRow>
+                                    <DataRow label="UAN"><WInput value={uan} onChange={e => setUan(e.target.value)} disabled={isSaving} /></DataRow>
                                     <DataRow label="Joining Date"><WPopover date={joiningDate} setDate={setJoiningDate} /></DataRow>
                                     <DataRow label="Experience"><WInput value={experience} onChange={e => setExperience(e.target.value)} disabled={isSaving}/></DataRow>
-                                    <DataRow label="Salary"><WInput type="number" value={salary} onChange={e => setSalary(e.target.value)} required disabled={isSaving} placeholder={`${currencySymbol} Annual`}/></DataRow>
+                                    <DataRow label="Salary"><WInput type="number" value={salary} onChange={e => setSalary(e.target.value)} required disabled={isSaving} placeholder={`${currencySymbol} Salary`}/></DataRow>
                                 </Section>
                                 <Section title="Physical Attributes">
                                     <DataRow label="Height"><WInput value={height} onChange={e => setHeight(e.target.value)} disabled={isSaving}/></DataRow>
@@ -297,15 +299,15 @@ export default function NewEmployeePage() {
                         <footer className="mt-auto pt-6 border-t border-gray-300 grid grid-cols-3 gap-8 text-sm">
                              <div>
                                 <p className="font-semibold text-gray-700">Left Thumb Impression</p>
-                                <div className="w-24 h-24 mt-2 border border-dashed bg-gray-50 flex items-center justify-center">
-                                    <Input type="file" accept="image/*" onChange={(e) => handleFileChange(e, setLeftThumbImpressionFile, setLeftThumbImpressionPreview)} className="absolute w-24 h-24 opacity-0 cursor-pointer" disabled={isSaving}/>
+                                <div className="relative w-24 h-24 mt-2 border border-dashed bg-gray-50 flex items-center justify-center">
+                                    <Input type="file" accept="image/*" onChange={(e) => handleFileChange(e, setLeftThumbImpressionFile, setLeftThumbImpressionPreview)} className="absolute w-full h-full opacity-0 cursor-pointer" disabled={isSaving}/>
                                     {leftThumbImpressionPreview ? <Image src={leftThumbImpressionPreview} alt="Thumb Preview" width={96} height={96} className="object-contain"/> : <span className="text-xs text-gray-400">Thumb</span>}
                                 </div>
                             </div>
                             <div className="text-left">
                                 <p className="font-semibold text-gray-700">Employee Signature</p>
-                                <div className="w-48 h-24 mt-2 border border-dashed bg-gray-50 flex items-center justify-center p-2">
-                                     <Input type="file" accept="image/*" onChange={(e) => handleFileChange(e, setSignatureFile, setSignaturePreview)} className="absolute w-48 h-24 opacity-0 cursor-pointer" disabled={isSaving}/>
+                                <div className="relative w-48 h-24 mt-2 border border-dashed bg-gray-50 flex items-center justify-center p-2">
+                                     <Input type="file" accept="image/*" onChange={(e) => handleFileChange(e, setSignatureFile, setSignaturePreview)} className="absolute w-full h-full opacity-0 cursor-pointer" disabled={isSaving}/>
                                     {signaturePreview ? <Image src={signaturePreview} alt="Signature Preview" width={192} height={96} className="object-contain h-full w-full"/> : <span className="text-xs text-gray-400">Signature</span>}
                                 </div>
                             </div>
@@ -319,7 +321,8 @@ export default function NewEmployeePage() {
                             <CardContent className="space-y-4">
                                 <div><Label htmlFor="name">Full Name</Label><Input id="name" value={name} onChange={(e) => setName(e.target.value)} required disabled={isSaving} /></div>
                                 <div><Label htmlFor="position">Position / Role</Label><Input id="position" value={position} onChange={(e) => setPosition(e.target.value)} required disabled={isSaving} /></div>
-                                <div><Label htmlFor="salary">Annual Salary ({currencySymbol})</Label><Input id="salary" type="number" value={salary} onChange={(e) => setSalary(e.target.value)} required min="0" disabled={isSaving} /></div>
+                                <div><Label htmlFor="salary">Salary ({currencySymbol})</Label><Input id="salary" type="number" value={salary} onChange={(e) => setSalary(e.target.value)} required min="0" disabled={isSaving} /></div>
+                                <div><Label htmlFor="uan">UAN</Label><Input id="uan" value={uan} onChange={(e) => setUan(e.target.value)} disabled={isSaving} /></div>
                             </CardContent>
                         </Card>
                         <Card>

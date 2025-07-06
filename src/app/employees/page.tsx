@@ -46,6 +46,7 @@ interface EmployeeFirestore {
   name: string;
   position: string;
   salary: number;
+  uan?: string;
   description?: string;
   profilePictureUrl?: string;
   profilePictureStoragePath?: string;
@@ -379,7 +380,7 @@ export default function EmployeesPage() {
         const employeeDocId = currentEmployee.id;
         const employeeRef = doc(db, 'employees', employeeDocId);
 
-        const updatedData: Partial<EmployeeFirestore> = { ...currentEmployee };
+        const updatedData: Partial<EmployeeFirestore> = { ...currentEmployee, uan: currentEmployee.uan || '' };
         delete updatedData.id; 
         delete (updatedData as any).createdAt;
 
@@ -805,8 +806,9 @@ export default function EmployeesPage() {
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                   <div><Label>Full Name</Label><Input value={currentEmployee.name || ''} onChange={(e) => setCurrentEmployee(p => ({...p, name: e.target.value}))} required disabled={isSaving} /></div>
                   <div><Label>Position / Role</Label><Input value={currentEmployee.position || ''} onChange={(e) => setCurrentEmployee(p => ({...p, position: e.target.value}))} required disabled={isSaving} /></div>
-                  <div><Label>Annual Salary ({currencySymbol})</Label><Input type="number" value={currentEmployee.salary ?? ''} onChange={(e) => setCurrentEmployee(p => ({...p, salary: e.target.value}))} required min="0" disabled={isSaving} /></div>
+                  <div><Label>Salary ({currencySymbol})</Label><Input type="number" value={currentEmployee.salary ?? ''} onChange={(e) => setCurrentEmployee(p => ({...p, salary: e.target.value}))} required min="0" disabled={isSaving} /></div>
               </div>
+              <div><Label>UAN</Label><Input value={currentEmployee.uan || ''} onChange={(e) => setCurrentEmployee(p => ({...p, uan: e.target.value}))} disabled={isSaving} /></div>
               <Separator />
               {/* Bio-Data Fields */}
               <CardDescription>Bio-Data Details</CardDescription>

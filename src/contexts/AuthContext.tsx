@@ -12,7 +12,7 @@ import {
   updateProfile,
   sendPasswordResetEmail,
 } from 'firebase/auth';
-import { doc, setDoc, serverTimestamp, getDoc, collection, addDoc, updateDoc } from 'firebase/firestore';
+import { doc, setDoc, serverTimestamp, getDoc, collection, addDoc, updateDoc, query, where, getDocs } from 'firebase/firestore';
 import { useRouter, usePathname } from 'next/navigation';
 import { useToast } from '@/hooks/use-toast';
 import { getCurrencySymbol } from '@/lib/countries';
@@ -93,7 +93,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         const idToken = await firebaseUser.getIdToken();
         setCookie('firebaseIdToken', idToken, 1);
 
-        const isSuperAdmin = firebaseUser.email === 'roshankumar70975@gmail.com';
+        const isSuperAdmin = firebaseUser.email === 'testuser1@gmail.com';
         
         // A super admin might not have a user document, so we allow them to proceed.
         if (userDocSnap.exists() || isSuperAdmin) {
@@ -135,8 +135,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
           console.log(`AuthContext: User authenticated. UID: ${firebaseUser.uid}, Role: ${appUser.role}, SuperAdmin: ${appUser.isSuperAdmin}`);
           
           const authPages = ['/auth/signin', '/auth/signup', '/auth/forgot-password'];
-          if (authPages.includes(pathname) || pathname === '/') {
-            router.push('/dashboard');
+          if (authPages.includes(pathname)) {
+            router.push('/');
           }
         } else {
           setUser(null);
@@ -200,8 +200,32 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         await firebaseSignOut(auth);
         return { user: firebaseUser, status: 'pending' };
       } else { 
+        const generateUniquePublicId = async (): Promise<string> => {
+            let publicId: string;
+            let isUnique = false;
+            let attempts = 0;
+            const maxAttempts = 10;
+            
+            while (!isUnique && attempts < maxAttempts) {
+                publicId = Math.floor(100000 + Math.random() * 900000).toString();
+                const q = query(collection(db, 'companyProfiles'), where('publicCompanyId', '==', publicId));
+                const snapshot = await getDocs(q);
+                isUnique = snapshot.empty;
+                attempts++;
+                if (!isUnique) {
+                  console.log(`Company ID collision for ${publicId}, attempt ${attempts}`);
+                }
+            }
+    
+            if (!isUnique) {
+                throw new Error("Could not generate a unique Company ID. Please try again later.");
+            }
+            return publicId!;
+        };
+
         const newCompanyDocRef = doc(collection(db, 'companyProfiles'));
         const companyId = newCompanyDocRef.id;
+        const publicCompanyId = await generateUniquePublicId();
 
         let signatureUrl = '';
         let signatureStoragePath = '';
@@ -225,6 +249,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
           city: companyInfo.city,
           state: companyInfo.stateOrProvince,
           country: companyInfo.country,
+          publicCompanyId: publicCompanyId,
           gstin: '', phone: '', email: firebaseUser.email || '', website: '',
           adminUserId: firebaseUser.uid,
           createdAt: serverTimestamp(),
@@ -259,7 +284,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     setAuthError(null);
     try {
       const userCredential = await signInWithEmailAndPassword(auth, email, password);
-      const isSuperAdmin = userCredential.user.email === 'roshankumar70975@gmail.com';
+      const isSuperAdmin = userCredential.user.email === 'testuser1@gmail.com';
 
       if (!isSuperAdmin) {
         const userDocRef = doc(db, 'users', userCredential.user.uid);

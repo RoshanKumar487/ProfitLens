@@ -9,7 +9,7 @@ body {
 
 @layer base {
   :root {
-    --background: 0 0% 100%;
+    --background: 210 40% 98%;
     --foreground: 222.2 47.4% 11.2%;
     
     --card: 0 0% 100%;
@@ -53,13 +53,13 @@ body {
     --chart-10: 0 80% 65%;   /* Bright Red */
 
     /* Sidebar specific theme */
-    --sidebar-background: 0 0% 100%;
-    --sidebar-foreground: 222.2 47.4% 11.2%;
+    --sidebar-background: 24 9.8% 10%;
+    --sidebar-foreground: 60 9.1% 97.8%;
     --sidebar-primary: 217 91% 60%;
     --sidebar-primary-foreground: 210 40% 98%;
-    --sidebar-accent: 240 4.8% 93%;
-    --sidebar-accent-foreground: 222.2 47.4% 11.2%;
-    --sidebar-border: 214.3 31.8% 91.4%;
+    --sidebar-accent: 215 28% 17%;
+    --sidebar-accent-foreground: 210 40% 98%;
+    --sidebar-border: 215 28% 17%;
     --sidebar-ring: 217 91% 60%;
 
     /* Background Animation */

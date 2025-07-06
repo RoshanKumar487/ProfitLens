@@ -105,7 +105,7 @@ const AppShellLayout = ({ children }: { children: React.ReactNode }) => {
       if (item.sidebar === false) {
         return false;
       }
-      if (item.href === '/admin') {
+      if (item.href === '/admin' || item.href === '/payroll') {
         return user?.role === 'admin';
       }
       if (item.href === '/super-admin') {
@@ -122,11 +122,31 @@ const AppShellLayout = ({ children }: { children: React.ReactNode }) => {
       asChild
     >
       <Link href="/">
-        <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-gradient-to-br from-blue-500 to-indigo-600 text-white shadow-lg">
-          <span className="text-base font-black">BS</span>
-        </div>
+        <svg
+          width="28"
+          height="28"
+          viewBox="0 0 24 24"
+          fill="none"
+          xmlns="http://www.w3.org/2000/svg"
+          className="h-7 w-7"
+        >
+          <defs>
+            <linearGradient id="logoGradient" x1="0" y1="0" x2="1" y2="1">
+              <stop offset="0%" stopColor="#3B82F6" />
+              <stop offset="100%" stopColor="#4F46E5" />
+            </linearGradient>
+          </defs>
+          <path
+            d="M22 2L15 22L11 13L2 9L22 2Z"
+            fill="url(#logoGradient)"
+            stroke="url(#logoGradient)"
+            strokeWidth="1"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+          />
+        </svg>
         <h1 className="text-xl font-headline font-bold text-sidebar-foreground group-data-[collapsible=icon]:hidden">
-          BizSight
+          InvoPilot
         </h1>
       </Link>
     </Button>
@@ -135,7 +155,7 @@ const AppShellLayout = ({ children }: { children: React.ReactNode }) => {
   return (
     <>
       {!isAuthPage && (
-        <Sidebar collapsible="icon" variant="sidebar" className="border-r border-sidebar-border/20 bg-sidebar backdrop-blur-md">
+        <Sidebar collapsible="icon" variant="sidebar" className="border-r border-sidebar-border/20 bg-sidebar backdrop-blur-md print:hidden">
           <SidebarHeader className="p-2">
             <Logo />
             {user && user.companyName && (
@@ -179,7 +199,7 @@ const AppShellLayout = ({ children }: { children: React.ReactNode }) => {
                   <TooltipTrigger asChild>
                     <Button
                       variant="ghost"
-                      className="h-10 w-full justify-start group-data-[collapsible=icon]:h-10 group-data-[collapsible=icon]:w-10 group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:px-0 px-2"
+                      className="h-10 w-full justify-start group-data-[collapsible=icon]:h-10 group-data-[collapsible=icon]:w-10 group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:px-0"
                       onClick={toggleSidebar}
                     >
                       <CollapseIcon className="size-5 shrink-0" />
@@ -199,7 +219,7 @@ const AppShellLayout = ({ children }: { children: React.ReactNode }) => {
 
       <SidebarInset className={cn(isAuthPage && "md:!ml-0")}>
         {!isAuthPage && (
-           <header className="sticky top-0 z-10 border-b border-border bg-background/80 backdrop-blur-sm">
+           <header className="sticky top-0 z-30 border-b border-border bg-background/80 backdrop-blur-sm print:hidden">
               <div className="mx-auto flex h-14 max-w-7xl items-center gap-4 px-4 sm:px-6">
                 <SidebarTrigger className="md:hidden" />
                 
@@ -213,13 +233,11 @@ const AppShellLayout = ({ children }: { children: React.ReactNode }) => {
                 <div className="flex-1" />
 
                 {user && (
-                    <div className="flex items-center gap-4">
+                    <div className="flex items-center gap-2">
                         <DropdownMenu>
                             <DropdownMenuTrigger asChild>
-                                <Button variant="default">
-                                    <PlusCircle className="mr-2 h-4 w-4" />
-                                    New
-                                    <ChevronDown className="ml-2 h-4 w-4" />
+                                <Button variant="default" size="icon">
+                                    <PlusCircle className="h-5 w-5" />
                                 </Button>
                             </DropdownMenuTrigger>
                             <DropdownMenuContent align="end" className="w-56">
@@ -330,7 +348,7 @@ const AppShellLayout = ({ children }: { children: React.ReactNode }) => {
             </div>
           </header>
         )}
-        <main className="flex-1">
+        <main className="flex-1 print:p-0">
           {authLoading ? (
              <div className="flex justify-center items-center h-screen">
                 <Loader2 className="h-10 w-10 animate-spin text-primary" />
@@ -345,7 +363,7 @@ const AppShellLayout = ({ children }: { children: React.ReactNode }) => {
             <Tooltip>
               <TooltipTrigger asChild>
                 <DialogTrigger asChild>
-                  <Button className="fixed bottom-6 right-6 h-14 w-14 rounded-full shadow-2xl z-50 bg-[#7C3AED] hover:bg-[#6D28D9] text-white hover:scale-110 transition-transform duration-200">
+                  <Button className="fixed bottom-6 right-6 h-14 w-14 rounded-full shadow-2xl z-50 bg-[#7C3AED] hover:bg-[#6D28D9] text-white hover:scale-110 transition-transform duration-200 print:hidden">
                     <Sparkles className="h-7 w-7" />
                   </Button>
                 </DialogTrigger>
