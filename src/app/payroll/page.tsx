@@ -635,8 +635,8 @@ export default function PayrollPage() {
         <CardContent>
           <div className="overflow-auto relative" style={{maxHeight: 'calc(100vh - 420px)'}}>
             <Table>
-              <TableHeader>
-                <TableRow className="sticky top-0 bg-card z-10">
+              <TableHeader className="sticky top-0 bg-card z-10">
+                <TableRow>
                   <TableHead className="w-8 p-0 print:hidden"></TableHead>
                   <TableHead className="w-[250px]">Employee</TableHead>
                   <TableHead>Base Salary</TableHead>
@@ -694,8 +694,8 @@ export default function PayrollPage() {
                   <TableRow><TableCell colSpan={columnCount} className="text-center h-24">{searchTerm || statusFilter !== 'All' ? 'No employees match your filters.' : 'No employees found. Add employees on the Employees page or add a new row manually.'}</TableCell></TableRow>
                 )}
               </TableBody>
-              <TableFooter>
-                  <TableRow className="font-bold bg-muted/50 sticky bottom-0">
+              <TableFooter className="sticky bottom-0 bg-muted z-10">
+                  <TableRow className="font-bold">
                       <TableCell className="print:hidden"></TableCell>
                       <TableCell>Totals</TableCell>
                       <TableCell>{currencySymbol}{totals.baseSalary.toFixed(2)}</TableCell>
