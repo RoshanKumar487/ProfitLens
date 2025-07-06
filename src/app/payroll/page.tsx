@@ -331,6 +331,10 @@ export default function PayrollPage() {
     setIsPayslipDialogOpen(true);
   };
 
+  const handlePrintSheet = () => {
+    window.print();
+  };
+
   const handlePrintPayslip = async () => {
     if (!payslipPrintRef.current) return;
     setIsPrinting(true);
@@ -395,7 +399,7 @@ export default function PayrollPage() {
         <h2 className="text-lg">Payroll for {format(payPeriod, 'MMMM yyyy')}</h2>
       </div>
 
-      <PageTitle title="Employee Payroll" subtitle="Manage monthly salary, advances, and deductions." icon={HandCoins} />
+      <PageTitle title="Employee Payroll" subtitle="Manage monthly salary, advances, and deductions." icon={HandCoins} className="print:hidden" />
 
       <Card className="print:shadow-none print:border-none">
         <CardHeader className="print:hidden">
@@ -441,7 +445,7 @@ export default function PayrollPage() {
                   </Tooltip>
                   <Tooltip>
                     <TooltipTrigger asChild>
-                        <Button variant="outline" size="icon" onClick={handlePrintPayslip}>
+                        <Button variant="outline" size="icon" onClick={handlePrintSheet}>
                             <Printer className="h-4 w-4" />
                         </Button>
                     </TooltipTrigger>
