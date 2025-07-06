@@ -621,7 +621,7 @@ export default function PayrollPage() {
             </div>
         </CardHeader>
         <CardContent>
-          <div className="overflow-x-auto">
+          <div className="overflow-x-auto isolate">
             <Table>
               <TableHeader>
                 <TableRow>
