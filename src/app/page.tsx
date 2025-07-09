@@ -22,18 +22,24 @@ import { getPayrollSettings, type PayrollSettings } from '@/app/settings/actions
 import { urlToDataUri } from '@/lib/utils';
 import jsPDF from 'jspdf';
 import html2canvas from 'html2canvas';
+import { Separator } from '@/components/ui/separator';
 
 const ToolCard = ({ item, isEnabled }: { item: (typeof NAV_ITEMS)[0]; isEnabled: boolean }) => {
   const CardWrapper = isEnabled ? Link : 'div';
   return (
     <CardWrapper href={isEnabled ? item.href : '#'} className={cn(!isEnabled && 'pointer-events-none opacity-60')}>
-      <div className="h-full rounded-lg border bg-card p-5 text-card-foreground shadow-sm transition-all duration-200 hover:border-primary/50 hover:shadow-lg">
-        <div className="mb-4 flex h-12 w-12 items-center justify-center rounded-full bg-gradient-to-br from-orange-400 to-red-500">
-          <item.icon className="h-6 w-6 text-white" />
+      <Card className="h-full transition-all duration-200 hover:shadow-lg hover:-translate-y-1">
+        <div className="p-6 flex flex-col items-center text-center">
+            <div className="mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-gradient-to-br from-orange-400 to-red-500">
+            <item.icon className="h-8 w-8 text-white" />
+            </div>
         </div>
-        <h3 className="text-base font-semibold text-foreground">{item.label}</h3>
-        <p className="mt-1 text-sm text-muted-foreground">{item.description}</p>
-      </div>
+        <Separator />
+        <div className="p-6 pt-4">
+            <h3 className="text-base font-semibold text-foreground text-left">{item.label}</h3>
+            <p className="mt-1 text-sm text-muted-foreground text-left">{item.description}</p>
+        </div>
+      </Card>
     </CardWrapper>
   );
 };
@@ -139,38 +145,41 @@ function PayslipDownloaderCard() {
 
     return (
         <>
-            <Card className="h-full p-5 flex flex-col hover:border-primary/50 hover:shadow-lg transition-all duration-200">
-                <div className="flex-grow">
-                     <div className="mb-4 flex h-12 w-12 items-center justify-center rounded-full bg-gradient-to-br from-orange-400 to-red-500">
-                        <Download className="h-6 w-6 text-white" />
+            <Card className="h-full transition-all duration-200 hover:shadow-lg hover:-translate-y-1 flex flex-col">
+                <div className="p-6 flex flex-col items-center text-center">
+                    <div className="mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-gradient-to-br from-orange-400 to-red-500">
+                        <Download className="h-8 w-8 text-white" />
                     </div>
-                    <h3 className="text-base font-semibold text-foreground">Download Payslips</h3>
-                    <p className="mt-1 text-sm text-muted-foreground">Download all paid employee payslips for a selected month in a single PDF file.</p>
                 </div>
-                <div className="mt-4 flex flex-col gap-2">
-                     <Popover>
-                        <PopoverTrigger asChild>
-                            <Button variant="outline" className="w-full justify-start font-normal" disabled={isDownloading}>
-                                <CalendarIcon className="mr-2 h-4 w-4" />
-                                {format(selectedMonth, 'MMMM yyyy')}
-                            </Button>
-                        </PopoverTrigger>
-                        <PopoverContent className="w-auto p-0">
-                            <Calendar
-                                mode="single"
-                                selected={selectedMonth}
-                                onSelect={(date) => date && setSelectedMonth(startOfMonth(date))}
-                                captionLayout="dropdown-buttons"
-                                fromYear={2020}
-                                toYear={new Date().getFullYear() + 1}
-                                components={{ Day: () => null }}
-                            />
-                        </PopoverContent>
-                    </Popover>
-                    <Button onClick={handlePrepareAndDownload} disabled={isDownloading || authLoading} size="sm">
-                        {isDownloading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
-                        {isDownloading ? 'Generating...' : 'Download'}
-                    </Button>
+                <Separator />
+                <div className="p-6 pt-4 flex-grow flex flex-col">
+                     <h3 className="text-base font-semibold text-foreground text-left">Download Payslips</h3>
+                    <p className="mt-1 text-sm text-muted-foreground text-left flex-grow">Download all paid employee payslips for a selected month in a single PDF file.</p>
+                    <div className="mt-4 flex flex-col gap-2">
+                        <Popover>
+                            <PopoverTrigger asChild>
+                                <Button variant="outline" className="w-full justify-start font-normal" disabled={isDownloading}>
+                                    <CalendarIcon className="mr-2 h-4 w-4" />
+                                    {format(selectedMonth, 'MMMM yyyy')}
+                                </Button>
+                            </PopoverTrigger>
+                            <PopoverContent className="w-auto p-0">
+                                <Calendar
+                                    mode="single"
+                                    selected={selectedMonth}
+                                    onSelect={(date) => date && setSelectedMonth(startOfMonth(date))}
+                                    captionLayout="dropdown-buttons"
+                                    fromYear={2020}
+                                    toYear={new Date().getFullYear() + 1}
+                                    components={{ Day: () => null }}
+                                />
+                            </PopoverContent>
+                        </Popover>
+                        <Button onClick={handlePrepareAndDownload} disabled={isDownloading || authLoading} size="sm">
+                            {isDownloading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
+                            {isDownloading ? 'Generating...' : 'Download'}
+                        </Button>
+                    </div>
                 </div>
             </Card>
 
