@@ -1,6 +1,6 @@
 
 import type { LucideIcon } from 'lucide-react';
-import { LayoutDashboard, TrendingUp, TrendingDown, Sparkles, Receipt, Users, Shield, Banknote, Settings, LayoutGrid, Crown, HandCoins, ShieldCheck, BarChart2 } from 'lucide-react';
+import { LayoutDashboard, TrendingUp, TrendingDown, Sparkles, Receipt, Users, Shield, Banknote, Settings, LayoutGrid, Crown, HandCoins, ShieldCheck, BarChart2, Package } from 'lucide-react';
 
 export interface NavItem {
   label: string;
@@ -40,6 +40,12 @@ export const NAV_ITEMS: NavItem[] = [
     href: '/invoicing',
     icon: Receipt,
     description: 'Create, send, and manage professional invoices for your clients.'
+  },
+  {
+    label: 'Inventory',
+    href: '/inventory',
+    icon: Package,
+    description: 'Track stock, sales, suppliers, and manage your products.',
   },
   {
     label: 'My Tools',
