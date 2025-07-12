@@ -4,15 +4,15 @@ import { db } from '@/lib/firebaseConfig';
 import { collection, query, where, getDocs, limit, orderBy, doc, getDoc } from 'firebase/firestore';
 import { getAuth } from 'firebase-admin/auth';
 import { app as adminApp } from '@/lib/firebaseAdminConfig';
-import { headers } from 'next/headers';
+import { cookies } from 'next/headers';
 
 
 async function getCompanyIdForCurrentUser(): Promise<string | null> {
-  const headersList = headers();
-  const idToken = headersList.get('x-firebase-id-token');
+  const cookieStore = cookies();
+  const idToken = cookieStore.get('firebaseIdToken')?.value;
 
   if (!idToken) {
-    console.error("API Error: No ID token provided.");
+    console.error("API Error: No ID token provided in cookies.");
     return null;
   }
   
