@@ -23,6 +23,7 @@ import Link from 'next/link';
 import { updateInvoice } from '../actions';
 import { Skeleton } from '@/components/ui/skeleton';
 import { getInvoiceSettings, type InvoiceSettings } from '@/app/settings/actions';
+import { Checkbox } from '@/components/ui/checkbox';
 
 interface InvoiceItem {
   id: string;
@@ -47,6 +48,7 @@ interface InvoiceDisplay {
   discountAmount: number;
   taxRate: number;
   taxAmount: number;
+  isRcmApplicable: boolean;
   amount: number;
   dueDate: Date;
   status: 'Paid' | 'Pending' | 'Overdue' | 'Draft';
@@ -118,7 +120,7 @@ export default function EditInvoicePage() {
         } else {
             discountAmount = discountValue;
         }
-        const taxRate = parseFloat(String(invoice.taxRate) || '0');
+        const taxRate = invoice.isRcmApplicable ? 0 : parseFloat(String(invoice.taxRate) || '0');
         const taxableAmount = subtotal - discountAmount;
         const taxAmount = taxableAmount * (taxRate / 100);
         const total = taxableAmount + taxAmount;
@@ -127,10 +129,11 @@ export default function EditInvoicePage() {
             ...prev, 
             subtotal: isNaN(subtotal) ? 0 : subtotal,
             discountAmount: isNaN(discountAmount) ? 0 : discountAmount,
+            taxRate: taxRate,
             taxAmount: isNaN(taxAmount) ? 0 : taxAmount,
             amount: isNaN(total) ? 0 : total,
         }) : null);
-    }, [invoice?.items, invoice?.discountType, invoice?.discountValue, invoice?.taxRate]);
+    }, [invoice?.items, invoice?.discountType, invoice?.discountValue, invoice?.taxRate, invoice?.isRcmApplicable]);
 
 
     const handleFormSubmit = async (e: React.FormEvent) => {
@@ -227,9 +230,15 @@ export default function EditInvoicePage() {
             <Card className="max-w-4xl mx-auto shadow-lg">
                 <form onSubmit={handleFormSubmit}>
                     <CardContent className="p-6 space-y-4">
-                        <div>
-                            <Label htmlFor="clientName">Client Name</Label>
-                            <Input id="clientName" value={invoice.clientName} onChange={(e) => handleValueChange('clientName', e.target.value)} required disabled={isSaving}/>
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                            <div>
+                                <Label htmlFor="invoiceNumber">Invoice Number</Label>
+                                <Input id="invoiceNumber" value={invoice.invoiceNumber} onChange={(e) => handleValueChange('invoiceNumber', e.target.value)} required disabled={isSaving}/>
+                            </div>
+                            <div>
+                                <Label htmlFor="clientName">Client Name</Label>
+                                <Input id="clientName" value={invoice.clientName} onChange={(e) => handleValueChange('clientName', e.target.value)} required disabled={isSaving}/>
+                            </div>
                         </div>
                         <div>
                             <Label htmlFor="clientEmail">Client Email</Label>
@@ -310,20 +319,33 @@ export default function EditInvoicePage() {
                         <Separator/>
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-4">
                             <div className="space-y-4">
-                                <div className="grid grid-cols-2 gap-2">
+                                <div className="grid grid-cols-2 gap-2 items-end">
                                     <div>
                                         <Label>Discount Type</Label>
                                         <Select value={invoice.discountType} onValueChange={(v: DiscountType) => handleValueChange('discountType', v)}><SelectTrigger><SelectValue/></SelectTrigger><SelectContent><SelectItem value="fixed">Fixed ({currencySymbol})</SelectItem><SelectItem value="percentage">Percentage (%)</SelectItem></SelectContent></Select>
                                     </div>
                                     <div><Label>Discount Value</Label><Input type="number" value={invoice.discountValue} onChange={(e) => handleValueChange('discountValue', e.target.value)} /></div>
                                 </div>
-                                <div><Label>Tax Rate (%)</Label><Input type="number" value={invoice.taxRate} onChange={(e) => handleValueChange('taxRate', e.target.value)} /></div>
+                                <div className="flex items-center gap-4">
+                                    <div className="flex-1">
+                                        <Label>Tax Rate (%)</Label>
+                                        <Input type="number" value={invoice.taxRate} onChange={(e) => handleValueChange('taxRate', e.target.value)} disabled={invoice.isRcmApplicable} />
+                                    </div>
+                                    <div className="flex items-center space-x-2 pt-6">
+                                        <Checkbox id="rcm" checked={invoice.isRcmApplicable} onCheckedChange={(checked) => handleValueChange('isRcmApplicable', checked)} />
+                                        <Label htmlFor="rcm" className="text-sm font-medium leading-none">RCM</Label>
+                                    </div>
+                                </div>
                             </div>
                             <div className="space-y-2 p-4 bg-primary/10 border border-primary/20 rounded-lg">
                                 <h4 className="font-medium text-center mb-2">Summary</h4>
                                 <div className="flex justify-between text-sm"><span className="text-muted-foreground">Subtotal:</span><span className="font-medium">{currencySymbol}{invoice.subtotal.toFixed(2)}</span></div>
                                 <div className="flex justify-between text-sm"><span className="text-muted-foreground">Discount:</span><span className="font-medium text-destructive">- {currencySymbol}{invoice.discountAmount.toFixed(2)}</span></div>
-                                <div className="flex justify-between text-sm"><span className="text-muted-foreground">Tax ({invoice.taxRate}%):</span><span className="font-medium text-chart-2">+ {currencySymbol}{invoice.taxAmount.toFixed(2)}</span></div>
+                                {invoice.isRcmApplicable ? (
+                                    <div className="flex justify-between text-sm"><span className="text-muted-foreground">Tax:</span><span className="font-medium">RCM Applicable</span></div>
+                                ) : (
+                                    <div className="flex justify-between text-sm"><span className="text-muted-foreground">Tax ({invoice.taxRate}%):</span><span className="font-medium text-chart-2">+ {currencySymbol}{invoice.taxAmount.toFixed(2)}</span></div>
+                                )}
                                 <Separator className="my-2" />
                                 <div className="flex justify-between text-lg font-bold"><span>Grand Total:</span><span>{currencySymbol}{invoice.amount.toFixed(2)}</span></div>
                             </div>

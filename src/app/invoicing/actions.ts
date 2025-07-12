@@ -37,6 +37,7 @@ interface InvoiceData {
   discountAmount: number;
   taxRate: number;
   taxAmount: number;
+  isRcmApplicable: boolean;
   amount: number;
   dueDate: Date;
   status: 'Paid' | 'Pending' | 'Overdue' | 'Draft';

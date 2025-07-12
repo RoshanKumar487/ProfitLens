@@ -33,6 +33,7 @@ interface InvoiceDisplay {
   issuedDate: Date;
   items?: InvoiceItem[];
   notes?: string;
+  isRcmApplicable?: boolean;
 }
 
 interface CompanyDetailsFirestore {
@@ -115,7 +116,6 @@ const InvoiceTemplateIndian = React.forwardRef<HTMLDivElement, InvoiceTemplatePr
 
     const customColumns = invoiceSettings?.customItemColumns || [];
     const items = invoiceToView.items || [];
-
 
     return (
       <div ref={ref} className="bg-white text-black font-sans text-xs w-[210mm] min-h-[297mm] mx-auto flex flex-col">
@@ -209,14 +209,22 @@ const InvoiceTemplateIndian = React.forwardRef<HTMLDivElement, InvoiceTemplatePr
                                     <td className="p-2 font-semibold">Subtotal</td>
                                     <td className="p-2 text-right font-semibold">{currencySymbol}{subtotal.toFixed(2)}</td>
                                 </tr>
-                                <tr className="border-b border-black">
-                                    <td className="p-2">CGST ({invoiceToView.taxRate / 2}%)</td>
-                                    <td className="p-2 text-right">{currencySymbol}{cgstAmount > 0 ? cgstAmount.toFixed(2) : '0.00'}</td>
-                                </tr>
-                                <tr className="border-b border-black">
-                                    <td className="p-2">SGST ({invoiceToView.taxRate / 2}%)</td>
-                                    <td className="p-2 text-right">{currencySymbol}{sgstAmount > 0 ? sgstAmount.toFixed(2) : '0.00'}</td>
-                                </tr>
+                                {invoiceToView.isRcmApplicable ? (
+                                    <tr className="border-b border-black">
+                                        <td colSpan={2} className="p-2 text-center font-semibold">RCM Applicable</td>
+                                    </tr>
+                                ) : (
+                                    <>
+                                    <tr className="border-b border-black">
+                                        <td className="p-2">CGST ({invoiceToView.taxRate / 2}%)</td>
+                                        <td className="p-2 text-right">{currencySymbol}{cgstAmount > 0 ? cgstAmount.toFixed(2) : '0.00'}</td>
+                                    </tr>
+                                    <tr className="border-b border-black">
+                                        <td className="p-2">SGST ({invoiceToView.taxRate / 2}%)</td>
+                                        <td className="p-2 text-right">{currencySymbol}{sgstAmount > 0 ? sgstAmount.toFixed(2) : '0.00'}</td>
+                                    </tr>
+                                    </>
+                                )}
                                 <tr className="font-bold" style={{ backgroundColor: isBlackAndWhite ? 'transparent' : '#f3f4f6' }}>
                                     <td className="p-2">Grand Total</td>
                                     <td className="p-2 text-right">{currencySymbol}{invoiceToView.amount.toFixed(2)}</td>
@@ -229,8 +237,7 @@ const InvoiceTemplateIndian = React.forwardRef<HTMLDivElement, InvoiceTemplatePr
                 <div className="grid grid-cols-2 mt-4">
                     <div className="p-2 text-xs">
                         <p className="font-bold">Terms & Conditions:</p>
-                        <p>1. Please pay within {format(invoiceToView.dueDate, 'dd-MM-yyyy')}.</p>
-                        <p>2. This is a computer generated invoice.</p>
+                        <p className="whitespace-pre-line">{invoiceToView.notes || '1. Please pay within the due date.\n2. This is a computer generated invoice.'}</p>
                     </div>
                     <div className="p-2 text-center">
                         <div className="relative h-24 w-48 mx-auto flex flex-col items-center justify-end">

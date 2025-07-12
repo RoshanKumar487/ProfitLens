@@ -25,6 +25,7 @@ import { getInvoiceSettings, saveInvoiceSettings, type InvoiceSettings, type Cus
 import { cn } from '@/lib/utils';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { v4 as uuidv4 } from 'uuid';
+import { Checkbox } from '@/components/ui/checkbox';
 
 
 interface InvoiceItem {
@@ -51,6 +52,7 @@ interface InvoiceDisplay {
   discountAmount: number;
   taxRate: number;
   taxAmount: number;
+  isRcmApplicable: boolean;
   amount: number;
   dueDate: Date;
   status: 'Paid' | 'Pending' | 'Overdue' | 'Draft';
@@ -107,6 +109,7 @@ export default function NewInvoicePage() {
             discountAmount: 0,
             taxRate: 0,
             taxAmount: 0,
+            isRcmApplicable: false,
             amount: 0,
     });
     const [isSaving, setIsSaving] = useState(false);
@@ -214,7 +217,8 @@ export default function NewInvoicePage() {
         } else {
             discountAmount = discountValue;
         }
-        const taxRate = parseFloat(String(currentInvoice.taxRate) || '0');
+        
+        const taxRate = currentInvoice.isRcmApplicable ? 0 : parseFloat(String(currentInvoice.taxRate) || '0');
         const taxableAmount = subtotal - discountAmount;
         const taxAmount = taxableAmount * (taxRate / 100);
         const total = taxableAmount + taxAmount;
@@ -223,10 +227,11 @@ export default function NewInvoicePage() {
             ...prev, 
             subtotal: isNaN(subtotal) ? 0 : subtotal,
             discountAmount: isNaN(discountAmount) ? 0 : discountAmount,
+            taxRate: taxRate,
             taxAmount: isNaN(taxAmount) ? 0 : taxAmount,
             amount: isNaN(total) ? 0 : total,
         }) : null);
-    }, [currentInvoice?.items, currentInvoice?.discountType, currentInvoice?.discountValue, currentInvoice?.taxRate]);
+    }, [currentInvoice?.items, currentInvoice?.discountType, currentInvoice?.discountValue, currentInvoice?.taxRate, currentInvoice?.isRcmApplicable]);
 
 
     const handleFormSubmit = async (e: React.FormEvent) => {
@@ -257,6 +262,7 @@ export default function NewInvoicePage() {
             discountAmount: currentInvoice.discountAmount || 0,
             taxRate: Number(currentInvoice.taxRate) || 0,
             taxAmount: currentInvoice.taxAmount || 0,
+            isRcmApplicable: currentInvoice.isRcmApplicable || false,
             amount: Number(currentInvoice.amount) || 0,
             issuedDate: currentInvoice.issuedDate,
             dueDate: currentInvoice.dueDate,
@@ -270,7 +276,9 @@ export default function NewInvoicePage() {
 
         if (result.success) {
             toast({ title: "Invoice Created", description: result.message });
-            localStorage.setItem(LOCAL_STORAGE_TAX_RATE_KEY, String(currentInvoice.taxRate || '0'));
+            if (!currentInvoice.isRcmApplicable) {
+                localStorage.setItem(LOCAL_STORAGE_TAX_RATE_KEY, String(currentInvoice.taxRate || '0'));
+            }
             localStorage.setItem(LOCAL_STORAGE_DISCOUNT_TYPE_KEY, currentInvoice.discountType || 'fixed');
             localStorage.setItem(LOCAL_STORAGE_DISCOUNT_VALUE_KEY, String(currentInvoice.discountValue || '0'));
             router.push('/invoicing');
@@ -633,8 +641,12 @@ export default function NewInvoicePage() {
                                                 <td className="p-2 text-right"><Input className="h-7 text-xs text-right p-1" type="number" value={currentInvoice.discountValue || 0} onChange={e => setCurrentInvoice({...currentInvoice, discountValue: parseFloat(e.target.value) || 0})} /></td>
                                             </tr>
                                             <tr className="bg-[#EBF4FF] text-black">
-                                                <td className="p-2"><Input className="h-7 text-xs p-1 bg-transparent border-0" value={`Tax Rate (%)`} readOnly/></td>
-                                                <td className="p-2 text-right"><Input className="h-7 text-xs text-right p-1" type="number" value={currentInvoice.taxRate || 0} onChange={e => setCurrentInvoice({...currentInvoice, taxRate: parseFloat(e.target.value) || 0})} /></td>
+                                                <td className="p-2 flex items-center gap-2">
+                                                    <Input className="h-7 text-xs p-1 bg-transparent border-0 flex-1" value={`Tax Rate (%)`} readOnly/>
+                                                    <Checkbox id="rcm-desktop" checked={currentInvoice.isRcmApplicable} onCheckedChange={(checked) => setCurrentInvoice({...currentInvoice, isRcmApplicable: !!checked})} />
+                                                    <Label htmlFor="rcm-desktop" className="text-xs font-medium">RCM</Label>
+                                                </td>
+                                                <td className="p-2 text-right"><Input className="h-7 text-xs text-right p-1" type="number" value={currentInvoice.taxRate || 0} onChange={e => setCurrentInvoice({...currentInvoice, taxRate: parseFloat(e.target.value) || 0})} disabled={currentInvoice.isRcmApplicable} /></td>
                                             </tr>
                                             <tr className="bg-[#EBF4FF] text-black">
                                                 <td className="p-2">Total</td>
@@ -725,11 +737,18 @@ export default function NewInvoicePage() {
                                     <div><Label>Discount Type</Label><Select value={currentInvoice.discountType || 'fixed'} onValueChange={(v: DiscountType) => setCurrentInvoice({...currentInvoice, discountType: v})}><SelectTrigger><SelectValue/></SelectTrigger><SelectContent><SelectItem value="fixed">Fixed ({currencySymbol})</SelectItem><SelectItem value="percentage">Percentage (%)</SelectItem></SelectContent></Select></div>
                                     <div><Label>Discount Value</Label><Input type="number" value={currentInvoice.discountValue || 0} onChange={(e) => setCurrentInvoice({...currentInvoice, discountValue: e.target.value})} /></div>
                                 </div>
-                                <div><Label>Tax Rate (%)</Label><Input type="number" value={currentInvoice.taxRate || 0} onChange={(e) => setCurrentInvoice({...currentInvoice, taxRate: e.target.value})} /></div>
+                                <div className="flex items-center gap-4">
+                                    <div className="flex-1"><Label>Tax Rate (%)</Label><Input type="number" value={currentInvoice.taxRate || 0} onChange={(e) => setCurrentInvoice({...currentInvoice, taxRate: e.target.value})} disabled={currentInvoice.isRcmApplicable} /></div>
+                                    <div className="flex items-center space-x-2 pt-6"><Checkbox id="rcm-mobile" checked={currentInvoice.isRcmApplicable} onCheckedChange={(checked) => setCurrentInvoice({...currentInvoice, isRcmApplicable: !!checked})} /><Label htmlFor="rcm-mobile" className="text-sm font-medium">RCM</Label></div>
+                                </div>
                                 <div className="space-y-2 p-4 bg-primary/10 rounded-lg">
                                     <div className="flex justify-between text-sm"><span className="text-muted-foreground">Subtotal:</span><span className="font-medium">{currencySymbol}{(currentInvoice.subtotal || 0).toFixed(2)}</span></div>
                                     <div className="flex justify-between text-sm"><span className="text-muted-foreground">Discount:</span><span className="font-medium text-destructive">- {currencySymbol}{(currentInvoice.discountAmount || 0).toFixed(2)}</span></div>
-                                    <div className="flex justify-between text-sm"><span className="text-muted-foreground">Tax:</span><span className="font-medium text-chart-2">+ {currencySymbol}{(currentInvoice.taxAmount || 0).toFixed(2)}</span></div>
+                                    {currentInvoice.isRcmApplicable ? (
+                                        <div className="flex justify-between text-sm"><span className="text-muted-foreground">Tax:</span><span className="font-medium">RCM Applicable</span></div>
+                                    ) : (
+                                        <div className="flex justify-between text-sm"><span className="text-muted-foreground">Tax:</span><span className="font-medium text-chart-2">+ {currencySymbol}{(currentInvoice.taxAmount || 0).toFixed(2)}</span></div>
+                                    )}
                                     <Separator className="my-2" />
                                     <div className="flex justify-between text-lg font-bold"><span>Total:</span><span>{currencySymbol}{(currentInvoice.amount || 0).toFixed(2)}</span></div>
                                 </div>
@@ -798,6 +817,3 @@ export default function NewInvoicePage() {
         </div>
     );
 }
-    
-
-    
