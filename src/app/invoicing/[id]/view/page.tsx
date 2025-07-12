@@ -304,29 +304,26 @@ export default function ViewInvoicePage() {
     return (
       <div className="w-full">
         <header className="w-full bg-background/80 border-b shadow-sm sticky top-14 sm:top-16 z-10 p-2 print:hidden backdrop-blur-sm">
-            <div className="max-w-7xl mx-auto flex justify-between items-center px-4">
+            <div className="max-w-7xl mx-auto flex justify-between items-center flex-wrap gap-2 px-4">
                 <div className="flex items-center gap-2">
                     <Receipt className="h-5 w-5 text-primary" />
                     <h1 className="text-lg font-bold truncate">Invoice {invoice.invoiceNumber}</h1>
                 </div>
                 <div className="flex items-center gap-2 flex-wrap justify-end">
-                    <Button variant="outline" asChild>
+                    <Button variant="outline" asChild size="sm">
                         <Link href={`/invoicing`}>
-                            <ArrowLeft className="mr-2 h-4 w-4" />
-                            All Invoices
+                            <ArrowLeft className="mr-2 h-4 w-4" /> All Invoices
                         </Link>
                     </Button>
-                    <Button variant="secondary" asChild>
+                    <Button variant="secondary" asChild size="sm">
                         <Link href={`/invoicing/${invoiceId}`}>
-                            <Edit className="mr-2 h-4 w-4" />
-                            Edit
+                            <Edit className="mr-2 h-4 w-4" /> Edit
                         </Link>
                     </Button>
                     <Dialog open={isSignatureDialogOpen} onOpenChange={setIsSignatureDialogOpen}>
                         <DialogTrigger asChild>
-                            <Button variant="secondary">
-                                <PenSquare className="mr-2 h-4 w-4" />
-                                Draw Signature
+                            <Button variant="secondary" size="sm">
+                                <PenSquare className="mr-2 h-4 w-4" /> Draw Signature
                             </Button>
                         </DialogTrigger>
                         <DialogContent>
@@ -337,18 +334,18 @@ export default function ViewInvoicePage() {
                             <SignaturePad onSave={handleSignatureSave} isSaving={false} />
                         </DialogContent>
                     </Dialog>
-                    <div className="flex items-center gap-4 border-l pl-4">
-                         <div className="flex items-center gap-2">
+                    <div className="flex items-center gap-2 border-l pl-2">
+                        <div className="flex items-center gap-1.5">
                             <Switch id="use-letterhead" checked={useLetterhead} onCheckedChange={setUseLetterhead} disabled={isProcessing} />
-                            <Label htmlFor="use-letterhead" className="cursor-pointer">Letterhead</Label>
+                            <Label htmlFor="use-letterhead" className="text-xs cursor-pointer">Letterhead</Label>
                         </div>
-                         <div className="flex items-center gap-2">
+                         <div className="flex items-center gap-1.5">
                             <Switch id="b-and-w" checked={isBlackAndWhite} onCheckedChange={setIsBlackAndWhite} disabled={isProcessing} />
-                            <Label htmlFor="b-and-w" className="cursor-pointer">B&W</Label>
+                            <Label htmlFor="b-and-w" className="text-xs cursor-pointer">B&W</Label>
                         </div>
                          <Select value={template} onValueChange={(value) => setTemplate(value as any)} disabled={isProcessing}>
-                            <SelectTrigger className="w-[180px]" id="template-select">
-                                <SelectValue placeholder="Select a template" />
+                            <SelectTrigger className="w-[120px] h-9" id="template-select">
+                                <SelectValue placeholder="Template" />
                             </SelectTrigger>
                             <SelectContent>
                                 <SelectItem value="business">Business</SelectItem>
@@ -360,13 +357,13 @@ export default function ViewInvoicePage() {
                             </SelectContent>
                         </Select>
                     </div>
-                    <Button onClick={handleDownloadPdf} disabled={isProcessing || !companyProfile}>
-                        {isProcessing ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Download className="mr-2 h-4 w-4" />} Download PDF
+                    <Button size="sm" onClick={handleDownloadPdf} disabled={isProcessing || !companyProfile}>
+                        {isProcessing ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Download className="mr-2 h-4 w-4" />} PDF
                     </Button>
-                    <Button onClick={handleEmail} disabled={isProcessing || !companyProfile}>
+                    <Button size="sm" onClick={handleEmail} disabled={isProcessing || !companyProfile}>
                         {isProcessing ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Mail className="mr-2 h-4 w-4" />} Email
                     </Button>
-                     <Button onClick={handlePrint} disabled={isProcessing || !companyProfile}>
+                     <Button size="sm" onClick={handlePrint} disabled={isProcessing || !companyProfile}>
                         {isProcessing ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Printer className="mr-2 h-4 w-4" />} Print
                     </Button>
                 </div>
