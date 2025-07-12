@@ -1,3 +1,4 @@
+
 'use server';
 
 import { db } from '@/lib/firebaseConfig';
@@ -25,6 +26,15 @@ export interface PayrollSettings {
   customFields: CustomPayrollField[];
   pfPercentage?: number;
   esiPercentage?: number;
+}
+
+export interface CustomProductField {
+    id: string;
+    label: string;
+}
+
+export interface ProductSettings {
+    customFields: CustomProductField[];
 }
 
 
@@ -98,6 +108,40 @@ export async function savePayrollSettings(
     return { success: true, message: 'Payroll settings saved successfully.' };
   } catch (error: any) {
     console.error('Error saving payroll settings:', error);
+    return { success: false, message: `Failed to save settings: ${error.message}` };
+  }
+}
+
+export async function getProductSettings(companyId: string): Promise<ProductSettings> {
+  if (!companyId) {
+    throw new Error('Company ID is required to get product settings.');
+  }
+
+  const companyDocRef = doc(db, 'companyProfiles', companyId);
+  const docSnap = await getDoc(companyDocRef);
+
+  if (docSnap.exists()) {
+    const data = docSnap.data();
+    return data.productSettings || { customFields: [] };
+  } else {
+    return { customFields: [] };
+  }
+}
+
+export async function saveProductSettings(
+  companyId: string,
+  settings: ProductSettings
+): Promise<{ success: boolean; message: string }> {
+  if (!companyId) {
+    return { success: false, message: 'Company ID is required to save settings.' };
+  }
+
+  try {
+    const companyDocRef = doc(db, 'companyProfiles', companyId);
+    await setDoc(companyDocRef, { productSettings: settings }, { merge: true });
+    return { success: true, message: 'Product settings saved successfully.' };
+  } catch (error: any) {
+    console.error('Error saving product settings:', error);
     return { success: false, message: `Failed to save settings: ${error.message}` };
   }
 }

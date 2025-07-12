@@ -14,9 +14,11 @@ import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, 
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Skeleton } from '@/components/ui/skeleton';
-import { Package, PlusCircle, Trash2, Loader2, Save, Search, ArrowUp, ArrowDown, ChevronsUpDown } from 'lucide-react';
+import { Package, PlusCircle, Trash2, Loader2, Save, Search, ArrowUp, ArrowDown, ChevronsUpDown, Settings } from 'lucide-react';
 import { v4 as uuidv4 } from 'uuid';
 import { saveAllProducts, deleteProduct } from './actions';
+import { getProductSettings, type ProductSettings } from '../settings/actions';
+import Link from 'next/link';
 
 type ProductDisplay = {
   id: string;
@@ -30,6 +32,7 @@ type ProductDisplay = {
   gstRate: number;
   quantity?: number;
   lowStockThreshold?: number;
+  customFields?: { [key: string]: string };
   isNew?: boolean;
 };
 
@@ -46,30 +49,49 @@ export default function ProductsServicesPage() {
     const [isSaving, setIsSaving] = useState(false);
     const [itemToDelete, setItemToDelete] = useState<ProductDisplay | null>(null);
 
-    // New state for filtering and sorting
     const [searchTerm, setSearchTerm] = useState('');
     const [sortConfig, setSortConfig] = useState<{ key: keyof ProductDisplay; direction: 'asc' | 'desc' }>({ key: 'name', direction: 'asc' });
+    const [productSettings, setProductSettings] = useState<ProductSettings | null>(null);
 
-    useEffect(() => {
-        if (!user || !user.companyId) {
-            setIsLoading(false);
-            return;
-        }
-
+    const fetchAllData = useCallback(async () => {
+      if (!user?.companyId) {
+        setIsLoading(false);
+        return;
+      }
+      setIsLoading(true);
+      
+      const settingsPromise = getProductSettings(user.companyId);
+      const productsPromise = new Promise<ProductDisplay[]>((resolve, reject) => {
         const productQuery = query(collection(db, 'products'), where('companyId', '==', user.companyId));
-
-        const unsubProducts = onSnapshot(productQuery, (snapshot) => {
+        const unsubscribe = onSnapshot(productQuery, (snapshot) => {
             const fetchedProducts = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as ProductDisplay));
-            setProducts(fetchedProducts);
-            setIsLoading(false);
+            resolve(fetchedProducts);
+            // We don't unsubscribe here because we want real-time updates.
+            // In a more complex app, manage this lifecycle carefully.
         }, (error) => { 
             console.error("Error fetching products:", error); 
             toast({ variant: 'destructive', title: "Error", description: "Could not fetch products." }); 
-            setIsLoading(false);
+            reject(error);
         });
-        
-        return () => unsubProducts();
+      });
+
+      try {
+        const [settings, fetchedProducts] = await Promise.all([settingsPromise, productsPromise]);
+        setProductSettings(settings);
+        setProducts(fetchedProducts);
+      } catch (error) {
+        // Error is already toasted in the promises
+      } finally {
+        setIsLoading(false);
+      }
+
     }, [user?.companyId, toast]);
+
+    useEffect(() => {
+      if (!authIsLoading && user) {
+        fetchAllData();
+      }
+    }, [user, authIsLoading, fetchAllData]);
     
     const filteredAndSortedProducts = useMemo(() => {
         let sortableItems = [...products];
@@ -113,7 +135,7 @@ export default function ProductsServicesPage() {
         return sortConfig.direction === 'asc' ? <ArrowUp className="ml-2 h-4 w-4" /> : <ArrowDown className="ml-2 h-4 w-4" />;
     };
 
-    const handleProductInputChange = (productId: string, field: keyof ProductDisplay, value: any) => {
+    const handleProductInputChange = (productId: string, field: keyof Omit<ProductDisplay, 'customFields'>, value: any) => {
       setProducts(prev =>
         prev.map(p => {
           if (p.id === productId) {
@@ -125,6 +147,21 @@ export default function ProductsServicesPage() {
           return p;
         })
       );
+    };
+
+    const handleCustomFieldChange = (productId: string, fieldId: string, value: string) => {
+        setProducts(prev => prev.map(p => {
+            if (p.id === productId) {
+                return {
+                    ...p,
+                    customFields: {
+                        ...(p.customFields || {}),
+                        [fieldId]: value
+                    }
+                };
+            }
+            return p;
+        }));
     };
 
     const handleAddProductRow = () => {
@@ -141,6 +178,7 @@ export default function ProductsServicesPage() {
         gstRate: 0,
         quantity: 0,
         lowStockThreshold: 10,
+        customFields: {}
       };
       setProducts(prev => [...prev, newProduct]);
     };
@@ -204,9 +242,11 @@ export default function ProductsServicesPage() {
         )
     }
 
+    const customFields = productSettings?.customFields || [];
+
     return (
         <div className="space-y-6 p-4 sm:p-6 lg:p-8">
-            <PageTitle title="Products & Services" subtitle="Manage your entire catalog of goods, services, and stock levels." icon={Package} />
+            <PageTitle title="Products & Services" subtitle="Manage your entire catalog of goods and services." icon={Package} />
             
             <Card>
                  <CardHeader>
@@ -225,6 +265,9 @@ export default function ProductsServicesPage() {
                                     onChange={(e) => setSearchTerm(e.target.value)}
                                 />
                             </div>
+                            <Button variant="outline" size="icon" asChild>
+                                <Link href="/settings"><Settings className="h-4 w-4" /></Link>
+                            </Button>
                             <Button onClick={handleSaveAllProducts} disabled={isSaving} className="w-full sm:w-auto">
                                 {isSaving ? <Loader2 className="mr-2 h-4 w-4 animate-spin"/> : <Save className="mr-2 h-4 w-4" />} Save All
                             </Button>
@@ -243,6 +286,9 @@ export default function ProductsServicesPage() {
                                 <TableHead><Button variant="ghost" className="-ml-4 h-8" onClick={() => handleSort('category')}>Category {getSortIcon('category')}</Button></TableHead>
                                 <TableHead>Type</TableHead>
                                 <TableHead>Unit</TableHead>
+                                {customFields.map(field => (
+                                    <TableHead key={field.id}>{field.label}</TableHead>
+                                ))}
                                 <TableHead><Button variant="ghost" className="-ml-4 h-8" onClick={() => handleSort('salePrice')}>Sale Price ({currencySymbol}) {getSortIcon('salePrice')}</Button></TableHead>
                                 <TableHead><Button variant="ghost" className="-ml-4 h-8" onClick={() => handleSort('purchasePrice')}>Purchase Price ({currencySymbol}) {getSortIcon('purchasePrice')}</Button></TableHead>
                                 <TableHead>GST Rate (%)</TableHead>
@@ -276,6 +322,15 @@ export default function ProductsServicesPage() {
                                             <SelectContent>{UNITS_OF_MEASURE.map(u => <SelectItem key={u} value={u}>{u}</SelectItem>)}</SelectContent>
                                         </Select>
                                     </TableCell>
+                                    {customFields.map(field => (
+                                        <TableCell key={field.id}>
+                                            <Input 
+                                                value={p.customFields?.[field.id] || ''} 
+                                                onChange={e => handleCustomFieldChange(p.id, field.id, e.target.value)} 
+                                                placeholder={field.label}
+                                            />
+                                        </TableCell>
+                                    ))}
                                     <TableCell><Input type="number" value={p.salePrice} onChange={e => handleProductInputChange(p.id, 'salePrice', e.target.value)} className="w-28" /></TableCell>
                                     <TableCell><Input type="number" value={p.purchasePrice} onChange={e => handleProductInputChange(p.id, 'purchasePrice', e.target.value)} className="w-28" /></TableCell>
                                     <TableCell><Input type="number" value={p.gstRate} onChange={e => handleProductInputChange(p.id, 'gstRate', e.target.value)} className="w-24"/></TableCell>
@@ -291,7 +346,7 @@ export default function ProductsServicesPage() {
                         </TableBody>
                         <TableFooter className="sticky bottom-0 bg-muted z-10">
                             <TableRow>
-                                <TableCell colSpan={8} className="font-bold text-right">Totals</TableCell>
+                                <TableCell colSpan={8 + customFields.length} className="font-bold text-right">Totals</TableCell>
                                 <TableCell className="font-bold text-center">{totals.stockQuantity}</TableCell>
                                 <TableCell colSpan={2} className="font-bold text-right">{currencySymbol}{totals.stockValue.toFixed(2)}</TableCell>
                                 <TableCell className="sticky right-0 bg-muted"></TableCell>

@@ -18,6 +18,7 @@ type ClientProduct = {
   gstRate: number;
   quantity?: number;
   lowStockThreshold?: number;
+  customFields?: { [key: string]: string };
   isNew?: boolean;
 };
 
@@ -58,6 +59,7 @@ export async function saveAllProducts(
         // Only include stock-related fields if the itemType is 'Goods'
         quantity: isGoods ? (productData.quantity ?? 0) : null,
         lowStockThreshold: isGoods ? (productData.lowStockThreshold ?? 10) : null,
+        customFields: productData.customFields || {},
         updatedAt: serverTimestamp(),
       };
       

@@ -1,3 +1,4 @@
+
 'use client';
 
 import React, { useState, useEffect, useCallback } from 'react';
@@ -8,9 +9,10 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Settings, PlusCircle, Trash2, Loader2, Save, Info, Palette, Database, HandCoins, Receipt } from 'lucide-react';
+import { Settings, PlusCircle, Trash2, Loader2, Save, Info, Palette, Database, HandCoins, Receipt, Package } from 'lucide-react';
 import { getInvoiceSettings, saveInvoiceSettings, type InvoiceSettings, type CustomItemColumn } from './actions';
 import { getPayrollSettings, savePayrollSettings, type PayrollSettings, type CustomPayrollField } from './actions';
+import { getProductSettings, saveProductSettings, type ProductSettings, type CustomProductField } from './actions';
 import { v4 as uuidv4 } from 'uuid';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
@@ -28,9 +30,12 @@ export default function SettingsPage() {
   
   const [invoiceSettings, setInvoiceSettings] = useState<InvoiceSettings>({ customItemColumns: [], defaultPaymentTermsDays: 30, defaultHsnCode: '', defaultNotes: '' });
   const [payrollSettings, setPayrollSettings] = useState<PayrollSettings>({ customFields: [], pfPercentage: 0, esiPercentage: 0 });
+  const [productSettings, setProductSettings] = useState<ProductSettings>({ customFields: [] });
+  
   const [newInvoiceColumnName, setNewInvoiceColumnName] = useState('');
   const [newPayrollFieldName, setNewPayrollFieldName] = useState('');
   const [newPayrollFieldType, setNewPayrollFieldType] = useState<'number' | 'string' | 'date'>('number');
+  const [newProductFieldName, setNewProductFieldName] = useState('');
   
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
@@ -42,12 +47,14 @@ export default function SettingsPage() {
     }
     setIsLoading(true);
     try {
-        const [fetchedInvoiceSettings, fetchedPayrollSettings] = await Promise.all([
+        const [fetchedInvoiceSettings, fetchedPayrollSettings, fetchedProductSettings] = await Promise.all([
             getInvoiceSettings(user.companyId),
             getPayrollSettings(user.companyId),
+            getProductSettings(user.companyId),
         ]);
         setInvoiceSettings(fetchedInvoiceSettings);
         setPayrollSettings(fetchedPayrollSettings);
+        setProductSettings(fetchedProductSettings);
     } catch (error: any) {
         toast({ title: 'Error', description: `Could not load settings: ${error.message}`, variant: 'destructive' });
     } finally {
@@ -120,6 +127,30 @@ export default function SettingsPage() {
     toast({ title: result.success ? 'Success' : 'Error', description: result.message, variant: result.success ? 'default' : 'destructive' });
     setIsSaving(false);
   };
+
+  // Product Settings Handlers
+  const handleAddProductField = () => {
+    if (!newProductFieldName.trim()) return;
+    const newField: CustomProductField = { id: uuidv4(), label: newProductFieldName.trim() };
+    setProductSettings(prev => ({ ...prev, customFields: [...prev.customFields, newField] }));
+    setNewProductFieldName('');
+  };
+
+  const handleProductFieldLabelChange = (id: string, newLabel: string) => {
+    setProductSettings(prev => ({...prev, customFields: prev.customFields.map(f => f.id === id ? { ...f, label: newLabel } : f)}));
+  };
+
+  const handleDeleteProductField = (id: string) => {
+    setProductSettings(prev => ({...prev, customFields: prev.customFields.filter(f => f.id !== id)}));
+  };
+
+  const handleSaveProductSettings = async () => {
+    if (!user || !user.companyId) return;
+    setIsSaving(true);
+    const result = await saveProductSettings(user.companyId, productSettings);
+    toast({ title: result.success ? 'Success' : 'Error', description: result.message, variant: result.success ? 'default' : 'destructive' });
+    setIsSaving(false);
+  };
   
   if (authIsLoading || isLoading) {
     return (
@@ -143,6 +174,19 @@ export default function SettingsPage() {
       <PageTitle title="Settings" subtitle="Customize your application experience." icon={Settings} />
 
       <div className="grid gap-6 md:grid-cols-1 lg:grid-cols-2 xl:grid-cols-3">
+        
+        <Card>
+            <CardHeader><CardTitle className="flex items-center gap-2"><Package className="h-5 w-5 text-primary"/>Product Settings</CardTitle><CardDescription>Customize the fields available for your products and services.</CardDescription></CardHeader>
+            <CardContent className="space-y-4">
+                <div className="space-y-2"><h3 className="text-md font-semibold text-foreground">Custom Product Fields</h3><p className="text-sm text-muted-foreground">Add or remove custom text fields for your products.</p></div>
+                <div className="space-y-2">
+                    {productSettings.customFields.length > 0 ? productSettings.customFields.map(field => (<div key={field.id} className="flex items-center gap-2 p-2 border rounded-md bg-muted/50"><Input value={field.label} onChange={(e) => handleProductFieldLabelChange(field.id, e.target.value)} disabled={isSaving} className="font-medium" /><Button variant="ghost" size="icon" onClick={() => handleDeleteProductField(field.id)} disabled={isSaving}><Trash2 className="h-4 w-4 text-destructive" /></Button></div>)) : (<p className="text-sm text-muted-foreground text-center py-4">No custom fields added.</p>)}
+                </div>
+                <div className="flex items-end gap-2 pt-4 border-t"><div className="flex-grow"><Label htmlFor="new-product-field">New Field Name</Label><Input id="new-product-field" value={newProductFieldName} onChange={e => setNewProductFieldName(e.target.value)} placeholder="e.g., Color, Size" disabled={isSaving} onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); handleAddProductField(); }}}/></div><Button onClick={handleAddProductField} disabled={isSaving}><PlusCircle className="mr-2 h-4 w-4" /> Add</Button></div>
+            </CardContent>
+            <CardFooter className="justify-end"><Button onClick={handleSaveProductSettings} disabled={isSaving}>{isSaving ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Save className="mr-2 h-4 w-4" />}Save Product Settings</Button></CardFooter>
+        </Card>
+
         <Card>
             <CardHeader><CardTitle className="flex items-center gap-2"><Receipt className="h-5 w-5 text-primary"/>Invoice Settings</CardTitle><CardDescription>Manage default values and custom fields for your invoices.</CardDescription></CardHeader>
             <CardContent className="space-y-4">
