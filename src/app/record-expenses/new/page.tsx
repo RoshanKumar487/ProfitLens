@@ -19,6 +19,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { db } from '@/lib/firebaseConfig';
 import { collection, addDoc, Timestamp, serverTimestamp } from 'firebase/firestore';
 import Link from 'next/link';
+import { searchEmployees } from '../actions'; // Import the new server action
 
 const EXPENSE_CATEGORIES = [
   'Software & Subscriptions', 'Marketing & Advertising', 'Office Supplies',
@@ -32,7 +33,7 @@ interface EmployeeSuggestion {
 }
 
 export default function NewExpensePage() {
-  const { user, currencySymbol, getIdToken } = useAuth();
+  const { user, currencySymbol } = useAuth();
   const router = useRouter();
   const searchParams = useSearchParams();
   const { toast } = useToast();
@@ -79,35 +80,34 @@ export default function NewExpensePage() {
     if (employeeName.trim().length < 1) {
         setEmployeeSuggestions([]);
         setShowSuggestions(false);
-        // If user clears the input, clear the selected employee
         if (selectedEmployee) setSelectedEmployee(null);
         return;
     }
 
-    // If a selection has been made and the input is changed, it's a new search.
     if (selectedEmployee && employeeName !== selectedEmployee.name) {
         setSelectedEmployee(null);
     }
 
     const timer = setTimeout(async () => {
         setIsSearching(true);
-        const idToken = await getIdToken();
-        const response = await fetch(`/api/employees?q=${encodeURIComponent(employeeName)}`, {
-            headers: { 'x-firebase-id-token': idToken || '' },
-        });
-
-        if (response.ok) {
-            const data = await response.json();
+        try {
+            // Use the Server Action instead of fetch
+            const data = await searchEmployees(employeeName);
             setEmployeeSuggestions(data);
             setShowSuggestions(true);
-        } else {
-            console.error("Failed to fetch employees");
+        } catch (error) {
+             console.error("Failed to fetch employees", error);
+             toast({
+                title: 'Search Failed',
+                description: 'Could not fetch employee list.',
+                variant: 'destructive'
+            });
         }
         setIsSearching(false);
     }, 300);
 
     return () => clearTimeout(timer);
-  }, [employeeName, selectedEmployee, getIdToken]);
+  }, [employeeName, selectedEmployee, toast]);
 
   const handleSelectEmployee = (employee: EmployeeSuggestion) => {
     setSelectedEmployee(employee);
