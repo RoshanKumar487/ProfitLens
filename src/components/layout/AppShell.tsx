@@ -128,24 +128,18 @@ const AppShellLayout = ({ children }: { children: React.ReactNode }) => {
           viewBox="0 0 24 24"
           fill="none"
           xmlns="http://www.w3.org/2000/svg"
-          className="h-7 w-7"
+          className="h-7 w-7 text-primary"
         >
-          <defs>
-            <linearGradient id="logoGradient" x1="0" y1="0" x2="1" y2="1">
-              <stop offset="0%" stopColor="#3B82F6" />
-              <stop offset="100%" stopColor="#4F46E5" />
-            </linearGradient>
-          </defs>
           <path
             d="M22 2L15 22L11 13L2 9L22 2Z"
-            fill="url(#logoGradient)"
-            stroke="url(#logoGradient)"
+            fill="currentColor"
+            stroke="currentColor"
             strokeWidth="1"
             strokeLinecap="round"
             strokeLinejoin="round"
           />
         </svg>
-        <h1 className="text-xl font-headline font-bold text-sidebar-foreground group-data-[collapsible=icon]:hidden">
+        <h1 className="text-xl font-headline font-bold text-foreground/80 group-data-[collapsible=icon]:hidden">
           InvoPilot
         </h1>
       </Link>
