@@ -4,7 +4,7 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/button';
-import { Receipt, Mail, Printer, ArrowLeft, Loader2, Edit, Download } from 'lucide-react';
+import { Receipt, Mail, Printer, ArrowLeft, Loader2, Edit, Download, PenSquare } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/contexts/AuthContext';
 import { doc, getDoc, Timestamp } from 'firebase/firestore';
@@ -15,6 +15,7 @@ import InvoiceTemplateModern from '../../InvoiceTemplateModern';
 import InvoiceTemplateBusiness from '../../InvoiceTemplateBusiness';
 import InvoiceTemplateMinimalist from '../../InvoiceTemplateMinimalist';
 import InvoiceTemplateBold from '../../InvoiceTemplateBold';
+import InvoiceTemplateCorporate from '../../InvoiceTemplateCorporate';
 import jsPDF from 'jspdf';
 import html2canvas from 'html2canvas';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -24,6 +25,8 @@ import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { getInvoiceSettings, type InvoiceSettings } from '@/app/settings/actions';
 import { Switch } from '@/components/ui/switch';
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
+import SignaturePad from '@/components/SignaturePad';
 
 // Interface definitions mirrored from invoicing/page.tsx for component props
 interface InvoiceItem {
@@ -86,11 +89,13 @@ export default function ViewInvoicePage() {
     const [companyProfile, setCompanyProfile] = useState<CompanyDetailsFirestore | null>(null);
     const [invoiceSettings, setInvoiceSettings] = useState<InvoiceSettings | null>(null);
     const [imageDataUris, setImageDataUris] = useState<{ signature?: string; stamp?: string }>({});
+    const [localSignatureUri, setLocalSignatureUri] = useState<string | undefined>(undefined);
     const [isLoadingData, setIsLoadingData] = useState(true);
     const [isProcessing, setIsProcessing] = useState(false);
-    const [template, setTemplate] = useState<'business' | 'modern' | 'simple' | 'minimalist' | 'bold'>('business');
+    const [template, setTemplate] = useState<'business' | 'modern' | 'simple' | 'minimalist' | 'bold' | 'corporate'>('corporate');
     const [useLetterhead, setUseLetterhead] = useState(true);
     const [isBlackAndWhite, setIsBlackAndWhite] = useState(false);
+    const [isSignatureDialogOpen, setIsSignatureDialogOpen] = useState(false);
     const printRef = useRef<HTMLDivElement>(null);
 
     const fetchAllData = useCallback(async () => {
@@ -231,6 +236,11 @@ export default function ViewInvoicePage() {
         }
     };
 
+    const handleSignatureSave = (dataUrl: string) => {
+        setLocalSignatureUri(dataUrl);
+        setIsSignatureDialogOpen(false);
+    };
+
     if (authIsLoading || isLoadingData) {
         return (
             <div className="flex flex-col items-center justify-center p-8 bg-muted min-h-screen">
@@ -266,7 +276,7 @@ export default function ViewInvoicePage() {
             invoiceToView: invoice, 
             companyProfileDetails: companyProfile, 
             currencySymbol: currencySymbol, 
-            signatureDataUri: imageDataUris.signature,
+            signatureDataUri: localSignatureUri || imageDataUris.signature, // Prioritize local signature
             stampDataUri: imageDataUris.stamp,
             invoiceSettings: invoiceSettings,
             letterheadTemplate: useLetterhead ? 'simple' as const : 'none' as const,
@@ -284,6 +294,8 @@ export default function ViewInvoicePage() {
                  return <InvoiceTemplateMinimalist {...commonProps} />
             case 'bold':
                  return <InvoiceTemplateBold {...commonProps} />
+            case 'corporate':
+                return <InvoiceTemplateCorporate {...commonProps} />
             default:
                 return  <InvoiceTemplateBusiness {...commonProps} />
         }
@@ -292,36 +304,48 @@ export default function ViewInvoicePage() {
     return (
       <div className="w-full">
         <header className="w-full bg-background/80 border-b shadow-sm sticky top-14 sm:top-16 z-10 p-2 print:hidden backdrop-blur-sm">
-            <div className="max-w-7xl mx-auto flex justify-between items-center px-4">
+            <div className="max-w-7xl mx-auto flex justify-between items-center flex-wrap gap-2 px-4">
                 <div className="flex items-center gap-2">
                     <Receipt className="h-5 w-5 text-primary" />
                     <h1 className="text-lg font-bold truncate">Invoice {invoice.invoiceNumber}</h1>
                 </div>
                 <div className="flex items-center gap-2 flex-wrap justify-end">
-                    <Button variant="outline" asChild>
+                    <Button variant="outline" asChild size="sm">
                         <Link href={`/invoicing`}>
-                            <ArrowLeft className="mr-2 h-4 w-4" />
-                            All Invoices
+                            <ArrowLeft className="mr-2 h-4 w-4" /> All Invoices
                         </Link>
                     </Button>
-                    <Button variant="secondary" asChild>
+                    <Button variant="secondary" asChild size="sm">
                         <Link href={`/invoicing/${invoiceId}`}>
-                            <Edit className="mr-2 h-4 w-4" />
-                            Edit
+                            <Edit className="mr-2 h-4 w-4" /> Edit
                         </Link>
                     </Button>
-                    <div className="flex items-center gap-4 border-l pl-4">
-                         <div className="flex items-center gap-2">
+                    <Dialog open={isSignatureDialogOpen} onOpenChange={setIsSignatureDialogOpen}>
+                        <DialogTrigger asChild>
+                            <Button variant="secondary" size="sm">
+                                <PenSquare className="mr-2 h-4 w-4" /> Draw Signature
+                            </Button>
+                        </DialogTrigger>
+                        <DialogContent>
+                            <DialogHeader>
+                                <DialogTitle>Draw Signature</DialogTitle>
+                                <DialogDescription>Draw a signature for this invoice. It will not be saved to your company profile.</DialogDescription>
+                            </DialogHeader>
+                            <SignaturePad onSave={handleSignatureSave} isSaving={false} />
+                        </DialogContent>
+                    </Dialog>
+                    <div className="flex items-center gap-2 border-l pl-2">
+                        <div className="flex items-center gap-1.5">
                             <Switch id="use-letterhead" checked={useLetterhead} onCheckedChange={setUseLetterhead} disabled={isProcessing} />
-                            <Label htmlFor="use-letterhead" className="cursor-pointer">Letterhead</Label>
+                            <Label htmlFor="use-letterhead" className="text-xs cursor-pointer">Letterhead</Label>
                         </div>
-                         <div className="flex items-center gap-2">
+                         <div className="flex items-center gap-1.5">
                             <Switch id="b-and-w" checked={isBlackAndWhite} onCheckedChange={setIsBlackAndWhite} disabled={isProcessing} />
-                            <Label htmlFor="b-and-w" className="cursor-pointer">B&W</Label>
+                            <Label htmlFor="b-and-w" className="text-xs cursor-pointer">B&W</Label>
                         </div>
                          <Select value={template} onValueChange={(value) => setTemplate(value as any)} disabled={isProcessing}>
-                            <SelectTrigger className="w-[180px]" id="template-select">
-                                <SelectValue placeholder="Select a template" />
+                            <SelectTrigger className="w-[120px] h-9" id="template-select">
+                                <SelectValue placeholder="Template" />
                             </SelectTrigger>
                             <SelectContent>
                                 <SelectItem value="business">Business</SelectItem>
@@ -329,16 +353,17 @@ export default function ViewInvoicePage() {
                                 <SelectItem value="simple">Simple</SelectItem>
                                 <SelectItem value="minimalist">Minimalist</SelectItem>
                                 <SelectItem value="bold">Bold</SelectItem>
+                                <SelectItem value="corporate">Corporate</SelectItem>
                             </SelectContent>
                         </Select>
                     </div>
-                    <Button onClick={handleDownloadPdf} disabled={isProcessing || !companyProfile}>
-                        {isProcessing ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Download className="mr-2 h-4 w-4" />} Download PDF
+                    <Button size="sm" onClick={handleDownloadPdf} disabled={isProcessing || !companyProfile}>
+                        {isProcessing ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Download className="mr-2 h-4 w-4" />} PDF
                     </Button>
-                    <Button onClick={handleEmail} disabled={isProcessing || !companyProfile}>
+                    <Button size="sm" onClick={handleEmail} disabled={isProcessing || !companyProfile}>
                         {isProcessing ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Mail className="mr-2 h-4 w-4" />} Email
                     </Button>
-                     <Button onClick={handlePrint} disabled={isProcessing || !companyProfile}>
+                     <Button size="sm" onClick={handlePrint} disabled={isProcessing || !companyProfile}>
                         {isProcessing ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Printer className="mr-2 h-4 w-4" />} Print
                     </Button>
                 </div>

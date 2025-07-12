@@ -1,5 +1,4 @@
-
-import { ref, uploadBytes, getDownloadURL, deleteObject } from 'firebase/storage';
+import { ref, uploadBytes, getDownloadURL, deleteObject, uploadString } from 'firebase/storage';
 import { storage } from './firebaseConfig'; // Your Firebase storage instance
 
 /**
@@ -19,6 +18,25 @@ export const uploadFileToStorage = async (file: File, path: string): Promise<str
     throw error; // Re-throw the error to be handled by the caller
   }
 };
+
+/**
+ * Uploads a base64 data URL to Firebase Storage.
+ * @param dataUrl The base64 data URL (e.g., from a signature pad).
+ * @param path The path in Firebase Storage.
+ * @returns A promise that resolves with the download URL.
+ */
+export const uploadBase64ToStorage = async (dataUrl: string, path: string): Promise<string> => {
+    const storageRef = ref(storage, path);
+    try {
+        const snapshot = await uploadString(storageRef, dataUrl, 'data_url');
+        const downloadURL = await getDownloadURL(snapshot.ref);
+        return downloadURL;
+    } catch (error) {
+        console.error("Error uploading base64 data to Firebase Storage:", error);
+        throw error;
+    }
+};
+
 
 /**
  * Deletes a file from Firebase Storage.

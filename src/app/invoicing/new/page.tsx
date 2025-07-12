@@ -117,7 +117,7 @@ export default function NewInvoicePage() {
     const [isLoading, setIsLoading] = useState(true);
 
     const [isSettingsDialogOpen, setIsSettingsDialogOpen] = useState(false);
-    const [tempSettings, setTempSettings] = useState<InvoiceSettings>({ customItemColumns: [], defaultPaymentTermsDays: 30, defaultHsnCode: '' });
+    const [tempSettings, setTempSettings] = useState<InvoiceSettings>({ customItemColumns: [], defaultPaymentTermsDays: 30, defaultHsnCode: '', defaultNotes: '' });
     const [newColumnName, setNewColumnName] = useState('');
 
 
