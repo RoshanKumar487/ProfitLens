@@ -1,7 +1,7 @@
 
 import { NextResponse } from 'next/server';
 import { db } from '@/lib/firebaseConfig';
-import { collection, query, where, getDocs, limit, orderBy } from 'firebase/firestore';
+import { collection, query, where, getDocs, limit, orderBy, doc, getDoc } from 'firebase/firestore';
 import { getAuth } from 'firebase-admin/auth';
 import { app as adminApp } from '@/lib/firebaseAdminConfig';
 import { headers } from 'next/headers';
@@ -53,12 +53,14 @@ export async function GET(request: Request) {
 
   try {
     const employeesRef = collection(db, 'employees');
+    // Firestore queries are case-sensitive. A common workaround is to store a lowercase version of the field.
+    // We will query against this `name_lowercase` field.
     const q = query(
       employeesRef,
       where('companyId', '==', companyId),
-      where('name', '>=', searchTerm),
-      where('name', '<=', searchTerm + '\uf8ff'),
-      orderBy('name'),
+      where('name_lowercase', '>=', lowerCaseSearchTerm),
+      where('name_lowercase', '<=', lowerCaseSearchTerm + '\uf8ff'),
+      orderBy('name_lowercase'),
       limit(10)
     );
 
@@ -71,6 +73,11 @@ export async function GET(request: Request) {
     return NextResponse.json(employees);
   } catch (error: any) {
     console.error('Error searching employees:', error);
+    // Suggesting an index is a common error, so we can provide a more helpful message.
+    if (error.message?.includes('indexes')) {
+        console.error("Firestore index missing. Please create a composite index for the 'employees' collection on 'companyId' (asc) and 'name_lowercase' (asc).");
+        return NextResponse.json({ error: 'Database configuration error. Please contact support.' }, { status: 500 });
+    }
     return NextResponse.json({ error: 'Failed to search employees' }, { status: 500 });
   }
 }

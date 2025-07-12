@@ -180,7 +180,9 @@ export default function NewEmployeePage() {
             ]);
             
             const dataToSave = {
-                name, position, salary: salaryNum, description, uan,
+                name,
+                name_lowercase: name.toLowerCase(),
+                position, salary: salaryNum, description, uan,
                 companyId: user.companyId, addedById: user.uid, addedBy: user.displayName || user.email || 'System',
                 createdAt: serverTimestamp(), updatedAt: serverTimestamp(),
                 profilePictureUrl: profilePic.url, profilePictureStoragePath: profilePic.path,

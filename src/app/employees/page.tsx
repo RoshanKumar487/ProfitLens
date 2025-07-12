@@ -44,6 +44,7 @@ import { Pagination, PaginationContent, PaginationItem, PaginationNext, Paginati
 interface EmployeeFirestore {
   id?: string;
   name: string;
+  name_lowercase: string;
   position: string;
   salary: number;
   uan?: string;
@@ -89,7 +90,7 @@ export interface EmployeeDisplay extends Omit<EmployeeFirestore, 'updatedAt' | '
   joiningDate?: Date;
 }
 
-type ParsedEmployee = Omit<EmployeeFirestore, 'id' | 'createdAt' | 'updatedAt' | 'companyId' | 'addedById' | 'addedBy' | 'profilePictureUrl' | 'profilePictureStoragePath' | 'associatedFileUrl' | 'associatedFileName' | 'associatedFileStoragePath'>;
+type ParsedEmployee = Omit<EmployeeFirestore, 'id' | 'createdAt' | 'updatedAt' | 'companyId' | 'addedById' | 'addedBy' | 'profilePictureUrl' | 'profilePictureStoragePath' | 'associatedFileUrl' | 'associatedFileName' | 'associatedFileStoragePath' | 'name_lowercase'>;
 
 const RECORDS_PER_PAGE = 20;
 
@@ -168,12 +169,13 @@ export default function EmployeesPage() {
       const employeesRef = collection(db, 'employees');
       
       let q;
+      const sortKey = sortConfig.key === 'name' ? 'name_lowercase' : sortConfig.key;
       const baseQuery = [
         where('companyId', '==', user.companyId),
-        orderBy(sortConfig.key, sortConfig.direction),
+        orderBy(sortKey, sortConfig.direction),
       ];
 
-      if (sortConfig.key !== 'createdAt') {
+      if (sortKey !== 'createdAt') {
         baseQuery.push(orderBy('createdAt', sortConfig.direction));
       }
 
@@ -380,7 +382,7 @@ export default function EmployeesPage() {
         const employeeDocId = currentEmployee.id;
         const employeeRef = doc(db, 'employees', employeeDocId);
 
-        const updatedData: Partial<EmployeeFirestore> = { ...currentEmployee, uan: currentEmployee.uan || '' };
+        const updatedData: Partial<EmployeeFirestore> = { ...currentEmployee, uan: currentEmployee.uan || '', name_lowercase: currentEmployee.name.toLowerCase() };
         delete updatedData.id; 
         delete (updatedData as any).createdAt;
 
