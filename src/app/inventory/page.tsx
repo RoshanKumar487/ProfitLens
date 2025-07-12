@@ -19,9 +19,10 @@ import { Label } from '@/components/ui/label';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Skeleton } from '@/components/ui/skeleton';
-import { Package, PlusCircle, MoreHorizontal, Edit, Trash2, Loader2, Save } from 'lucide-react';
+import { Package, PlusCircle, MoreHorizontal, Edit, Trash2, Loader2, Save, ShoppingCart, DollarSign, Warehouse, AlertTriangle } from 'lucide-react';
 import { saveProduct, deleteProduct, saveSupplier, deleteSupplier, adjustStock, type Product, type Supplier } from './actions';
 import { Badge } from '@/components/ui/badge';
+import { cn } from '@/lib/utils';
 
 type ProductDisplay = Product & { id: string; supplierName?: string };
 
@@ -140,69 +141,118 @@ export default function InventoryPage() {
         <div className="space-y-6 p-4 sm:p-6 lg:p-8">
             <PageTitle title="Inventory Management" subtitle="Track stock, sales, suppliers, and manage your products." icon={Package} />
             <div className="grid gap-6 md:grid-cols-3">
-                <DataCard title="Total Products" value={inventoryStats.totalProducts.toString()} icon={Package} />
-                <DataCard title="Total Stock Value" value={`${currencySymbol}${inventoryStats.stockValue.toLocaleString(undefined, { minimumFractionDigits: 2 })}`} icon={Package} />
-                <DataCard title="Low Stock Items" value={inventoryStats.lowStockItems.toString()} icon={Package} className={inventoryStats.lowStockItems > 0 ? "bg-danger-card" : ""} />
+                <DataCard title="Total Products" value={inventoryStats.totalProducts.toString()} icon={ShoppingCart} />
+                <DataCard title="Total Stock Value" value={`${currencySymbol}${inventoryStats.stockValue.toLocaleString(undefined, { minimumFractionDigits: 2 })}`} icon={DollarSign} />
+                <DataCard title="Low Stock Items" value={inventoryStats.lowStockItems.toString()} icon={AlertTriangle} className={inventoryStats.lowStockItems > 0 ? "bg-danger-card" : ""} />
             </div>
 
             <Tabs defaultValue="products">
-                <div className="flex justify-between items-center mb-4">
+                <div className="flex flex-col sm:flex-row justify-between items-center mb-4 gap-4">
                     <TabsList>
                         <TabsTrigger value="products">Products</TabsTrigger>
                         <TabsTrigger value="suppliers">Suppliers</TabsTrigger>
                     </TabsList>
-                    <div className="flex gap-2">
-                        <Button onClick={() => handleOpenDialog('supplier')}><PlusCircle className="mr-2 h-4 w-4" /> Add Supplier</Button>
-                        <Button onClick={() => handleOpenDialog('product')}><PlusCircle className="mr-2 h-4 w-4" /> Add Product</Button>
+                    <div className="flex gap-2 w-full sm:w-auto">
+                        <Button onClick={() => handleOpenDialog('supplier')} className="flex-1 sm:flex-initial"><PlusCircle className="mr-2 h-4 w-4" /> Add Supplier</Button>
+                        <Button onClick={() => handleOpenDialog('product')} className="flex-1 sm:flex-initial"><PlusCircle className="mr-2 h-4 w-4" /> Add Product</Button>
                     </div>
                 </div>
                 <TabsContent value="products">
-                    <Card><CardHeader><CardTitle>Product List</CardTitle><CardDescription>All products in your inventory.</CardDescription></CardHeader>
-                    <CardContent>
-                        <Table>
-                            <TableHeader><TableRow><TableHead>Name</TableHead><TableHead>Category</TableHead><TableHead>Supplier</TableHead><TableHead>Stock Qty</TableHead><TableHead>Sale Price</TableHead><TableHead className="text-right">Actions</TableHead></TableRow></TableHeader>
-                            <TableBody>
+                    <Card>
+                        <CardHeader className="hidden md:block">
+                            <CardTitle>Product List</CardTitle>
+                            <CardDescription>All products in your inventory.</CardDescription>
+                        </CardHeader>
+                        <CardContent>
+                            {/* Desktop Table */}
+                            <Table className="hidden md:table">
+                                <TableHeader><TableRow><TableHead>Name</TableHead><TableHead>Category</TableHead><TableHead>Supplier</TableHead><TableHead>Stock Qty</TableHead><TableHead>Sale Price</TableHead><TableHead className="text-right">Actions</TableHead></TableRow></TableHeader>
+                                <TableBody>
+                                    {productsWithNames.map(p => (
+                                        <TableRow key={p.id}>
+                                            <TableCell className="font-medium">{p.name} {p.sku && <span className="text-xs text-muted-foreground">({p.sku})</span>}</TableCell>
+                                            <TableCell>{p.category || 'N/A'}</TableCell>
+                                            <TableCell>{p.supplierName}</TableCell>
+                                            <TableCell><Badge variant={p.lowStockThreshold && p.quantity <= p.lowStockThreshold ? 'destructive' : 'secondary'}>{p.quantity}</Badge></TableCell>
+                                            <TableCell>{currencySymbol}{p.salePrice.toFixed(2)}</TableCell>
+                                            <TableCell className="text-right">
+                                                <Button variant="outline" size="sm" className="mr-2" onClick={() => handleOpenStockDialog(p)}>Adjust Stock</Button>
+                                                <DropdownMenu><DropdownMenuTrigger asChild><Button variant="ghost" size="icon"><MoreHorizontal/></Button></DropdownMenuTrigger><DropdownMenuContent><DropdownMenuItem onClick={()=>handleOpenDialog('product', p)}>Edit</DropdownMenuItem><DropdownMenuItem onClick={()=>promptDelete('product', p)} className="text-destructive">Delete</DropdownMenuItem></DropdownMenuContent></DropdownMenu>
+                                            </TableCell>
+                                        </TableRow>
+                                    ))}
+                                </TableBody>
+                            </Table>
+                            {/* Mobile Card List */}
+                            <div className="md:hidden space-y-4">
                                 {productsWithNames.map(p => (
-                                    <TableRow key={p.id}>
-                                        <TableCell className="font-medium">{p.name} {p.sku && <span className="text-xs text-muted-foreground">({p.sku})</span>}</TableCell>
-                                        <TableCell>{p.category || 'N/A'}</TableCell>
-                                        <TableCell>{p.supplierName}</TableCell>
-                                        <TableCell>
-                                            <Badge variant={p.lowStockThreshold && p.quantity <= p.lowStockThreshold ? 'destructive' : 'secondary'}>{p.quantity}</Badge>
-                                        </TableCell>
-                                        <TableCell>{currencySymbol}{p.salePrice.toFixed(2)}</TableCell>
-                                        <TableCell className="text-right">
-                                            <Button variant="outline" size="sm" className="mr-2" onClick={() => handleOpenStockDialog(p)}>Adjust Stock</Button>
-                                            <DropdownMenu><DropdownMenuTrigger asChild><Button variant="ghost" size="icon"><MoreHorizontal/></Button></DropdownMenuTrigger>
-                                            <DropdownMenuContent><DropdownMenuItem onClick={()=>handleOpenDialog('product', p)}>Edit</DropdownMenuItem><DropdownMenuItem onClick={()=>promptDelete('product', p)} className="text-destructive">Delete</DropdownMenuItem></DropdownMenuContent></DropdownMenu>
-                                        </TableCell>
-                                    </TableRow>
+                                    <Card key={p.id}>
+                                        <CardContent className="p-4 space-y-2">
+                                            <div className="flex justify-between items-start">
+                                                <h3 className="font-bold">{p.name}</h3>
+                                                <DropdownMenu><DropdownMenuTrigger asChild><Button variant="ghost" size="icon" className="h-8 w-8 -mr-2 -mt-2"><MoreHorizontal/></Button></DropdownMenuTrigger><DropdownMenuContent><DropdownMenuItem onClick={()=>handleOpenDialog('product', p)}>Edit</DropdownMenuItem><DropdownMenuItem onClick={()=>promptDelete('product', p)} className="text-destructive">Delete</DropdownMenuItem></DropdownMenuContent></DropdownMenu>
+                                            </div>
+                                            <div className="text-sm text-muted-foreground grid grid-cols-2 gap-x-4">
+                                                <p><strong>Price:</strong> {currencySymbol}{p.salePrice.toFixed(2)}</p>
+                                                <p><strong>Category:</strong> {p.category || 'N/A'}</p>
+                                                <p><strong>Supplier:</strong> {p.supplierName}</p>
+                                            </div>
+                                            <div className="flex justify-between items-center pt-2 border-t mt-2">
+                                                <Badge variant={p.lowStockThreshold && p.quantity <= p.lowStockThreshold ? 'destructive' : 'secondary'}>In Stock: {p.quantity}</Badge>
+                                                <Button variant="outline" size="sm" onClick={() => handleOpenStockDialog(p)}>Adjust Stock</Button>
+                                            </div>
+                                        </CardContent>
+                                    </Card>
                                 ))}
-                            </TableBody>
-                        </Table>
-                    </CardContent></Card>
+                            </div>
+                        </CardContent>
+                    </Card>
                 </TabsContent>
                  <TabsContent value="suppliers">
-                    <Card><CardHeader><CardTitle>Supplier List</CardTitle><CardDescription>All your product suppliers.</CardDescription></CardHeader>
-                    <CardContent>
-                        <Table>
-                            <TableHeader><TableRow><TableHead>Name</TableHead><TableHead>Contact Person</TableHead><TableHead>Email</TableHead><TableHead>Phone</TableHead><TableHead className="text-right">Actions</TableHead></TableRow></TableHeader>
-                            <TableBody>
+                    <Card>
+                        <CardHeader className="hidden md:block">
+                            <CardTitle>Supplier List</CardTitle>
+                            <CardDescription>All your product suppliers.</CardDescription>
+                        </CardHeader>
+                        <CardContent>
+                            {/* Desktop Table */}
+                            <Table className="hidden md:table">
+                                <TableHeader><TableRow><TableHead>Name</TableHead><TableHead>Contact Person</TableHead><TableHead>Email</TableHead><TableHead>Phone</TableHead><TableHead className="text-right">Actions</TableHead></TableRow></TableHeader>
+                                <TableBody>
+                                    {suppliers.map(s => (
+                                        <TableRow key={s.id}>
+                                            <TableCell className="font-medium">{s.name}</TableCell>
+                                            <TableCell>{s.contactPerson || 'N/A'}</TableCell>
+                                            <TableCell>{s.email || 'N/A'}</TableCell>
+                                            <TableCell>{s.phone || 'N/A'}</TableCell>
+                                            <TableCell className="text-right">
+                                            <DropdownMenu><DropdownMenuTrigger asChild><Button variant="ghost" size="icon"><MoreHorizontal/></Button></DropdownMenuTrigger>
+                                                <DropdownMenuContent><DropdownMenuItem onClick={()=>handleOpenDialog('supplier', s)}>Edit</DropdownMenuItem><DropdownMenuItem onClick={()=>promptDelete('supplier', s)} className="text-destructive">Delete</DropdownMenuItem></DropdownMenuContent></DropdownMenu>
+                                            </TableCell>
+                                        </TableRow>
+                                    ))}
+                                </TableBody>
+                            </Table>
+                            {/* Mobile Card List */}
+                             <div className="md:hidden space-y-4">
                                 {suppliers.map(s => (
-                                    <TableRow key={s.id}>
-                                        <TableCell className="font-medium">{s.name}</TableCell>
-                                        <TableCell>{s.contactPerson || 'N/A'}</TableCell>
-                                        <TableCell>{s.email || 'N/A'}</TableCell>
-                                        <TableCell>{s.phone || 'N/A'}</TableCell>
-                                        <TableCell className="text-right">
-                                           <DropdownMenu><DropdownMenuTrigger asChild><Button variant="ghost" size="icon"><MoreHorizontal/></Button></DropdownMenuTrigger>
-                                            <DropdownMenuContent><DropdownMenuItem onClick={()=>handleOpenDialog('supplier', s)}>Edit</DropdownMenuItem><DropdownMenuItem onClick={()=>promptDelete('supplier', s)} className="text-destructive">Delete</DropdownMenuItem></DropdownMenuContent></DropdownMenu>
-                                        </TableCell>
-                                    </TableRow>
+                                    <Card key={s.id}>
+                                        <CardContent className="p-4 space-y-2">
+                                            <div className="flex justify-between items-start">
+                                                <h3 className="font-bold">{s.name}</h3>
+                                                <DropdownMenu><DropdownMenuTrigger asChild><Button variant="ghost" size="icon" className="h-8 w-8 -mr-2 -mt-2"><MoreHorizontal/></Button></DropdownMenuTrigger><DropdownMenuContent><DropdownMenuItem onClick={()=>handleOpenDialog('supplier', s)}>Edit</DropdownMenuItem><DropdownMenuItem onClick={()=>promptDelete('supplier', s)} className="text-destructive">Delete</DropdownMenuItem></DropdownMenuContent></DropdownMenu>
+                                            </div>
+                                            <div className="text-sm text-muted-foreground space-y-1">
+                                                <p><strong>Contact:</strong> {s.contactPerson || 'N/A'}</p>
+                                                <p><strong>Email:</strong> {s.email || 'N/A'}</p>
+                                                <p><strong>Phone:</strong> {s.phone || 'N/A'}</p>
+                                            </div>
+                                        </CardContent>
+                                    </Card>
                                 ))}
-                            </TableBody>
-                        </Table>
-                    </CardContent></Card>
+                            </div>
+                        </CardContent>
+                    </Card>
                 </TabsContent>
             </Tabs>
 
@@ -216,15 +266,15 @@ export default function InventoryPage() {
                         {dialogOpen === 'product' && (
                            <div className="space-y-4">
                                 <div><Label>Product Name</Label><Input value={(itemToEdit as Product)?.name || ''} onChange={e => setItemToEdit({...itemToEdit, name: e.target.value})} placeholder="e.g., T-Shirt" required disabled={isSaving}/></div>
-                                <div className="grid grid-cols-2 gap-4">
+                                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                                     <div><Label>SKU</Label><Input value={(itemToEdit as Product)?.sku || ''} onChange={e => setItemToEdit({...itemToEdit, sku: e.target.value})} placeholder="Optional" disabled={isSaving}/></div>
                                     <div><Label>Category</Label><Input value={(itemToEdit as Product)?.category || ''} onChange={e => setItemToEdit({...itemToEdit, category: e.target.value})} placeholder="e.g., Apparel" disabled={isSaving}/></div>
                                 </div>
-                                <div className="grid grid-cols-2 gap-4">
+                                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                                     <div><Label>Purchase Price ({currencySymbol})</Label><Input type="number" value={(itemToEdit as Product)?.purchasePrice ?? ''} onChange={e => setItemToEdit({...itemToEdit, purchasePrice: parseFloat(e.target.value) || 0})} required disabled={isSaving}/></div>
                                     <div><Label>Sale Price ({currencySymbol})</Label><Input type="number" value={(itemToEdit as Product)?.salePrice ?? ''} onChange={e => setItemToEdit({...itemToEdit, salePrice: parseFloat(e.target.value) || 0})} required disabled={isSaving}/></div>
                                 </div>
-                                 <div className="grid grid-cols-2 gap-4">
+                                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                                     <div><Label>Initial Quantity</Label><Input type="number" value={(itemToEdit as Product)?.quantity ?? ''} onChange={e => setItemToEdit({...itemToEdit, quantity: parseInt(e.target.value, 10) || 0})} required disabled={isSaving}/></div>
                                     <div><Label>Low Stock Alert</Label><Input type="number" value={(itemToEdit as Product)?.lowStockThreshold || ''} onChange={e => setItemToEdit({...itemToEdit, lowStockThreshold: parseInt(e.target.value, 10) || undefined})} placeholder="e.g. 10" disabled={isSaving}/></div>
                                 </div>

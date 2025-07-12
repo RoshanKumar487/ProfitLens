@@ -32,6 +32,7 @@ import { urlToDataUri } from '@/lib/utils';
 import jsPDF from 'jspdf';
 import html2canvas from 'html2canvas';
 import { Label } from '@/components/ui/label';
+import { cn } from '@/lib/utils';
 
 interface EmployeeWithPayroll {
   id: string; // employeeId for existing, tempId for new
@@ -558,7 +559,7 @@ export default function PayrollPage() {
               <CardTitle>Payroll for {format(payPeriod, 'MMMM yyyy')}</CardTitle>
               <CardDescription>Select a month to view or edit payroll data.</CardDescription>
             </div>
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-2 flex-wrap justify-end">
                 <Popover>
                     <PopoverTrigger asChild>
                     <Button variant={"outline"}>
@@ -633,88 +634,124 @@ export default function PayrollPage() {
             </div>
         </CardHeader>
         <CardContent>
-          <div className="overflow-auto relative" style={{maxHeight: 'calc(100vh - 420px)'}}>
-            <Table>
-              <TableHeader className="sticky top-0 bg-card z-10">
-                <TableRow>
-                  <TableHead className="w-8 p-0 print:hidden"></TableHead>
-                  <TableHead className="w-[250px]">Employee</TableHead>
-                  <TableHead>Base Salary</TableHead>
-                  <TableHead>Working Days</TableHead>
-                  <TableHead>Present Days</TableHead>
-                  <TableHead>OT Days</TableHead>
-                  <TableHead>Gross Earnings</TableHead>
-                  <TableHead>Advances</TableHead>
-                  <TableHead>Other Deductions</TableHead>
-                  <TableHead>PF</TableHead>
-                  <TableHead>ESI</TableHead>
-                  {payrollSettings?.customFields.map(field => field.type === 'number' && <TableHead key={field.id}>{field.label}</TableHead>)}
-                  <TableHead>Total Deductions</TableHead>
-                  <TableHead>Net Payment</TableHead>
-                  <TableHead>Status</TableHead>
-                   <TableHead className="print:hidden">Actions</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
+            {/* Mobile View */}
+            <div className="md:hidden space-y-4">
                 {isLoading ? (
-                  [...Array(3)].map((_, i) => (
-                    <TableRow key={i}>
-                      <TableCell className="print:hidden"></TableCell>
-                      <TableCell><div className="flex items-center gap-2"><Skeleton className="h-10 w-10 rounded-full" /><Skeleton className="h-4 w-32" /></div></TableCell>
-                      {[...Array(columnCount-3)].map((_, j) => (<TableCell key={j}><Skeleton className="h-8 w-24" /></TableCell>))}
-                      <TableCell className="print:hidden"><Skeleton className="h-8 w-8" /></TableCell>
+                    [...Array(3)].map((_,i) => <Skeleton key={i} className="h-48 w-full rounded-lg" />)
+                ) : filteredAndCalculatedData.map(emp => (
+                    <Card key={emp.id}>
+                        <CardHeader>
+                            <div className="flex justify-between items-start">
+                                <div className="flex items-center gap-3">
+                                    <Avatar><AvatarImage src={emp.profilePictureUrl} /><AvatarFallback>{getInitials(emp.name)}</AvatarFallback></Avatar>
+                                    <div>
+                                        <CardTitle className="text-lg">{emp.name}</CardTitle>
+                                        <CardDescription>{emp.position || 'N/A'}</CardDescription>
+                                    </div>
+                                </div>
+                                <DropdownMenu><DropdownMenuTrigger asChild><Button variant="ghost" size="icon" className="h-8 w-8"><MoreHorizontal className="h-4 w-4" /></Button></DropdownMenuTrigger><DropdownMenuContent align="end"><DropdownMenuItem onClick={() => handleOpenPayslipDialog(emp)}><Printer className="mr-2 h-4 w-4" /> Print Payslip</DropdownMenuItem><DropdownMenuItem onClick={() => handleOpenEmailDialog(emp)}><Mail className="mr-2 h-4 w-4" /> Email Payslip</DropdownMenuItem><DropdownMenuSeparator /><DropdownMenuItem onClick={() => promptDelete(emp)} className="text-destructive focus:text-destructive focus:bg-destructive/10"><Trash2 className="mr-2 h-4 w-4" /> Delete Record</DropdownMenuItem></DropdownMenuContent></DropdownMenu>
+                            </div>
+                        </CardHeader>
+                        <CardContent className="space-y-4">
+                             <div className="text-center p-4 rounded-lg bg-primary/10">
+                                <p className="text-sm text-primary font-semibold">Net Payment</p>
+                                <p className="text-3xl font-bold text-primary">{currencySymbol}{emp.netPayment?.toFixed(2) || '0.00'}</p>
+                            </div>
+                            <div className="grid grid-cols-2 gap-4 text-sm">
+                                <div><p className="text-muted-foreground">Base Salary</p><p className="font-semibold">{currencySymbol}{emp.baseSalary?.toFixed(2)}</p></div>
+                                <div><p className="text-muted-foreground">Gross Earnings</p><p className="font-semibold">{currencySymbol}{emp.grossEarnings?.toFixed(2)}</p></div>
+                                <div><p className="text-muted-foreground">Total Deductions</p><p className="font-semibold text-destructive">{currencySymbol}{emp.totalDeductions?.toFixed(2)}</p></div>
+                                <div><p className="text-muted-foreground">Status</p><Button variant={emp.status === 'Paid' ? 'default' : 'secondary'} size="sm" onClick={() => handleStatusChange(emp.id, emp.status === 'Paid' ? 'Pending' : 'Paid')} className="w-20 h-7 text-xs">{emp.status}</Button></div>
+                            </div>
+                             {/* You can add a details button here to show an edit dialog if needed */}
+                        </CardContent>
+                    </Card>
+                ))}
+            </div>
+
+            {/* Desktop View */}
+            <div className="hidden md:block overflow-auto relative" style={{maxHeight: 'calc(100vh - 420px)'}}>
+                <Table>
+                <TableHeader className="sticky top-0 bg-card z-10">
+                    <TableRow>
+                    <TableHead className="w-8 p-0 print:hidden"></TableHead>
+                    <TableHead className="w-[250px] sticky left-0 bg-card z-20">Employee</TableHead>
+                    <TableHead>Base Salary</TableHead>
+                    <TableHead>Working Days</TableHead>
+                    <TableHead>Present Days</TableHead>
+                    <TableHead>OT Days</TableHead>
+                    <TableHead>Gross Earnings</TableHead>
+                    <TableHead>Advances</TableHead>
+                    <TableHead>Other Deductions</TableHead>
+                    <TableHead>PF</TableHead>
+                    <TableHead>ESI</TableHead>
+                    {payrollSettings?.customFields.map(field => field.type === 'number' && <TableHead key={field.id}>{field.label}</TableHead>)}
+                    <TableHead>Total Deductions</TableHead>
+                    <TableHead>Net Payment</TableHead>
+                    <TableHead>Status</TableHead>
+                    <TableHead className="print:hidden sticky right-0 bg-card z-20">Actions</TableHead>
                     </TableRow>
-                  ))
-                ) : filteredAndCalculatedData.length > 0 ? (
-                  filteredAndCalculatedData.map(emp => (
-                    <TableRow key={emp.id} className="group">
-                      <TableCell className="p-0 print:hidden"><div className="flex items-center justify-center"><TooltipProvider><Tooltip><TooltipTrigger asChild><Button variant="ghost" size="icon" className="h-6 w-6 rounded-full opacity-0 group-hover:opacity-100 transition-opacity" onClick={() => handleInsertRow(emp.id)}><PlusCircle className="h-4 w-4" /></Button></TooltipTrigger><TooltipContent side="right"><p>Insert row below</p></TooltipContent></Tooltip></TooltipProvider></div></TableCell>
-                      <TableCell>{emp.isNew ? (<Input placeholder="Enter Employee Name" value={emp.name} onChange={e => handleInputChange(emp.id, 'name', e.target.value)} />) : (<div className="flex items-center gap-2"><Avatar><AvatarImage src={emp.profilePictureUrl} /><AvatarFallback>{getInitials(emp.name)}</AvatarFallback></Avatar><span className="font-medium">{emp.name}</span></div>)}</TableCell>
-                      <TableCell><Input type="number" value={emp.baseSalary} onChange={e => handleInputChange(emp.id, 'baseSalary', e.target.value)} className="w-28" /></TableCell>
-                      <TableCell><Input type="number" value={emp.workingDays} onChange={e => handleInputChange(emp.id, 'workingDays', e.target.value)} className="w-24" /></TableCell>
-                      <TableCell><Input type="number" value={emp.presentDays} onChange={e => handleInputChange(emp.id, 'presentDays', e.target.value)} className="w-24" /></TableCell>
-                      <TableCell><Input type="number" value={emp.otDays} onChange={e => handleInputChange(emp.id, 'otDays', e.target.value)} className="w-24" step="0.1" /></TableCell>
-                      <TableCell className="font-semibold">{currencySymbol}{emp.grossEarnings?.toFixed(2) || '0.00'}</TableCell>
-                      <TableCell><Input type="number" value={emp.advances} onChange={e => handleInputChange(emp.id, 'advances', e.target.value)} className="w-28" /></TableCell>
-                      <TableCell><Input type="number" value={emp.otherDeductions} onChange={e => handleInputChange(emp.id, 'otherDeductions', e.target.value)} className="w-28" /></TableCell>
-                      <TableCell className="text-sm">{currencySymbol}{emp.pfContribution?.toFixed(2) || '0.00'}</TableCell>
-                      <TableCell className="text-sm">{currencySymbol}{emp.esiContribution?.toFixed(2) || '0.00'}</TableCell>
-                       {payrollSettings?.customFields.map(field => {
-                          if (field.type !== 'number') return null;
-                          const value = emp.customFields?.[field.id] ?? '';
-                          return (<TableCell key={field.id}><Input type="number" value={value} onChange={e => handleInputChange(emp.id, field.id, e.target.value)} className="w-28" /></TableCell>);
-                       })}
-                      <TableCell className="font-semibold">{currencySymbol}{emp.totalDeductions?.toFixed(2) || '0.00'}</TableCell>
-                      <TableCell className="font-bold text-lg">{currencySymbol}{emp.netPayment?.toFixed(2) || '0.00'}</TableCell>
-                      <TableCell><Button variant={emp.status === 'Paid' ? 'default' : 'secondary'} size="sm" onClick={() => handleStatusChange(emp.id, emp.status === 'Paid' ? 'Pending' : 'Paid')} className="w-20">{emp.status}</Button></TableCell>
-                      <TableCell className="print:hidden"><DropdownMenu><DropdownMenuTrigger asChild><Button variant="ghost" size="icon" className="h-8 w-8"><MoreHorizontal className="h-4 w-4" /></Button></DropdownMenuTrigger><DropdownMenuContent align="end"><DropdownMenuItem onClick={() => handleOpenPayslipDialog(emp)}><Printer className="mr-2 h-4 w-4" /> Print Payslip</DropdownMenuItem><DropdownMenuItem onClick={() => handleOpenEmailDialog(emp)}><Mail className="mr-2 h-4 w-4" /> Email Payslip</DropdownMenuItem><DropdownMenuSeparator /><DropdownMenuItem onClick={() => promptDelete(emp)} className="text-destructive focus:text-destructive focus:bg-destructive/10"><Trash2 className="mr-2 h-4 w-4" /> Delete Record</DropdownMenuItem></DropdownMenuContent></DropdownMenu></TableCell>
+                </TableHeader>
+                <TableBody>
+                    {isLoading ? (
+                    [...Array(3)].map((_, i) => (
+                        <TableRow key={i}>
+                        <TableCell className="print:hidden"></TableCell>
+                        <TableCell className="sticky left-0 bg-card"><div className="flex items-center gap-2"><Skeleton className="h-10 w-10 rounded-full" /><Skeleton className="h-4 w-32" /></div></TableCell>
+                        {[...Array(columnCount-3)].map((_, j) => (<TableCell key={j}><Skeleton className="h-8 w-24" /></TableCell>))}
+                        <TableCell className="print:hidden sticky right-0 bg-card"><Skeleton className="h-8 w-8" /></TableCell>
+                        </TableRow>
+                    ))
+                    ) : filteredAndCalculatedData.length > 0 ? (
+                    filteredAndCalculatedData.map(emp => (
+                        <TableRow key={emp.id} className="group">
+                        <TableCell className="p-0 print:hidden"><div className="flex items-center justify-center"><TooltipProvider><Tooltip><TooltipTrigger asChild><Button variant="ghost" size="icon" className="h-6 w-6 rounded-full opacity-0 group-hover:opacity-100 transition-opacity" onClick={() => handleInsertRow(emp.id)}><PlusCircle className="h-4 w-4" /></Button></TooltipTrigger><TooltipContent side="right"><p>Insert row below</p></TooltipContent></Tooltip></TooltipProvider></div></TableCell>
+                        <TableCell className="sticky left-0 bg-card group-hover:bg-muted">{emp.isNew ? (<Input placeholder="Enter Employee Name" value={emp.name} onChange={e => handleInputChange(emp.id, 'name', e.target.value)} />) : (<div className="flex items-center gap-2"><Avatar><AvatarImage src={emp.profilePictureUrl} /><AvatarFallback>{getInitials(emp.name)}</AvatarFallback></Avatar><span className="font-medium">{emp.name}</span></div>)}</TableCell>
+                        <TableCell><Input type="number" value={emp.baseSalary} onChange={e => handleInputChange(emp.id, 'baseSalary', e.target.value)} className="w-28" /></TableCell>
+                        <TableCell><Input type="number" value={emp.workingDays} onChange={e => handleInputChange(emp.id, 'workingDays', e.target.value)} className="w-24" /></TableCell>
+                        <TableCell><Input type="number" value={emp.presentDays} onChange={e => handleInputChange(emp.id, 'presentDays', e.target.value)} className="w-24" /></TableCell>
+                        <TableCell><Input type="number" value={emp.otDays} onChange={e => handleInputChange(emp.id, 'otDays', e.target.value)} className="w-24" step="0.1" /></TableCell>
+                        <TableCell className="font-semibold">{currencySymbol}{emp.grossEarnings?.toFixed(2) || '0.00'}</TableCell>
+                        <TableCell><Input type="number" value={emp.advances} onChange={e => handleInputChange(emp.id, 'advances', e.target.value)} className="w-28" /></TableCell>
+                        <TableCell><Input type="number" value={emp.otherDeductions} onChange={e => handleInputChange(emp.id, 'otherDeductions', e.target.value)} className="w-28" /></TableCell>
+                        <TableCell className="text-sm">{currencySymbol}{emp.pfContribution?.toFixed(2) || '0.00'}</TableCell>
+                        <TableCell className="text-sm">{currencySymbol}{emp.esiContribution?.toFixed(2) || '0.00'}</TableCell>
+                        {payrollSettings?.customFields.map(field => {
+                            if (field.type !== 'number') return null;
+                            const value = emp.customFields?.[field.id] ?? '';
+                            return (<TableCell key={field.id}><Input type="number" value={value} onChange={e => handleInputChange(emp.id, field.id, e.target.value)} className="w-28" /></TableCell>);
+                        })}
+                        <TableCell className="font-semibold">{currencySymbol}{emp.totalDeductions?.toFixed(2) || '0.00'}</TableCell>
+                        <TableCell className="font-bold text-lg">{currencySymbol}{emp.netPayment?.toFixed(2) || '0.00'}</TableCell>
+                        <TableCell><Button variant={emp.status === 'Paid' ? 'default' : 'secondary'} size="sm" onClick={() => handleStatusChange(emp.id, emp.status === 'Paid' ? 'Pending' : 'Paid')} className="w-20">{emp.status}</Button></TableCell>
+                        <TableCell className="print:hidden sticky right-0 bg-card group-hover:bg-muted"><DropdownMenu><DropdownMenuTrigger asChild><Button variant="ghost" size="icon" className="h-8 w-8"><MoreHorizontal className="h-4 w-4" /></Button></DropdownMenuTrigger><DropdownMenuContent align="end"><DropdownMenuItem onClick={() => handleOpenPayslipDialog(emp)}><Printer className="mr-2 h-4 w-4" /> Print Payslip</DropdownMenuItem><DropdownMenuItem onClick={() => handleOpenEmailDialog(emp)}><Mail className="mr-2 h-4 w-4" /> Email Payslip</DropdownMenuItem><DropdownMenuSeparator /><DropdownMenuItem onClick={() => promptDelete(emp)} className="text-destructive focus:text-destructive focus:bg-destructive/10"><Trash2 className="mr-2 h-4 w-4" /> Delete Record</DropdownMenuItem></DropdownMenuContent></DropdownMenu></TableCell>
+                        </TableRow>
+                    ))
+                    ) : (
+                    <TableRow><TableCell colSpan={columnCount} className="text-center h-24">{searchTerm || statusFilter !== 'All' ? 'No employees match your filters.' : 'No employees found. Add employees on the Employees page or add a new row manually.'}</TableCell></TableRow>
+                    )}
+                </TableBody>
+                <TableFooter className="sticky bottom-0 bg-muted z-10">
+                    <TableRow className="font-bold">
+                        <TableCell className="print:hidden"></TableCell>
+                        <TableCell className="sticky left-0 bg-muted z-20">Totals</TableCell>
+                        <TableCell>{currencySymbol}{totals.baseSalary.toFixed(2)}</TableCell>
+                        <TableCell></TableCell>
+                        <TableCell>{totals.presentDays}</TableCell>
+                        <TableCell>{totals.otDays}</TableCell>
+                        <TableCell>{currencySymbol}{totals.grossEarnings.toFixed(2)}</TableCell>
+                        <TableCell>{currencySymbol}{totals.advances.toFixed(2)}</TableCell>
+                        <TableCell>{currencySymbol}{totals.otherDeductions.toFixed(2)}</TableCell>
+                        <TableCell>{currencySymbol}{totals.pfContribution.toFixed(2)}</TableCell>
+                        <TableCell>{currencySymbol}{totals.esiContribution.toFixed(2)}</TableCell>
+                        {payrollSettings?.customFields.map(field => field.type === 'number' && <TableCell key={`total-${field.id}`}>{currencySymbol}{(totals.customFields[field.id] || 0).toFixed(2)}</TableCell>)}
+                        <TableCell>{currencySymbol}{totals.totalDeductions.toFixed(2)}</TableCell>
+                        <TableCell>{currencySymbol}{totals.netPayment.toFixed(2)}</TableCell>
+                        <TableCell colSpan={2} className="print:hidden sticky right-0 bg-muted z-20"></TableCell>
                     </TableRow>
-                  ))
-                ) : (
-                  <TableRow><TableCell colSpan={columnCount} className="text-center h-24">{searchTerm || statusFilter !== 'All' ? 'No employees match your filters.' : 'No employees found. Add employees on the Employees page or add a new row manually.'}</TableCell></TableRow>
-                )}
-              </TableBody>
-              <TableFooter className="sticky bottom-0 bg-muted z-10">
-                  <TableRow className="font-bold">
-                      <TableCell className="print:hidden"></TableCell>
-                      <TableCell>Totals</TableCell>
-                      <TableCell>{currencySymbol}{totals.baseSalary.toFixed(2)}</TableCell>
-                      <TableCell></TableCell>
-                      <TableCell>{totals.presentDays}</TableCell>
-                      <TableCell>{totals.otDays}</TableCell>
-                      <TableCell>{currencySymbol}{totals.grossEarnings.toFixed(2)}</TableCell>
-                      <TableCell>{currencySymbol}{totals.advances.toFixed(2)}</TableCell>
-                      <TableCell>{currencySymbol}{totals.otherDeductions.toFixed(2)}</TableCell>
-                      <TableCell>{currencySymbol}{totals.pfContribution.toFixed(2)}</TableCell>
-                      <TableCell>{currencySymbol}{totals.esiContribution.toFixed(2)}</TableCell>
-                      {payrollSettings?.customFields.map(field => field.type === 'number' && <TableCell key={`total-${field.id}`}>{currencySymbol}{(totals.customFields[field.id] || 0).toFixed(2)}</TableCell>)}
-                      <TableCell>{currencySymbol}{totals.totalDeductions.toFixed(2)}</TableCell>
-                      <TableCell>{currencySymbol}{totals.netPayment.toFixed(2)}</TableCell>
-                      <TableCell colSpan={2} className="print:hidden"></TableCell>
-                  </TableRow>
-              </TableFooter>
-            </Table>
-          </div>
+                </TableFooter>
+                </Table>
+            </div>
         </CardContent>
         <CardFooter className="pt-4 print:hidden">
           <Button variant="outline" size="sm" onClick={handleAddRow}><PlusCircle className="mr-2 h-4 w-4" /> Add Employee Row</Button>
@@ -723,7 +760,7 @@ export default function PayrollPage() {
         <AlertDialog open={!!employeeToDelete} onOpenChange={(open) => !open && setEmployeeToDelete(null)}>
             <AlertDialogContent>
                 <AlertDialogHeader><AlertDialogTitle>Are you sure?</AlertDialogTitle><AlertDialogDescription>{employeeToDelete?.isNew ? (<>This will remove <strong>{employeeToDelete?.name || 'this new row'}</strong> from the current payroll view. No data will be deleted.</>) : (<>This will permanently delete the payroll record for <strong>{employeeToDelete?.name}</strong> for this month. This action cannot be undone.</>)}</AlertDialogDescription></AlertDialogHeader>
-                <AlertDialogFooter><AlertDialogCancel onClick={() => setEmployeeToDelete(null)} disabled={isDeleting}>Cancel</AlertDialogCancel><AlertDialogAction onClick={handleConfirmDelete} disabled={isDeleting} className={employeeToDelete?.isNew ? "" : "bg-destructive hover:bg-destructive/90"}>{isDeleting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : (employeeToDelete?.isNew ? 'Remove' : 'Delete')}</AlertDialogAction></AlertDialogFooter>
+                <AlertDialogFooter><AlertDialogCancel onClick={() => setEmployeeToDelete(null)} disabled={isDeleting}>Cancel</AlertDialogCancel><AlertDialogAction onClick={handleConfirmDelete} disabled={isDeleting} className={cn(employeeToDelete?.isNew ? "" : "bg-destructive hover:bg-destructive/90")}>{isDeleting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : (employeeToDelete?.isNew ? 'Remove' : 'Delete')}</AlertDialogAction></AlertDialogFooter>
             </AlertDialogContent>
         </AlertDialog>
         <Dialog open={isPayslipDialogOpen} onOpenChange={setIsPayslipDialogOpen}>
