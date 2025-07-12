@@ -24,7 +24,7 @@ interface InvoiceItem { id: string; description: string; quantity: number; unitP
 interface InvoiceFirestore { invoiceNumber: string; clientName: string; clientEmail?: string; amount: number; subtotal: number; discountAmount: number; taxAmount: number; issuedDate: Timestamp; dueDate: Timestamp; status: string; notes?: string; items?: InvoiceItem[]; }
 interface RevenueEntryFirestore { date: Timestamp; amount: number; source: string; description?: string; }
 interface BankTransactionFirestore { date: Timestamp; amount: number; type: 'deposit' | 'withdrawal'; category: string; description: string; accountId: string; }
-interface ProductFirestore { name: string; sku: string; category: string; itemType: 'Goods' | 'Service'; unit: string; salePrice: number; purchasePrice: number; gstRate: number; quantity?: number; lowStockThreshold?: number; createdAt: Timestamp; updatedAt?: Timestamp; }
+interface ProductFirestore { name: string; sku: string; category: string; itemType: 'Goods' | 'Service'; unit: string; salePrice: number; purchasePrice: number; gstRate: number; quantity?: number; lowStockThreshold?: number; customFields?: { [key: string]: string; }; createdAt: Timestamp; updatedAt?: Timestamp; }
 
 
 export default function ReportsPage() {
@@ -101,7 +101,7 @@ export default function ReportsPage() {
         return;
       }
 
-      const filenameBase = `ProfitLens_${reportType}_${format(fromDate, 'yyyyMMdd')}_to_${format(toDate, 'yyyyMMdd')}`;
+      const filenameBase = `InventoryOS_${reportType}_${format(fromDate, 'yyyyMMdd')}_to_${format(toDate, 'yyyyMMdd')}`;
       
       if (exportFormat === 'csv') {
         const csvRows = [
@@ -114,7 +114,9 @@ export default function ReportsPage() {
       } else { // PDF logic
         const { default: jsPDF } = await import('jspdf');
         await import('jspdf-autotable'); // For side effects
-        const doc = new jsPDF();
+        const doc = new jsPDF({
+          orientation: 'landscape',
+        });
         
         doc.text(`${reportType} Report`, 14, 16);
         doc.setFontSize(10);
@@ -125,7 +127,8 @@ export default function ReportsPage() {
           body: dataToExport.map(row => headers.map(header => String(row[header] ?? ''))),
           startY: 28,
           headStyles: { fillColor: [30, 78, 140] }, // Blue header
-          styles: { fontSize: 8 },
+          styles: { fontSize: 7, cellPadding: 2 },
+          margin: { top: 28 },
         });
 
         doc.save(`${filenameBase}.pdf`);
@@ -260,7 +263,7 @@ export default function ReportsPage() {
             isExportingEmployees,
             (exportFormat) => handleExport(
                 exportFormat,
-                'Employees', 'employees', employeeFromDate, employeeToDate, 'createdAt',
+                'Team', 'employees', employeeFromDate, employeeToDate, 'createdAt',
                 ['ID', 'Name', 'Position', 'Salary', 'Description', 'Added By', 'Profile Picture URL', 'Associated File Name', 'Associated File URL', 'Created At', 'Updated At'],
                 (doc) => {
                     const data = doc.data() as EmployeeFirestore;
@@ -283,36 +286,8 @@ export default function ReportsPage() {
             'creation'
         )}
         {renderReportCard(
-            'Expense Report',
-            'Export a list of all expenses.',
-            TrendingDown,
-            expenseFromDate,
-            setExpenseFromDate,
-            expenseToDate,
-            setExpenseToDate,
-            isExportingExpenses,
-            (exportFormat) => handleExport(
-                exportFormat,
-                'Expenses', 'expenses', expenseFromDate, expenseToDate, 'date',
-                ['Date', 'Amount', 'Category', 'Vendor', 'Description', 'Added By'],
-                (doc) => {
-                    const data = doc.data() as ExpenseFirestore;
-                    return {
-                        'Date': format(data.date.toDate(), 'yyyy-MM-dd'), 
-                        'Amount': data.amount.toFixed(2),
-                        'Category': data.category, 
-                        'Vendor': data.vendor || '', 
-                        'Description': data.description || '',
-                        'Added By': data.addedBy || 'N/A',
-                    };
-                },
-                setIsExportingExpenses
-            ),
-            'expense'
-        )}
-        {renderReportCard(
-            'Itemized Invoice Report',
-            'Export a detailed list of all invoice items.',
+            'Itemized Sales Report',
+            'Export a detailed list of all sold items.',
             ReceiptIcon,
             invoiceFromDate,
             setInvoiceFromDate,
@@ -321,7 +296,7 @@ export default function ReportsPage() {
             isExportingInvoices,
             (exportFormat) => handleExport(
                 exportFormat,
-                'Invoices', 'invoices', invoiceFromDate, invoiceToDate, 'issuedDate',
+                'Sales & Orders', 'invoices', invoiceFromDate, invoiceToDate, 'issuedDate',
                 ['Invoice Number', 'Invoice Status', 'Issued Date', 'Due Date', 'Client Name', 'Item Description', 'Item Quantity', 'Item Unit Price', 'Item Total'],
                 (doc) => {
                     const data = doc.data() as InvoiceFirestore;
@@ -355,59 +330,6 @@ export default function ReportsPage() {
             'issued'
         )}
         {renderReportCard(
-            'Revenue Report',
-            'Export a list of all revenue entries.',
-            DollarSign,
-            revenueFromDate,
-            setRevenueFromDate,
-            revenueToDate,
-            setRevenueToDate,
-            isExportingRevenue,
-            (exportFormat) => handleExport(
-                exportFormat,
-                'Revenue', 'revenueEntries', revenueFromDate, revenueToDate, 'date',
-                ['Date', 'Amount', 'Source', 'Description'],
-                (doc) => {
-                    const data = doc.data() as RevenueEntryFirestore;
-                    return {
-                        'Date': format(data.date.toDate(), 'yyyy-MM-dd'), 'Amount': data.amount.toFixed(2),
-                        'Source': data.source, 'Description': data.description || '',
-                    };
-                },
-                setIsExportingRevenue
-            ),
-            'revenue'
-        )}
-         {renderReportCard(
-            'Bank Transactions Report',
-            'Export all bank account transactions.',
-            Banknote,
-            bankTransactionFromDate,
-            setBankTransactionFromDate,
-            bankTransactionToDate,
-            setBankTransactionToDate,
-            isExportingBankTransactions,
-            (exportFormat) => handleExport(
-                exportFormat,
-                'Bank Transactions', 'transactions', bankTransactionFromDate, bankTransactionToDate, 'date',
-                ['Date', 'Account ID', 'Type', 'Amount', 'Category', 'Description'],
-                (doc) => {
-                    const data = doc.data() as BankTransactionFirestore;
-                    return {
-                        'Date': format(data.date.toDate(), 'yyyy-MM-dd'), 
-                        'Account ID': data.accountId,
-                        'Type': data.type,
-                        'Amount': data.amount.toFixed(2),
-                        'Category': data.category,
-                        'Description': data.description,
-                    };
-                },
-                setIsExportingBankTransactions,
-                true // Use collectionGroup query
-            ),
-            'transaction'
-        )}
-        {renderReportCard(
             'Products & Services Report',
             'Export your entire item catalog with stock levels.',
             Package,
@@ -416,29 +338,42 @@ export default function ReportsPage() {
             productToDate,
             setProductToDate,
             isExportingProducts,
-            (exportFormat) => handleExport(
-                exportFormat,
-                'Products & Services', 'products', productFromDate, productToDate, 'createdAt',
-                ['ID', 'Name', 'SKU', 'Category', 'Item Type', 'Unit', 'Sale Price', 'Purchase Price', 'GST Rate (%)', 'Stock Quantity', 'Low Stock Threshold', 'Created At'],
-                (doc) => {
-                    const data = doc.data() as ProductFirestore;
-                    return {
-                        'ID': doc.id,
-                        'Name': data.name,
-                        'SKU': data.sku,
-                        'Category': data.category,
-                        'Item Type': data.itemType,
-                        'Unit': data.unit,
-                        'Sale Price': data.salePrice.toFixed(2),
-                        'Purchase Price': data.purchasePrice.toFixed(2),
-                        'GST Rate (%)': data.gstRate.toFixed(2),
-                        'Stock Quantity': data.quantity ?? 'N/A',
-                        'Low Stock Threshold': data.lowStockThreshold ?? 'N/A',
-                        'Created At': format(data.createdAt.toDate(), 'yyyy-MM-dd HH:mm:ss'),
-                    };
-                },
-                setIsExportingProducts
-            ),
+            (exportFormat) => {
+                const customHeaders = productSettings?.customFields.map(f => f.label) || [];
+                const allHeaders = ['ID', 'Name', 'SKU', 'Category', 'Item Type', 'Unit', ...customHeaders, 'Sale Price', 'Purchase Price', 'GST Rate (%)', 'Stock Quantity', 'Low Stock Threshold', 'Created At'];
+                
+                handleExport(
+                    exportFormat,
+                    'Products & Services', 'products', productFromDate, productToDate, 'createdAt',
+                    allHeaders,
+                    (doc) => {
+                        const data = doc.data() as ProductFirestore;
+                        const customFieldsData: Record<string, string> = {};
+                        if (productSettings?.customFields) {
+                            for (const field of productSettings.customFields) {
+                                customFieldsData[field.label] = data.customFields?.[field.id] || '';
+                            }
+                        }
+
+                        return {
+                            'ID': doc.id,
+                            'Name': data.name,
+                            'SKU': data.sku,
+                            'Category': data.category,
+                            'Item Type': data.itemType,
+                            'Unit': data.unit,
+                            ...customFieldsData,
+                            'Sale Price': data.salePrice.toFixed(2),
+                            'Purchase Price': data.purchasePrice.toFixed(2),
+                            'GST Rate (%)': data.gstRate.toFixed(2),
+                            'Stock Quantity': data.quantity ?? 'N/A',
+                            'Low Stock Threshold': data.lowStockThreshold ?? 'N/A',
+                            'Created At': format(data.createdAt.toDate(), 'yyyy-MM-dd HH:mm:ss'),
+                        };
+                    },
+                    setIsExportingProducts
+                )
+            },
             'creation'
         )}
       </div>
