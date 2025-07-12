@@ -213,7 +213,7 @@ const AppShellLayout = ({ children }: { children: React.ReactNode }) => {
 
       <SidebarInset className={cn(isAuthPage && "md:!ml-0")}>
         {!isAuthPage && (
-           <header className="sticky top-0 z-30 border-b border-border bg-background/80 backdrop-blur-sm print:hidden">
+           <header className="sticky top-0 z-30 border-b border-sidebar-border/20 bg-sidebar backdrop-blur-md print:hidden">
               <div className="mx-auto flex h-14 max-w-7xl items-center gap-4 px-4 sm:px-6">
                 <SidebarTrigger className="md:hidden" />
                 
