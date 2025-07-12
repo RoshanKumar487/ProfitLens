@@ -136,7 +136,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
           
           const authPages = ['/auth/signin', '/auth/signup', '/auth/forgot-password'];
           if (authPages.includes(pathname)) {
-            router.push('/');
+            router.push('/dashboard');
           }
         } else {
           setUser(null);
