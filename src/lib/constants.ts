@@ -45,13 +45,7 @@ export const NAV_ITEMS: NavItem[] = [
     label: 'Products & Services',
     href: '/products-services',
     icon: Package,
-    description: 'Manage your master list of all items you buy and sell.',
-  },
-  {
-    label: 'Stock Management',
-    href: '/inventory',
-    icon: Warehouse,
-    description: 'Track stock levels, suppliers, and inventory value for your goods.',
+    description: 'Manage your entire catalog of items and their stock levels.',
   },
   {
     label: 'My Tools',
@@ -103,3 +97,4 @@ export const NAV_ITEMS: NavItem[] = [
     description: 'Manage all companies and users across the platform.',
   }
 ];
+

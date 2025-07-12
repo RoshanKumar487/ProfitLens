@@ -27,6 +27,8 @@ type ProductDisplay = {
   salePrice: number;
   purchasePrice: number;
   gstRate: number;
+  quantity?: number;
+  lowStockThreshold?: number;
   isNew?: boolean;
 };
 
@@ -68,7 +70,7 @@ export default function ProductsServicesPage() {
       setProducts(prev =>
         prev.map(p => {
           if (p.id === productId) {
-            const parsedValue = ['purchasePrice', 'salePrice', 'gstRate'].includes(field)
+            const parsedValue = ['purchasePrice', 'salePrice', 'gstRate', 'quantity', 'lowStockThreshold'].includes(field)
               ? parseFloat(value) || 0
               : value;
             return { ...p, [field]: parsedValue };
@@ -90,6 +92,8 @@ export default function ProductsServicesPage() {
         salePrice: 0,
         purchasePrice: 0,
         gstRate: 0,
+        quantity: 0,
+        lowStockThreshold: 10,
       };
       setProducts(prev => [...prev, newProduct]);
     };
@@ -104,23 +108,27 @@ export default function ProductsServicesPage() {
         if (!product.name) continue;
 
         const { id, isNew, ...productData } = product;
+        const isGoods = productData.itemType === 'Goods';
+
+        const dataToSave = {
+          ...productData,
+          quantity: isGoods ? (productData.quantity ?? 0) : undefined,
+          lowStockThreshold: isGoods ? (productData.lowStockThreshold ?? 10) : undefined,
+          updatedAt: serverTimestamp(),
+        };
 
         if (isNew) {
           const newProductRef = doc(collection(db, 'products'));
           batch.set(newProductRef, {
-            ...productData,
+            ...dataToSave,
             companyId: user.companyId,
-            // For inventory-only items, we might not have these, but good to keep structure
-            quantity: productData.itemType === 'Goods' ? 0 : undefined,
-            lowStockThreshold: productData.itemType === 'Goods' ? 10 : undefined,
             createdAt: serverTimestamp(),
-            updatedAt: serverTimestamp(),
           });
           changesCount++;
         } else {
           // In a real app, you would compare with original data to avoid unnecessary writes
           const productRef = doc(db, 'products', id);
-          batch.update(productRef, { ...productData, updatedAt: serverTimestamp() });
+          batch.update(productRef, dataToSave);
           changesCount++; // Simplified for now
         }
       }
@@ -170,14 +178,14 @@ export default function ProductsServicesPage() {
 
     return (
         <div className="space-y-6 p-4 sm:p-6 lg:p-8">
-            <PageTitle title="Products & Services" subtitle="Manage your entire catalog of goods and services." icon={Package} />
+            <PageTitle title="Products & Services" subtitle="Manage your entire catalog of goods, services, and stock levels." icon={Package} />
             
             <Card>
                  <CardHeader>
                     <div className="flex justify-between items-center">
                         <div>
                             <CardTitle>Item Master</CardTitle>
-                            <CardDescription>This is your master list of all items you buy or sell.</CardDescription>
+                            <CardDescription>This is your master list of all items you buy, sell, and stock.</CardDescription>
                         </div>
                         <Button onClick={handleSaveAllProducts} disabled={isSaving}>
                             {isSaving ? <Loader2 className="mr-2 h-4 w-4 animate-spin"/> : <Save className="mr-2 h-4 w-4" />} Save All
@@ -197,11 +205,18 @@ export default function ProductsServicesPage() {
                                 <TableHead>Sale Price ({currencySymbol})</TableHead>
                                 <TableHead>Purchase Price ({currencySymbol})</TableHead>
                                 <TableHead>GST Rate (%)</TableHead>
+                                <TableHead>Stock Qty</TableHead>
+                                <TableHead>Low Stock Alert</TableHead>
+                                <TableHead>Stock Value ({currencySymbol})</TableHead>
                                 <TableHead className="w-[50px] sticky right-0 bg-card z-20"></TableHead>
                             </TableRow>
                         </TableHeader>
                         <TableBody>
-                            {products.map(p => (
+                            {products.map(p => {
+                              const isGoods = p.itemType === 'Goods';
+                              const stockValue = isGoods ? (p.quantity || 0) * p.purchasePrice : 0;
+                              
+                              return (
                                 <TableRow key={p.id} className="group">
                                     <TableCell className="font-medium sticky left-0 bg-card group-hover:bg-muted">
                                     <Input value={p.name} onChange={e => handleProductInputChange(p.id, 'name', e.target.value)} placeholder="New Item Name" />
@@ -223,11 +238,15 @@ export default function ProductsServicesPage() {
                                     <TableCell><Input type="number" value={p.salePrice} onChange={e => handleProductInputChange(p.id, 'salePrice', e.target.value)} className="w-28" /></TableCell>
                                     <TableCell><Input type="number" value={p.purchasePrice} onChange={e => handleProductInputChange(p.id, 'purchasePrice', e.target.value)} className="w-28" /></TableCell>
                                     <TableCell><Input type="number" value={p.gstRate} onChange={e => handleProductInputChange(p.id, 'gstRate', e.target.value)} className="w-24"/></TableCell>
+                                    <TableCell><Input type="number" value={p.quantity || ''} onChange={e => handleProductInputChange(p.id, 'quantity', e.target.value)} className="w-24" disabled={!isGoods} /></TableCell>
+                                    <TableCell><Input type="number" value={p.lowStockThreshold || ''} onChange={e => handleProductInputChange(p.id, 'lowStockThreshold', e.target.value)} className="w-28" disabled={!isGoods} /></TableCell>
+                                    <TableCell className="font-semibold text-right">{isGoods ? stockValue.toFixed(2) : 'N/A'}</TableCell>
                                     <TableCell className="sticky right-0 bg-card group-hover:bg-muted">
                                     <Button variant="ghost" size="icon" onClick={() => promptDelete(p)}><Trash2 className="h-4 w-4 text-destructive"/></Button>
                                     </TableCell>
                                 </TableRow>
-                            ))}
+                              )
+                            })}
                         </TableBody>
                     </Table>
                     </div>
