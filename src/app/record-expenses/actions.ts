@@ -3,10 +3,6 @@
 
 import { db } from '@/lib/firebaseConfig';
 import { collection, doc, updateDoc, deleteDoc, Timestamp, serverTimestamp, writeBatch, query, where, getDocs, limit, orderBy } from 'firebase/firestore';
-import { getAuth } from 'firebase-admin/auth';
-import { app as adminApp } from '@/lib/firebaseAdminConfig';
-import { headers } from 'next/headers';
-
 
 export interface ExpenseUpdateData {
   date: Date;
@@ -28,23 +24,7 @@ export interface ExpenseImportData {
   employeeName?: string;
 }
 
-// Helper to get company ID from the user's session token
-async function getCompanyIdForCurrentUser(): Promise<string | null> {
-  const idToken = headers().get('x-firebase-id-token');
-  if (!idToken) return null;
-  
-  try {
-    const decodedToken = await getAuth(adminApp).verifyIdToken(idToken);
-    const userDocSnap = await getDoc(doc(db, 'users', decodedToken.uid));
-    return userDocSnap.exists() ? userDocSnap.data().companyId : null;
-  } catch (error) {
-    console.error("Error getting current user's company ID:", error);
-    return null;
-  }
-}
-
-export async function searchEmployees(searchTerm: string): Promise<{ id: string; name: string }[]> {
-  const companyId = await getCompanyIdForCurrentUser();
+export async function searchEmployees(searchTerm: string, companyId: string): Promise<{ id: string; name: string }[]> {
   if (!companyId) {
     console.error("Action Error: Could not verify company ID for employee search.");
     return [];
@@ -99,7 +79,7 @@ export async function bulkAddExpenses(
         const newExpenseRef = doc(collection(db, 'expenses'));
         batch.set(newExpenseRef, {
           ...expense,
-          date: Timestamp.fromDate(expense.date), // Convert JS Date to Firestore Timestamp
+          date: expense.date instanceof Date ? Timestamp.fromDate(expense.date) : expense.date,
           companyId,
           addedById,
           addedBy,

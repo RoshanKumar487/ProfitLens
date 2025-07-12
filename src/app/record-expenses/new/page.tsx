@@ -13,13 +13,13 @@ import { Calendar } from '@/components/ui/calendar';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { CalendarIcon, TrendingDown, Save, Loader2, Search } from 'lucide-react';
-import { format } from 'date-fns';
+import { format, parseISO } from 'date-fns';
 import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/contexts/AuthContext';
 import { db } from '@/lib/firebaseConfig';
 import { collection, addDoc, Timestamp, serverTimestamp } from 'firebase/firestore';
 import Link from 'next/link';
-import { searchEmployees } from '../actions'; // Import the new server action
+import { searchEmployees } from '../actions'; 
 
 const EXPENSE_CATEGORIES = [
   'Software & Subscriptions', 'Marketing & Advertising', 'Office Supplies',
@@ -45,7 +45,6 @@ export default function NewExpensePage() {
   const [vendor, setVendor] = useState<string>('');
   const [isSaving, setIsSaving] = useState(false);
   
-  // State for new employee search field
   const [employeeName, setEmployeeName] = useState('');
   const [employeeSuggestions, setEmployeeSuggestions] = useState<EmployeeSuggestion[]>([]);
   const [selectedEmployee, setSelectedEmployee] = useState<EmployeeSuggestion | null>(null);
@@ -54,7 +53,6 @@ export default function NewExpensePage() {
 
 
   useEffect(() => {
-    // Pre-fill form from URL query parameters
     const urlAmount = searchParams.get('amount');
     const urlVendor = searchParams.get('vendor');
     const urlDescription = searchParams.get('description');
@@ -68,16 +66,16 @@ export default function NewExpensePage() {
         setCategory(urlCategory);
     }
     if (urlDate) {
-        const parsedDate = new Date(urlDate);
+        // Handle both ISO string and other potential date formats
+        const parsedDate = urlDate.includes('T') ? parseISO(urlDate) : new Date(urlDate);
         if (!isNaN(parsedDate.getTime())) {
             setDate(parsedDate);
         }
     }
   }, [searchParams]);
 
-  // Effect for searching employees
   useEffect(() => {
-    if (employeeName.trim().length < 1) {
+    if (employeeName.trim().length < 1 || !user?.companyId) {
         setEmployeeSuggestions([]);
         setShowSuggestions(false);
         if (selectedEmployee) setSelectedEmployee(null);
@@ -91,8 +89,7 @@ export default function NewExpensePage() {
     const timer = setTimeout(async () => {
         setIsSearching(true);
         try {
-            // Use the Server Action instead of fetch
-            const data = await searchEmployees(employeeName);
+            const data = await searchEmployees(employeeName, user.companyId!);
             setEmployeeSuggestions(data);
             setShowSuggestions(true);
         } catch (error) {
@@ -107,7 +104,7 @@ export default function NewExpensePage() {
     }, 300);
 
     return () => clearTimeout(timer);
-  }, [employeeName, selectedEmployee, toast]);
+  }, [employeeName, selectedEmployee, toast, user?.companyId]);
 
   const handleSelectEmployee = (employee: EmployeeSuggestion) => {
     setSelectedEmployee(employee);
@@ -135,16 +132,15 @@ export default function NewExpensePage() {
 
     setIsSaving(true);
     
-    // Determine employee details to save
     const finalEmployeeId = selectedEmployee ? selectedEmployee.id : null;
-    const finalEmployeeName = employeeName || null;
+    const finalEmployeeName = finalEmployeeId ? selectedEmployee?.name : (employeeName || null);
 
     const newEntryPayload = {
       date: Timestamp.fromDate(date),
       amount: amountNum,
       category: category,
       description: description || '',
-      vendor: vendor || '', // Keep vendor for non-advance expenses
+      vendor: vendor || '',
       employeeId: finalEmployeeId,
       employeeName: finalEmployeeName,
       companyId: user.companyId,

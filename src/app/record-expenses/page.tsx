@@ -18,18 +18,19 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow, TableCap
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { CalendarIcon, TrendingDown, Save, Loader2, MoreHorizontal, Edit, Trash2, Upload, PlusCircle, ScanLine, Camera, ArrowUp, ArrowDown, ChevronsUpDown } from 'lucide-react';
-import { format } from 'date-fns';
+import { format, parseISO } from 'date-fns';
 import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/contexts/AuthContext';
 import { db } from '@/lib/firebaseConfig';
 import { collection, getDocs, query, where, orderBy, Timestamp, limit, startAfter, endBefore, limitToLast, type QueryDocumentSnapshot, type DocumentData } from 'firebase/firestore';
 import * as xlsx from 'xlsx';
 import { updateExpenseEntry, deleteExpenseEntry, type ExpenseUpdateData, bulkAddExpenses, type ExpenseImportData } from './actions';
-import { analyzeReceipt } from '@/ai/flows/analyze-receipt-flow';
+import { analyzeReceipt, type AnalyzeReceiptOutput } from '@/ai/flows/analyze-receipt-flow';
 import { Skeleton } from '@/components/ui/skeleton';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { Pagination, PaginationContent, PaginationItem, PaginationNext, PaginationPrevious } from '@/components/ui/pagination';
+import { v4 as uuidv4 } from 'uuid';
 
 const EXPENSE_CATEGORIES = [
   'Software & Subscriptions', 'Marketing & Advertising', 'Office Supplies',
@@ -70,6 +71,9 @@ interface ExpenseEntryDisplay {
   createdAt: Timestamp;
 }
 
+type ParsedReceipt = AnalyzeReceiptOutput & { id: string, image: string };
+
+
 const RECORDS_PER_PAGE = 20;
 
 export default function RecordExpensesPage() {
@@ -98,11 +102,14 @@ export default function RecordExpensesPage() {
   const [parsedExpenses, setParsedExpenses] = useState<ExpenseImportData[]>([]);
   const [isImporting, setIsImporting] = useState(false);
 
+  // States for the new bulk scanner
   const [isScanDialogOpen, setIsScanDialogOpen] = useState(false);
+  const [isCameraActive, setIsCameraActive] = useState(false);
   const [isInitializingCamera, setIsInitializingCamera] = useState(false);
   const [isScanning, setIsScanning] = useState(false);
   const [hasCameraPermission, setHasCameraPermission] = useState<boolean | null>(null);
-
+  const [scannedReceipts, setScannedReceipts] = useState<ParsedReceipt[]>([]);
+  
   const videoRef = useRef<HTMLVideoElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
 
@@ -112,7 +119,6 @@ export default function RecordExpensesPage() {
       return;
     }
     
-    // Fetch employees for the dropdown
     try {
         const empQuery = query(collection(db, 'employees'), where('companyId', '==', user.companyId), orderBy('name'));
         const empSnapshot = await getDocs(empQuery);
@@ -186,15 +192,13 @@ export default function RecordExpensesPage() {
       fetchInitialData();
       handleSortChange('date');
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [user, authIsLoading]);
+  }, [user, authIsLoading, fetchInitialData]);
   
   useEffect(() => {
     if (!authIsLoading && user) {
         fetchExpenseEntries('reset');
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [sortConfig]);
+  }, [sortConfig, authIsLoading, user, fetchExpenseEntries]);
   
   const handlePageChange = (direction: 'next' | 'prev') => {
     let newPage = currentPage;
@@ -366,100 +370,108 @@ export default function RecordExpensesPage() {
     }
     setIsImporting(false);
   };
+  
+    const cleanupWebcam = useCallback(() => {
+        if (videoRef.current && videoRef.current.srcObject) {
+            const stream = videoRef.current.srcObject as MediaStream;
+            stream.getTracks().forEach(track => track.stop());
+            videoRef.current.srcObject = null;
+        }
+        setIsCameraActive(false);
+    }, []);
 
-  const cleanupWebcam = useCallback(() => {
-    if (videoRef.current && videoRef.current.srcObject) {
-      const stream = videoRef.current.srcObject as MediaStream;
-      stream.getTracks().forEach(track => track.stop());
-      videoRef.current.srcObject = null;
-    }
-  }, []);
-
-  useEffect(() => {
-      const getCameraPermission = async () => {
-        if (isScanDialogOpen) {
-          setIsInitializingCamera(true);
-          try {
+    const startWebcam = useCallback(async () => {
+        cleanupWebcam();
+        setIsInitializingCamera(true);
+        try {
             const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } });
             setHasCameraPermission(true);
             if (videoRef.current) {
-              videoRef.current.srcObject = stream;
+                videoRef.current.srcObject = stream;
             }
-          } catch (error) {
+            setIsCameraActive(true);
+        } catch (error) {
             console.error('Error accessing camera:', error);
             setHasCameraPermission(false);
-            toast({
-              variant: 'destructive',
-              title: 'Camera Access Denied',
-              description: 'Please enable camera permissions in your browser settings.',
-            });
-            setIsScanDialogOpen(false);
-          } finally {
-              setIsInitializingCamera(false);
-          }
-        } else {
-          cleanupWebcam();
+            toast({ variant: 'destructive', title: 'Camera Access Denied', description: 'Please enable camera permissions.' });
+            setIsScanDialogOpen(false); // Close dialog if permission denied
+        } finally {
+            setIsInitializingCamera(false);
         }
-      };
-      getCameraPermission();
+    }, [cleanupWebcam, toast]);
+    
+    const handleOpenScanDialog = () => {
+        setScannedReceipts([]);
+        setIsScanDialogOpen(true);
+        startWebcam();
+    };
 
-      return () => cleanupWebcam();
-  }, [isScanDialogOpen, cleanupWebcam, toast]);
+    const handleCloseScanDialog = () => {
+        cleanupWebcam();
+        setIsScanDialogOpen(false);
+    };
 
+    const handleCaptureAndAnalyze = async () => {
+        if (!videoRef.current || !canvasRef.current) return;
+        const video = videoRef.current;
+        const canvas = canvasRef.current;
+        canvas.width = video.videoWidth;
+        canvas.height = video.videoHeight;
+        const context = canvas.getContext('2d');
+        if (!context) return;
+        context.drawImage(video, 0, 0, video.videoWidth, video.videoHeight);
+        const imageDataUrl = canvas.toDataURL('image/jpeg', 0.9);
+        
+        setIsScanning(true);
+        try {
+            const result = await analyzeReceipt({ receiptImage: imageDataUrl });
+            setScannedReceipts(prev => [...prev, { ...result, id: uuidv4(), image: imageDataUrl }]);
+        } catch (error: any) {
+            toast({ variant: 'destructive', title: 'Scan Failed' });
+        } finally {
+            setIsScanning(false);
+        }
+    };
 
-  const handleCaptureAndAnalyze = async () => {
-      if (!videoRef.current || !canvasRef.current) return;
-      
-      const video = videoRef.current;
-      const canvas = canvasRef.current;
-      
-      canvas.width = video.videoWidth;
-      canvas.height = video.videoHeight;
-      
-      const context = canvas.getContext('2d');
-      context?.drawImage(video, 0, 0, video.videoWidth, video.videoHeight);
-      
-      const imageDataUrl = canvas.toDataURL('image/jpeg', 0.9);
-      
-      setIsScanning(true);
-      cleanupWebcam();
+    const handleScannedReceiptChange = (id: string, field: keyof ParsedReceipt, value: any) => {
+        setScannedReceipts(prev => prev.map(r => r.id === id ? { ...r, [field]: value } : r));
+    };
 
-      try {
-          const result = await analyzeReceipt({ receiptImage: imageDataUrl });
-          
-          const queryParams = new URLSearchParams();
-          if (result.amount) queryParams.set('amount', result.amount.toString());
-          if (result.vendor) queryParams.set('vendor', result.vendor);
-          if (result.description) queryParams.set('description', result.description);
-          if (result.category) queryParams.set('category', result.category);
-          if (result.date) {
-            // Validate date format before parsing
-            if (/^\d{4}-\d{2}-\d{2}$/.test(result.date)) {
-                const parsedDate = new Date(result.date + 'T00:00:00Z'); // Assume UTC
+    const handleAddAllScanned = async () => {
+        if (!user || !user.companyId) return;
+        const expensesToSave: ExpenseImportData[] = scannedReceipts.map(r => {
+            let date = new Date();
+            if (r.date) {
+                const parsedDate = parseISO(r.date);
                 if (!isNaN(parsedDate.getTime())) {
-                    queryParams.set('date', parsedDate.toISOString());
+                    date = parsedDate;
                 }
             }
-          }
+            return {
+                date: date,
+                amount: r.amount || 0,
+                category: r.category || 'Other',
+                description: r.description || '',
+                vendor: r.vendor || '',
+            };
+        }).filter(e => e.amount > 0);
 
-          toast({
-              title: "Receipt Scanned",
-              description: "Review the extracted information on the new expense page.",
-          });
-
-          setIsScanDialogOpen(false);
-          router.push(`/record-expenses/new?${queryParams.toString()}`);
-
-      } catch (error: any) {
-          console.error("Error analyzing receipt:", error);
-          toast({
-              variant: 'destructive',
-              title: 'Scan Failed',
-              description: 'Could not extract data from the receipt. Please enter it manually.',
-          });
-          setIsScanning(false);
-      }
-  };
+        if (expensesToSave.length === 0) {
+            toast({ title: 'No valid expenses to add.', variant: 'default' });
+            return;
+        }
+        
+        setIsSaving(true);
+        const result = await bulkAddExpenses(expensesToSave, user.companyId, user.uid, user.displayName || 'System');
+        toast({ title: result.success ? 'Success' : 'Error', description: result.message, variant: result.success ? 'default' : 'destructive' });
+        
+        if (result.success) {
+            setScannedReceipts([]);
+            handleCloseScanDialog();
+            fetchExpenseEntries('reset');
+        }
+        setIsSaving(false);
+    };
 
 
   if (authIsLoading) {
@@ -502,13 +514,13 @@ export default function RecordExpensesPage() {
                 </Tooltip>
                 <Tooltip>
                 <TooltipTrigger asChild>
-                    <Button onClick={() => setIsScanDialogOpen(true)} variant="outline" size="icon" disabled={isSaving || isLoadingEntries}>
+                    <Button onClick={handleOpenScanDialog} variant="outline" size="icon" disabled={isSaving || isLoadingEntries}>
                     <ScanLine className="h-4 w-4" />
                     <span className="sr-only">Scan Receipt</span>
                     </Button>
                 </TooltipTrigger>
                 <TooltipContent>
-                    <p>Scan Receipt</p>
+                    <p>Bulk Scan Receipts</p>
                 </TooltipContent>
                 </Tooltip>
             </TooltipProvider>
@@ -725,33 +737,57 @@ export default function RecordExpensesPage() {
       </Dialog>
       
       {/* Scan Receipt Dialog */}
-      <Dialog open={isScanDialogOpen} onOpenChange={setIsScanDialogOpen}>
-        <DialogContent>
+      <Dialog open={isScanDialogOpen} onOpenChange={(open) => {if (!open) handleCloseScanDialog()}}>
+        <DialogContent className="max-w-5xl h-[90vh] flex flex-col">
             <DialogHeader>
-                <DialogTitle>Scan Receipt</DialogTitle>
-                <DialogDescription>Position your receipt within the frame and click capture.</DialogDescription>
+                <DialogTitle>Bulk Scan Receipts</DialogTitle>
+                <DialogDescription>Capture receipts one by one. Review and add them all at once.</DialogDescription>
             </DialogHeader>
-            <div className="relative">
-                {isInitializingCamera && (
-                    <div className="absolute inset-0 flex items-center justify-center bg-background/80 z-10">
-                        <Loader2 className="h-8 w-8 animate-spin" />
-                        <p className="ml-2">Starting camera...</p>
+            <div className="grid md:grid-cols-2 gap-6 flex-1 min-h-0">
+                <div className="flex flex-col gap-4">
+                    <div className="relative aspect-video bg-black rounded-lg overflow-hidden">
+                        {isInitializingCamera && (
+                            <div className="absolute inset-0 flex items-center justify-center bg-background/80 z-10">
+                                <Loader2 className="h-8 w-8 animate-spin" />
+                            </div>
+                        )}
+                        <video ref={videoRef} className="w-full h-full object-cover" autoPlay muted playsInline />
+                        <canvas ref={canvasRef} className="hidden" />
                     </div>
-                )}
-                {isScanning && (
-                     <div className="absolute inset-0 flex flex-col items-center justify-center bg-background/80 z-10">
-                        <Loader2 className="h-8 w-8 animate-spin" />
-                        <p className="ml-2 mt-2">Analyzing receipt...</p>
-                    </div>
-                )}
-                <video ref={videoRef} className="w-full aspect-video rounded-md bg-black" autoPlay muted playsInline />
-                <canvas ref={canvasRef} className="hidden" />
+                    <Button onClick={handleCaptureAndAnalyze} disabled={isInitializingCamera || isScanning || !isCameraActive}>
+                        {isScanning ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Camera className="mr-2 h-4 w-4" />}
+                        {isScanning ? 'Analyzing...' : 'Capture & Analyze'}
+                    </Button>
+                </div>
+                <div className="flex flex-col min-h-0">
+                   <Label>Scanned Expenses</Label>
+                   <ScrollArea className="flex-1 mt-2 border rounded-lg">
+                    <Table>
+                        <TableHeader>
+                            <TableRow>
+                                <TableHead>Vendor</TableHead>
+                                <TableHead>Date</TableHead>
+                                <TableHead className="text-right">Amount</TableHead>
+                            </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                            {scannedReceipts.map(receipt => (
+                                <TableRow key={receipt.id}>
+                                    <TableCell><Input value={receipt.vendor || ''} onChange={e => handleScannedReceiptChange(receipt.id, 'vendor', e.target.value)} className="h-8" /></TableCell>
+                                    <TableCell><Input value={receipt.date || ''} onChange={e => handleScannedReceiptChange(receipt.id, 'date', e.target.value)} className="h-8" placeholder="YYYY-MM-DD" /></TableCell>
+                                    <TableCell><Input type="number" value={receipt.amount || ''} onChange={e => handleScannedReceiptChange(receipt.id, 'amount', e.target.value)} className="h-8 w-24 text-right" /></TableCell>
+                                </TableRow>
+                            ))}
+                        </TableBody>
+                    </Table>
+                   </ScrollArea>
+                </div>
             </div>
             <DialogFooter>
-                <Button variant="outline" onClick={() => setIsScanDialogOpen(false)} disabled={isScanning}>Cancel</Button>
-                <Button onClick={handleCaptureAndAnalyze} disabled={isInitializingCamera || isScanning || !hasCameraPermission}>
-                    <Camera className="mr-2 h-4 w-4" />
-                    Capture & Analyze
+                <Button variant="outline" onClick={handleCloseScanDialog}>Close</Button>
+                <Button onClick={handleAddAllScanned} disabled={isSaving || scannedReceipts.length === 0}>
+                    {isSaving ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
+                    Add All ({scannedReceipts.length})
                 </Button>
             </DialogFooter>
         </DialogContent>
