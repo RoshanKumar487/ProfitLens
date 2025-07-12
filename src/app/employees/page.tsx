@@ -4,25 +4,28 @@
 import React, { useState, useEffect, FormEvent, useCallback, useRef, useMemo } from 'react';
 import PageTitle from '@/components/PageTitle';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import { Textarea } from '@/components/ui/textarea';
-import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell, TableCaption } from '@/components/ui/table';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter, DialogClose } from "@/components/ui/dialog";
+import {
+  Table,
+  TableHeader,
+  TableBody,
+  TableRow,
+  TableHead,
+  TableCell,
+  TableCaption,
+} from '@/components/ui/table';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
-import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger, DropdownMenuSeparator } from '@/components/ui/dropdown-menu';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
-import { Users2, PlusCircle, MoreHorizontal, Edit, Trash2, Loader2, Save, Camera, UploadCloud, FileText, XCircle, SwitchCamera, Upload, ArrowUp, ArrowDown, ChevronsUpDown, ScanLine, Printer, Fingerprint, PenSquare, Download, Expand } from 'lucide-react';
+import { Users2, PlusCircle, MoreHorizontal, Edit, Trash2, Loader2, Upload, ArrowUp, ArrowDown, ChevronsUpDown, Printer, Download } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/contexts/AuthContext';
 import { db } from '@/lib/firebaseConfig';
-import { collection, doc, getDoc, getDocs, updateDoc, deleteDoc, query, where, orderBy, Timestamp, serverTimestamp, limit, startAfter, endBefore, limitToLast, type QueryDocumentSnapshot, type DocumentData } from 'firebase/firestore';
-import { uploadFileToStorage, deleteFileFromStorage } from '@/lib/firebaseStorageUtils';
+import { collection, doc, getDoc, getDocs, query, where, orderBy, Timestamp, serverTimestamp, limit, startAfter, endBefore, limitToLast, type QueryDocumentSnapshot, type DocumentData, deleteDoc } from 'firebase/firestore';
+import { deleteFileFromStorage } from '@/lib/firebaseStorageUtils';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Badge } from '@/components/ui/badge';
-import { cn, urlToDataUri } from '@/lib/utils';
+import { urlToDataUri } from '@/lib/utils';
 import * as xlsx from 'xlsx';
 import { bulkAddEmployees } from './actions';
 import { ScrollArea } from '@/components/ui/scroll-area';
@@ -30,16 +33,12 @@ import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/comp
 import { analyzeEmployeeDocument } from '@/ai/flows/analyze-employee-document-flow';
 import Link from 'next/link';
 import BioDataTemplate from './BioDataTemplate';
-import { Separator } from '@/components/ui/separator';
-import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
-import { Calendar } from '@/components/ui/calendar';
-import { format } from 'date-fns';
-import { Calendar as CalendarIcon } from 'lucide-react';
-import jsPDF from 'jspdf';
-import html2canvas from 'html2canvas';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
+import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
 import { Pagination, PaginationContent, PaginationItem, PaginationNext, PaginationPrevious } from '@/components/ui/pagination';
+import jsPDF from 'jspdf';
+import html2canvas from 'html2canvas';
 
 interface EmployeeFirestore {
   id?: string;
@@ -107,44 +106,17 @@ const getInitials = (name: string = "") => {
 export default function EmployeesPage() {
   const { user, isLoading: authIsLoading, currencySymbol } = useAuth();
   const [employees, setEmployees] = useState<EmployeeDisplay[]>([]);
-  const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
-  const [currentEmployee, setCurrentEmployee] = useState<Partial<EmployeeDisplay & { salary?: string | number }>>({});
   const { toast } = useToast();
   const [isLoadingEmployees, setIsLoadingEmployees] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
   const [employeeToDeleteId, setEmployeeToDeleteId] = useState<string | null>(null);
 
-  const videoRef = useRef<HTMLVideoElement>(null);
-  const canvasRef = useRef<HTMLCanvasElement>(null);
-  const [hasCameraPermission, setHasCameraPermission] = useState<boolean | null>(null);
-  const [showProfileWebcam, setShowProfileWebcam] = useState(false);
-  
-  const [profilePictureFile, setProfilePictureFile] = useState<File | null>(null);
-  const [profilePicturePreview, setProfilePicturePreview] = useState<string | null>(null);
-  const [associatedFile, setAssociatedFile] = useState<File | null>(null);
-  const [leftThumbImpressionFile, setLeftThumbImpressionFile] = useState<File | null>(null);
-  const [leftThumbImpressionPreview, setLeftThumbImpressionPreview] = useState<string | null>(null);
-  const [signatureFile, setSignatureFile] = useState<File | null>(null);
-  const [signaturePreview, setSignaturePreview] = useState<string | null>(null);
-
-
-  const [facingMode, setFacingMode] = useState<'user' | 'environment'>('user');
-  const [hasMultipleCameras, setHasMultipleCameras] = useState(false);
-  const [isSwitchingCamera, setIsSwitchingCamera] = useState(false);
-  
-  const [isDraggingProfile, setIsDraggingProfile] = useState(false);
-  const [isDraggingFile, setIsDraggingFile] = useState(false);
-
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [isImportDialogOpen, setIsImportDialogOpen] = useState(false);
   const [editableParsedEmployees, setEditableParsedEmployees] = useState<ParsedEmployee[]>([]);
   const [isImporting, setIsImporting] = useState(false);
   
-  const [isScanDialogOpen, setIsScanDialogOpen] = useState(false);
-  const [isScanning, setIsScanning] = useState(false);
-  const [isInitializingCamera, setIsInitializingCamera] = useState(false);
-
   const [sortConfig, setSortConfig] = useState<{ key: keyof EmployeeDisplay; direction: 'desc' | 'asc' }>({ key: 'createdAt', direction: 'desc' });
   const [currentPage, setCurrentPage] = useState(1);
   const [firstVisible, setFirstVisible] = useState<QueryDocumentSnapshot<DocumentData> | null>(null);
@@ -257,183 +229,6 @@ export default function EmployeesPage() {
     return <ArrowDown className="ml-2 h-4 w-4" />;
   };
 
-  useEffect(() => {
-    return () => {
-      if (profilePicturePreview && profilePicturePreview.startsWith('blob:')) { URL.revokeObjectURL(profilePicturePreview); }
-      if (signaturePreview && signaturePreview.startsWith('blob:')) { URL.revokeObjectURL(signaturePreview); }
-      if (leftThumbImpressionPreview && leftThumbImpressionPreview.startsWith('blob:')) { URL.revokeObjectURL(leftThumbImpressionPreview); }
-    };
-  }, [profilePicturePreview, signaturePreview, leftThumbImpressionPreview]);
-  
-  useEffect(() => {
-    const checkForMultipleCameras = async () => {
-      if (navigator.mediaDevices && navigator.mediaDevices.enumerateDevices) {
-        try {
-          const devices = await navigator.mediaDevices.enumerateDevices();
-          const videoDevices = devices.filter(device => device.kind === 'videoinput');
-          setHasMultipleCameras(videoDevices.length > 1);
-        } catch (error) {
-          console.error("Could not enumerate devices:", error);
-          setHasMultipleCameras(false);
-        }
-      }
-    };
-    checkForMultipleCameras();
-  }, []);
-
-  const cleanupWebcam = useCallback(() => {
-    if (videoRef.current && videoRef.current.srcObject) {
-      const stream = videoRef.current.srcObject as MediaStream;
-      stream.getTracks().forEach(track => track.stop());
-      videoRef.current.srcObject = null;
-    }
-  }, []);
-  
-  const startWebcam = useCallback(async (mode: 'user' | 'environment') => {
-      setIsSwitchingCamera(true);
-      cleanupWebcam(); // Stop previous stream before starting a new one
-      try {
-        const constraints = { video: { facingMode: { exact: mode } } };
-        const stream = await navigator.mediaDevices.getUserMedia(constraints);
-        setHasCameraPermission(true);
-        if (videoRef.current) {
-          videoRef.current.srcObject = stream;
-        }
-      } catch (error) {
-        console.error('Error switching camera:', error);
-        try {
-          console.log("Fallback to default camera");
-          const stream = await navigator.mediaDevices.getUserMedia({ video: true });
-          setHasCameraPermission(true);
-          if (videoRef.current) {
-            videoRef.current.srcObject = stream;
-          }
-          setFacingMode('user'); 
-          toast({ variant: 'default', title: 'Camera not available', description: 'Switched to default camera.' });
-        } catch (fallbackError) {
-           console.error('Error accessing any camera:', fallbackError);
-           setHasCameraPermission(false);
-           toast({ variant: 'destructive', title: 'Camera Access Denied', description: 'Please enable camera permissions.' });
-           setShowProfileWebcam(false);
-           setIsScanDialogOpen(false);
-        }
-      } finally {
-          setIsSwitchingCamera(false);
-      }
-    }, [cleanupWebcam, toast]);
-  
-    useEffect(() => {
-      if (showProfileWebcam) {
-        startWebcam(facingMode);
-      } else {
-        if(!isScanDialogOpen) cleanupWebcam();
-      }
-      return () => { if (showProfileWebcam) cleanupWebcam(); };
-    }, [showProfileWebcam, facingMode, startWebcam, cleanupWebcam, isScanDialogOpen]);
-
-    useEffect(() => {
-      const getCameraPermission = async () => {
-        if (isScanDialogOpen) {
-          setIsInitializingCamera(true);
-          try {
-            const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } });
-            setHasCameraPermission(true);
-            if (videoRef.current) videoRef.current.srcObject = stream;
-          } catch (error) {
-            console.error('Error accessing camera:', error);
-            setHasCameraPermission(false);
-            toast({ variant: 'destructive', title: 'Camera Access Denied', description: 'Please enable camera permissions.' });
-            setIsScanDialogOpen(false);
-          } finally { setIsInitializingCamera(false); }
-        } else {
-          if(!showProfileWebcam) cleanupWebcam();
-        }
-      };
-      getCameraPermission();
-      return () => { if(isScanDialogOpen) cleanupWebcam()};
-  }, [isScanDialogOpen, cleanupWebcam, toast, showProfileWebcam]);
-  
-  const resetEditFormState = useCallback(() => {
-    setIsEditDialogOpen(false);
-    setCurrentEmployee({});
-    setProfilePictureFile(null);
-    setProfilePicturePreview(null);
-    setAssociatedFile(null);
-    setLeftThumbImpressionFile(null);
-    setLeftThumbImpressionPreview(null);
-    setSignatureFile(null);
-    setSignaturePreview(null);
-    setShowProfileWebcam(false);
-    setHasCameraPermission(null);
-    cleanupWebcam();
-  }, [cleanupWebcam]);
-
-  const handleUpdateSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!user || !user.companyId || !currentEmployee?.id) return toast({ title: "Authentication Error", variant: "destructive" });
-    if (!currentEmployee.name || !currentEmployee.position || currentEmployee.salary === undefined) return toast({ title: "Missing Information", variant: "destructive" });
-
-    const salaryNum = Number(currentEmployee.salary);
-    if (isNaN(salaryNum) || salaryNum < 0) return toast({ title: "Invalid Salary", variant: "destructive"});
-
-    setIsSaving(true);
-    
-    try {
-        const employeeDocId = currentEmployee.id;
-        const employeeRef = doc(db, 'employees', employeeDocId);
-
-        const updatedData: Partial<EmployeeFirestore> = { ...currentEmployee, uan: currentEmployee.uan || '', name_lowercase: currentEmployee.name.toLowerCase() };
-        delete updatedData.id; 
-        delete (updatedData as any).createdAt;
-
-        const uploadIfNeeded = async (file: File | null, oldPath: string | undefined, type: string) => {
-          if (!file) return { url: undefined, path: undefined };
-          if (oldPath) await deleteFileFromStorage(oldPath).catch(e => console.warn(`Old ${type} deletion failed`, e));
-          const newPath = `employees/${user.companyId}/${employeeDocId}/${type}.${file.name.split('.').pop()}`;
-          const newUrl = await uploadFileToStorage(file, newPath);
-          return { url: newUrl, path: newPath };
-        };
-        
-        const [profilePic, assocFile, thumbFile, sigFile] = await Promise.all([
-            uploadIfNeeded(profilePictureFile, currentEmployee.profilePictureStoragePath, 'profileImage'),
-            uploadIfNeeded(associatedFile, currentEmployee.associatedFileStoragePath, 'associatedFile'),
-            uploadIfNeeded(leftThumbImpressionFile, currentEmployee.leftThumbImpressionStoragePath, 'thumbImpression'),
-            uploadIfNeeded(signatureFile, currentEmployee.signatureStoragePath, 'signature')
-        ]);
-        
-        if (profilePic.url !== undefined) { updatedData.profilePictureUrl = profilePic.url; updatedData.profilePictureStoragePath = profilePic.path; }
-        if (assocFile.url !== undefined) { updatedData.associatedFileUrl = assocFile.url; updatedData.associatedFileStoragePath = assocFile.path; updatedData.associatedFileName = associatedFile!.name; }
-        if (thumbFile.url !== undefined) { updatedData.leftThumbImpressionUrl = thumbFile.url; updatedData.leftThumbImpressionStoragePath = thumbFile.path; }
-        if (sigFile.url !== undefined) { updatedData.signatureUrl = sigFile.url; updatedData.signatureStoragePath = sigFile.path; }
-        
-        const dataToSave: any = { ...updatedData, salary: salaryNum, updatedAt: serverTimestamp() };
-        if(currentEmployee.dateOfBirth) dataToSave.dateOfBirth = Timestamp.fromDate(currentEmployee.dateOfBirth);
-        if(currentEmployee.joiningDate) dataToSave.joiningDate = Timestamp.fromDate(currentEmployee.joiningDate);
-
-        await updateDoc(employeeRef, dataToSave);
-        toast({ title: "Employee Updated" });
-        fetchEmployees('reset');
-        resetEditFormState();
-    } catch (error: any) {
-        toast({ title: "Save Failed", description: error.message, variant: "destructive" });
-    } finally {
-        setIsSaving(false);
-    }
-  };
-
-  const handleEditEmployee = (employee: EmployeeDisplay) => {
-    setCurrentEmployee({ ...employee, salary: employee.salary.toString() });
-    setProfilePicturePreview(employee.profilePictureUrl || null);
-    setSignaturePreview(employee.signatureUrl || null);
-    setLeftThumbImpressionPreview(employee.leftThumbImpressionUrl || null);
-    setProfilePictureFile(null);
-    setAssociatedFile(null);
-    setSignatureFile(null);
-    setLeftThumbImpressionFile(null);
-    setShowProfileWebcam(false);
-    setIsEditDialogOpen(true);
-  };
-  
   const promptDeleteEmployee = (id: string) => {
     setEmployeeToDeleteId(id);
     setIsDeleteDialogOpen(true);
@@ -466,95 +261,7 @@ export default function EmployeesPage() {
       setIsDeleteDialogOpen(false);
     }
   };
-
-  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>, setFile: React.Dispatch<React.SetStateAction<File | null>>, setPreview?: React.Dispatch<React.SetStateAction<string | null>>) => {
-      const file = e.target.files?.[0] || null;
-      if (file) {
-          if (file.type.startsWith('image/') && file.size > 2 * 1024 * 1024) { return toast({ title: "Image too large (< 2MB)", variant: "destructive" }); }
-          if (!file.type.startsWith('image/') && file.size > 10 * 1024 * 1024) { return toast({ title: "File too large (< 10MB)", variant: "destructive" }); }
-          setFile(file);
-          if (setPreview) setPreview(URL.createObjectURL(file));
-      } else {
-          setFile(null);
-          if (setPreview) setPreview(null);
-      }
-      e.target.value = ''; // Allow re-upload
-  };
-
-  const handleCaptureProfilePhoto = () => {
-    if (!videoRef.current || !canvasRef.current || !videoRef.current.srcObject) return;
-    const video = videoRef.current;
-    const canvas = canvasRef.current;
-    canvas.width = video.videoWidth;
-    canvas.height = video.videoHeight;
-    canvas.getContext('2d')?.drawImage(video, 0, 0, video.videoWidth, video.videoHeight);
-    canvas.toBlob((blob) => {
-      if (blob) {
-        const file = new File([blob], `webcam.jpeg`, { type: 'image/jpeg' });
-        setProfilePictureFile(file);
-        setProfilePicturePreview(URL.createObjectURL(file));
-      }
-    }, 'image/jpeg');
-    setShowProfileWebcam(false);
-  };
   
-  const handleCaptureAndAnalyzeDocument = async () => {
-    if (!videoRef.current || !canvasRef.current) return;
-    const video = videoRef.current;
-    const canvas = canvasRef.current;
-    canvas.width = video.videoWidth;
-    canvas.height = video.videoHeight;
-    canvas.getContext('2d')?.drawImage(video, 0, 0, video.videoWidth, video.videoHeight);
-    const imageDataUrl = canvas.toDataURL('image/jpeg', 0.9);
-    setIsScanning(true);
-    cleanupWebcam();
-
-    try {
-        const result = await analyzeEmployeeDocument({ documentImage: imageDataUrl });
-        if (!result.employees || result.employees.length === 0) {
-          toast({ title: "No Data Found", variant: "destructive" });
-          setIsScanDialogOpen(false);
-          return;
-        }
-        setEditableParsedEmployees(result.employees);
-        setIsScanDialogOpen(false);
-        setIsImportDialogOpen(true);
-        toast({ title: "Document Scanned", description: "Please review the extracted data." });
-    } catch (error: any) {
-        toast({ variant: 'destructive', title: 'Scan Failed' });
-    } finally { setIsScanning(false); }
-  };
-
-
-  const handleRemoveImage = (type: 'profile' | 'signature' | 'thumb') => {
-      if(type === 'profile') {
-          setProfilePictureFile(null);
-          setProfilePicturePreview(null);
-          setCurrentEmployee(prev => ({...prev, profilePictureUrl: undefined }));
-      } else if (type === 'signature') {
-          setSignatureFile(null);
-          setSignaturePreview(null);
-          setCurrentEmployee(prev => ({...prev, signatureUrl: undefined }));
-      } else if (type === 'thumb') {
-          setLeftThumbImpressionFile(null);
-          setLeftThumbImpressionPreview(null);
-          setCurrentEmployee(prev => ({...prev, leftThumbImpressionUrl: undefined }));
-      }
-  };
-  
-  const handleRemoveAssociatedFile = () => {
-    setAssociatedFile(null);
-     setCurrentEmployee(prev => ({...prev, associatedFileUrl: undefined, associatedFileName: undefined }));
-  };
-  
-  const handleDragEvents = (e: React.DragEvent<HTMLDivElement>) => { e.preventDefault(); e.stopPropagation(); };
-  const handleProfileDragEnter = (e: React.DragEvent<HTMLDivElement>) => { handleDragEvents(e); if (e.dataTransfer.items?.length > 0) setIsDraggingProfile(true); };
-  const handleProfileDragLeave = (e: React.DragEvent<HTMLDivElement>) => { handleDragEvents(e); setIsDraggingProfile(false); };
-  const handleProfileDrop = (e: React.DragEvent<HTMLDivElement>) => { handleDragEvents(e); setIsDraggingProfile(false); handleFileChange(e.dataTransfer as any, setProfilePictureFile, setProfilePicturePreview); };
-  const handleFileDragEnter = (e: React.DragEvent<HTMLDivElement>) => { handleDragEvents(e); if (e.dataTransfer.items?.length > 0) setIsDraggingFile(true); };
-  const handleFileDragLeave = (e: React.DragEvent<HTMLDivElement>) => { handleDragEvents(e); setIsDraggingFile(false); };
-  const handleFileDrop = (e: React.DragEvent<HTMLDivElement>) => { handleDragEvents(e); setIsDraggingFile(false); handleFileChange(e.dataTransfer as any, setAssociatedFile); };
-
   const handleImportClick = () => { fileInputRef.current?.click(); };
   const handleImportFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -740,12 +447,6 @@ export default function EmployeesPage() {
                         </TooltipTrigger>
                         <TooltipContent><p>Import from Excel</p></TooltipContent>
                     </Tooltip>
-                    <Tooltip>
-                        <TooltipTrigger asChild>
-                            <Button variant="outline" size="icon" disabled><Expand className="h-4 w-4" /></Button>
-                        </TooltipTrigger>
-                        <TooltipContent><p>Expand View</p></TooltipContent>
-                    </Tooltip>
                 </TooltipProvider>
                 <Button asChild disabled={isSaving || isLoadingEmployees}><Link href="/employees/new"><PlusCircle className="mr-2 h-4 w-4" /> Add Employee</Link></Button>
                 <input type="file" ref={fileInputRef} onChange={handleImportFileChange} className="hidden" accept=".xlsx, .xls, .csv" />
@@ -755,9 +456,9 @@ export default function EmployeesPage() {
         <CardContent>
           <Table>
             <TableCaption>{!isLoadingEmployees && employees.length === 0 ? "No employees found." : `Page ${currentPage} of employees.`}</TableCaption>
-            <TableHeader><TableRow><TableHead className="w-[60px]">Avatar</TableHead><TableHead><Button variant="ghost" onClick={() => handleSortChange('name')} className="-ml-4 h-auto p-1 text-xs sm:text-sm">Name {getSortIcon('name')}</Button></TableHead><TableHead><Button variant="ghost" onClick={() => handleSortChange('position')} className="-ml-4 h-auto p-1 text-xs sm:text-sm">Position {getSortIcon('position')}</Button></TableHead><TableHead>Description</TableHead><TableHead className="text-right"><Button variant="ghost" onClick={() => handleSortChange('salary')} className="h-auto p-1 text-xs sm:text-sm">Salary {getSortIcon('salary')}</Button></TableHead><TableHead>File</TableHead><TableHead className="text-right w-[100px]">Actions</TableHead></TableRow></TableHeader>
+            <TableHeader><TableRow><TableHead className="w-[60px]">Avatar</TableHead><TableHead><Button variant="ghost" onClick={() => handleSortChange('name')} className="-ml-4 h-auto p-1 text-xs sm:text-sm">Name {getSortIcon('name')}</Button></TableHead><TableHead><Button variant="ghost" onClick={() => handleSortChange('position')} className="-ml-4 h-auto p-1 text-xs sm:text-sm">Position {getSortIcon('position')}</Button></TableHead><TableHead>Description</TableHead><TableHead className="text-right"><Button variant="ghost" onClick={() => handleSortChange('salary')} className="h-auto p-1 text-xs sm:text-sm">Salary {getSortIcon('salary')}</Button></TableHead><TableHead className="text-right w-[100px]">Actions</TableHead></TableRow></TableHeader>
             <TableBody>
-              {isLoadingEmployees && employees.length === 0 && ([...Array(3)].map((_, i) => (<TableRow key={`skel-${i}`}><TableCell><Skeleton className="h-10 w-10 rounded-full" /></TableCell><TableCell><Skeleton className="h-4 w-3/4" /></TableCell><TableCell><Skeleton className="h-4 w-1/2" /></TableCell><TableCell><Skeleton className="h-4 w-3/4" /></TableCell><TableCell className="text-right"><Skeleton className="h-4 w-1/4 ml-auto" /></TableCell><TableCell><Skeleton className="h-4 w-1/2" /></TableCell><TableCell className="text-right"><Skeleton className="h-8 w-8 ml-auto" /></TableCell></TableRow>)))}
+              {isLoadingEmployees && employees.length === 0 && ([...Array(3)].map((_, i) => (<TableRow key={`skel-${i}`}><TableCell><Skeleton className="h-10 w-10 rounded-full" /></TableCell><TableCell><Skeleton className="h-4 w-3/4" /></TableCell><TableCell><Skeleton className="h-4 w-1/2" /></TableCell><TableCell><Skeleton className="h-4 w-3/4" /></TableCell><TableCell className="text-right"><Skeleton className="h-4 w-1/4 ml-auto" /></TableCell><TableCell className="text-right"><Skeleton className="h-8 w-8 ml-auto" /></TableCell></TableRow>)))}
               {!isLoadingEmployees && employees.map((employee) => (
                 <TableRow key={employee.id}>
                   <TableCell><Avatar className="h-10 w-10"><AvatarImage src={employee.profilePictureUrl || `https://placehold.co/40x40.png?text=${getInitials(employee.name)}`} alt={employee.name} data-ai-hint="person portrait" /><AvatarFallback>{getInitials(employee.name)}</AvatarFallback></Avatar></TableCell>
@@ -765,8 +466,7 @@ export default function EmployeesPage() {
                   <TableCell>{employee.position}</TableCell>
                   <TableCell className="max-w-[200px] truncate text-sm text-muted-foreground" title={employee.description}>{employee.description || '-'}</TableCell>
                   <TableCell className="text-right">{currencySymbol}{employee.salary.toLocaleString()}</TableCell>
-                  <TableCell>{employee.associatedFileUrl && employee.associatedFileName ? (<a href={employee.associatedFileUrl} target="_blank" rel="noopener noreferrer" className="text-sm text-primary hover:underline truncate max-w-[120px] inline-block" title={employee.associatedFileName}><FileText className="h-4 w-4 inline mr-1 flex-shrink-0" />{employee.associatedFileName}</a>) : ( <span className="text-sm text-muted-foreground">None</span> )}</TableCell>
-                  <TableCell className="text-right"><DropdownMenu><DropdownMenuTrigger asChild><Button variant="ghost" size="icon" className="h-8 w-8" disabled={isSaving}><MoreHorizontal className="h-4 w-4" /></Button></DropdownMenuTrigger><DropdownMenuContent align="end"><DropdownMenuItem onClick={() => handleOpenBioDataDialog(employee)}><Printer className="mr-2 h-4 w-4"/>Print Bio-Data</DropdownMenuItem><DropdownMenuItem onClick={() => handleEditEmployee(employee)}><Edit className="mr-2 h-4 w-4" /> Edit</DropdownMenuItem><DropdownMenuSeparator /><DropdownMenuItem onClick={() => promptDeleteEmployee(employee.id)} className="text-destructive focus:text-destructive focus:bg-destructive/10"><Trash2 className="mr-2 h-4 w-4" /> Delete</DropdownMenuItem></DropdownMenuContent></DropdownMenu></TableCell>
+                  <TableCell className="text-right"><DropdownMenu><DropdownMenuTrigger asChild><Button variant="ghost" size="icon" className="h-8 w-8" disabled={isSaving}><MoreHorizontal className="h-4 w-4" /></Button></DropdownMenuTrigger><DropdownMenuContent align="end"><DropdownMenuItem asChild><Link href={`/employees/${employee.id}`}><Printer className="mr-2 h-4 w-4"/>Print Bio-Data</Link></DropdownMenuItem><DropdownMenuItem asChild><Link href={`/employees/${employee.id}/edit`}><Edit className="mr-2 h-4 w-4" /> Edit</Link></DropdownMenuItem><DropdownMenuSeparator /><DropdownMenuItem onClick={() => promptDeleteEmployee(employee.id)} className="text-destructive focus:text-destructive focus:bg-destructive/10"><Trash2 className="mr-2 h-4 w-4" /> Delete</DropdownMenuItem></DropdownMenuContent></DropdownMenu></TableCell>
                 </TableRow>
               ))}
             </TableBody>
@@ -796,54 +496,6 @@ export default function EmployeesPage() {
             </div>
         </CardContent>
       </Card>
-
-
-      <Dialog open={isEditDialogOpen} onOpenChange={(open) => { if (!open) resetEditFormState(); else setIsEditDialogOpen(true); }}>
-        <DialogContent className="sm:max-w-4xl max-h-[90vh] flex flex-col">
-          <DialogHeader><DialogTitle className="font-headline">Edit Employee</DialogTitle><DialogDescription>Update {currentEmployee.name}'s details.</DialogDescription></DialogHeader>
-          <ScrollArea className="flex-grow pr-6 -mr-6">
-            <form id="employeeDialogForm" onSubmit={handleUpdateSubmit} className="space-y-4 py-1 pr-1">
-              {/* Basic Info */}
-              <CardDescription>Basic Information</CardDescription>
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                  <div><Label>Full Name</Label><Input value={currentEmployee.name || ''} onChange={(e) => setCurrentEmployee(p => ({...p, name: e.target.value}))} required disabled={isSaving} /></div>
-                  <div><Label>Position / Role</Label><Input value={currentEmployee.position || ''} onChange={(e) => setCurrentEmployee(p => ({...p, position: e.target.value}))} required disabled={isSaving} /></div>
-                  <div><Label>Salary ({currencySymbol})</Label><Input type="number" value={currentEmployee.salary ?? ''} onChange={(e) => setCurrentEmployee(p => ({...p, salary: e.target.value}))} required min="0" disabled={isSaving} /></div>
-              </div>
-              <div><Label>UAN</Label><Input value={currentEmployee.uan || ''} onChange={(e) => setCurrentEmployee(p => ({...p, uan: e.target.value}))} disabled={isSaving} /></div>
-              <Separator />
-              {/* Bio-Data Fields */}
-              <CardDescription>Bio-Data Details</CardDescription>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div><Label>Father's Name</Label><Input value={currentEmployee.fatherName || ''} onChange={e => setCurrentEmployee(p => ({...p, fatherName: e.target.value}))} disabled={isSaving}/></div>
-                    <div><Label>Mother's Name</Label><Input value={currentEmployee.motherName || ''} onChange={e => setCurrentEmployee(p => ({...p, motherName: e.target.value}))} disabled={isSaving}/></div>
-                </div>
-              {/* ... All other bio-data fields ... */}
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div><Label>Date of Birth</Label><Popover><PopoverTrigger asChild><Button variant="outline" className="w-full justify-start text-left font-normal" disabled={isSaving}><CalendarIcon className="mr-2 h-4 w-4" />{currentEmployee.dateOfBirth ? format(currentEmployee.dateOfBirth, 'PPP') : <span>Pick a date</span>}</Button></PopoverTrigger><PopoverContent className="w-auto p-0"><Calendar mode="single" selected={currentEmployee.dateOfBirth} onSelect={(d) => setCurrentEmployee(p=>({...p, dateOfBirth: d}))} captionLayout="dropdown-buttons" fromYear={1950} toYear={new Date().getFullYear()} initialFocus /></PopoverContent></Popover></div>
-                  <div><Label>Joining Date</Label><Popover><PopoverTrigger asChild><Button variant="outline" className="w-full justify-start text-left font-normal" disabled={isSaving}><CalendarIcon className="mr-2 h-4 w-4" />{currentEmployee.joiningDate ? format(currentEmployee.joiningDate, 'PPP') : <span>Pick a date</span>}</Button></PopoverTrigger><PopoverContent className="w-auto p-0"><Calendar mode="single" selected={currentEmployee.joiningDate} onSelect={(d) => setCurrentEmployee(p=>({...p, joiningDate: d}))} captionLayout="dropdown-buttons" fromYear={1980} toYear={new Date().getFullYear()} initialFocus /></PopoverContent></Popover></div>
-              </div>
-
-               {/* File Uploads */}
-                <Separator/>
-                <CardDescription>File Uploads</CardDescription>
-                <div className="space-y-4">
-                    {/* Profile Picture */}
-                    <div><Label>Profile Picture</Label><div className="flex items-start gap-4"><Avatar className="h-24 w-24"><AvatarImage src={profilePicturePreview || currentEmployee.profilePictureUrl || `https://placehold.co/96x96.png?text=${getInitials(currentEmployee.name)}`} /><AvatarFallback>{getInitials(currentEmployee.name)}</AvatarFallback></Avatar><div className="flex-grow space-y-2"><Input type="file" accept="image/*" onChange={(e) => handleFileChange(e, setProfilePictureFile, setProfilePicturePreview)} disabled={isSaving} /><Button type="button" variant="ghost" size="sm" onClick={() => handleRemoveImage('profile')} className="text-destructive w-full">Remove Image</Button></div></div></div>
-                    {/* Signature */}
-                    <div><Label>Signature</Label><div className="flex items-start gap-4"><div className="h-24 w-24 border rounded-md flex items-center justify-center p-1 bg-white">{signaturePreview || currentEmployee.signatureUrl ? <img src={signaturePreview || currentEmployee.signatureUrl!} alt="Signature" className="object-contain max-h-full max-w-full" crossOrigin="anonymous"/> : <PenSquare className="h-8 w-8 text-muted-foreground"/>}</div><div className="flex-grow space-y-2"><Input type="file" accept="image/*" onChange={(e) => handleFileChange(e, setSignatureFile, setSignaturePreview)} disabled={isSaving} /><Button type="button" variant="ghost" size="sm" onClick={() => handleRemoveImage('signature')} className="text-destructive w-full">Remove Signature</Button></div></div></div>
-                    {/* Thumb Impression */}
-                    <div><Label>Left Thumb Impression</Label><div className="flex items-start gap-4"><div className="h-24 w-24 border rounded-md flex items-center justify-center p-1 bg-white">{leftThumbImpressionPreview || currentEmployee.leftThumbImpressionUrl ? <img src={leftThumbImpressionPreview || currentEmployee.leftThumbImpressionUrl!} alt="Thumb" className="object-contain max-h-full max-w-full" crossOrigin="anonymous"/> : <Fingerprint className="h-8 w-8 text-muted-foreground"/>}</div><div className="flex-grow space-y-2"><Input type="file" accept="image/*" onChange={(e) => handleFileChange(e, setLeftThumbImpressionFile, setLeftThumbImpressionPreview)} disabled={isSaving} /><Button type="button" variant="ghost" size="sm" onClick={() => handleRemoveImage('thumb')} className="text-destructive w-full">Remove Thumb</Button></div></div></div>
-                    {/* Associated File */}
-                    <div><Label>Associated File</Label><div className="flex items-start gap-4"><div className="flex-grow space-y-2"><Input type="file" onChange={(e) => handleFileChange(e, setAssociatedFile)} disabled={isSaving} />{currentEmployee.associatedFileName && <div className="text-xs">Current: <a href={currentEmployee.associatedFileUrl} className="text-primary hover:underline" target="_blank" rel="noopener noreferrer">{currentEmployee.associatedFileName}</a></div>}{associatedFile && <div className="text-xs">New: <span className="font-medium">{associatedFile.name}</span></div>}<Button type="button" variant="ghost" size="sm" onClick={handleRemoveAssociatedFile} className="text-destructive w-full">Remove Associated File</Button></div></div></div>
-                </div>
-
-              <div><Label>Description / Notes</Label><Textarea value={currentEmployee.description || ''} onChange={(e) => setCurrentEmployee(p => ({...p, description: e.target.value}))} rows={2} disabled={isSaving}/></div>
-            </form>
-          </ScrollArea>
-          <DialogFooter className="mt-auto pt-3 border-t"><DialogClose asChild><Button type="button" variant="outline" onClick={resetEditFormState} disabled={isSaving}>Cancel</Button></DialogClose><Button type="submit" form="employeeDialogForm" disabled={isSaving}>{isSaving ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Save className="mr-2 h-4 w-4" />} Save</Button></DialogFooter>
-        </DialogContent>
-      </Dialog>
 
       <Dialog open={isBioDataDialogOpen} onOpenChange={setIsBioDataDialogOpen}>
           <DialogContent className="max-w-4xl w-full h-[95vh] flex flex-col p-0 bg-gray-100 dark:bg-background">
@@ -884,9 +536,8 @@ export default function EmployeesPage() {
           </DialogContent>
       </Dialog>
       
-      <Dialog open={isImportDialogOpen} onOpenChange={setIsImportDialogOpen}><DialogContent className="sm:max-w-4xl"><DialogHeader><DialogTitle>Review Employee Import</DialogTitle><DialogDescription>Review and edit the employees parsed from your file or scan. Invalid or incomplete data will be skipped. Click 'Confirm Import' to add them.</DialogDescription></DialogHeader><ScrollArea className="max-h-[60vh] border rounded-md"><Table><TableHeader><TableRow><TableHead>Name</TableHead><TableHead>Position</TableHead><TableHead>Description</TableHead><TableHead className="text-right">Salary</TableHead></TableRow></TableHeader><TableBody>{editableParsedEmployees.length > 0 ? editableParsedEmployees.map((emp, index) => (<TableRow key={index}><TableCell><Input value={emp.name} onChange={(e) => handleParsedEmployeeChange(index, 'name', e.target.value)} className="h-8" /></TableCell><TableCell><Input value={emp.position} onChange={(e) => handleParsedEmployeeChange(index, 'position', e.target.value)} className="h-8" /></TableCell><TableCell><Input value={emp.description || ''} onChange={(e) => handleParsedEmployeeChange(index, 'description', e.target.value)} className="h-8" /></TableCell><TableCell className="text-right"><Input type="number" value={emp.salary} onChange={(e) => handleParsedEmployeeChange(index, 'salary', Number(e.target.value))} className="h-8 text-right" /></TableCell></TableRow>)) : (<TableRow><TableCell colSpan={4} className="text-center h-24">No valid employees to display.</TableCell></TableRow>)}</TableBody></Table></ScrollArea><DialogFooter><Button variant="outline" onClick={() => setIsImportDialogOpen(false)} disabled={isImporting}>Cancel</Button><Button onClick={handleConfirmImport} disabled={isImporting || editableParsedEmployees.length === 0}>{isImporting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}Confirm Import ({editableParsedEmployees.length})</Button></DialogFooter></DialogContent></Dialog>
-      <Dialog open={isScanDialogOpen} onOpenChange={setIsScanDialogOpen}><DialogContent><DialogHeader><DialogTitle>Scan Document</DialogTitle><DialogDescription>Position the employee list within the frame and click capture.</DialogDescription></DialogHeader><div className="relative">{isInitializingCamera && (<div className="absolute inset-0 flex items-center justify-center bg-background/80 z-10"><Loader2 className="h-8 w-8 animate-spin" /><p className="ml-2">Starting camera...</p></div>)}{isScanning && (<div className="absolute inset-0 flex flex-col items-center justify-center bg-background/80 z-10"><Loader2 className="h-8 w-8 animate-spin" /><p className="ml-2 mt-2">Analyzing document...</p></div>)}<video ref={videoRef} className="w-full aspect-video rounded-md bg-black" autoPlay muted playsInline /><canvas ref={canvasRef} className="hidden" /></div><DialogFooter><Button variant="outline" onClick={() => setIsScanDialogOpen(false)} disabled={isScanning}>Cancel</Button><Button onClick={handleCaptureAndAnalyzeDocument} disabled={isInitializingCamera || isScanning || !hasCameraPermission}><Camera className="mr-2 h-4 w-4" />Capture & Analyze</Button></DialogFooter></DialogContent></Dialog>
       <AlertDialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}><AlertDialogContent><AlertDialogHeader><AlertDialogTitle>Are you sure?</AlertDialogTitle><AlertDialogDescription>This will permanently delete the employee and their files. This action cannot be undone.</AlertDialogDescription></AlertDialogHeader><AlertDialogFooter><AlertDialogCancel onClick={() => setEmployeeToDeleteId(null)} disabled={isSaving}>Cancel</AlertDialogCancel><AlertDialogAction onClick={confirmDeleteEmployee} className="bg-destructive text-destructive-foreground hover:bg-destructive/90" disabled={isSaving}>{isSaving ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : 'Delete'}</AlertDialogAction></AlertDialogFooter></AlertDialogContent></AlertDialog>
     </div>
   );
 }
+
