@@ -89,7 +89,7 @@ export default function ViewInvoicePage() {
     const [imageDataUris, setImageDataUris] = useState<{ signature?: string; stamp?: string }>({});
     const [isLoadingData, setIsLoadingData] = useState(true);
     const [isProcessing, setIsProcessing] = useState(false);
-    const [template, setTemplate] = useState<'business' | 'modern' | 'simple' | 'minimalist' | 'bold' | 'corporate'>('business');
+    const [template, setTemplate] = useState<'business' | 'modern' | 'simple' | 'minimalist' | 'bold' | 'corporate'>('corporate');
     const [useLetterhead, setUseLetterhead] = useState(true);
     const [isBlackAndWhite, setIsBlackAndWhite] = useState(false);
     const printRef = useRef<HTMLDivElement>(null);

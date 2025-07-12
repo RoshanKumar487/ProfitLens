@@ -22,6 +22,7 @@ interface InvoiceDisplay {
   clientName: string;
   clientEmail?: string;
   clientAddress?: string;
+  clientGstin?: string;
   subtotal: number;
   discountAmount: number;
   taxRate: number;
@@ -95,6 +96,8 @@ const InvoiceTemplateCorporate = React.forwardRef<HTMLDivElement, InvoiceTemplat
                 <p className="text-xs text-gray-300">Invoice To:</p>
                 <p className="text-xl font-bold">{invoiceToView.clientName}</p>
                 <p className="text-sm text-gray-300">{invoiceToView.clientEmail}</p>
+                <p className="text-sm text-gray-300 whitespace-pre-line mt-1">{invoiceToView.clientAddress}</p>
+                {invoiceToView.clientGstin && <p className="text-sm text-gray-300 mt-1">GSTIN: {invoiceToView.clientGstin}</p>}
               </div>
             </div>
             <div className="text-right">
@@ -116,9 +119,10 @@ const InvoiceTemplateCorporate = React.forwardRef<HTMLDivElement, InvoiceTemplat
         <main className="flex-grow p-8">
             <section className="grid grid-cols-2 gap-8 mb-8">
                 <div>
+                    <h3 className="font-bold mb-1">FROM</h3>
                     <p><strong className="w-20 inline-block">Phone:</strong> {companyProfileDetails.phone}</p>
                     <p><strong className="w-20 inline-block">Email:</strong> {companyProfileDetails.email}</p>
-                    <p><strong className="w-20 inline-block">Address:</strong> {fullCompanyAddress}</p>
+                    <p><strong className="w-20 inline-block">GSTIN:</strong> {companyProfileDetails.gstin}</p>
                 </div>
                 <div>
                     <h3 className="font-bold mb-1">PAYMENT METHOD</h3>
