@@ -5,7 +5,7 @@ import React, { useState, useCallback } from 'react';
 import PageTitle from '@/components/PageTitle';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
-import { Calendar as CalendarIcon, FileBarChart, Loader2, FileText, User, TrendingDown, Receipt as ReceiptIcon, DollarSign, Banknote, ChevronDown } from 'lucide-react';
+import { Calendar as CalendarIcon, FileBarChart, Loader2, FileText, User, TrendingDown, Receipt as ReceiptIcon, DollarSign, Banknote, ChevronDown, Package } from 'lucide-react';
 import { format } from 'date-fns';
 import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/contexts/AuthContext';
@@ -24,6 +24,7 @@ interface InvoiceItem { id: string; description: string; quantity: number; unitP
 interface InvoiceFirestore { invoiceNumber: string; clientName: string; clientEmail?: string; amount: number; subtotal: number; discountAmount: number; taxAmount: number; issuedDate: Timestamp; dueDate: Timestamp; status: string; notes?: string; items?: InvoiceItem[]; }
 interface RevenueEntryFirestore { date: Timestamp; amount: number; source: string; description?: string; }
 interface BankTransactionFirestore { date: Timestamp; amount: number; type: 'deposit' | 'withdrawal'; category: string; description: string; accountId: string; }
+interface ProductFirestore { name: string; sku: string; category: string; itemType: 'Goods' | 'Service'; unit: string; salePrice: number; purchasePrice: number; gstRate: number; quantity?: number; lowStockThreshold?: number; createdAt: Timestamp; updatedAt?: Timestamp; }
 
 
 export default function ReportsPage() {
@@ -50,6 +51,10 @@ export default function ReportsPage() {
   const [bankTransactionFromDate, setBankTransactionFromDate] = useState<Date | undefined>();
   const [bankTransactionToDate, setBankTransactionToDate] = useState<Date | undefined>();
   const [isExportingBankTransactions, setIsExportingBankTransactions] = useState(false);
+  
+  const [productFromDate, setProductFromDate] = useState<Date | undefined>();
+  const [productToDate, setProductToDate] = useState<Date | undefined>();
+  const [isExportingProducts, setIsExportingProducts] = useState(false);
   
 
   const handleExport = useCallback(async (
@@ -401,6 +406,40 @@ export default function ReportsPage() {
                 true // Use collectionGroup query
             ),
             'transaction'
+        )}
+        {renderReportCard(
+            'Products & Services Report',
+            'Export your entire item catalog with stock levels.',
+            Package,
+            productFromDate,
+            setProductFromDate,
+            productToDate,
+            setProductToDate,
+            isExportingProducts,
+            (exportFormat) => handleExport(
+                exportFormat,
+                'Products & Services', 'products', productFromDate, productToDate, 'createdAt',
+                ['ID', 'Name', 'SKU', 'Category', 'Item Type', 'Unit', 'Sale Price', 'Purchase Price', 'GST Rate (%)', 'Stock Quantity', 'Low Stock Threshold', 'Created At'],
+                (doc) => {
+                    const data = doc.data() as ProductFirestore;
+                    return {
+                        'ID': doc.id,
+                        'Name': data.name,
+                        'SKU': data.sku,
+                        'Category': data.category,
+                        'Item Type': data.itemType,
+                        'Unit': data.unit,
+                        'Sale Price': data.salePrice.toFixed(2),
+                        'Purchase Price': data.purchasePrice.toFixed(2),
+                        'GST Rate (%)': data.gstRate.toFixed(2),
+                        'Stock Quantity': data.quantity ?? 'N/A',
+                        'Low Stock Threshold': data.lowStockThreshold ?? 'N/A',
+                        'Created At': format(data.createdAt.toDate(), 'yyyy-MM-dd HH:mm:ss'),
+                    };
+                },
+                setIsExportingProducts
+            ),
+            'creation'
         )}
       </div>
     </div>
