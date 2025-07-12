@@ -32,7 +32,7 @@ interface EmployeeSuggestion {
 }
 
 export default function NewExpensePage() {
-  const { user, currencySymbol } = useAuth();
+  const { user, currencySymbol, getIdToken } = useAuth();
   const router = useRouter();
   const searchParams = useSearchParams();
   const { toast } = useToast();
@@ -91,17 +91,23 @@ export default function NewExpensePage() {
 
     const timer = setTimeout(async () => {
         setIsSearching(true);
-        const response = await fetch(`/api/employees?q=${encodeURIComponent(employeeName)}`);
+        const idToken = await getIdToken();
+        const response = await fetch(`/api/employees?q=${encodeURIComponent(employeeName)}`, {
+            headers: { 'x-firebase-id-token': idToken || '' },
+        });
+
         if (response.ok) {
             const data = await response.json();
             setEmployeeSuggestions(data);
             setShowSuggestions(true);
+        } else {
+            console.error("Failed to fetch employees");
         }
         setIsSearching(false);
     }, 300);
 
     return () => clearTimeout(timer);
-  }, [employeeName, selectedEmployee]);
+  }, [employeeName, selectedEmployee, getIdToken]);
 
   const handleSelectEmployee = (employee: EmployeeSuggestion) => {
     setSelectedEmployee(employee);

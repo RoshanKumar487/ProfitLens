@@ -31,7 +31,7 @@ interface User {
   currencySymbol: string;
   role: UserRole;
   isSuperAdmin: boolean;
-  getIdToken: () => Promise<string>;
+  getIdToken: () => Promise<string | null>;
 }
 
 interface SignUpCompanyInfo {
@@ -59,6 +59,7 @@ interface AuthContextType {
   signIn: (email: string, password: string) => Promise<FirebaseUser | null>;
   signOut: () => Promise<void>;
   sendPasswordReset: (email: string) => Promise<void>;
+  getIdToken: () => Promise<string | null>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -346,10 +347,18 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     }
   };
 
+  const getIdToken = async (): Promise<string | null> => {
+    const currentUser = auth.currentUser;
+    if (currentUser) {
+      return currentUser.getIdToken();
+    }
+    return null;
+  };
+
   const currencySymbol = user?.currencySymbol || '$';
 
   return (
-    <AuthContext.Provider value={{ user, isLoading, error: authError, currencySymbol, signUp, signIn, signOut, sendPasswordReset }}>
+    <AuthContext.Provider value={{ user, isLoading, error: authError, currencySymbol, signUp, signIn, signOut, sendPasswordReset, getIdToken }}>
       {children}
     </AuthContext.Provider>
   );
