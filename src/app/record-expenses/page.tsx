@@ -28,6 +28,7 @@ import { updateExpenseEntry, deleteExpenseEntry, type ExpenseUpdateData, bulkAdd
 import { analyzeReceipt } from '@/ai/flows/analyze-receipt-flow';
 import { Skeleton } from '@/components/ui/skeleton';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import { Pagination, PaginationContent, PaginationItem, PaginationNext, PaginationPrevious } from '@/components/ui/pagination';
 
 const EXPENSE_CATEGORIES = [
@@ -72,6 +73,7 @@ const RECORDS_PER_PAGE = 20;
 export default function RecordExpensesPage() {
   const { user, isLoading: authIsLoading } = useAuth();
   const currency = user?.currencySymbol || '$';
+  const router = useRouter();
   
   const [recentEntries, setRecentEntries] = useState<ExpenseEntryDisplay[]>([]);
   const [isLoadingEntries, setIsLoadingEntries] = useState(true);
@@ -392,16 +394,18 @@ export default function RecordExpensesPage() {
       try {
           const result = await analyzeReceipt({ receiptImage: imageDataUrl });
           
-          const router = (await import('next/navigation')).useRouter();
           const queryParams = new URLSearchParams();
           if (result.amount) queryParams.set('amount', result.amount.toString());
           if (result.vendor) queryParams.set('vendor', result.vendor);
           if (result.description) queryParams.set('description', result.description);
           if (result.category) queryParams.set('category', result.category);
           if (result.date) {
-            const parsedDate = new Date(result.date + 'T00:00:00');
-            if (!isNaN(parsedDate.getTime())) {
-                queryParams.set('date', parsedDate.toISOString());
+            // Validate date format before parsing
+            if (/^\d{4}-\d{2}-\d{2}$/.test(result.date)) {
+                const parsedDate = new Date(result.date + 'T00:00:00Z'); // Assume UTC
+                if (!isNaN(parsedDate.getTime())) {
+                    queryParams.set('date', parsedDate.toISOString());
+                }
             }
           }
 

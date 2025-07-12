@@ -1,8 +1,8 @@
 
 'use client';
 
-import React, { useState, FormEvent } from 'react';
-import { useRouter } from 'next/navigation';
+import React, { useState, FormEvent, useEffect } from 'react';
+import { useRouter, useSearchParams } from 'next/navigation';
 import PageTitle from '@/components/PageTitle';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -29,6 +29,7 @@ const EXPENSE_CATEGORIES = [
 export default function NewExpensePage() {
   const { user, currencySymbol } = useAuth();
   const router = useRouter();
+  const searchParams = useSearchParams();
   const { toast } = useToast();
 
   const [date, setDate] = useState<Date | undefined>(new Date());
@@ -37,6 +38,28 @@ export default function NewExpensePage() {
   const [description, setDescription] = useState<string>('');
   const [vendor, setVendor] = useState<string>('');
   const [isSaving, setIsSaving] = useState(false);
+
+  useEffect(() => {
+    // Pre-fill form from URL query parameters
+    const urlAmount = searchParams.get('amount');
+    const urlVendor = searchParams.get('vendor');
+    const urlDescription = searchParams.get('description');
+    const urlCategory = searchParams.get('category');
+    const urlDate = searchParams.get('date');
+
+    if (urlAmount) setAmount(urlAmount);
+    if (urlVendor) setVendor(urlVendor);
+    if (urlDescription) setDescription(urlDescription);
+    if (urlCategory && EXPENSE_CATEGORIES.includes(urlCategory)) {
+        setCategory(urlCategory);
+    }
+    if (urlDate) {
+        const parsedDate = new Date(urlDate);
+        if (!isNaN(parsedDate.getTime())) {
+            setDate(parsedDate);
+        }
+    }
+  }, [searchParams]);
 
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
