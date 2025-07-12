@@ -660,43 +660,7 @@ export default function PayrollPage() {
             </div>
         </CardHeader>
         <CardContent>
-            {/* Mobile View */}
-            <div className="md:hidden space-y-4">
-                {isLoading ? (
-                    [...Array(3)].map((_,i) => <Skeleton key={i} className="h-48 w-full rounded-lg" />)
-                ) : filteredAndCalculatedData.map(emp => (
-                    <Card key={emp.id}>
-                        <CardHeader>
-                            <div className="flex justify-between items-start">
-                                <div className="flex items-center gap-3">
-                                    <Avatar><AvatarImage src={emp.profilePictureUrl} /><AvatarFallback>{getInitials(emp.name)}</AvatarFallback></Avatar>
-                                    <div>
-                                        <CardTitle className="text-lg">{emp.name}</CardTitle>
-                                        <CardDescription>{emp.position || 'N/A'}</CardDescription>
-                                    </div>
-                                </div>
-                                <DropdownMenu><DropdownMenuTrigger asChild><Button variant="ghost" size="icon" className="h-8 w-8"><MoreHorizontal className="h-4 w-4" /></Button></DropdownMenuTrigger><DropdownMenuContent align="end"><DropdownMenuItem onClick={() => handleOpenPayslipDialog(emp)}><Printer className="mr-2 h-4 w-4" /> Print Payslip</DropdownMenuItem><DropdownMenuItem onClick={() => handleOpenEmailDialog(emp)}><Mail className="mr-2 h-4 w-4" /> Email Payslip</DropdownMenuItem><DropdownMenuSeparator /><DropdownMenuItem onClick={() => promptDelete(emp)} className="text-destructive focus:text-destructive focus:bg-destructive/10"><Trash2 className="mr-2 h-4 w-4" /> Delete Record</DropdownMenuItem></DropdownMenuContent></DropdownMenu>
-                            </div>
-                        </CardHeader>
-                        <CardContent className="space-y-4">
-                             <div className="text-center p-4 rounded-lg bg-primary/10">
-                                <p className="text-sm text-primary font-semibold">Net Payment</p>
-                                <p className="text-3xl font-bold text-primary">{currencySymbol}{emp.netPayment?.toFixed(2) || '0.00'}</p>
-                            </div>
-                            <div className="grid grid-cols-2 gap-4 text-sm">
-                                <div><p className="text-muted-foreground">Base Salary</p><p className="font-semibold">{currencySymbol}{emp.baseSalary?.toFixed(2)}</p></div>
-                                <div><p className="text-muted-foreground">Gross Earnings</p><p className="font-semibold">{currencySymbol}{emp.grossEarnings?.toFixed(2)}</p></div>
-                                <div><p className="text-muted-foreground">Total Deductions</p><p className="font-semibold text-destructive">{currencySymbol}{emp.totalDeductions?.toFixed(2)}</p></div>
-                                <div><p className="text-muted-foreground">Status</p><Button variant={emp.status === 'Paid' ? 'default' : 'secondary'} size="sm" onClick={() => handleStatusChange(emp.id, emp.status === 'Paid' ? 'Pending' : 'Paid')} className="w-20 h-7 text-xs">{emp.status}</Button></div>
-                            </div>
-                             {/* You can add a details button here to show an edit dialog if needed */}
-                        </CardContent>
-                    </Card>
-                ))}
-            </div>
-
-            {/* Desktop View */}
-            <div ref={payrollTableRef} className="hidden md:block overflow-auto relative" style={{maxHeight: 'calc(100vh - 420px)'}}>
+            <div ref={payrollTableRef} className="overflow-auto relative" style={{maxHeight: 'calc(100vh - 420px)'}}>
                  <div className="hidden print:block text-center mb-4">
                     <h1 className="text-xl font-bold">{user?.companyName}</h1>
                     <h2 className="text-lg">Payroll for {format(payPeriod, 'MMMM yyyy')}</h2>
