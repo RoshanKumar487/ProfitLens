@@ -32,17 +32,15 @@ import { useRouter } from 'next/navigation';
 import { Pagination, PaginationContent, PaginationItem, PaginationNext, PaginationPrevious } from '@/components/ui/pagination';
 
 const EXPENSE_CATEGORIES = [
-  'Software & Subscriptions',
-  'Marketing & Advertising',
-  'Office Supplies',
-  'Utilities',
-  'Rent & Lease',
-  'Salaries & Wages',
-  'Travel',
-  'Meals & Entertainment',
-  'Professional Services',
-  'Other',
+  'Software & Subscriptions', 'Marketing & Advertising', 'Office Supplies',
+  'Utilities', 'Rent & Lease', 'Salary / Advance', 'Travel',
+  'Meals & Entertainment', 'Professional Services', 'Other',
 ];
+
+interface Employee {
+    id: string;
+    name: string;
+}
 
 interface ExpenseEntryFirestore {
   id?: string; 
@@ -51,6 +49,8 @@ interface ExpenseEntryFirestore {
   category: string;
   description?: string;
   vendor?: string;
+  employeeId?: string;
+  employeeName?: string;
   addedById: string;
   addedBy: string;
   companyId: string;
@@ -64,6 +64,8 @@ interface ExpenseEntryDisplay {
   category: string;
   description?: string;
   vendor?: string;
+  employeeId?: string;
+  employeeName?: string;
   addedBy: string;
   createdAt: Timestamp;
 }
@@ -76,6 +78,7 @@ export default function RecordExpensesPage() {
   const router = useRouter();
   
   const [recentEntries, setRecentEntries] = useState<ExpenseEntryDisplay[]>([]);
+  const [employees, setEmployees] = useState<Employee[]>([]);
   const [isLoadingEntries, setIsLoadingEntries] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
   const { toast } = useToast();
@@ -102,6 +105,24 @@ export default function RecordExpensesPage() {
 
   const videoRef = useRef<HTMLVideoElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
+
+  const fetchInitialData = useCallback(async () => {
+    if (authIsLoading || !user || !user.companyId) {
+      setIsLoadingEntries(false);
+      return;
+    }
+    
+    // Fetch employees for the dropdown
+    try {
+        const empQuery = query(collection(db, 'employees'), where('companyId', '==', user.companyId), orderBy('name'));
+        const empSnapshot = await getDocs(empQuery);
+        setEmployees(empSnapshot.docs.map(doc => ({ id: doc.id, name: doc.data().name })));
+    } catch (error) {
+        toast({ title: 'Error', description: 'Could not fetch employees list.', variant: 'destructive' });
+    }
+
+  }, [user, authIsLoading, toast]);
+
 
   const fetchExpenseEntries = useCallback(async (direction: 'next' | 'prev' | 'reset' = 'reset') => {
     if (authIsLoading || !user || !user.companyId) {
@@ -140,6 +161,8 @@ export default function RecordExpensesPage() {
           category: data.category,
           description: data.description || '',
           vendor: data.vendor || '',
+          employeeId: data.employeeId,
+          employeeName: data.employeeName,
           addedBy: data.addedBy || 'N/A',
           createdAt: data.createdAt,
         };
@@ -160,6 +183,7 @@ export default function RecordExpensesPage() {
 
   useEffect(() => {
     if (!authIsLoading) {
+      fetchInitialData();
       handleSortChange('date');
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -221,12 +245,21 @@ export default function RecordExpensesPage() {
     }
 
     setIsSaving(true);
+
+    let employeeName = '';
+    if (currentExpense.employeeId) {
+        const selectedEmployee = employees.find(emp => emp.id === currentExpense.employeeId);
+        employeeName = selectedEmployee ? selectedEmployee.name : '';
+    }
+
     const updatePayload: ExpenseUpdateData = {
         date: currentExpense.date,
         amount: amountNum,
         category: currentExpense.category,
         description: currentExpense.description || '',
         vendor: currentExpense.vendor || '',
+        employeeId: currentExpense.employeeId,
+        employeeName: employeeName
     };
     
     const result = await updateExpenseEntry(currentExpense.id, updatePayload);
@@ -506,7 +539,7 @@ export default function RecordExpensesPage() {
                     <Button variant="ghost" onClick={() => handleSortChange('category')} className="-ml-4 h-auto p-1 text-xs sm:text-sm">Category/Vendor {getSortIcon('category')}</Button>
                 </TableHead>
                 <TableHead>Description</TableHead>
-                <TableHead>Added By</TableHead>
+                <TableHead>Employee</TableHead>
                 <TableHead className="text-right">
                     <Button variant="ghost" onClick={() => handleSortChange('amount')} className="h-auto p-1 text-xs sm:text-sm">Amount {getSortIcon('amount')}</Button>
                 </TableHead>
@@ -520,7 +553,7 @@ export default function RecordExpensesPage() {
                     <TableCell><Skeleton className="h-4 w-[80px]" /></TableCell>
                     <TableCell><Skeleton className="h-4 w-[150px]" /></TableCell>
                     <TableCell><Skeleton className="h-4 w-[200px]" /></TableCell>
-                    <TableCell><Skeleton className="h-4 w-[100px]" /></TableCell>
+                    <TableCell><Skeleton className="h-4 w-[120px]" /></TableCell>
                     <TableCell className="text-right"><Skeleton className="h-4 w-[60px] ml-auto" /></TableCell>
                     <TableCell className="text-right"><Skeleton className="h-8 w-8 ml-auto" /></TableCell>
                   </TableRow>
@@ -533,7 +566,7 @@ export default function RecordExpensesPage() {
                       {entry.vendor && <div className="text-xs text-muted-foreground">{entry.vendor}</div>}
                     </TableCell>
                     <TableCell className="max-w-xs truncate" title={entry.description}>{entry.description || '-'}</TableCell>
-                    <TableCell>{entry.addedBy}</TableCell>
+                    <TableCell>{entry.employeeName || '-'}</TableCell>
                     <TableCell className="text-right font-semibold">{currency}{entry.amount.toFixed(2)}</TableCell>
                     <TableCell className="text-right">
                       <DropdownMenu>
@@ -598,6 +631,16 @@ export default function RecordExpensesPage() {
                   <SelectContent>{EXPENSE_CATEGORIES.map((cat) => (<SelectItem key={cat} value={cat}>{cat}</SelectItem>))}</SelectContent>
                 </Select>
               </div>
+              <div>
+                <Label htmlFor="edit-employee">Employee (Optional)</Label>
+                <Select value={currentExpense.employeeId || ''} onValueChange={(val) => setCurrentExpense(p => p ? {...p, employeeId: val} : null)} disabled={isSaving}>
+                    <SelectTrigger><SelectValue placeholder="Select an employee"/></SelectTrigger>
+                    <SelectContent>
+                        <SelectItem value="">None</SelectItem>
+                        {employees.map(emp => <SelectItem key={emp.id} value={emp.id}>{emp.name}</SelectItem>)}
+                    </SelectContent>
+                </Select>
+                </div>
               <div>
                 <Label htmlFor="edit-vendor">Vendor (Optional)</Label>
                 <Input id="edit-vendor" value={currentExpense.vendor} onChange={(e) => setCurrentExpense(prev => prev ? {...prev, vendor: e.target.value} : null)} disabled={isSaving}/>

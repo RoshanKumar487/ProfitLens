@@ -1,3 +1,4 @@
+
 'use server';
 
 import { db } from '@/lib/firebaseConfig';
@@ -9,6 +10,8 @@ export interface ExpenseUpdateData {
   category: string;
   description: string;
   vendor: string;
+  employeeId?: string;
+  employeeName?: string;
 }
 
 export interface ExpenseImportData {
@@ -17,6 +20,8 @@ export interface ExpenseImportData {
   category: string;
   description?: string;
   vendor?: string;
+  employeeId?: string;
+  employeeName?: string;
 }
 
 export async function bulkAddExpenses(
@@ -68,11 +73,18 @@ export async function bulkAddExpenses(
 export async function updateExpenseEntry(id: string, updates: ExpenseUpdateData): Promise<{ success: boolean; message: string }> {
   try {
     const expenseRef = doc(db, 'expenses', id);
-    await updateDoc(expenseRef, { 
+    const payload = { 
       ...updates,
       date: Timestamp.fromDate(updates.date),
       updatedAt: serverTimestamp() 
-    });
+    };
+
+    if (!payload.employeeId) {
+        (payload as any).employeeId = null;
+        (payload as any).employeeName = null;
+    }
+
+    await updateDoc(expenseRef, payload);
     return { success: true, message: 'Expense updated successfully.' };
   } catch (error: any) {
     console.error("Error updating expense:", error);

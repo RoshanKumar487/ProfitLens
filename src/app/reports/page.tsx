@@ -19,7 +19,7 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigge
 
 // Local interfaces for Firestore data structures
 interface EmployeeFirestore { name: string; position: string; salary: number; description?: string; profilePictureUrl?: string; associatedFileName?: string; associatedFileUrl?: string; addedBy?: string; createdAt: Timestamp; updatedAt?: Timestamp; }
-interface ExpenseFirestore { date: Timestamp; amount: number; category: string; vendor?: string; description?: string; addedBy?: string; }
+interface ExpenseFirestore { date: Timestamp; amount: number; category: string; vendor?: string; description?: string; addedBy?: string; employeeName?: string; }
 interface InvoiceItem { id: string; description: string; quantity: number; unitPrice: number; }
 interface InvoiceFirestore { invoiceNumber: string; clientName: string; clientEmail?: string; amount: number; subtotal: number; discountAmount: number; taxAmount: number; issuedDate: Timestamp; dueDate: Timestamp; status: string; notes?: string; items?: InvoiceItem[]; }
 interface RevenueEntryFirestore { date: Timestamp; amount: number; source: string; description?: string; }
@@ -328,6 +328,35 @@ export default function ReportsPage() {
                 setIsExportingInvoices
             ),
             'issued'
+        )}
+        {renderReportCard(
+            'Expense Report',
+            'Export all recorded expenses within a date range.',
+            TrendingDown,
+            expenseFromDate,
+            setExpenseFromDate,
+            expenseToDate,
+            setExpenseToDate,
+            isExportingExpenses,
+            (exportFormat) => handleExport(
+                exportFormat,
+                'Expenses', 'expenses', expenseFromDate, expenseToDate, 'date',
+                ['Date', 'Amount', 'Category', 'Vendor', 'Description', 'Employee Name', 'Added By'],
+                (doc) => {
+                    const data = doc.data() as ExpenseFirestore;
+                    return {
+                        'Date': format(data.date.toDate(), 'yyyy-MM-dd'),
+                        'Amount': data.amount,
+                        'Category': data.category,
+                        'Vendor': data.vendor || '',
+                        'Description': data.description || '',
+                        'Employee Name': data.employeeName || 'N/A',
+                        'Added By': data.addedBy || 'N/A'
+                    };
+                },
+                setIsExportingExpenses
+            ),
+            'expense'
         )}
         {renderReportCard(
             'Products & Services Report',

@@ -17,14 +17,19 @@ import { format } from 'date-fns';
 import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/contexts/AuthContext';
 import { db } from '@/lib/firebaseConfig';
-import { collection, addDoc, Timestamp, serverTimestamp } from 'firebase/firestore';
+import { collection, addDoc, Timestamp, serverTimestamp, query, where, getDocs, orderBy } from 'firebase/firestore';
 import Link from 'next/link';
 
 const EXPENSE_CATEGORIES = [
   'Software & Subscriptions', 'Marketing & Advertising', 'Office Supplies',
-  'Utilities', 'Rent & Lease', 'Salaries & Wages', 'Travel',
+  'Utilities', 'Rent & Lease', 'Salary / Advance', 'Travel',
   'Meals & Entertainment', 'Professional Services', 'Other',
 ];
+
+interface Employee {
+    id: string;
+    name: string;
+}
 
 export default function NewExpensePage() {
   const { user, currencySymbol } = useAuth();
@@ -38,6 +43,8 @@ export default function NewExpensePage() {
   const [description, setDescription] = useState<string>('');
   const [vendor, setVendor] = useState<string>('');
   const [isSaving, setIsSaving] = useState(false);
+  const [employees, setEmployees] = useState<Employee[]>([]);
+  const [selectedEmployee, setSelectedEmployee] = useState<string>('');
 
   useEffect(() => {
     // Pre-fill form from URL query parameters
@@ -61,6 +68,17 @@ export default function NewExpensePage() {
     }
   }, [searchParams]);
 
+  useEffect(() => {
+    if (user?.companyId) {
+        const fetchEmployees = async () => {
+            const empQuery = query(collection(db, 'employees'), where('companyId', '==', user.companyId), orderBy('name'));
+            const querySnapshot = await getDocs(empQuery);
+            setEmployees(querySnapshot.docs.map(doc => ({ id: doc.id, name: doc.data().name })));
+        };
+        fetchEmployees();
+    }
+  }, [user]);
+
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
     if (!user || !user.companyId) {
@@ -79,12 +97,24 @@ export default function NewExpensePage() {
     }
 
     setIsSaving(true);
+
+    let employeeId, employeeName;
+    if (selectedEmployee) {
+        const employee = employees.find(e => e.id === selectedEmployee);
+        if (employee) {
+            employeeId = employee.id;
+            employeeName = employee.name;
+        }
+    }
+
     const newEntryPayload = {
       date: Timestamp.fromDate(date),
       amount: amountNum,
       category: category,
       description: description || '',
       vendor: vendor || '',
+      employeeId: employeeId || null,
+      employeeName: employeeName || null,
       companyId: user.companyId,
       createdAt: serverTimestamp(),
       addedById: user.uid,
@@ -134,6 +164,18 @@ export default function NewExpensePage() {
                 <SelectContent>{EXPENSE_CATEGORIES.map((cat) => (<SelectItem key={cat} value={cat}>{cat}</SelectItem>))}</SelectContent>
               </Select>
             </div>
+            {category === 'Salary / Advance' && (
+                <div>
+                    <Label htmlFor="employee">Employee (Optional)</Label>
+                    <Select value={selectedEmployee} onValueChange={setSelectedEmployee} disabled={isSaving}>
+                        <SelectTrigger id="employee"><SelectValue placeholder="Select an employee"/></SelectTrigger>
+                        <SelectContent>
+                            <SelectItem value="">None</SelectItem>
+                            {employees.map(emp => <SelectItem key={emp.id} value={emp.id}>{emp.name}</SelectItem>)}
+                        </SelectContent>
+                    </Select>
+                </div>
+            )}
             <div>
               <Label htmlFor="vendor">Vendor (Optional)</Label>
               <Input id="vendor" value={vendor} onChange={(e) => setVendor(e.target.value)} placeholder="e.g., AWS, Staples" disabled={isSaving}/>
@@ -159,5 +201,3 @@ export default function NewExpensePage() {
     </div>
   );
 }
-
-    

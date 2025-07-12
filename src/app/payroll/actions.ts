@@ -14,6 +14,7 @@ import {
   setDoc,
   deleteDoc,
 } from 'firebase/firestore';
+import { format, startOfMonth, endOfMonth } from 'date-fns';
 import nodemailer from 'nodemailer';
 
 export interface PayrollData {
@@ -80,25 +81,50 @@ export async function getPayrollDataForPeriod(companyId: string, payPeriod: stri
     
     const payrollsRef = collection(db, 'payrolls');
     const qPayrolls = query(payrollsRef, where('companyId', '==', companyId), where('payPeriod', '==', payPeriod));
+    
+    // Fetch advances for the given period
+    const periodDate = new Date(payPeriod + '-02'); // Use 2nd to avoid timezone issues
+    const startDate = startOfMonth(periodDate);
+    const endDate = endOfMonth(periodDate);
 
-    const [employeeSnapshot, payrollSnapshot] = await Promise.all([
+    const advancesRef = collection(db, 'expenses');
+    const qAdvances = query(advancesRef, 
+        where('companyId', '==', companyId),
+        where('category', '==', 'Salary / Advance'),
+        where('date', '>=', startDate),
+        where('date', '<=', endDate)
+    );
+
+    const [employeeSnapshot, payrollSnapshot, advancesSnapshot] = await Promise.all([
         getDocs(qEmployees),
-        getDocs(qPayrolls)
+        getDocs(qPayrolls),
+        getDocs(qAdvances)
     ]);
 
     const payrollsMap = new Map(payrollSnapshot.docs.map(doc => [doc.data().employeeId, { id: doc.id, ...doc.data() }]));
+    
+    const advancesByEmployee = new Map<string, number>();
+    advancesSnapshot.forEach(doc => {
+        const data = doc.data();
+        if(data.employeeId) {
+            const currentAdvances = advancesByEmployee.get(data.employeeId) || 0;
+            advancesByEmployee.set(data.employeeId, currentAdvances + data.amount);
+        }
+    });
+
 
     const employeesWithPayroll = employeeSnapshot.docs.map(doc => {
         const employeeData = doc.data();
         const existingPayrollData = payrollsMap.get(doc.id);
         const customFields = existingPayrollData?.customFields || {};
+        const advances = advancesByEmployee.get(doc.id) || 0;
 
         const combinedData = {
             id: doc.id,
             ...employeeData,
             payrollId: existingPayrollData ? existingPayrollData.id : null,
             baseSalary: existingPayrollData ? existingPayrollData.baseSalary : (employeeData.salary || 0),
-            advances: existingPayrollData ? existingPayrollData.advances : 0,
+            advances: existingPayrollData ? existingPayrollData.advances : advances,
             otherDeductions: existingPayrollData ? existingPayrollData.otherDeductions : 0,
             workingDays: existingPayrollData?.workingDays,
             presentDays: existingPayrollData?.presentDays,
