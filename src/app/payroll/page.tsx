@@ -86,7 +86,8 @@ export default function PayrollPage() {
 
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState<'All' | 'Pending' | 'Paid'>('All');
-
+  
+  const payrollTableRef = useRef<HTMLDivElement>(null);
   const payslipPrintRef = useRef<HTMLDivElement>(null);
   const [isPayslipDialogOpen, setIsPayslipDialogOpen] = useState(false);
   const [employeeForAction, setEmployeeForAction] = useState<EmployeeWithPayroll | null>(null);
@@ -424,9 +425,38 @@ export default function PayrollPage() {
     setRecipientEmail('');
     setIsEmailDialogOpen(true);
   };
+  
+  const handleDownloadSheetPdf = async () => {
+    if (!payrollTableRef.current) return;
+    setIsPrinting(true);
+    toast({ title: 'Generating PDF...', description: 'Please wait, this may take a moment.'});
+    
+    try {
+      const canvas = await html2canvas(payrollTableRef.current, { scale: 2, useCORS: true });
+      const imgData = canvas.toDataURL('image/png');
+      
+      const pdf = new jsPDF({
+        orientation: 'landscape',
+        unit: 'mm',
+        format: 'a2' // Use a larger paper size to fit content
+      });
 
-  const handlePrintSheet = () => {
-    window.print();
+      const pdfWidth = pdf.internal.pageSize.getWidth();
+      const pdfHeight = pdf.internal.pageSize.getHeight();
+      
+      const imgProps= pdf.getImageProperties(imgData);
+      const imgHeight = (imgProps.height * pdfWidth) / imgProps.width;
+
+      pdf.addImage(imgData, 'PNG', 0, 0, pdfWidth, imgHeight, undefined, 'FAST');
+      pdf.save(`PayrollSheet-${format(payPeriod, 'yyyy-MM')}.pdf`);
+
+      toast({ title: 'Download Complete', description: 'The payroll sheet has been downloaded as a PDF.' });
+    } catch(error: any) {
+        console.error("Error generating PDF:", error);
+        toast({ title: "PDF Generation Failed", description: error.message, variant: "destructive" });
+    } finally {
+        setIsPrinting(false);
+    }
   };
 
   const handlePrintPayslip = async () => {
@@ -545,11 +575,7 @@ export default function PayrollPage() {
 
   return (
     <div className="space-y-6 p-4 sm:p-6 lg:p-8 print:p-0 print:space-y-0">
-      <div className="hidden print:block text-center mb-4">
-        <h1 className="text-xl font-bold">{user?.companyName}</h1>
-        <h2 className="text-lg">Payroll for {format(payPeriod, 'MMMM yyyy')}</h2>
-      </div>
-
+      
       <PageTitle title="Employee Payroll" subtitle="Manage monthly salary, advances, and deductions." icon={HandCoins} className="print:hidden" />
 
       <Card className="print:shadow-none print:border-none">
@@ -596,11 +622,11 @@ export default function PayrollPage() {
                   </Tooltip>
                   <Tooltip>
                     <TooltipTrigger asChild>
-                        <Button variant="outline" size="icon" onClick={handlePrintSheet}>
-                            <Printer className="h-4 w-4" />
+                        <Button variant="outline" size="icon" onClick={handleDownloadSheetPdf} disabled={isPrinting}>
+                            {isPrinting ? <Loader2 className="h-4 w-4 animate-spin"/> : <Download className="h-4 w-4" />}
                         </Button>
                     </TooltipTrigger>
-                    <TooltipContent><p>Print Payroll Sheet</p></TooltipContent>
+                    <TooltipContent><p>Download Payroll Sheet as PDF</p></TooltipContent>
                   </Tooltip>
                 </TooltipProvider>
                 <Button onClick={handleSaveAll} disabled={isSaving || isLoading}>
@@ -670,7 +696,11 @@ export default function PayrollPage() {
             </div>
 
             {/* Desktop View */}
-            <div className="hidden md:block overflow-auto relative" style={{maxHeight: 'calc(100vh - 420px)'}}>
+            <div ref={payrollTableRef} className="hidden md:block overflow-auto relative" style={{maxHeight: 'calc(100vh - 420px)'}}>
+                 <div className="hidden print:block text-center mb-4">
+                    <h1 className="text-xl font-bold">{user?.companyName}</h1>
+                    <h2 className="text-lg">Payroll for {format(payPeriod, 'MMMM yyyy')}</h2>
+                </div>
                 <Table>
                 <TableHeader className="sticky top-0 bg-card z-10 print:bg-white">
                     <TableRow>

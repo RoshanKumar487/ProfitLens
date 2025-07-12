@@ -54,6 +54,18 @@ body {
     /* Background Animation */
     --gradient-from: 210 40% 97%;
     --gradient-to: 210 40% 99%;
+    
+    /* Chart Colors */
+    --chart-1: 12 76% 61%;
+    --chart-2: 173 58% 39%;
+    --chart-3: 197 37% 24%;
+    --chart-4: 43 74% 66%;
+    --chart-5: 27 87% 67%;
+    --chart-6: 217 91% 60%;
+    --chart-7: 333 80% 50%;
+    --chart-8: 270 90% 60%;
+    --chart-9: 150 70% 40%;
+    --chart-10: 50 80% 55%;
   }
 
   .dark {
@@ -101,6 +113,18 @@ body {
     /* Background Animation */
     --gradient-from: 224 71% 6%;
     --gradient-to: 224 71% 2%;
+    
+     /* Chart Colors */
+    --chart-1: 12 76% 61%;
+    --chart-2: 173 58% 39%;
+    --chart-3: 197 37% 24%;
+    --chart-4: 43 74% 66%;
+    --chart-5: 27 87% 67%;
+    --chart-6: 217 91% 60%;
+    --chart-7: 333 80% 50%;
+    --chart-8: 270 90% 60%;
+    --chart-9: 150 70% 40%;
+    --chart-10: 50 80% 55%;
   }
 }
 
@@ -141,21 +165,21 @@ body {
 
 @media print {
   @page {
-    size: A4;
-    margin: 0;
+    size: A4 landscape;
+    margin: 1cm;
   }
   body {
     -webkit-print-color-adjust: exact;
     print-color-adjust: exact;
   }
   .print\:hidden {
-    display: none;
+    display: none !important;
   }
   .print\:block {
-    display: block;
+    display: block !important;
   }
   .print\:p-0 {
-    padding: 0;
+    padding: 0 !important;
   }
   .print\:space-y-0 > :not([hidden]) ~ :not([hidden]) {
     --tw-space-y-reverse: 0;
@@ -163,18 +187,21 @@ body {
     margin-bottom: calc(0px * var(--tw-space-y-reverse));
   }
   .print\:shadow-none {
-    box-shadow: none;
+    box-shadow: none !important;
   }
   .print\:border-none {
-    border: none;
+    border: none !important;
   }
    .print\:bg-white {
-    background-color: white;
+    background-color: white !important;
   }
   .print\:bg-gray-100 {
-    background-color: #f3f4f6;
+    background-color: #f3f4f6 !important;
   }
   .print\:bg-transparent {
-    background-color: transparent;
+    background-color: transparent !important;
+  }
+  .print\:text-black {
+    color: black !important;
   }
 }
