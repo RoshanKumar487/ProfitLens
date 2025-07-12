@@ -4,7 +4,7 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/button';
-import { Receipt, Mail, Printer, ArrowLeft, Loader2, Edit, Download } from 'lucide-react';
+import { Receipt, Mail, Printer, ArrowLeft, Loader2, Edit, Download, PenSquare } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/contexts/AuthContext';
 import { doc, getDoc, Timestamp } from 'firebase/firestore';
@@ -25,6 +25,8 @@ import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { getInvoiceSettings, type InvoiceSettings } from '@/app/settings/actions';
 import { Switch } from '@/components/ui/switch';
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
+import SignaturePad from '@/components/SignaturePad';
 
 // Interface definitions mirrored from invoicing/page.tsx for component props
 interface InvoiceItem {
@@ -87,11 +89,13 @@ export default function ViewInvoicePage() {
     const [companyProfile, setCompanyProfile] = useState<CompanyDetailsFirestore | null>(null);
     const [invoiceSettings, setInvoiceSettings] = useState<InvoiceSettings | null>(null);
     const [imageDataUris, setImageDataUris] = useState<{ signature?: string; stamp?: string }>({});
+    const [localSignatureUri, setLocalSignatureUri] = useState<string | undefined>(undefined);
     const [isLoadingData, setIsLoadingData] = useState(true);
     const [isProcessing, setIsProcessing] = useState(false);
     const [template, setTemplate] = useState<'business' | 'modern' | 'simple' | 'minimalist' | 'bold' | 'corporate'>('corporate');
     const [useLetterhead, setUseLetterhead] = useState(true);
     const [isBlackAndWhite, setIsBlackAndWhite] = useState(false);
+    const [isSignatureDialogOpen, setIsSignatureDialogOpen] = useState(false);
     const printRef = useRef<HTMLDivElement>(null);
 
     const fetchAllData = useCallback(async () => {
@@ -232,6 +236,11 @@ export default function ViewInvoicePage() {
         }
     };
 
+    const handleSignatureSave = (dataUrl: string) => {
+        setLocalSignatureUri(dataUrl);
+        setIsSignatureDialogOpen(false);
+    };
+
     if (authIsLoading || isLoadingData) {
         return (
             <div className="flex flex-col items-center justify-center p-8 bg-muted min-h-screen">
@@ -267,7 +276,7 @@ export default function ViewInvoicePage() {
             invoiceToView: invoice, 
             companyProfileDetails: companyProfile, 
             currencySymbol: currencySymbol, 
-            signatureDataUri: imageDataUris.signature,
+            signatureDataUri: localSignatureUri || imageDataUris.signature, // Prioritize local signature
             stampDataUri: imageDataUris.stamp,
             invoiceSettings: invoiceSettings,
             letterheadTemplate: useLetterhead ? 'simple' as const : 'none' as const,
@@ -313,6 +322,21 @@ export default function ViewInvoicePage() {
                             Edit
                         </Link>
                     </Button>
+                    <Dialog open={isSignatureDialogOpen} onOpenChange={setIsSignatureDialogOpen}>
+                        <DialogTrigger asChild>
+                            <Button variant="secondary">
+                                <PenSquare className="mr-2 h-4 w-4" />
+                                Draw Signature
+                            </Button>
+                        </DialogTrigger>
+                        <DialogContent>
+                            <DialogHeader>
+                                <DialogTitle>Draw Signature</DialogTitle>
+                                <DialogDescription>Draw a signature for this invoice. It will not be saved to your company profile.</DialogDescription>
+                            </DialogHeader>
+                            <SignaturePad onSave={handleSignatureSave} isSaving={false} />
+                        </DialogContent>
+                    </Dialog>
                     <div className="flex items-center gap-4 border-l pl-4">
                          <div className="flex items-center gap-2">
                             <Switch id="use-letterhead" checked={useLetterhead} onCheckedChange={setUseLetterhead} disabled={isProcessing} />
