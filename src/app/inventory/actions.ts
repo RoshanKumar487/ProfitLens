@@ -18,10 +18,13 @@ export interface Product {
   name: string;
   sku?: string;
   category?: string;
+  itemType?: 'Goods' | 'Service';
+  unit?: string;
   purchasePrice: number;
   salePrice: number;
-  quantity: number;
-  lowStockThreshold?: number;
+  gstRate?: number;
+  quantity?: number; // Only for 'Goods'
+  lowStockThreshold?: number; // Only for 'Goods'
   supplierId?: string;
 }
 
