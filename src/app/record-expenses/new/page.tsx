@@ -1,7 +1,7 @@
 
 'use client';
 
-import React, { useState, FormEvent, useEffect } from 'react';
+import React, { useState, FormEvent, useEffect, useMemo } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import PageTitle from '@/components/PageTitle';
 import { Button } from '@/components/ui/button';
@@ -12,12 +12,12 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/com
 import { Calendar } from '@/components/ui/calendar';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { CalendarIcon, TrendingDown, Save, Loader2 } from 'lucide-react';
+import { CalendarIcon, TrendingDown, Save, Loader2, Search } from 'lucide-react';
 import { format } from 'date-fns';
 import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/contexts/AuthContext';
 import { db } from '@/lib/firebaseConfig';
-import { collection, addDoc, Timestamp, serverTimestamp, query, where, getDocs, orderBy } from 'firebase/firestore';
+import { collection, addDoc, Timestamp, serverTimestamp } from 'firebase/firestore';
 import Link from 'next/link';
 
 const EXPENSE_CATEGORIES = [
@@ -26,7 +26,7 @@ const EXPENSE_CATEGORIES = [
   'Meals & Entertainment', 'Professional Services', 'Other',
 ];
 
-interface Employee {
+interface EmployeeSuggestion {
     id: string;
     name: string;
 }
@@ -43,8 +43,14 @@ export default function NewExpensePage() {
   const [description, setDescription] = useState<string>('');
   const [vendor, setVendor] = useState<string>('');
   const [isSaving, setIsSaving] = useState(false);
-  const [employees, setEmployees] = useState<Employee[]>([]);
-  const [selectedEmployee, setSelectedEmployee] = useState<string>('');
+  
+  // State for new employee search field
+  const [employeeName, setEmployeeName] = useState('');
+  const [employeeSuggestions, setEmployeeSuggestions] = useState<EmployeeSuggestion[]>([]);
+  const [selectedEmployee, setSelectedEmployee] = useState<EmployeeSuggestion | null>(null);
+  const [isSearching, setIsSearching] = useState(false);
+  const [showSuggestions, setShowSuggestions] = useState(false);
+
 
   useEffect(() => {
     // Pre-fill form from URL query parameters
@@ -68,16 +74,41 @@ export default function NewExpensePage() {
     }
   }, [searchParams]);
 
+  // Effect for searching employees
   useEffect(() => {
-    if (user?.companyId) {
-        const fetchEmployees = async () => {
-            const empQuery = query(collection(db, 'employees'), where('companyId', '==', user.companyId), orderBy('name'));
-            const querySnapshot = await getDocs(empQuery);
-            setEmployees(querySnapshot.docs.map(doc => ({ id: doc.id, name: doc.data().name })));
-        };
-        fetchEmployees();
+    if (employeeName.trim().length < 1) {
+        setEmployeeSuggestions([]);
+        setShowSuggestions(false);
+        // If user clears the input, clear the selected employee
+        if (selectedEmployee) setSelectedEmployee(null);
+        return;
     }
-  }, [user]);
+
+    // If a selection has been made and the input is changed, it's a new search.
+    if (selectedEmployee && employeeName !== selectedEmployee.name) {
+        setSelectedEmployee(null);
+    }
+
+    const timer = setTimeout(async () => {
+        setIsSearching(true);
+        const response = await fetch(`/api/employees?q=${encodeURIComponent(employeeName)}`);
+        if (response.ok) {
+            const data = await response.json();
+            setEmployeeSuggestions(data);
+            setShowSuggestions(true);
+        }
+        setIsSearching(false);
+    }, 300);
+
+    return () => clearTimeout(timer);
+  }, [employeeName, selectedEmployee]);
+
+  const handleSelectEmployee = (employee: EmployeeSuggestion) => {
+    setSelectedEmployee(employee);
+    setEmployeeName(employee.name);
+    setShowSuggestions(false);
+  };
+
 
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
@@ -97,24 +128,19 @@ export default function NewExpensePage() {
     }
 
     setIsSaving(true);
-
-    let employeeId, employeeName;
-    if (selectedEmployee) {
-        const employee = employees.find(e => e.id === selectedEmployee);
-        if (employee) {
-            employeeId = employee.id;
-            employeeName = employee.name;
-        }
-    }
+    
+    // Determine employee details to save
+    const finalEmployeeId = selectedEmployee ? selectedEmployee.id : null;
+    const finalEmployeeName = employeeName || null;
 
     const newEntryPayload = {
       date: Timestamp.fromDate(date),
       amount: amountNum,
       category: category,
       description: description || '',
-      vendor: vendor || '',
-      employeeId: employeeId || null,
-      employeeName: employeeName || null,
+      vendor: vendor || '', // Keep vendor for non-advance expenses
+      employeeId: finalEmployeeId,
+      employeeName: finalEmployeeName,
       companyId: user.companyId,
       createdAt: serverTimestamp(),
       addedById: user.uid,
@@ -164,22 +190,41 @@ export default function NewExpensePage() {
                 <SelectContent>{EXPENSE_CATEGORIES.map((cat) => (<SelectItem key={cat} value={cat}>{cat}</SelectItem>))}</SelectContent>
               </Select>
             </div>
-            {category === 'Salary / Advance' && (
+
+            {category === 'Salary / Advance' ? (
+                <div className="relative">
+                    <Label htmlFor="employeeName">Employee Name</Label>
+                     <div className="flex items-center gap-2">
+                        <Input 
+                            id="employeeName" 
+                            value={employeeName} 
+                            onChange={(e) => setEmployeeName(e.target.value)} 
+                            placeholder="Type to search existing employees or enter new name" 
+                            autoComplete="off" 
+                            disabled={isSaving}
+                            onFocus={() => setShowSuggestions(true)}
+                            onBlur={() => setTimeout(() => setShowSuggestions(false), 200)}
+                        />
+                        {isSearching && <Loader2 className="h-4 w-4 animate-spin" />}
+                    </div>
+                    {showSuggestions && employeeSuggestions.length > 0 && (
+                        <Card className="absolute z-10 w-full mt-1 shadow-lg max-h-48 overflow-y-auto">
+                            <CardContent className="p-2">
+                                {employeeSuggestions.map((employee) => (
+                                    <div key={employee.id} onMouseDown={() => handleSelectEmployee(employee)} className="p-2 text-sm rounded-md hover:bg-accent cursor-pointer">
+                                        {employee.name}
+                                    </div>
+                                ))}
+                            </CardContent>
+                        </Card>
+                    )}
+                </div>
+            ) : (
                 <div>
-                    <Label htmlFor="employee">Employee (Optional)</Label>
-                    <Select value={selectedEmployee} onValueChange={setSelectedEmployee} disabled={isSaving}>
-                        <SelectTrigger id="employee"><SelectValue placeholder="Select an employee"/></SelectTrigger>
-                        <SelectContent>
-                            <SelectItem value="">None</SelectItem>
-                            {employees.map(emp => <SelectItem key={emp.id} value={emp.id}>{emp.name}</SelectItem>)}
-                        </SelectContent>
-                    </Select>
+                    <Label htmlFor="vendor">Vendor (Optional)</Label>
+                    <Input id="vendor" value={vendor} onChange={(e) => setVendor(e.target.value)} placeholder="e.g., AWS, Staples" disabled={isSaving}/>
                 </div>
             )}
-            <div>
-              <Label htmlFor="vendor">Vendor (Optional)</Label>
-              <Input id="vendor" value={vendor} onChange={(e) => setVendor(e.target.value)} placeholder="e.g., AWS, Staples" disabled={isSaving}/>
-            </div>
             <div>
               <Label htmlFor="description">Description (Optional)</Label>
               <Textarea id="description" value={description} onChange={(e) => setDescription(e.target.value)} placeholder="e.g., Monthly server costs, Printer paper" disabled={isSaving}/>

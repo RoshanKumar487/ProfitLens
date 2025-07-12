@@ -18,5 +18,5 @@ export function middleware(request: NextRequest) {
 }
 
 export const config = {
-  matcher: '/ai-assistant/:path*',
+  matcher: ['/ai-assistant/:path*', '/api/:path*'],
 }
