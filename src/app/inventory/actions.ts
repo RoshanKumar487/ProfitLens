@@ -33,57 +33,8 @@ export interface Supplier {
   phone?: string;
 }
 
-// Product Actions
-export async function saveProduct(
-  companyId: string,
-  productData: Product
-): Promise<{ success: boolean; message: string; id?: string }> {
-  if (!companyId) return { success: false, message: 'Company ID is required.' };
-
-  const batch = writeBatch(db);
-  const { id, ...data } = productData;
-  let newProductId = id;
-
-  try {
-    if (id) {
-      // Update existing product
-      const productRef = doc(db, 'products', id);
-      batch.update(productRef, { ...data, updatedAt: serverTimestamp() });
-    } else {
-      // Create new product
-      const newProductRef = doc(collection(db, 'products'));
-      newProductId = newProductRef.id;
-      batch.set(newProductRef, {
-        ...data,
-        companyId,
-        createdAt: serverTimestamp(),
-        updatedAt: serverTimestamp(),
-      });
-    }
-    await batch.commit();
-    return {
-      success: true,
-      message: `Product ${id ? 'updated' : 'created'} successfully.`,
-      id: newProductId,
-    };
-  } catch (error: any) {
-    console.error('Error saving product:', error);
-    return { success: false, message: `Failed to save product: ${error.message}` };
-  }
-}
-
-export async function deleteProduct(
-  productId: string
-): Promise<{ success: boolean; message: string }> {
-  try {
-    const productRef = doc(db, 'products', productId);
-    await deleteDoc(productRef);
-    return { success: true, message: 'Product deleted successfully.' };
-  } catch (error: any) {
-    console.error('Error deleting product:', error);
-    return { success: false, message: `Failed to delete product: ${error.message}` };
-  }
-}
+// Product Actions are now managed directly on the page for a spreadsheet-like UX.
+// This file is kept for supplier actions and potential future complex product actions.
 
 // Supplier Actions
 export async function saveSupplier(
@@ -136,7 +87,7 @@ export async function deleteSupplier(
 }
 
 
-// Stock Adjustment Action
+// Stock Adjustment Action could be moved here if needed for more complex logic
 export async function adjustStock(
   productId: string,
   adjustment: number,
