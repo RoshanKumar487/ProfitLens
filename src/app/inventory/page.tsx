@@ -4,22 +4,22 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { db } from '@/lib/firebaseConfig';
-import { collection, query, where, orderBy, onSnapshot, Timestamp, doc } from 'firebase/firestore';
+import { collection, query, where, orderBy, onSnapshot } from 'firebase/firestore';
 import { useToast } from '@/hooks/use-toast';
 import PageTitle from '@/components/PageTitle';
 import DataCard from '@/components/DataCard';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from '@/components/ui/card';
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow, TableCaption } from '@/components/ui/table';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter, DialogClose } from "@/components/ui/dialog";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { Label } from '@/components/ui/label';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Skeleton } from '@/components/ui/skeleton';
-import { Package, PlusCircle, MoreHorizontal, Edit, Trash2, Loader2, Save, Truck, PackagePlus, PackageMinus } from 'lucide-react';
+import { Package, PlusCircle, MoreHorizontal, Edit, Trash2, Loader2, Save } from 'lucide-react';
 import { saveProduct, deleteProduct, saveSupplier, deleteSupplier, adjustStock, type Product, type Supplier } from './actions';
 import { Badge } from '@/components/ui/badge';
 
@@ -39,9 +39,9 @@ export default function InventoryPage() {
 
     // Dialogs and Forms State
     const [dialogOpen, setDialogOpen] = useState<'product' | 'supplier' | 'stock' | null>(null);
-    const [itemToEdit, setItemToEdit] = useState<Product | Supplier | null>(null);
+    const [itemToEdit, setItemToEdit] = useState<Partial<Product & Supplier>>({});
     const [itemToDelete, setItemToDelete] = useState<{ type: 'product' | 'supplier'; id: string; name: string } | null>(null);
-    const [stockAdjustment, setStockAdjustment] = useState<{ productId: string; productName: string; quantity: number; type: 'Purchase' | 'Sale' | 'Correction' }>({ productId: '', productName: '', quantity: 0, type: 'Purchase' });
+    const [stockAdjustment, setStockAdjustment] = useState<{ productId: string; productName: string; quantity: number; type: 'Purchase' | 'Sale' | 'Correction' }>({ productId: '', productName: '', quantity: 1, type: 'Purchase' });
 
     // Fetch data using real-time listeners
     useEffect(() => {
@@ -56,17 +56,17 @@ export default function InventoryPage() {
         const unsubProducts = onSnapshot(productQuery, (snapshot) => {
             const fetchedProducts = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as ProductDisplay));
             setProducts(fetchedProducts);
-            if (suppliers.length > 0) setIsLoading(false);
+            if (suppliers.length > 0 || suppliers.length === 0) setIsLoading(false);
         }, (error) => { console.error("Error fetching products:", error); toast({ variant: 'destructive', title: "Error", description: "Could not fetch products." }); });
 
         const unsubSuppliers = onSnapshot(supplierQuery, (snapshot) => {
             const fetchedSuppliers = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as (Supplier & { id: string })));
             setSuppliers(fetchedSuppliers);
-            if (products.length > 0 || snapshot.empty) setIsLoading(false);
+            setIsLoading(false);
         }, (error) => { console.error("Error fetching suppliers:", error); toast({ variant: 'destructive', title: "Error", description: "Could not fetch suppliers." }); });
         
         return () => { unsubProducts(); unsubSuppliers(); };
-    }, [user?.companyId]);
+    }, [user?.companyId, toast]);
     
     // Memoize products with supplier names for display
     const productsWithNames = useMemo(() => {
@@ -100,7 +100,7 @@ export default function InventoryPage() {
 
     const handleStockAdjustmentSubmit = async () => {
         setIsSaving(true);
-        const adjustment = stockAdjustment.type === 'Purchase' ? stockAdjustment.quantity : -stockAdjustment.quantity;
+        const adjustment = stockAdjustment.type === 'Sale' ? -stockAdjustment.quantity : stockAdjustment.quantity;
         const result = await adjustStock(stockAdjustment.productId, adjustment, stockAdjustment.type);
         toast({ title: result.success ? 'Success' : 'Error', description: result.message, variant: result.success ? 'default' : 'destructive' });
         if (result.success) setDialogOpen(null);
@@ -133,7 +133,7 @@ export default function InventoryPage() {
     }, [products]);
     
     if(authIsLoading || isLoading) {
-        return <div className="p-8"><Skeleton className="h-[200px] w-full"/></div>
+        return <div className="p-8"><Skeleton className="h-[120px] w-full mb-6"/><Skeleton className="h-[400px] w-full"/></div>
     }
 
     return (
@@ -146,7 +146,7 @@ export default function InventoryPage() {
             </div>
 
             <Tabs defaultValue="products">
-                <div className="flex justify-between items-center">
+                <div className="flex justify-between items-center mb-4">
                     <TabsList>
                         <TabsTrigger value="products">Products</TabsTrigger>
                         <TabsTrigger value="suppliers">Suppliers</TabsTrigger>
@@ -207,28 +207,28 @@ export default function InventoryPage() {
             </Tabs>
 
             {/* Product/Supplier Dialog */}
-            <Dialog open={dialogOpen === 'product' || dialogOpen === 'supplier'} onOpenChange={() => setDialogOpen(null)}>
+            <Dialog open={dialogOpen === 'product' || dialogOpen === 'supplier'} onOpenChange={(open) => !open && setDialogOpen(null)}>
                 <DialogContent>
                     <DialogHeader>
                         <DialogTitle>{itemToEdit?.id ? 'Edit' : 'Add'} {dialogOpen === 'product' ? 'Product' : 'Supplier'}</DialogTitle>
                     </DialogHeader>
-                    <form id="itemForm" onSubmit={handleFormSubmit} className="space-y-4">
+                    <form id="itemForm" onSubmit={handleFormSubmit} className="space-y-4 pt-4">
                         {dialogOpen === 'product' && (
                            <div className="space-y-4">
-                                <Input value={(itemToEdit as Product)?.name || ''} onChange={e => setItemToEdit({...itemToEdit, name: e.target.value})} placeholder="Product Name" required/>
+                                <div><Label>Product Name</Label><Input value={(itemToEdit as Product)?.name || ''} onChange={e => setItemToEdit({...itemToEdit, name: e.target.value})} placeholder="e.g., T-Shirt" required disabled={isSaving}/></div>
                                 <div className="grid grid-cols-2 gap-4">
-                                    <Input value={(itemToEdit as Product)?.sku || ''} onChange={e => setItemToEdit({...itemToEdit, sku: e.target.value})} placeholder="SKU (Optional)"/>
-                                    <Input value={(itemToEdit as Product)?.category || ''} onChange={e => setItemToEdit({...itemToEdit, category: e.target.value})} placeholder="Category (Optional)"/>
+                                    <div><Label>SKU</Label><Input value={(itemToEdit as Product)?.sku || ''} onChange={e => setItemToEdit({...itemToEdit, sku: e.target.value})} placeholder="Optional" disabled={isSaving}/></div>
+                                    <div><Label>Category</Label><Input value={(itemToEdit as Product)?.category || ''} onChange={e => setItemToEdit({...itemToEdit, category: e.target.value})} placeholder="e.g., Apparel" disabled={isSaving}/></div>
                                 </div>
                                 <div className="grid grid-cols-2 gap-4">
-                                    <Input type="number" value={(itemToEdit as Product)?.purchasePrice} onChange={e => setItemToEdit({...itemToEdit, purchasePrice: parseFloat(e.target.value) || 0})} placeholder="Purchase Price" required/>
-                                    <Input type="number" value={(itemToEdit as Product)?.salePrice} onChange={e => setItemToEdit({...itemToEdit, salePrice: parseFloat(e.target.value) || 0})} placeholder="Sale Price" required/>
+                                    <div><Label>Purchase Price ({currencySymbol})</Label><Input type="number" value={(itemToEdit as Product)?.purchasePrice ?? ''} onChange={e => setItemToEdit({...itemToEdit, purchasePrice: parseFloat(e.target.value) || 0})} required disabled={isSaving}/></div>
+                                    <div><Label>Sale Price ({currencySymbol})</Label><Input type="number" value={(itemToEdit as Product)?.salePrice ?? ''} onChange={e => setItemToEdit({...itemToEdit, salePrice: parseFloat(e.target.value) || 0})} required disabled={isSaving}/></div>
                                 </div>
                                  <div className="grid grid-cols-2 gap-4">
-                                    <Input type="number" value={(itemToEdit as Product)?.quantity} onChange={e => setItemToEdit({...itemToEdit, quantity: parseInt(e.target.value, 10) || 0})} placeholder="Initial Quantity" required/>
-                                    <Input type="number" value={(itemToEdit as Product)?.lowStockThreshold || ''} onChange={e => setItemToEdit({...itemToEdit, lowStockThreshold: parseInt(e.target.value, 10) || undefined})} placeholder="Low Stock Alert Qty"/>
+                                    <div><Label>Initial Quantity</Label><Input type="number" value={(itemToEdit as Product)?.quantity ?? ''} onChange={e => setItemToEdit({...itemToEdit, quantity: parseInt(e.target.value, 10) || 0})} required disabled={isSaving}/></div>
+                                    <div><Label>Low Stock Alert</Label><Input type="number" value={(itemToEdit as Product)?.lowStockThreshold || ''} onChange={e => setItemToEdit({...itemToEdit, lowStockThreshold: parseInt(e.target.value, 10) || undefined})} placeholder="e.g. 10" disabled={isSaving}/></div>
                                 </div>
-                                 <Select value={(itemToEdit as Product)?.supplierId || ''} onValueChange={val => setItemToEdit({...itemToEdit, supplierId: val})}>
+                                 <Select value={(itemToEdit as Product)?.supplierId || ''} onValueChange={val => setItemToEdit({...itemToEdit, supplierId: val})} disabled={isSaving}>
                                     <SelectTrigger><SelectValue placeholder="Select a supplier (optional)"/></SelectTrigger>
                                     <SelectContent>
                                         {suppliers.map(s => <SelectItem key={s.id} value={s.id}>{s.name}</SelectItem>)}
@@ -238,15 +238,15 @@ export default function InventoryPage() {
                         )}
                          {dialogOpen === 'supplier' && (
                             <div className="space-y-4">
-                                <Input value={(itemToEdit as Supplier)?.name || ''} onChange={e => setItemToEdit({...itemToEdit, name: e.target.value})} placeholder="Supplier Name" required/>
-                                <Input value={(itemToEdit as Supplier)?.contactPerson || ''} onChange={e => setItemToEdit({...itemToEdit, contactPerson: e.target.value})} placeholder="Contact Person (Optional)"/>
-                                <Input type="email" value={(itemToEdit as Supplier)?.email || ''} onChange={e => setItemToEdit({...itemToEdit, email: e.target.value})} placeholder="Email (Optional)"/>
-                                <Input value={(itemToEdit as Supplier)?.phone || ''} onChange={e => setItemToEdit({...itemToEdit, phone: e.target.value})} placeholder="Phone (Optional)"/>
+                                <div><Label>Supplier Name</Label><Input value={(itemToEdit as Supplier)?.name || ''} onChange={e => setItemToEdit({...itemToEdit, name: e.target.value})} placeholder="e.g., ACME Inc." required disabled={isSaving}/></div>
+                                <div><Label>Contact Person</Label><Input value={(itemToEdit as Supplier)?.contactPerson || ''} onChange={e => setItemToEdit({...itemToEdit, contactPerson: e.target.value})} placeholder="Optional" disabled={isSaving}/></div>
+                                <div><Label>Email</Label><Input type="email" value={(itemToEdit as Supplier)?.email || ''} onChange={e => setItemToEdit({...itemToEdit, email: e.target.value})} placeholder="Optional" disabled={isSaving}/></div>
+                                <div><Label>Phone</Label><Input value={(itemToEdit as Supplier)?.phone || ''} onChange={e => setItemToEdit({...itemToEdit, phone: e.target.value})} placeholder="Optional" disabled={isSaving}/></div>
                             </div>
                          )}
                     </form>
                     <DialogFooter>
-                        <DialogClose asChild><Button variant="outline" disabled={isSaving}>Cancel</Button></DialogClose>
+                        <Button variant="outline" onClick={() => setDialogOpen(null)} disabled={isSaving}>Cancel</Button>
                         <Button type="submit" form="itemForm" disabled={isSaving}>{isSaving ? <Loader2 className="animate-spin mr-2"/> : null} Save</Button>
                     </DialogFooter>
                 </DialogContent>
@@ -256,25 +256,27 @@ export default function InventoryPage() {
             <Dialog open={dialogOpen === 'stock'} onOpenChange={() => setDialogOpen(null)}>
                 <DialogContent>
                     <DialogHeader><DialogTitle>Adjust Stock for {stockAdjustment.productName}</DialogTitle></DialogHeader>
-                    <div className="space-y-4">
+                    <div className="space-y-4 pt-4">
+                        <Label>Adjustment Type</Label>
                         <Select value={stockAdjustment.type} onValueChange={v => setStockAdjustment({...stockAdjustment, type: v as any})}>
                             <SelectTrigger><SelectValue/></SelectTrigger>
                             <SelectContent><SelectItem value="Purchase">Add Stock (Purchase)</SelectItem><SelectItem value="Sale">Remove Stock (Sale)</SelectItem><SelectItem value="Correction">Correction</SelectItem></SelectContent>
                         </Select>
+                        <Label>Quantity</Label>
                         <Input type="number" value={stockAdjustment.quantity} onChange={e => setStockAdjustment({...stockAdjustment, quantity: parseInt(e.target.value, 10) || 0})} min="1"/>
                     </div>
                      <DialogFooter>
-                        <DialogClose asChild><Button variant="outline" disabled={isSaving}>Cancel</Button></DialogClose>
+                        <Button variant="outline" onClick={() => setDialogOpen(null)} disabled={isSaving}>Cancel</Button>
                         <Button onClick={handleStockAdjustmentSubmit} disabled={isSaving}>{isSaving ? <Loader2 className="animate-spin mr-2"/> : null} Adjust Stock</Button>
                     </DialogFooter>
                 </DialogContent>
             </Dialog>
 
             {/* Delete Confirmation */}
-            <AlertDialog open={!!itemToDelete} onOpenChange={() => setItemToDelete(null)}>
+            <AlertDialog open={!!itemToDelete} onOpenChange={(open) => !open && setItemToDelete(null)}>
                 <AlertDialogContent>
                     <AlertDialogHeader><AlertDialogTitle>Are you sure?</AlertDialogTitle><AlertDialogDescription>This will permanently delete the {itemToDelete?.type} "{itemToDelete?.name}". This action cannot be undone.</AlertDialogDescription></AlertDialogHeader>
-                    <AlertDialogFooter><AlertDialogCancel>Cancel</AlertDialogCancel><AlertDialogAction onClick={confirmDelete} className="bg-destructive hover:bg-destructive/90">{isSaving ? <Loader2 className="animate-spin mr-2"/> : null} Delete</AlertDialogAction></AlertDialogFooter>
+                    <AlertDialogFooter><Button variant="ghost" onClick={() => setItemToDelete(null)} disabled={isSaving}>Cancel</Button><Button onClick={confirmDelete} variant="destructive" disabled={isSaving}>{isSaving ? <Loader2 className="animate-spin mr-2"/> : null} Delete</Button></AlertDialogFooter>
                 </AlertDialogContent>
             </AlertDialog>
         </div>

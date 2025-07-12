@@ -7,9 +7,8 @@ import {
   doc,
   writeBatch,
   serverTimestamp,
-  getDocs,
-  query,
-  where,
+  getDoc,
+  deleteDoc,
   runTransaction,
 } from 'firebase/firestore';
 
@@ -43,6 +42,7 @@ export async function saveProduct(
 
   const batch = writeBatch(db);
   const { id, ...data } = productData;
+  let newProductId = id;
 
   try {
     if (id) {
@@ -51,8 +51,9 @@ export async function saveProduct(
       batch.update(productRef, { ...data, updatedAt: serverTimestamp() });
     } else {
       // Create new product
-      const productRef = doc(collection(db, 'products'));
-      batch.set(productRef, {
+      const newProductRef = doc(collection(db, 'products'));
+      newProductId = newProductRef.id;
+      batch.set(newProductRef, {
         ...data,
         companyId,
         createdAt: serverTimestamp(),
@@ -63,7 +64,7 @@ export async function saveProduct(
     return {
       success: true,
       message: `Product ${id ? 'updated' : 'created'} successfully.`,
-      id: id || '',
+      id: newProductId,
     };
   } catch (error: any) {
     console.error('Error saving product:', error);
@@ -93,14 +94,16 @@ export async function saveSupplier(
 
   const batch = writeBatch(db);
   const { id, ...data } = supplierData;
+  let newSupplierId = id;
 
   try {
     if (id) {
       const supplierRef = doc(db, 'suppliers', id);
       batch.update(supplierRef, { ...data, updatedAt: serverTimestamp() });
     } else {
-      const supplierRef = doc(collection(db, 'suppliers'));
-      batch.set(supplierRef, {
+      const newSupplierRef = doc(collection(db, 'suppliers'));
+      newSupplierId = newSupplierRef.id;
+      batch.set(newSupplierRef, {
         ...data,
         companyId,
         createdAt: serverTimestamp(),
@@ -111,7 +114,7 @@ export async function saveSupplier(
     return {
       success: true,
       message: `Supplier ${id ? 'updated' : 'created'} successfully.`,
-      id: id || '',
+      id: newSupplierId,
     };
   } catch (error: any) {
     console.error('Error saving supplier:', error);
@@ -122,8 +125,6 @@ export async function saveSupplier(
 export async function deleteSupplier(
   supplierId: string
 ): Promise<{ success: boolean; message: string }> {
-  // Note: A more robust implementation would check if this supplier is linked to any products
-  // and either prevent deletion or handle unlinking.
   try {
     const supplierRef = doc(db, 'suppliers', supplierId);
     await deleteDoc(supplierRef);
@@ -156,9 +157,12 @@ export async function adjustStock(
       }
 
       transaction.update(productRef, { quantity: newQuantity });
-      // In a real app, you would also log this transaction to an audit trail collection.
+      // In a real app, you might also log this transaction to an audit trail collection.
     });
-    return { success: true, message: `Stock for product updated by ${adjustment}. New total: ${await (await getDoc(productRef)).data()?.quantity}.` };
+    const updatedProduct = await getDoc(productRef);
+    const finalQuantity = updatedProduct.data()?.quantity;
+
+    return { success: true, message: `Stock for product updated by ${adjustment}. New total: ${finalQuantity}.` };
   } catch (error: any) {
     console.error("Error adjusting stock:", error);
     return { success: false, message: `Failed to adjust stock: ${error.message}` };
