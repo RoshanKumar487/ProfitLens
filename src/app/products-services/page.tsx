@@ -1,7 +1,7 @@
 
 'use client';
 
-import React, { useState, useEffect, useCallback, useMemo } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { db } from '@/lib/firebaseConfig';
 import { collection, query, where, orderBy, onSnapshot, writeBatch, doc, serverTimestamp, deleteDoc } from 'firebase/firestore';
@@ -9,13 +9,14 @@ import { useToast } from '@/hooks/use-toast';
 import PageTitle from '@/components/PageTitle';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from '@/components/ui/card';
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow, TableCaption, TableFooter } from '@/components/ui/table';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Package, PlusCircle, Trash2, Loader2, Save } from 'lucide-react';
 import { v4 as uuidv4 } from 'uuid';
+import { saveAllProducts, deleteProduct } from './actions';
 
 type ProductDisplay = {
   id: string;
@@ -43,7 +44,7 @@ export default function ProductsServicesPage() {
     const [products, setProducts] = useState<ProductDisplay[]>([]);
     const [isLoading, setIsLoading] = useState(true);
     const [isSaving, setIsSaving] = useState(false);
-    const [itemToDelete, setItemToDelete] = useState<{ id: string, name: string, isNew?: boolean } | null>(null);
+    const [itemToDelete, setItemToDelete] = useState<ProductDisplay | null>(null);
 
     useEffect(() => {
         if (!user || !user.companyId) {
@@ -70,7 +71,7 @@ export default function ProductsServicesPage() {
       setProducts(prev =>
         prev.map(p => {
           if (p.id === productId) {
-            const parsedValue = ['purchasePrice', 'salePrice', 'gstRate', 'quantity', 'lowStockThreshold'].includes(field)
+            const parsedValue = ['purchasePrice', 'salePrice', 'gstRate', 'quantity', 'lowStockThreshold'].includes(field as string)
               ? parseFloat(value) || 0
               : value;
             return { ...p, [field]: parsedValue };
@@ -101,52 +102,16 @@ export default function ProductsServicesPage() {
     const handleSaveAllProducts = async () => {
       if (!user?.companyId) return;
       setIsSaving(true);
-      const batch = writeBatch(db);
-      let changesCount = 0;
-
-      for (const product of products) {
-        if (!product.name) continue;
-
-        const { id, isNew, ...productData } = product;
-        const isGoods = productData.itemType === 'Goods';
-
-        const dataToSave = {
-          ...productData,
-          quantity: isGoods ? (productData.quantity ?? 0) : undefined,
-          lowStockThreshold: isGoods ? (productData.lowStockThreshold ?? 10) : undefined,
-          updatedAt: serverTimestamp(),
-        };
-
-        if (isNew) {
-          const newProductRef = doc(collection(db, 'products'));
-          batch.set(newProductRef, {
-            ...dataToSave,
-            companyId: user.companyId,
-            createdAt: serverTimestamp(),
-          });
-          changesCount++;
-        } else {
-          // In a real app, you would compare with original data to avoid unnecessary writes
-          const productRef = doc(db, 'products', id);
-          batch.update(productRef, dataToSave);
-          changesCount++; // Simplified for now
-        }
-      }
-
-      if (changesCount === 0) {
-        toast({ title: "No Changes", description: "No new products or changes to save." });
-        setIsSaving(false);
-        return;
-      }
-
-      try {
-        await batch.commit();
-        toast({ title: "Success", description: "All product changes saved successfully." });
-      } catch (error: any) {
-        toast({ title: "Error", description: `Failed to save products: ${error.message}`, variant: 'destructive' });
-      } finally {
-        setIsSaving(false);
-      }
+      
+      const result = await saveAllProducts(products, user.companyId);
+      
+      toast({
+        title: result.success ? "Success" : "Error",
+        description: result.message,
+        variant: result.success ? "default" : "destructive",
+      });
+      
+      setIsSaving(false);
     };
     
     const promptDelete = (item: ProductDisplay) => {
@@ -160,11 +125,28 @@ export default function ProductsServicesPage() {
     const confirmDelete = async () => {
         if (!itemToDelete) return;
         setIsSaving(true);
-        await deleteDoc(doc(db, 'products', itemToDelete.id));
-        toast({ title: "Success", description: "Product deleted successfully." });
+        const result = await deleteProduct(itemToDelete.id);
+
+        toast({
+            title: result.success ? "Success" : "Error",
+            description: result.message,
+            variant: result.success ? "default" : "destructive",
+        });
+
         setItemToDelete(null);
         setIsSaving(false);
     };
+    
+    const totals = React.useMemo(() => {
+        return products.reduce((acc, p) => {
+            if (p.itemType === 'Goods') {
+                acc.stockValue += (p.quantity ?? 0) * p.purchasePrice;
+                acc.stockQuantity += (p.quantity ?? 0);
+            }
+            return acc;
+        }, { stockValue: 0, stockQuantity: 0 });
+    }, [products]);
+
 
     if(authIsLoading || isLoading) {
         return (
@@ -248,6 +230,14 @@ export default function ProductsServicesPage() {
                               )
                             })}
                         </TableBody>
+                        <TableFooter className="sticky bottom-0 bg-muted z-10">
+                            <TableRow>
+                                <TableCell colSpan={8} className="font-bold text-right">Totals</TableCell>
+                                <TableCell className="font-bold text-center">{totals.stockQuantity}</TableCell>
+                                <TableCell colSpan={2} className="font-bold text-right">{currencySymbol}{totals.stockValue.toFixed(2)}</TableCell>
+                                <TableCell className="sticky right-0 bg-muted"></TableCell>
+                            </TableRow>
+                        </TableFooter>
                     </Table>
                     </div>
                 </CardContent>
@@ -259,10 +249,15 @@ export default function ProductsServicesPage() {
             <AlertDialog open={!!itemToDelete} onOpenChange={(open) => !open && setItemToDelete(null)}>
                 <AlertDialogContent>
                     <AlertDialogHeader><AlertDialogTitle>Are you sure?</AlertDialogTitle><AlertDialogDescription>This will permanently delete "{itemToDelete?.name}". This action cannot be undone.</AlertDialogDescription></AlertDialogHeader>
-                    <AlertDialogFooter><Button variant="ghost" onClick={() => setItemToDelete(null)} disabled={isSaving}>Cancel</Button><Button onClick={confirmDelete} variant="destructive" disabled={isSaving}>{isSaving ? <Loader2 className="animate-spin mr-2"/> : null} Delete</Button></AlertDialogFooter>
+                    <AlertDialogFooter>
+                        <Button variant="ghost" onClick={() => setItemToDelete(null)} disabled={isSaving}>Cancel</Button>
+                        <Button onClick={confirmDelete} variant="destructive" disabled={isSaving}>
+                            {isSaving ? <Loader2 className="animate-spin mr-2"/> : null} 
+                            Delete
+                        </Button>
+                    </AlertDialogFooter>
                 </AlertDialogContent>
             </AlertDialog>
         </div>
     );
 }
-
