@@ -461,7 +461,7 @@ export default function PayrollPage() {
       const imgData = canvas.toDataURL('image/png');
       const pdf = new jsPDF({ orientation: 'p', unit: 'mm', format: 'a4' });
       pdf.addImage(imgData, 'PNG', 0, 0, pdf.internal.pageSize.getWidth(), pdf.internal.pageSize.getHeight());
-      pdf.save(`Payslip-${employeeForAction.name}-${format(payPeriod, 'yyyy-MM')}.pdf`);
+      pdf.save(`Payslip-${employeeForAction.name.replace(/\s+/g, '_')}-${format(payPeriod, 'yyyy-MM')}.pdf`);
       toast({ title: "Download Started" });
     } catch (error: any) {
       toast({ title: "Download Failed", description: error.message, variant: "destructive" });
@@ -730,7 +730,9 @@ export default function PayrollPage() {
           <DialogContent className="max-w-4xl w-full h-[95vh] flex flex-col p-0 bg-gray-100 dark:bg-background">
             <DialogHeader className="p-4 sm:p-6 pb-2 border-b bg-background no-print"><DialogTitle className="font-headline text-xl truncate">Payslip: {employeeForAction?.name}</DialogTitle></DialogHeader>
             <ScrollArea className="flex-grow bg-muted p-4 sm:p-8">
-              {employeeForAction && companyDetails ? (<div ref={payslipPrintRef}><PayslipTemplate employee={employeeForAction} payPeriod={format(payPeriod, 'yyyy-MM')} companyDetails={companyDetails} payrollSettings={payrollSettings} currencySymbol={currencySymbol} signatureDataUri={payslipImageDataUris.signature} stampDataUri={payslipImageDataUris.stamp}/></div>) : <Skeleton className="w-[210mm] h-[297mm] mx-auto bg-white" />}
+              <div ref={payslipPrintRef}>
+                {employeeForAction && companyDetails ? (<PayslipTemplate employee={employeeForAction} payPeriod={format(payPeriod, 'yyyy-MM')} companyDetails={companyDetails} payrollSettings={payrollSettings} currencySymbol={currencySymbol} signatureDataUri={payslipImageDataUris.signature} stampDataUri={payslipImageDataUris.stamp}/>) : <Skeleton className="w-[210mm] h-[297mm] mx-auto bg-white" />}
+              </div>
             </ScrollArea>
             <DialogFooter className="p-4 sm:p-6 border-t bg-background no-print justify-end flex-wrap gap-2">
               <Button type="button" variant="secondary" onClick={handleDownloadPayslipPdf} disabled={isPrinting}>{isPrinting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Download className="mr-2 h-4 w-4" />} Download PDF</Button>
@@ -755,23 +757,23 @@ export default function PayrollPage() {
                     Send Email
                 </Button>
                 </DialogFooter>
+                 <div className="absolute -left-[9999px] top-0 opacity-0 pointer-events-none">
+                    <div ref={payslipPrintRef}>
+                      {employeeForAction && companyDetails && (
+                          <PayslipTemplate
+                              employee={employeeForAction}
+                              payPeriod={format(payPeriod, 'yyyy-MM')}
+                              companyDetails={companyDetails}
+                              payrollSettings={payrollSettings}
+                              currencySymbol={currencySymbol}
+                              signatureDataUri={payslipImageDataUris.signature}
+                              stampDataUri={payslipImageDataUris.stamp}
+                          />
+                      )}
+                    </div>
+                </div>
             </DialogContent>
         </Dialog>
-        <div className="absolute -left-[9999px] top-0">
-          {employeeForAction && companyDetails && (
-              <div ref={payslipPrintRef}>
-                  <PayslipTemplate
-                      employee={employeeForAction}
-                      payPeriod={format(payPeriod, 'yyyy-MM')}
-                      companyDetails={companyDetails}
-                      payrollSettings={payrollSettings}
-                      currencySymbol={currencySymbol}
-                      signatureDataUri={payslipImageDataUris.signature}
-                      stampDataUri={payslipImageDataUris.stamp}
-                  />
-              </div>
-          )}
-        </div>
     </div>
   );
 }
