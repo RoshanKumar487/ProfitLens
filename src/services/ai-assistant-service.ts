@@ -70,6 +70,7 @@ export async function listEmployees(companyId: string): Promise<any[]> {
 export async function addEmployee(companyId: string, employeeData: Employee): Promise<string> {
     const docRef = await addDoc(collection(db, 'employees'), {
         ...employeeData,
+        name_lowercase: employeeData.name.toLowerCase(),
         companyId,
         addedById: 'ai_assistant', // Or get current user if available
         addedBy: 'AI Assistant',

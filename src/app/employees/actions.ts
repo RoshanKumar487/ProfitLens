@@ -36,6 +36,7 @@ export async function bulkAddEmployees(
         const newEmployeeRef = doc(collection(db, 'employees'));
         batch.set(newEmployeeRef, {
           ...employee,
+          name_lowercase: employee.name.toLowerCase(),
           companyId,
           addedById,
           addedBy,

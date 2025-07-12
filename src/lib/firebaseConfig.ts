@@ -1,6 +1,6 @@
 
 import { initializeApp, getApps, getApp, type FirebaseApp } from 'firebase/app';
-import { getFirestore, type Firestore } from 'firebase/firestore';
+import { getFirestore, type Firestore, doc, getDoc } from 'firebase/firestore'; // Import doc and getDoc
 import { getAuth, type Auth } from 'firebase/auth';
 import { getStorage, type FirebaseStorage } from 'firebase/storage'; // Ensure getStorage is imported
 
@@ -63,4 +63,4 @@ try {
   throw new Error("Firebase Storage initialization failed.");
 }
 
-export { app, auth, db, storage }; // Export storage
+export { app, auth, db, storage, doc, getDoc }; // Export doc and getDoc

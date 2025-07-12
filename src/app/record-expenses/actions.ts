@@ -1,7 +1,12 @@
+
 'use server';
 
 import { db } from '@/lib/firebaseConfig';
-import { collection, doc, updateDoc, deleteDoc, Timestamp, serverTimestamp, writeBatch } from 'firebase/firestore';
+import { collection, doc, updateDoc, deleteDoc, Timestamp, serverTimestamp, writeBatch, query, where, getDocs, limit, orderBy } from 'firebase/firestore';
+import { getAuth } from 'firebase-admin/auth';
+import { app as adminApp } from '@/lib/firebaseAdminConfig';
+import { headers } from 'next/headers';
+
 
 export interface ExpenseUpdateData {
   date: Date;
@@ -9,6 +14,8 @@ export interface ExpenseUpdateData {
   category: string;
   description: string;
   vendor: string;
+  employeeId?: string;
+  employeeName?: string;
 }
 
 export interface ExpenseImportData {
@@ -17,7 +24,57 @@ export interface ExpenseImportData {
   category: string;
   description?: string;
   vendor?: string;
+  employeeId?: string;
+  employeeName?: string;
 }
+
+// Helper to get company ID from the user's session token
+async function getCompanyIdForCurrentUser(): Promise<string | null> {
+  const idToken = headers().get('x-firebase-id-token');
+  if (!idToken) return null;
+  
+  try {
+    const decodedToken = await getAuth(adminApp).verifyIdToken(idToken);
+    const userDocSnap = await getDoc(doc(db, 'users', decodedToken.uid));
+    return userDocSnap.exists() ? userDocSnap.data().companyId : null;
+  } catch (error) {
+    console.error("Error getting current user's company ID:", error);
+    return null;
+  }
+}
+
+export async function searchEmployees(searchTerm: string): Promise<{ id: string; name: string }[]> {
+  const companyId = await getCompanyIdForCurrentUser();
+  if (!companyId) {
+    console.error("Action Error: Could not verify company ID for employee search.");
+    return [];
+  }
+
+  const lowerCaseSearchTerm = searchTerm.toLowerCase();
+  try {
+    const employeesRef = collection(db, 'employees');
+    const q = query(
+      employeesRef,
+      where('companyId', '==', companyId),
+      where('name_lowercase', '>=', lowerCaseSearchTerm),
+      where('name_lowercase', '<=', lowerCaseSearchTerm + '\uf8ff'),
+      orderBy('name_lowercase'),
+      limit(10)
+    );
+
+    const querySnapshot = await getDocs(q);
+    const employees = querySnapshot.docs.map(doc => ({
+      id: doc.id,
+      name: doc.data().name,
+    }));
+
+    return employees;
+  } catch (error: any) {
+    console.error('Error searching employees in server action:', error);
+    return [];
+  }
+}
+
 
 export async function bulkAddExpenses(
   expenses: ExpenseImportData[],
@@ -68,11 +125,18 @@ export async function bulkAddExpenses(
 export async function updateExpenseEntry(id: string, updates: ExpenseUpdateData): Promise<{ success: boolean; message: string }> {
   try {
     const expenseRef = doc(db, 'expenses', id);
-    await updateDoc(expenseRef, { 
+    const payload = { 
       ...updates,
       date: Timestamp.fromDate(updates.date),
       updatedAt: serverTimestamp() 
-    });
+    };
+
+    if (!payload.employeeId) {
+        (payload as any).employeeId = null;
+        (payload as any).employeeName = null;
+    }
+
+    await updateDoc(expenseRef, payload);
     return { success: true, message: 'Expense updated successfully.' };
   } catch (error: any) {
     console.error("Error updating expense:", error);
