@@ -15,6 +15,7 @@ import InvoiceTemplateModern from '../../InvoiceTemplateModern';
 import InvoiceTemplateBusiness from '../../InvoiceTemplateBusiness';
 import InvoiceTemplateMinimalist from '../../InvoiceTemplateMinimalist';
 import InvoiceTemplateBold from '../../InvoiceTemplateBold';
+import InvoiceTemplateCorporate from '../../InvoiceTemplateCorporate';
 import jsPDF from 'jspdf';
 import html2canvas from 'html2canvas';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -88,7 +89,7 @@ export default function ViewInvoicePage() {
     const [imageDataUris, setImageDataUris] = useState<{ signature?: string; stamp?: string }>({});
     const [isLoadingData, setIsLoadingData] = useState(true);
     const [isProcessing, setIsProcessing] = useState(false);
-    const [template, setTemplate] = useState<'business' | 'modern' | 'simple' | 'minimalist' | 'bold'>('business');
+    const [template, setTemplate] = useState<'business' | 'modern' | 'simple' | 'minimalist' | 'bold' | 'corporate'>('business');
     const [useLetterhead, setUseLetterhead] = useState(true);
     const [isBlackAndWhite, setIsBlackAndWhite] = useState(false);
     const printRef = useRef<HTMLDivElement>(null);
@@ -284,6 +285,8 @@ export default function ViewInvoicePage() {
                  return <InvoiceTemplateMinimalist {...commonProps} />
             case 'bold':
                  return <InvoiceTemplateBold {...commonProps} />
+            case 'corporate':
+                return <InvoiceTemplateCorporate {...commonProps} />
             default:
                 return  <InvoiceTemplateBusiness {...commonProps} />
         }
@@ -329,6 +332,7 @@ export default function ViewInvoicePage() {
                                 <SelectItem value="simple">Simple</SelectItem>
                                 <SelectItem value="minimalist">Minimalist</SelectItem>
                                 <SelectItem value="bold">Bold</SelectItem>
+                                <SelectItem value="corporate">Corporate</SelectItem>
                             </SelectContent>
                         </Select>
                     </div>
