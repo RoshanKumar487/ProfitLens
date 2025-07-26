@@ -14,7 +14,7 @@
       "queryScope": "COLLECTION_GROUP",
       "fields": [
         { "fieldPath": "companyId", "order": "ASCENDING" },
-        { "fieldPath": "category", "order": "DESCENDING" }
+        { "fieldPath": "category", "order": "ASCENDING" }
       ]
     },
     {
