@@ -1,57 +1,58 @@
-
 rules_version = '2';
 
 service cloud.firestore {
   match /databases/{database}/documents {
 
-    // Helper function to get the expected companyId for a given userId
-    function getExpectedCompanyIdForUser(userId) {
-      return "fb-default-company-" + userId.slice(0, 5);
+    // Helper functions to make rules more readable.
+    function isSuperAdmin() {
+      return request.auth != null && request.auth.token.email == 'testuser1@gmail.com';
     }
 
-    // Company Profiles: Only the user associated with the companyId can manage it.
-    // The document ID {companyId} itself must match the derived ID for the authenticated user.
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isUser(userId) {
+      return isSignedIn() && request.auth.uid == userId;
+    }
+    
+    function getUserData(userId) {
+      return get(/databases/$(database)/documents/users/$(userId)).data;
+    }
+
+    function isCompanyMember(companyId) {
+      let userData = getUserData(request.auth.uid);
+      return isSignedIn() && userData.companyId == companyId;
+    }
+
+    function isCompanyAdmin(companyId) {
+      let userData = getUserData(request.auth.uid);
+      return isSignedIn() && userData.companyId == companyId && userData.role == 'admin';
+    }
+
+    // Rules for the 'users' collection.
+    match /users/{userId} {
+      allow read, update: if isUser(userId) || isSuperAdmin();
+      allow create: if isSignedIn(); // Allow user creation on signup.
+    }
+
+    // Rules for the 'companyProfiles' collection.
     match /companyProfiles/{companyId} {
-      allow read, create, update, delete: if request.auth != null && companyId == getExpectedCompanyIdForUser(request.auth.uid);
+      allow create: if isSignedIn(); // Allow company creation on signup.
+      allow read, update, delete: if isCompanyAdmin(companyId) || isSuperAdmin();
     }
-
-    // Appointments Collection
-    match /appointments/{appointmentId} {
-      // Allow create if the companyId in the new document matches the user's expected companyId
-      allow create: if request.auth != null && request.resource.data.companyId == getExpectedCompanyIdForUser(request.auth.uid);
-      // Allow read, update, delete if the companyId in the existing document matches the user's expected companyId
-      allow read, update, delete: if request.auth != null && resource.data.companyId == getExpectedCompanyIdForUser(request.auth.uid);
-      // Allow list operations (queries). Individual document reads are still protected by the 'read' rule.
-      // Client-side queries MUST include `where('companyId', '==', user.companyId)`.
-      allow list: if request.auth != null;
+    
+    // Rules for the 'accessRequests' collection.
+    match /accessRequests/{requestId} {
+      allow create: if isSignedIn(); // Allow users to create requests.
+      allow read, update, delete: if isCompanyAdmin(resource.data.companyId) || isSuperAdmin();
     }
-
-    // Employees Collection
-    match /employees/{employeeId} {
-      allow create: if request.auth != null && request.resource.data.companyId == getExpectedCompanyIdForUser(request.auth.uid);
-      allow read, update, delete: if request.auth != null && resource.data.companyId == getExpectedCompanyIdForUser(request.auth.uid);
-      allow list: if request.auth != null;
-    }
-
-    // Expenses Collection
-    match /expenses/{expenseId} {
-      allow create: if request.auth != null && request.resource.data.companyId == getExpectedCompanyIdForUser(request.auth.uid);
-      allow read, update, delete: if request.auth != null && resource.data.companyId == getExpectedCompanyIdForUser(request.auth.uid);
-      allow list: if request.auth != null;
-    }
-
-    // Invoices Collection
-    match /invoices/{invoiceId} {
-      allow create: if request.auth != null && request.resource.data.companyId == getExpectedCompanyIdForUser(request.auth.uid);
-      allow read, update, delete: if request.auth != null && resource.data.companyId == getExpectedCompanyIdForUser(request.auth.uid);
-      allow list: if request.auth != null;
-    }
-
-    // Revenue Entries Collection
-    match /revenueEntries/{revenueEntryId} {
-      allow create: if request.auth != null && request.resource.data.companyId == getExpectedCompanyIdForUser(request.auth.uid);
-      allow read, update, delete: if request.auth != null && resource.data.companyId == getExpectedCompanyIdForUser(request.auth.uid);
-      allow list: if request.auth != null;
+    
+    // Generic rule for all other company-specific data.
+    // This applies to invoices, expenses, employees, bankAccounts, transactions, etc.
+    match /{collection}/{docId} {
+      allow read: if isCompanyMember(resource.data.companyId) || isSuperAdmin();
+      allow create, update, delete: if isCompanyAdmin(request.resource.data.companyId) || isSuperAdmin();
     }
   }
 }
