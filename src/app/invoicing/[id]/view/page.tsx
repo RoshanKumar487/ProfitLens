@@ -100,14 +100,13 @@ export default function ViewInvoicePage() {
     const printRef = useRef<HTMLDivElement>(null);
 
     const fetchAllData = useCallback(async () => {
-        if (!user || !invoiceId) {
+        if (!user || !user.companyId || !invoiceId) {
             setIsLoadingData(false);
             return;
         }
         setIsLoadingData(true);
         try {
             const companyId = user.companyId;
-            if (!companyId) throw new Error("User not associated with a company.");
 
             const invoiceRef = doc(db, 'invoices', invoiceId);
             const invoiceSnap = await getDoc(invoiceRef);

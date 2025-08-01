@@ -1,7 +1,7 @@
 
 'use client';
 
-import React, { useState, useEffect, type FormEvent } from 'react';
+import React, { useState, FormEvent, useCallback, useEffect } from 'react';
 import { useRouter, useParams } from 'next/navigation';
 import PageTitle from '@/components/PageTitle';
 import { Button } from '@/components/ui/button';
@@ -70,13 +70,13 @@ export default function EditInvoicePage() {
     const [isSaving, setIsSaving] = useState(false);
 
     useEffect(() => {
-        if (authLoading) return;
-        if (!user || !invoiceId) {
-            router.push('/auth/signin');
-            return;
-        }
-
+        if (authLoading || !user?.companyId) return;
+        
         const fetchInvoice = async () => {
+            if (!invoiceId) {
+                router.push('/invoicing');
+                return;
+            }
             setIsLoading(true);
             try {
                 const [settings, invoiceSnap] = await Promise.all([
