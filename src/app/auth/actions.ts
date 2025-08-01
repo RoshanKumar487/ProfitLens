@@ -38,8 +38,6 @@ export async function signUp(formData: unknown) {
       return { success: false, error: 'A user with this email already exists.' };
     }
     
-    // For simplicity, we'll create a new company for each sign up.
-    // In a real app, you might handle invitations to existing companies.
     const companyResult = await db.run('INSERT INTO companies (name) VALUES (?)', companyName);
     const companyId = companyResult.lastID;
 
@@ -56,17 +54,19 @@ export async function signUp(formData: unknown) {
 
     const userId = userResult.lastID;
 
-    if (userId) {
-      await createSession(userId, companyId);
-      // No redirect here, sign-up page handles it
-      return { success: true };
-    } else {
+    if (!userId) {
       return { success: false, error: 'Failed to create user.' };
     }
+
+    await createSession(userId, companyId);
+    
   } catch (e: any) {
     console.error('Sign-up error:', e);
     return { success: false, error: 'An unexpected server error occurred during sign up.' };
   }
+  
+  // Redirect after successful sign-up
+  redirect('/dashboard');
 }
 
 export async function signIn(formData: unknown) {

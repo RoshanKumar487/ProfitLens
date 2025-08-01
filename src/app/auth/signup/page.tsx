@@ -41,19 +41,30 @@ export default function SignUpPage() {
 
   const onSubmit = async (values: SignUpFormValues) => {
     setIsLoading(true);
-    const result = await signUp(values);
-    setIsLoading(false);
-
-    if (result.success) {
-      toast({ title: 'Sign Up Successful', description: 'Welcome! You are now being redirected to the dashboard.' });
-      router.push('/dashboard');
-      router.refresh();
-    } else {
-      toast({
-        title: 'Sign Up Failed',
-        description: result.error || 'An unexpected error occurred.',
-        variant: 'destructive',
-      });
+    try {
+      const result = await signUp(values);
+      if (result?.error) {
+        toast({
+          title: 'Sign Up Failed',
+          description: result.error,
+          variant: 'destructive',
+        });
+      }
+      // If successful, the action will redirect, and an error will be thrown.
+    } catch (error: any) {
+        if (error.digest?.startsWith('NEXT_REDIRECT')) {
+            toast({ title: 'Sign Up Successful', description: 'Welcome! You are now being redirected to the dashboard.' });
+            router.refresh(); // Refresh the page to update auth state
+            throw error; // Re-throw to complete the redirection
+        }
+        console.error("Sign up failed:", error);
+        toast({
+            title: 'An Unexpected Error Occurred',
+            description: 'Please try signing up again.',
+            variant: 'destructive',
+        });
+    } finally {
+        setIsLoading(false);
     }
   };
 
