@@ -4,7 +4,7 @@
 import { connectToDatabase } from '@/lib/mongodb';
 import { redirect } from 'next/navigation';
 import bcrypt from 'bcryptjs';
-import { createSession, getSession } from '@/lib/session';
+import { createSession, getSession, deleteSession } from '@/lib/session';
 
 export async function getCurrentUser() {
     const session = await getSession();
@@ -59,11 +59,7 @@ export async function getCurrentUser() {
 
 
 export async function signOutAction() {
-  await getSession().then(session => {
-    if (session) {
-      cookies().delete('session');
-    }
-  });
+  await deleteSession();
   redirect('/auth/signin');
 }
 

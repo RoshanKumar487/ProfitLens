@@ -44,6 +44,6 @@ export async function getSession() {
   return await decrypt(sessionCookie);
 }
 
-export async function signOut() {
+export async function deleteSession() {
   cookies().set('session', '', { expires: new Date(0) });
 }
