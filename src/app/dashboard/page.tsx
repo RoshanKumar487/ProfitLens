@@ -4,8 +4,6 @@
 import React, { useState, useEffect } from 'react';
 import dynamic from 'next/dynamic';
 import { useAuth } from '@/contexts/AuthContext';
-import { db } from '@/lib/firebaseConfig';
-import { collection, query, where, getDocs, orderBy, limit, Timestamp } from 'firebase/firestore';
 import { format, subMonths } from 'date-fns';
 
 import PageTitle from '@/components/PageTitle';
@@ -48,7 +46,7 @@ interface RecentActivity {
 }
 
 export default function DashboardPage() {
-  const { user, currencySymbol, isLoading: authIsLoading } = useAuth();
+  const { currencySymbol, isLoading: authIsLoading } = useAuth();
   const [financialData, setFinancialData] = useState<FinancialData | null>(null);
   const [monthlyChartData, setMonthlyChartData] = useState<MonthlyData[]>([]);
   const [recentActivity, setRecentActivity] = useState<RecentActivity[]>([]);
