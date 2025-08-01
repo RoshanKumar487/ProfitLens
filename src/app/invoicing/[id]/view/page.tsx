@@ -147,7 +147,7 @@ export default function ViewInvoicePage() {
         if (!authIsLoading) {
             fetchAllData();
         }
-    }, [authIsLoading, fetchAllData]);
+    }, [authIsLoading, fetchAllData, user]);
 
     const handleDownloadPdf = async () => {
         if (!printRef.current || !invoice) return;
