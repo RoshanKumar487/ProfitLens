@@ -1,3 +1,4 @@
+
 'use server';
 
 import { connectToDatabase } from '@/lib/mongodb';
@@ -134,30 +135,50 @@ export async function getCurrentUser() {
         });
         
         const userId = payload.userId as string;
-        if (!userId) {
+        if (!ObjectId.isValid(userId)) {
             return null;
         }
         
         const { db } = await connectToDatabase();
-        const user = await db.collection('users').findOne({ _id: new ObjectId(userId) });
-
-        if (!user) return null;
-
-        const company = await db.collection('companies').findOne({ _id: user.companyId });
         
-        if (!company) return null;
+        // Use an aggregation pipeline to fetch user and company data in one go
+        const userAndCompany = await db.collection('users').aggregate([
+            { $match: { _id: new ObjectId(userId) } },
+            {
+                $lookup: {
+                    from: 'companies',
+                    localField: 'companyId',
+                    foreignField: '_id',
+                    as: 'companyInfo'
+                }
+            },
+            { $unwind: { path: "$companyInfo", preserveNullAndEmptyArrays: true } },
+            {
+                $project: {
+                    password: 0 // Exclude password from the result
+                }
+            }
+        ]).toArray();
+
+        if (userAndCompany.length === 0 || !userAndCompany[0]) {
+            return null;
+        }
+
+        const user = userAndCompany[0];
+        const company = user.companyInfo;
 
         return {
             uid: user._id.toHexString(),
             displayName: user.name,
             email: user.email,
-            companyId: company._id.toHexString(),
-            companyName: company.name,
-            publicCompanyId: `CMP-${company._id.toHexString().substring(0,8)}`,
-            currencySymbol: company.currencySymbol || '$',
+            companyId: user.companyId.toHexString(),
+            companyName: company?.name || 'N/A',
+            publicCompanyId: `CMP-${user.companyId.toHexString().substring(0,8)}`,
+            currencySymbol: company?.currencySymbol || '$',
             role: user.role,
             isSuperAdmin: !!user.isSuperAdmin,
         };
+
     } catch (e) {
         console.error('Session verification failed:', e);
         return null;
