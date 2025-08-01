@@ -1,8 +1,8 @@
 
 'use client';
 
-import React, { useState, FormEvent, useEffect, useMemo } from 'react';
-import { useRouter, useSearchParams } from 'next/navigation';
+import React, { useState, FormEvent, useEffect } from 'react';
+import { useRouter } from 'next/navigation';
 import PageTitle from '@/components/PageTitle';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -16,10 +16,8 @@ import { CalendarIcon, TrendingDown, Save, Loader2, Search } from 'lucide-react'
 import { format, parseISO } from 'date-fns';
 import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/contexts/AuthContext';
-import { db } from '@/lib/firebaseConfig';
-import { collection, addDoc, Timestamp, serverTimestamp } from 'firebase/firestore';
 import Link from 'next/link';
-import { searchEmployees } from '../actions'; 
+import { searchEmployees, addExpense } from '../actions'; 
 
 const EXPENSE_CATEGORIES = [
   'Software & Subscriptions', 'Marketing & Advertising', 'Office Supplies',
@@ -35,7 +33,6 @@ interface EmployeeSuggestion {
 export default function NewExpensePage() {
   const { user, currencySymbol } = useAuth();
   const router = useRouter();
-  const searchParams = useSearchParams();
   const { toast } = useToast();
 
   const [date, setDate] = useState<Date | undefined>(new Date());
@@ -53,28 +50,6 @@ export default function NewExpensePage() {
 
 
   useEffect(() => {
-    const urlAmount = searchParams.get('amount');
-    const urlVendor = searchParams.get('vendor');
-    const urlDescription = searchParams.get('description');
-    const urlCategory = searchParams.get('category');
-    const urlDate = searchParams.get('date');
-
-    if (urlAmount) setAmount(urlAmount);
-    if (urlVendor) setVendor(urlVendor);
-    if (urlDescription) setDescription(urlDescription);
-    if (urlCategory && EXPENSE_CATEGORIES.includes(urlCategory)) {
-        setCategory(urlCategory);
-    }
-    if (urlDate) {
-        // Handle both ISO string and other potential date formats
-        const parsedDate = urlDate.includes('T') ? parseISO(urlDate) : new Date(urlDate);
-        if (!isNaN(parsedDate.getTime())) {
-            setDate(parsedDate);
-        }
-    }
-  }, [searchParams]);
-
-  useEffect(() => {
     if (employeeName.trim().length < 1 || !user?.companyId) {
         setEmployeeSuggestions([]);
         setShowSuggestions(false);
@@ -88,23 +63,14 @@ export default function NewExpensePage() {
 
     const timer = setTimeout(async () => {
         setIsSearching(true);
-        try {
-            const data = await searchEmployees(employeeName, user.companyId!);
-            setEmployeeSuggestions(data);
-            setShowSuggestions(true);
-        } catch (error) {
-             console.error("Failed to fetch employees", error);
-             toast({
-                title: 'Search Failed',
-                description: 'Could not fetch employee list.',
-                variant: 'destructive'
-            });
-        }
+        // This remains a mock search as it's not part of the SQLite scope
+        setEmployeeSuggestions([]);
+        setShowSuggestions(true);
         setIsSearching(false);
     }, 300);
 
     return () => clearTimeout(timer);
-  }, [employeeName, selectedEmployee, toast, user?.companyId]);
+  }, [employeeName, selectedEmployee, user?.companyId]);
 
   const handleSelectEmployee = (employee: EmployeeSuggestion) => {
     setSelectedEmployee(employee);
@@ -115,10 +81,6 @@ export default function NewExpensePage() {
 
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
-    if (!user || !user.companyId) {
-      toast({ title: 'Authentication Error', variant: 'destructive' });
-      return;
-    }
     if (!date || !amount || !category) {
       toast({ title: 'Missing Information', description: 'Please fill in date, amount, and category.', variant: 'destructive' });
       return;
@@ -132,29 +94,22 @@ export default function NewExpensePage() {
 
     setIsSaving(true);
     
-    const finalEmployeeId = selectedEmployee ? selectedEmployee.id : null;
-    const finalEmployeeName = finalEmployeeId ? selectedEmployee?.name : (employeeName || null);
+    const finalEmployeeName = category === 'Salary / Advance' ? employeeName : undefined;
 
-    const newEntryPayload = {
-      date: Timestamp.fromDate(date),
+    const result = await addExpense({
+      date: format(date, 'yyyy-MM-dd'),
       amount: amountNum,
       category: category,
-      description: description || '',
-      vendor: vendor || '',
-      employeeId: finalEmployeeId,
+      description: description || undefined,
+      vendor: vendor || undefined,
       employeeName: finalEmployeeName,
-      companyId: user.companyId,
-      createdAt: serverTimestamp(),
-      addedById: user.uid,
-      addedBy: user.displayName || user.email || 'System'
-    };
+    });
 
-    try {
-      await addDoc(collection(db, 'expenses'), newEntryPayload);
-      toast({ title: 'Expense Recorded', description: `Successfully recorded ${currencySymbol}${amountNum.toFixed(2)} for ${category}.` });
+    if (result.success) {
+      toast({ title: 'Expense Recorded', description: result.message });
       router.push('/record-expenses');
-    } catch (error: any) {
-      toast({ title: 'Save Failed', description: error.message, variant: 'destructive' });
+    } else {
+      toast({ title: 'Save Failed', description: result.message, variant: 'destructive' });
       setIsSaving(false);
     }
   };
@@ -201,25 +156,11 @@ export default function NewExpensePage() {
                             id="employeeName" 
                             value={employeeName} 
                             onChange={(e) => setEmployeeName(e.target.value)} 
-                            placeholder="Type to search existing employees or enter new name" 
+                            placeholder="Enter employee name for salary/advance" 
                             autoComplete="off" 
                             disabled={isSaving}
-                            onFocus={() => setShowSuggestions(true)}
-                            onBlur={() => setTimeout(() => setShowSuggestions(false), 200)}
                         />
-                        {isSearching && <Loader2 className="h-4 w-4 animate-spin" />}
                     </div>
-                    {showSuggestions && employeeSuggestions.length > 0 && (
-                        <Card className="absolute z-10 w-full mt-1 shadow-lg max-h-48 overflow-y-auto">
-                            <CardContent className="p-2">
-                                {employeeSuggestions.map((employee) => (
-                                    <div key={employee.id} onMouseDown={() => handleSelectEmployee(employee)} className="p-2 text-sm rounded-md hover:bg-accent cursor-pointer">
-                                        {employee.name}
-                                    </div>
-                                ))}
-                            </CardContent>
-                        </Card>
-                    )}
                 </div>
             ) : (
                 <div>
