@@ -48,38 +48,40 @@ const AppShellLayout = ({ children }: { children: React.ReactNode }) => {
   const [notifications, setNotifications] = React.useState<Notification[]>([]);
   const CollapseIcon = state === 'expanded' ? ChevronLeft : ChevronRight;
   
-  React.useEffect(() => {
-    if (user?.role !== 'admin' || !user?.companyId) {
-      setPendingRequestCount(0);
-      setNotifications([]);
-      return;
-    }
+  // This useEffect was causing the error because `db` is a mock object.
+  // Since the backend is disconnected, this notification logic is no longer needed.
+  // React.useEffect(() => {
+  //   if (user?.role !== 'admin' || !user?.companyId) {
+  //     setPendingRequestCount(0);
+  //     setNotifications([]);
+  //     return;
+  //   }
 
-    const requestsRef = collection(db, 'accessRequests');
-    const q = query(
-      requestsRef,
-      where('companyId', '==', user.companyId),
-      where('status', '==', 'pending'),
-      orderBy('createdAt', 'desc')
-    );
+  //   const requestsRef = collection(db, 'accessRequests');
+  //   const q = query(
+  //     requestsRef,
+  //     where('companyId', '==', user.companyId),
+  //     where('status', '==', 'pending'),
+  //     orderBy('createdAt', 'desc')
+  //   );
 
-    const unsubscribe = onSnapshot(q, (snapshot) => {
-      const fetchedNotifications = snapshot.docs.map(doc => {
-        const data = doc.data();
-        return {
-            id: doc.id,
-            userName: data.userName,
-            createdAt: data.createdAt as Timestamp,
-        };
-      });
-      setNotifications(fetchedNotifications);
-      setPendingRequestCount(snapshot.size);
-    }, (error) => {
-      console.error("Error fetching pending requests:", error);
-    });
+  //   const unsubscribe = onSnapshot(q, (snapshot) => {
+  //     const fetchedNotifications = snapshot.docs.map(doc => {
+  //       const data = doc.data();
+  //       return {
+  //           id: doc.id,
+  //           userName: data.userName,
+  //           createdAt: data.createdAt as Timestamp,
+  //       };
+  //     });
+  //     setNotifications(fetchedNotifications);
+  //     setPendingRequestCount(snapshot.size);
+  //   }, (error) => {
+  //     console.error("Error fetching pending requests:", error);
+  //   });
 
-    return () => unsubscribe();
-  }, [user]);
+  //   return () => unsubscribe();
+  // }, [user]);
   
   const getInitials = (name?: string | null) => {
     if (!name) return 'U';
