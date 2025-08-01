@@ -13,7 +13,8 @@ const firebaseConfig = {
   "storageBucket": "bizsight-k0icr.appspot.com",
   "apiKey": "AIzaSyDhCyWZPBS6lNNzmp8F90mlyg4ikqtOd3o",
   "authDomain": "bizsight-k0icr.firebaseapp.com",
-  "messagingSenderId": "859842469189"
+  "messagingSenderId": "859842469189",
+  "measurementId": "G-XXXXXXXXXX"
 };
 
 
@@ -65,5 +66,6 @@ try {
 }
 
 export { app, auth, db, storage, doc, getDoc }; // Export doc and getDoc
+
 
 
