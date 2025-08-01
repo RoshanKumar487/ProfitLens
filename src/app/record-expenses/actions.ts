@@ -3,7 +3,6 @@
 import { connectToDatabase } from '@/lib/mongodb';
 import { revalidatePath } from 'next/cache';
 import { getCurrentUser } from '@/app/auth/actions';
-import { ObjectId } from 'mongodb';
 
 export interface Expense {
   id?: string; // MongoDB will use _id
@@ -25,8 +24,9 @@ export async function addExpense(expense: Omit<Expense, 'id'>) {
     const { db } = await connectToDatabase();
     await db.collection('expenses').insertOne({
       ...expense,
-      userId: new ObjectId(user.uid),
-      companyId: new ObjectId(user.companyId),
+      // Store IDs as strings, consistent with the mock user object
+      userId: user.uid, 
+      companyId: user.companyId,
       createdAt: new Date(),
     });
     
@@ -46,9 +46,11 @@ export async function getExpenses(): Promise<Expense[]> {
 
   try {
     const { db } = await connectToDatabase();
+    // Query using the string userId from the mock user
     const expenses = await db.collection('expenses')
-      .find({ userId: new ObjectId(user.uid) })
+      .find({ userId: user.uid })
       .sort({ date: -1 })
+      .limit(100) // Added a limit to prevent fetching too much data
       .toArray();
 
     return expenses.map(doc => ({
