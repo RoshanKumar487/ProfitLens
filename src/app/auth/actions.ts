@@ -1,3 +1,4 @@
+
 'use server';
 
 import { getDb } from '@/lib/db';
@@ -36,16 +37,27 @@ export async function signUp(formData: unknown) {
     if (existingUser) {
       return { success: false, error: 'A user with this email already exists.' };
     }
+    
+    // For simplicity, we'll create a new company for each sign up.
+    // In a real app, you might handle invitations to existing companies.
+    const companyResult = await db.run('INSERT INTO companies (name) VALUES (?)', companyName);
+    const companyId = companyResult.lastID;
+
+    if (!companyId) {
+        return { success: false, error: 'Failed to create company.' };
+    }
 
     const hashedPassword = await bcrypt.hash(password, saltRounds);
 
-    const { lastID } = await db.run(
-      'INSERT INTO users (name, email, password, companyName) VALUES (?, ?, ?, ?)',
-      name, email, hashedPassword, companyName
+    const userResult = await db.run(
+      'INSERT INTO users (name, email, password, companyId, role) VALUES (?, ?, ?, ?, ?)',
+      name, email, hashedPassword, companyId, 'admin' // First user is admin
     );
 
-    if (lastID) {
-      await createSession(lastID);
+    const userId = userResult.lastID;
+
+    if (userId) {
+      await createSession(userId, companyId);
       return { success: true };
     } else {
       return { success: false, error: 'Failed to create user.' };
@@ -75,16 +87,16 @@ export async function signIn(formData: unknown) {
       return { success: false, error: 'Invalid email or password.' };
     }
 
-    await createSession(user.id);
-    return { success: true };
+    await createSession(user.id, user.companyId);
+    redirect('/dashboard');
   } catch (e: any) {
     return { success: false, error: e.message || 'An unexpected error occurred.' };
   }
 }
 
-async function createSession(userId: number) {
+async function createSession(userId: number, companyId: number) {
   const expires = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000); // 7 days
-  const session = await new SignJWT({ userId })
+  const session = await new SignJWT({ userId, companyId })
     .setProtectedHeader({ alg: 'HS256' })
     .setIssuedAt()
     .setExpirationTime('7d')
@@ -113,18 +125,24 @@ export async function getCurrentUser() {
         });
         
         const db = await getDb();
-        const user = await db.get('SELECT id, name, email, companyName, currencySymbol, role, isSuperAdmin FROM users WHERE id = ?', payload.userId);
+        const user = await db.get(`
+            SELECT 
+                u.id, u.name, u.email, u.role, u.isSuperAdmin,
+                c.id as companyId, c.name as companyName, c.currencySymbol
+            FROM users u
+            JOIN companies c ON u.companyId = c.id
+            WHERE u.id = ?
+        `, payload.userId);
 
         if (!user) return null;
 
-        // Adapt to the structure expected by AuthContext
         return {
             uid: user.id.toString(),
             displayName: user.name,
             email: user.email,
-            companyId: user.id.toString(), // Using user ID as company ID for simplicity
+            companyId: user.companyId,
             companyName: user.companyName,
-            publicCompanyId: `CMP-${user.id}`,
+            publicCompanyId: `CMP-${user.companyId}`,
             currencySymbol: user.currencySymbol,
             role: user.role,
             isSuperAdmin: !!user.isSuperAdmin,

@@ -1,3 +1,4 @@
+
 import { NextResponse, type NextRequest } from 'next/server';
 import { jwtVerify } from 'jose';
 
@@ -9,7 +10,7 @@ export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
   
   // Skip middleware for API routes, Next.js assets, etc.
-  if (pathname.startsWith('/api/') || pathname.startsWith('/_next/')) {
+  if (pathname.startsWith('/api/') || pathname.startsWith('/_next/') || pathname.includes('.')) {
     return NextResponse.next();
   }
 

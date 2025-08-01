@@ -1,3 +1,4 @@
+
 'use client';
 
 import React, { useState } from 'react';
@@ -24,7 +25,6 @@ type SignInFormValues = z.infer<typeof SignInSchema>;
 
 export default function SignInPage() {
   const { toast } = useToast();
-  const router = useRouter();
   const [isLoading, setIsLoading] = useState(false);
 
   const form = useForm<SignInFormValues>({
@@ -37,17 +37,15 @@ export default function SignInPage() {
 
   const onSubmit = async (values: SignInFormValues) => {
     setIsLoading(true);
+    // The signIn action now handles redirection on success.
+    // We only need to handle the error case here.
     const result = await signIn(values);
     setIsLoading(false);
 
-    if (result.success) {
-      toast({ title: 'Sign In Successful', description: "Welcome back!" });
-      router.push('/dashboard');
-      router.refresh(); // Important to re-fetch server components with new auth state
-    } else {
+    if (result?.error) {
       toast({
         title: 'Sign In Failed',
-        description: result.error || 'An unexpected error occurred.',
+        description: result.error,
         variant: 'destructive',
       });
     }
