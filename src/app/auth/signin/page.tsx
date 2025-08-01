@@ -3,7 +3,8 @@
 
 import React from 'react';
 import Link from 'next/link';
-import { useFormState, useFormStatus } from 'react-dom';
+import { useActionState } from 'react';
+import { useFormStatus } from 'react-dom';
 import { signIn } from '../actions';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
@@ -23,7 +24,7 @@ function SubmitButton() {
 }
 
 export default function SignInPage() {
-  const [state, formAction] = useFormState(signIn, undefined);
+  const [state, formAction] = useActionState(signIn, undefined);
   const { toast } = useToast();
 
   React.useEffect(() => {
