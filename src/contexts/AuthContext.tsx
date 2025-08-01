@@ -3,7 +3,7 @@
 
 import { createContext, useContext, useEffect, useState, type ReactNode } from 'react';
 import { useRouter, usePathname } from 'next/navigation';
-import { getCurrentUser, signOut as signOutAction } from '@/app/auth/actions';
+import { getCurrentUser, signOutAction } from '@/app/auth/actions';
 
 interface User {
   uid: string;
