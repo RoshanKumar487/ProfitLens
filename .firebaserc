@@ -1,5 +1,9 @@
 {
   "projects": {
-    "default": "bizsight-k0icr"
-  }
+    "default": "bizsight-k0icr",
+    "/": "profitlenz-68b39",
+    "?": "profitlenz-68b39"
+  },
+  "targets": {},
+  "etags": {}
 }

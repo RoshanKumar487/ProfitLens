@@ -8,13 +8,13 @@ import { getStorage, type FirebaseStorage } from 'firebase/storage'; // Ensure g
 
 
 const firebaseConfig = {
-  "projectId": "bizsight-k0icr",
-  "appId": "1:859842469189:web:39f1dc3746f4efe39cb22c",
-  "storageBucket": "bizsight-k0icr.appspot.com",
-  "apiKey": "AIzaSyDhCyWZPBS6lNNzmp8F90mlyg4ikqtOd3o",
-  "authDomain": "bizsight-k0icr.firebaseapp.com",
-  "messagingSenderId": "859842469189",
-  "measurementId": "G-XXXXXXXXXX"
+  apiKey: "AIzaSyAW4JEuIEsVGMMRpQJYaGTf1dzLv_meXx8",
+  authDomain: "profitlenz-68b39.firebaseapp.com",
+  projectId: "profitlenz-68b39",
+  storageBucket: "profitlenz-68b39.firebasestorage.app",
+  messagingSenderId: "579389453160",
+  appId: "1:579389453160:web:d0e3d42b2b327984775cdd",
+  measurementId: "G-9H7V95TDWD"
 };
 
 
