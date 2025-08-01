@@ -71,8 +71,11 @@ export default function InvoicingPage() {
       const baseQuery = [
         where('companyId', '==', user.companyId),
         orderBy(sortConfig.key, sortConfig.direction),
-        orderBy('createdAt', sortConfig.direction)
       ];
+      // Add a secondary sort field to ensure consistent pagination
+      if (sortConfig.key !== 'createdAt') {
+          baseQuery.push(orderBy('createdAt', 'desc'));
+      }
 
       if (direction === 'next' && lastVisible) {
         q = query(invoicesColRef, ...baseQuery, startAfter(lastVisible), limit(RECORDS_PER_PAGE));
@@ -101,6 +104,7 @@ export default function InvoicingPage() {
       } else if (direction === 'prev' && currentPage > 1) {
         // if we go back and there are no results, refetch the first page
         fetchInvoices('reset');
+        setCurrentPage(1);
       }
 
     } catch (error: any) {
@@ -291,10 +295,10 @@ export default function InvoicingPage() {
                 <Pagination>
                     <PaginationContent>
                     <PaginationItem>
-                        <PaginationPrevious href="#" onClick={(e) => { e.preventDefault(); handlePageChange('prev'); }} className={currentPage === 1 ? 'pointer-events-none opacity-50' : ''} />
+                        <PaginationPrevious href="#" onClick={(e) => { e.preventDefault(); handlePageChange('prev'); }} className={currentPage === 1 ? 'pointer-events-none opacity-50' : undefined} />
                     </PaginationItem>
                     <PaginationItem>
-                        <PaginationNext href="#" onClick={(e) => { e.preventDefault(); handlePageChange('next'); }} className={invoices.length < RECORDS_PER_PAGE ? 'pointer-events-none opacity-50' : ''} />
+                        <PaginationNext href="#" onClick={(e) => { e.preventDefault(); handlePageChange('next'); }} className={invoices.length < RECORDS_PER_PAGE ? 'pointer-events-none opacity-50' : undefined} />
                     </PaginationItem>
                     </PaginationContent>
                 </Pagination>

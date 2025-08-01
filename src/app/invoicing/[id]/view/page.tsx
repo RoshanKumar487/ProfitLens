@@ -57,6 +57,7 @@ interface InvoiceDisplay {
   issuedDate: Date;
   items: InvoiceItem[];
   notes?: string;
+  isRcmApplicable?: boolean;
 }
 
 interface CompanyDetailsFirestore {
@@ -144,7 +145,7 @@ export default function ViewInvoicePage() {
     }, [invoiceId, user, toast, router]);
 
     useEffect(() => {
-        if (!authIsLoading) {
+        if (!authIsLoading && user) {
             fetchAllData();
         }
     }, [authIsLoading, fetchAllData, user]);

@@ -123,6 +123,15 @@
       ]
     },
     {
+      "collectionGroup": "invoices",
+      "queryScope": "COLLECTION_GROUP",
+      "fields": [
+        { "fieldPath": "companyId", "order": "ASCENDING" },
+        { "fieldPath": "invoiceNumber", "order": "DESCENDING" },
+        { "fieldPath": "createdAt", "order": "DESCENDING"}
+      ]
+    },
+    {
       "collectionGroup": "revenueEntries",
       "queryScope": "COLLECTION_GROUP",
       "fields": [
