@@ -1,3 +1,4 @@
+
 'use client';
 
 import React, { useState, useEffect } from 'react';
@@ -11,15 +12,7 @@ import { format } from 'date-fns';
 import { useAuth } from '@/contexts/AuthContext';
 import { Skeleton } from '@/components/ui/skeleton';
 import Link from 'next/link';
-
-interface RevenueEntryDisplay {
-  id: string;
-  date: Date; 
-  amount: number;
-  source: string;
-  description?: string;
-  addedBy: string;
-}
+import { getRevenueEntries, type RevenueEntryDisplay } from './actions';
 
 export default function RecordRevenuePage() {
   const { user, isLoading: authIsLoading, currencySymbol } = useAuth();
@@ -28,10 +21,18 @@ export default function RecordRevenuePage() {
   const [isLoadingEntries, setIsLoadingEntries] = useState(true);
 
   useEffect(() => {
-    // This is now a mock fetch since we don't have a backend for revenue yet.
-    setIsLoadingEntries(false);
-    setRecentEntries([]);
-  }, []);
+    async function loadRevenue() {
+        if (!user) {
+            setIsLoadingEntries(false);
+            return;
+        }
+        setIsLoadingEntries(true);
+        const entries = await getRevenueEntries();
+        setRecentEntries(entries);
+        setIsLoadingEntries(false);
+    }
+    loadRevenue();
+  }, [user]);
 
   if (authIsLoading) {
     return (
@@ -69,7 +70,7 @@ export default function RecordRevenuePage() {
       <Card className="shadow-lg">
         <CardHeader>
             <CardTitle className="font-headline">Revenue Entries</CardTitle>
-            <CardDescription>A list of your recorded revenue entries. (Note: Data is not persistent yet)</CardDescription>
+            <CardDescription>A list of your recorded revenue entries from the database.</CardDescription>
         </CardHeader>
         <CardContent>
           <Table>
@@ -79,7 +80,6 @@ export default function RecordRevenuePage() {
                       <TableHead>Date</TableHead>
                       <TableHead>Source</TableHead>
                       <TableHead>Description</TableHead>
-                      <TableHead>Added By</TableHead>
                       <TableHead className="text-right">Amount</TableHead>
                       <TableHead className="w-[50px] text-right">Actions</TableHead>
                   </TableRow>
@@ -91,23 +91,21 @@ export default function RecordRevenuePage() {
                     <TableCell><Skeleton className="h-4 w-[90px]" /></TableCell>
                     <TableCell><Skeleton className="h-4 w-[120px]" /></TableCell>
                     <TableCell><Skeleton className="h-4 w-[200px]" /></TableCell>
-                    <TableCell><Skeleton className="h-4 w-[100px]" /></TableCell>
                     <TableCell className="text-right"><Skeleton className="h-4 w-[70px] ml-auto" /></TableCell>
                     <TableCell className="text-right"><Skeleton className="h-8 w-8 ml-auto" /></TableCell>
                   </TableRow>
                 ))
               ) : recentEntries.length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={6} className="h-24 text-center">
+                    <TableCell colSpan={5} className="h-24 text-center">
                         No revenue entries found. Click "Record Revenue" to get started.
                     </TableCell>
                 </TableRow>
               ) : recentEntries.map(entry => (
                   <TableRow key={entry.id}>
-                      <TableCell>{format(entry.date, 'PP')}</TableCell>
+                      <TableCell>{format(new Date(entry.date), 'PP')}</TableCell>
                       <TableCell className="font-medium">{entry.source}</TableCell>
                       <TableCell className="max-w-xs truncate" title={entry.description}>{entry.description || '-'}</TableCell>
-                      <TableCell>{entry.addedBy}</TableCell>
                       <TableCell className="text-right font-semibold text-green-600">{currencySymbol}{entry.amount.toFixed(2)}</TableCell>
                       <TableCell className="text-right">
                             <DropdownMenu>

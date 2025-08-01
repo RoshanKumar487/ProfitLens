@@ -27,41 +27,12 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigge
 import { ScrollArea } from '@/components/ui/scroll-area';
 import PayslipTemplate from './PayslipTemplate';
 import { doc, getDoc } from 'firebase/firestore';
-import { db } from '@/lib/firebaseConfig';
 import { urlToDataUri } from '@/lib/utils';
 import jsPDF from 'jspdf';
 import html2canvas from 'html2canvas';
 import { Label } from '@/components/ui/label';
 import { cn } from '@/lib/utils';
-
-interface EmployeeWithPayroll {
-  id: string; // employeeId for existing, tempId for new
-  name: string;
-  position?: string;
-  uan?: string;
-  joiningDate?: Date;
-  profilePictureUrl?: string;
-  payrollId: string | null;
-  baseSalary: number; // Base salary from employee record
-  workingDays: number;
-  presentDays: number;
-  otDays: number;
-  advances: number;
-  otherDeductions: number;
-  status: 'Pending' | 'Paid';
-  customFields: { [key: string]: any };
-  isNew?: boolean;
-
-  // Calculated fields, not stored in DB but computed on client
-  proratedSalary?: number;
-  overtimePay?: number;
-  grossEarnings?: number;
-  pfContribution?: number;
-  esiContribution?: number;
-  totalDeductions?: number;
-  netPayment?: number;
-}
-
+import { type EmployeeWithPayroll } from './actions';
 
 const getInitials = (name: string = "") => {
   const names = name.split(' ');
@@ -99,12 +70,33 @@ export default function PayrollPage() {
   const [recipientEmail, setRecipientEmail] = useState('');
   const [isSendingEmail, setIsSendingEmail] = useState(false);
 
+  const fetchPayrollData = useCallback(async () => {
+    if (!user?.companyId) return;
+    setIsLoading(true);
+    try {
+        const period = format(payPeriod, 'yyyy-MM');
+        const [pData, pSettings, cDetails] = await Promise.all([
+            getPayrollDataForPeriod(user.companyId, period),
+            getPayrollSettings(user.companyId),
+            // Mock company details fetch
+            Promise.resolve({ name: user.companyName, address: '123 Main St' })
+        ]);
+        setPayrollData(pData);
+        setPayrollSettings(pSettings);
+        setCompanyDetails(cDetails);
+    } catch (error) {
+        toast({ title: "Error", description: "Failed to load payroll data.", variant: "destructive" });
+    } finally {
+        setIsLoading(false);
+    }
+  }, [user?.companyId, payPeriod, toast, user?.companyName]);
+
+
   useEffect(() => {
-    // Removed all Firebase data fetching logic to prevent errors
-    // after backend disconnection.
-    setIsLoading(false);
-    setPayrollSettings({ customFields: [], pfPercentage: 12, esiPercentage: 0.75 });
-  }, []);
+    if (!authLoading && user?.companyId) {
+        fetchPayrollData();
+    }
+  }, [authLoading, user?.companyId, fetchPayrollData]);
 
   const filteredAndCalculatedData = useMemo(() => {
     if (!payrollSettings) return [];
@@ -223,7 +215,13 @@ export default function PayrollPage() {
   const handleSaveAll = async () => {
     if (!user?.companyId) return;
     setIsSaving(true);
-    toast({ title: 'Action Disabled', description: 'Cannot save data without a backend connection.', variant: 'destructive' });
+    const result = await savePayrollData(user.companyId, format(payPeriod, 'yyyy-MM'), payrollData);
+    if (result.success) {
+        toast({ title: 'Success', description: 'Payroll data saved successfully.' });
+        fetchPayrollData();
+    } else {
+        toast({ title: 'Error', description: result.message, variant: 'destructive' });
+    }
     setIsSaving(false);
   };
   
@@ -232,7 +230,7 @@ export default function PayrollPage() {
   };
   
   const handleConfirmDelete = async () => {
-    if (!employeeToDelete) return;
+    if (!employeeToDelete || !user?.companyId) return;
     if (employeeToDelete.isNew || !employeeToDelete.payrollId) {
       setPayrollData(prev => prev.filter(emp => emp.id !== employeeToDelete.id));
       setEmployeeToDelete(null);
@@ -240,7 +238,13 @@ export default function PayrollPage() {
       return;
     }
     setIsDeleting(true);
-    toast({ title: 'Action Disabled', description: 'Cannot delete data without a backend connection.', variant: 'destructive' });
+    const result = await deletePayrollRecord(user.companyId, employeeToDelete.payrollId);
+     if (result.success) {
+        toast({ title: 'Success', description: 'Payroll record deleted.' });
+        fetchPayrollData();
+    } else {
+        toast({ title: 'Error', description: result.message, variant: 'destructive' });
+    }
     setIsDeleting(false);
     setEmployeeToDelete(null);
   };
@@ -299,7 +303,7 @@ export default function PayrollPage() {
   };
 
 
-  if (authLoading) {
+  if (authLoading || isLoading) {
       return <div className="flex justify-center items-center h-64"><Loader2 className="h-12 w-12 animate-spin text-primary" /></div>;
   }
 

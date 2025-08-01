@@ -3,8 +3,6 @@
 
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
-import { db } from '@/lib/firebaseConfig';
-import { collection, query, where, orderBy, onSnapshot } from 'firebase/firestore';
 import { useToast } from '@/hooks/use-toast';
 import PageTitle from '@/components/PageTitle';
 import { Button } from '@/components/ui/button';
@@ -16,25 +14,10 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Skeleton } from '@/components/ui/skeleton';
 import { Package, PlusCircle, Trash2, Loader2, Save, Search, ArrowUp, ArrowDown, ChevronsUpDown, Settings } from 'lucide-react';
 import { v4 as uuidv4 } from 'uuid';
-import { saveAllProducts, deleteProduct } from './actions';
+import { getAllProducts, saveAllProducts, deleteProduct } from './actions';
 import { getProductSettings, type ProductSettings } from '../settings/actions';
 import Link from 'next/link';
-
-type ProductDisplay = {
-  id: string;
-  name: string;
-  sku: string;
-  category: string;
-  itemType: 'Goods' | 'Service';
-  unit: string;
-  salePrice: number;
-  purchasePrice: number;
-  gstRate: number;
-  quantity?: number;
-  lowStockThreshold?: number;
-  customFields?: { [key: string]: string };
-  isNew?: boolean;
-};
+import { type ProductDisplay } from './actions';
 
 const UNITS_OF_MEASURE = [
     'pcs', 'nos', 'kg', 'g', 'ltr', 'ml', 'm', 'ft', 'in', 'box', 'set', 'pair', 'dozen'
@@ -52,13 +35,47 @@ export default function ProductsServicesPage() {
     const [searchTerm, setSearchTerm] = useState('');
     const [sortConfig, setSortConfig] = useState<{ key: keyof ProductDisplay; direction: 'asc' | 'desc' }>({ key: 'name', direction: 'asc' });
     const [productSettings, setProductSettings] = useState<ProductSettings | null>(null);
+    
+    const fetchProducts = useCallback(async () => {
+        if (!user?.companyId) return;
+        setIsLoading(true);
+        try {
+            const fetchedProducts = await getAllProducts(user.companyId);
+            setProducts(fetchedProducts);
+        } catch (error) {
+            toast({ title: "Error", description: "Failed to load products.", variant: "destructive" });
+        } finally {
+            setIsLoading(false);
+        }
+    }, [user?.companyId, toast]);
 
     useEffect(() => {
-      // Removed all Firebase data fetching logic to prevent errors
-      // after backend disconnection.
-      setIsLoading(false);
-      setProductSettings({ customFields: [] });
-    }, []);
+        const fetchInitialData = async () => {
+            if (!user?.companyId) {
+                setIsLoading(false);
+                return;
+            }
+            setIsLoading(true);
+            try {
+                const [fetchedProducts, fetchedSettings] = await Promise.all([
+                    getAllProducts(user.companyId),
+                    getProductSettings(user.companyId)
+                ]);
+                setProducts(fetchedProducts);
+                setProductSettings(fetchedSettings);
+            } catch (error) {
+                 toast({ title: "Error", description: "Failed to load initial data.", variant: "destructive" });
+            } finally {
+                setIsLoading(false);
+            }
+        };
+
+        if (user?.companyId) {
+           fetchInitialData();
+        } else if (!authIsLoading) {
+            setIsLoading(false);
+        }
+    }, [user?.companyId, authIsLoading, toast]);
     
     const filteredAndSortedProducts = useMemo(() => {
         let sortableItems = [...products];
@@ -102,7 +119,7 @@ export default function ProductsServicesPage() {
         return sortConfig.direction === 'asc' ? <ArrowUp className="ml-2 h-4 w-4" /> : <ArrowDown className="ml-2 h-4 w-4" />;
     };
 
-    const handleProductInputChange = (productId: string, field: keyof Omit<ProductDisplay, 'customFields'>, value: any) => {
+    const handleProductInputChange = (productId: string, field: keyof Omit<ProductDisplay, 'customFields' | 'id'>, value: any) => {
       setProducts(prev =>
         prev.map(p => {
           if (p.id === productId) {
@@ -153,7 +170,13 @@ export default function ProductsServicesPage() {
     const handleSaveAllProducts = async () => {
       if (!user?.companyId) return;
       setIsSaving(true);
-      toast({ title: 'Action Disabled', description: 'Cannot save data without a backend connection.', variant: 'destructive' });
+      const result = await saveAllProducts(user.companyId, products);
+      if (result.success) {
+        toast({ title: "Success", description: result.message });
+        await fetchProducts();
+      } else {
+        toast({ title: "Error", description: result.message, variant: "destructive" });
+      }
       setIsSaving(false);
     };
     
@@ -166,9 +189,15 @@ export default function ProductsServicesPage() {
     };
 
     const confirmDelete = async () => {
-        if (!itemToDelete) return;
+        if (!itemToDelete || !user?.companyId) return;
         setIsSaving(true);
-        toast({ title: 'Action Disabled', description: 'Cannot delete data without a backend connection.', variant: 'destructive' });
+        const result = await deleteProduct(user.companyId, itemToDelete.id);
+        if (result.success) {
+            toast({ title: "Success", description: result.message });
+            setProducts(prev => prev.filter(p => p.id !== itemToDelete.id));
+        } else {
+            toast({ title: "Error", description: result.message, variant: "destructive" });
+        }
         setItemToDelete(null);
         setIsSaving(false);
     };

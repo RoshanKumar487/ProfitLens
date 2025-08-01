@@ -1,3 +1,4 @@
+
 'use client';
 
 import React, { useState, FormEvent } from 'react';
@@ -15,14 +16,7 @@ import { format } from 'date-fns';
 import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/contexts/AuthContext';
 import Link from 'next/link';
-
-// Mock function since we removed the actions file
-async function addRevenueEntry(payload: any) {
-  console.log("Mock addRevenueEntry called with:", payload);
-  // In a real app, this would be a server action.
-  // For now, we simulate success.
-  return new Promise(resolve => setTimeout(() => resolve({ success: true, message: "Revenue recorded successfully (mock)." }), 1000));
-}
+import { addRevenueEntry } from '../actions';
 
 export default function NewRevenuePage() {
   const { user, currencySymbol } = useAuth();
@@ -53,15 +47,13 @@ export default function NewRevenuePage() {
     }
 
     setIsSaving(true);
-    const newEntryPayload = {
-      date: date.toISOString(), 
-      amount: amountNum,
-      source: source,
-      description: description || '',
-      userId: user.uid,
-    };
 
-    const result: any = await addRevenueEntry(newEntryPayload);
+    const result = await addRevenueEntry({
+      date: format(date, 'yyyy-MM-dd'),
+      amount: amountNum,
+      source,
+      description,
+    });
 
     if (result.success) {
       toast({ title: 'Revenue Recorded', description: result.message });
