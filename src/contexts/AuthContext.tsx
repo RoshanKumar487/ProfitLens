@@ -184,11 +184,20 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       const firebaseUser = userCredential.user;
       await updateProfile(firebaseUser, { displayName });
 
+      const userDocRef = doc(db, 'users', firebaseUser.uid);
+      await setDoc(userDocRef, {
+          uid: firebaseUser.uid,
+          email: firebaseUser.email,
+          displayName,
+          companyId: null, // Initially no company
+          role: 'pending', // Start as pending
+          createdAt: serverTimestamp(),
+      });
+
       if (companyInfo.id) { 
-        const userDocRef = doc(db, 'users', firebaseUser.uid);
-        await setDoc(userDocRef, {
-          uid: firebaseUser.uid, email: firebaseUser.email, displayName,
-          companyId: companyInfo.id, role: 'pending', createdAt: serverTimestamp(),
+        // Update user with company info for pending request
+        await updateDoc(userDocRef, {
+            companyId: companyInfo.id,
         });
 
         await addDoc(collection(db, 'accessRequests'), {
@@ -261,10 +270,10 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
           stampStoragePath,
         });
         
-        const userDocRef = doc(db, 'users', firebaseUser.uid);
-        await setDoc(userDocRef, {
-          uid: firebaseUser.uid, email: firebaseUser.email, displayName,
-          companyId: newCompanyDocRef.id, role: 'admin', createdAt: serverTimestamp(),
+        // Update user to be an admin of the new company
+        await updateDoc(userDocRef, {
+            companyId: newCompanyDocRef.id,
+            role: 'admin',
         });
         
         console.log('AuthContext: New company created by admin:', firebaseUser.uid, 'CompanyId:', newCompanyDocRef.id);
