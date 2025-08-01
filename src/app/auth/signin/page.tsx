@@ -27,7 +27,6 @@ function SubmitButton() {
 export default function SignInPage() {
   const [state, formAction] = useActionState(signIn, undefined);
   const { toast } = useToast();
-  const router = useRouter();
 
   useEffect(() => {
     if (state?.error) {
@@ -37,10 +36,7 @@ export default function SignInPage() {
         variant: 'destructive',
       });
     }
-    if (state?.success) {
-      router.push('/dashboard');
-    }
-  }, [state, toast, router]);
+  }, [state, toast]);
 
   return (
     <div className="flex min-h-screen items-center justify-center bg-background p-4">

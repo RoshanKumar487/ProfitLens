@@ -96,7 +96,7 @@ export async function signIn(previousState: any, formData: FormData) {
         return { error: 'An unexpected error occurred.' };
     }
     
-    return { success: true };
+    redirect('/dashboard');
 }
 
 export async function signUp(previousState: any, formData: FormData) {
@@ -150,5 +150,5 @@ export async function signUp(previousState: any, formData: FormData) {
         return { error: 'An unexpected error occurred during sign-up.' };
     }
     
-    return { success: true };
+    redirect('/dashboard');
 }
