@@ -2,7 +2,6 @@
 'use server';
 
 import { connectToDatabase } from '@/lib/mongodb';
-import { cookies } from 'next/headers';
 import { redirect } from 'next/navigation';
 import bcrypt from 'bcryptjs';
 import { createSession, getSession } from '@/lib/session';
@@ -60,11 +59,15 @@ export async function getCurrentUser() {
 
 
 export async function signOutAction() {
-  cookies().set('session', '', { expires: new Date(0) });
+  await getSession().then(session => {
+    if (session) {
+      cookies().delete('session');
+    }
+  });
   redirect('/auth/signin');
 }
 
-export async function signIn(formData: FormData) {
+export async function signIn(previousState: any, formData: FormData) {
     const email = formData.get('email') as string;
     const password = formData.get('password') as string;
 
@@ -85,18 +88,25 @@ export async function signIn(formData: FormData) {
         if (!passwordsMatch) {
             return { error: 'Invalid email or password.' };
         }
+        
+        if (!user.companyId) {
+            return { error: 'User is not associated with a company.' };
+        }
 
         await createSession(user._id.toHexString(), user.companyId.toHexString());
         
     } catch (error) {
         console.error('Sign in error:', error);
+        if (error instanceof Error && error.name === 'NEXT_REDIRECT') {
+          throw error;
+        }
         return { error: 'An unexpected error occurred.' };
     }
-
+    
     redirect('/dashboard');
 }
 
-export async function signUp(formData: FormData) {
+export async function signUp(previousState: any, formData: FormData) {
     const name = formData.get('name') as string;
     const companyName = formData.get('companyName') as string;
     const email = formData.get('email') as string;
@@ -125,6 +135,10 @@ export async function signUp(formData: FormData) {
             createdAt: new Date(),
         });
         const companyId = companyResult.insertedId;
+        
+        if (!companyId) {
+            return { error: 'Failed to create company profile.' };
+        }
 
         // Create the user and associate them with the company
         const userResult = await db.collection('users').insertOne({
@@ -140,8 +154,11 @@ export async function signUp(formData: FormData) {
 
     } catch (error) {
         console.error('Sign up error:', error);
+        if (error instanceof Error && error.name === 'NEXT_REDIRECT') {
+          throw error;
+        }
         return { error: 'An unexpected error occurred during sign-up.' };
     }
-
+    
     redirect('/dashboard');
 }
