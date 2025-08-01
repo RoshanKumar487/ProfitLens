@@ -1,24 +1,6 @@
 
 'use server';
 
-import { db } from '@/lib/firebaseConfig';
-import {
-  collection,
-  addDoc,
-  getDocs,
-  doc,
-  updateDoc,
-  deleteDoc,
-  query,
-  where,
-  orderBy,
-  Timestamp,
-  serverTimestamp,
-  getDoc,
-  writeBatch,
-  limit,
-} from 'firebase/firestore';
-import { v4 as uuidv4 } from 'uuid';
 import { analyzeExpenseOpportunities } from '@/ai/flows/analyze-expense-opportunities';
 
 
@@ -30,20 +12,13 @@ interface Employee {
   description?: string;
 }
 
-interface InvoiceItem {
-  id: string;
-  description: string;
-  quantity: number;
-  unitPrice: number;
-}
-
 interface Invoice {
   clientName: string;
   clientEmail?: string;
   clientAddress?: string;
   issuedDate: Date;
   dueDate: Date;
-  items: InvoiceItem[];
+  items: { id: string; description: string; quantity: number; unitPrice: number; }[];
   status: 'Paid' | 'Pending' | 'Overdue' | 'Draft';
 }
 
@@ -56,133 +31,75 @@ interface Expense {
 }
 
 
-// Shared function to get user info - assuming a server context where auth is available
-// For simplicity in this service, we'll pass companyId directly.
-// The calling action is responsible for security.
-
 // == EMPLOYEE SERVICES ==
+// Mock implementation since the database is disconnected.
 export async function listEmployees(companyId: string): Promise<any[]> {
-  const q = query(collection(db, 'employees'), where('companyId', '==', companyId), orderBy('createdAt', 'desc'));
-  const snapshot = await getDocs(q);
-  return snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+  console.log(`[Mock Service] Listing employees for company ${companyId}`);
+  return Promise.resolve([]);
 }
 
 export async function addEmployee(companyId: string, employeeData: Employee): Promise<string> {
-    const docRef = await addDoc(collection(db, 'employees'), {
-        ...employeeData,
-        name_lowercase: employeeData.name.toLowerCase(),
-        companyId,
-        addedById: 'ai_assistant', // Or get current user if available
-        addedBy: 'AI Assistant',
-        createdAt: serverTimestamp(),
-        updatedAt: serverTimestamp(),
-    });
-    return docRef.id;
+    console.log(`[Mock Service] Adding employee for company ${companyId}`, employeeData);
+    return Promise.resolve('mock-employee-id-123');
 }
 
 export async function findEmployeeByName(companyId: string, name: string): Promise<any | null> {
-    const q = query(collection(db, 'employees'), where('companyId', '==', companyId), where('name', '==', name), limit(1));
-    const snapshot = await getDocs(q);
-    if (snapshot.empty) return null;
-    const doc = snapshot.docs[0];
-    return { id: doc.id, ...doc.data() };
+    console.log(`[Mock Service] Finding employee by name: ${name}`);
+    return Promise.resolve(null);
 }
 
 
 // == INVOICE SERVICES ==
+// Mock implementation since the database is disconnected.
 export async function listInvoices(companyId: string): Promise<any[]> {
-  const q = query(collection(db, 'invoices'), where('companyId', '==', companyId), orderBy('issuedDate', 'desc'));
-  const snapshot = await getDocs(q);
-  return snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+  console.log(`[Mock Service] Listing invoices for company ${companyId}`);
+  return Promise.resolve([]);
 }
 
 export async function createInvoice(companyId: string, invoiceData: Invoice): Promise<string> {
-    const subtotal = invoiceData.items.reduce((sum, item) => sum + (item.quantity * item.unitPrice), 0);
-    // Assuming 0 tax/discount for AI-created invoices for simplicity, can be expanded.
-    const total = subtotal;
-
-    const newInvoiceNumber = `INV-${Date.now().toString().slice(-6)}`;
-
-    const docRef = await addDoc(collection(db, 'invoices'), {
-        ...invoiceData,
-        companyId,
-        invoiceNumber: newInvoiceNumber,
-        issuedDate: Timestamp.fromDate(invoiceData.issuedDate),
-        dueDate: Timestamp.fromDate(invoiceData.dueDate),
-        subtotal,
-        discountType: 'fixed',
-        discountValue: 0,
-        discountAmount: 0,
-        taxRate: 0,
-        taxAmount: 0,
-        amount: total,
-        createdAt: serverTimestamp(),
-    });
-    return docRef.id;
+    console.log(`[Mock Service] Creating invoice for company ${companyId}`, invoiceData);
+    return Promise.resolve('mock-invoice-id-123');
 }
 
 export async function updateInvoiceStatus(companyId: string, invoiceNumber: string, status: 'Paid' | 'Pending' | 'Overdue' | 'Draft'): Promise<boolean> {
-    const q = query(collection(db, 'invoices'), where('companyId', '==', companyId), where('invoiceNumber', '==', invoiceNumber), limit(1));
-    const snapshot = await getDocs(q);
-    if (snapshot.empty) return false;
-    
-    const invoiceRef = snapshot.docs[0].ref;
-    await updateDoc(invoiceRef, { status });
-    return true;
+    console.log(`[Mock Service] Updating invoice ${invoiceNumber} to status ${status}`);
+    return Promise.resolve(true);
 }
 
 
 // == EXPENSE SERVICES ==
+// Mock implementation since the database is disconnected.
 export async function listExpenses(companyId: string): Promise<any[]> {
-    const q = query(collection(db, 'expenses'), where('companyId', '==', companyId), orderBy('date', 'desc'));
-    const snapshot = await getDocs(q);
-    return snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+    console.log(`[Mock Service] Listing expenses for company ${companyId}`);
+    return Promise.resolve([]);
 }
 
 export async function addExpense(companyId: string, expenseData: Expense): Promise<string> {
-    const docRef = await addDoc(collection(db, 'expenses'), {
-        ...expenseData,
-        companyId,
-        date: Timestamp.fromDate(expenseData.date),
-        addedById: 'ai_assistant',
-        addedBy: 'AI Assistant',
-        createdAt: serverTimestamp(),
-        updatedAt: serverTimestamp(),
-    });
-    return docRef.id;
+    console.log(`[Mock Service] Adding expense for company ${companyId}`, expenseData);
+    return Promise.resolve('mock-expense-id-123');
 }
 
 export async function deleteLastExpense(companyId: string): Promise<boolean> {
-    const q = query(collection(db, 'expenses'), where('companyId', '==', companyId), orderBy('createdAt', 'desc'), limit(1));
-    const snapshot = await getDocs(q);
-    if (snapshot.empty) return false;
-
-    await deleteDoc(snapshot.docs[0].ref);
-    return true;
+    console.log(`[Mock Service] Deleting last expense for company ${companyId}`);
+    return Promise.resolve(true);
 }
 
 // == REPORTING & ANALYSIS SERVICES ==
+// Mock implementation since the database is disconnected.
 export async function generateFinancialSummary(companyId: string): Promise<any> {
-  const expensesQuery = query(collection(db, 'expenses'), where('companyId', '==', companyId));
-  const revenueQuery = query(collection(db, 'revenueEntries'), where('companyId', '==', companyId));
-
-  const [expensesSnapshot, revenueSnapshot] = await Promise.all([
-    getDocs(expensesQuery),
-    getDocs(revenueQuery),
-  ]);
-
-  const totalExpenses = expensesSnapshot.docs.reduce((sum, doc) => sum + doc.data().amount, 0);
-  const totalRevenue = revenueSnapshot.docs.reduce((sum, doc) => sum + doc.data().amount, 0);
+  console.log(`[Mock Service] Generating financial summary for company ${companyId}`);
+  const totalRevenue = 50000;
+  const totalExpenses = 30000;
 
   const analysis = await analyzeExpenseOpportunities({
       revenue: totalRevenue,
       expenses: totalExpenses,
   });
 
-  return {
+  return Promise.resolve({
       totalRevenue,
       totalExpenses,
       netProfit: totalRevenue - totalExpenses,
       analysis,
-  };
+  });
 }
