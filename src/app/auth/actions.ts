@@ -1,12 +1,12 @@
-
 'use server';
 
-import { getDb } from '@/lib/db';
+import { connectToDatabase } from '@/lib/mongodb';
 import { z } from 'zod';
 import bcrypt from 'bcryptjs';
 import { SignJWT, jwtVerify } from 'jose';
 import { cookies } from 'next/headers';
 import { redirect } from 'next/navigation';
+import { ObjectId } from 'mongodb';
 
 const saltRounds = 10;
 const secretKey = new TextEncoder().encode(process.env.JWT_SECRET || 'your-super-secret-key-that-is-at-least-32-chars-long');
@@ -32,14 +32,14 @@ export async function signUp(formData: unknown) {
   const { name, email, password, companyName } = result.data;
   
   try {
-    const db = await getDb();
-    const existingUser = await db.get('SELECT id FROM users WHERE email = ?', email);
+    const { db } = await connectToDatabase();
+    const existingUser = await db.collection('users').findOne({ email });
     if (existingUser) {
       return { success: false, error: 'A user with this email already exists.' };
     }
     
-    const companyResult = await db.run('INSERT INTO companies (name) VALUES (?)', companyName);
-    const companyId = companyResult.lastID;
+    const companyResult = await db.collection('companies').insertOne({ name: companyName, createdAt: new Date() });
+    const companyId = companyResult.insertedId;
 
     if (!companyId) {
         return { success: false, error: 'Failed to create company.' };
@@ -47,25 +47,29 @@ export async function signUp(formData: unknown) {
 
     const hashedPassword = await bcrypt.hash(password, saltRounds);
 
-    const userResult = await db.run(
-      'INSERT INTO users (name, email, password, companyId, role) VALUES (?, ?, ?, ?, ?)',
-      name, email, hashedPassword, companyId, 'admin' // First user is admin
-    );
+    const userResult = await db.collection('users').insertOne({
+      name,
+      email,
+      password: hashedPassword,
+      companyId,
+      role: 'admin', // First user is admin
+      createdAt: new Date()
+    });
 
-    const userId = userResult.lastID;
+    const userId = userResult.insertedId;
 
     if (!userId) {
+      // In a real app, you might want to delete the company that was just created.
       return { success: false, error: 'Failed to create user.' };
     }
 
-    await createSession(userId, companyId);
+    await createSession(userId.toHexString(), companyId.toHexString());
     
   } catch (e: any) {
     console.error('Sign-up error:', e);
     return { success: false, error: 'An unexpected server error occurred during sign up.' };
   }
   
-  // Redirect after successful sign-up
   redirect('/dashboard');
 }
 
@@ -79,8 +83,9 @@ export async function signIn(formData: unknown) {
   let user;
   
   try {
-    const db = await getDb();
-    user = await db.get('SELECT * FROM users WHERE email = ?', email);
+    const { db } = await connectToDatabase();
+    user = await db.collection('users').findOne({ email });
+    
     if (!user) {
       return { success: false, error: 'Invalid email or password.' };
     }
@@ -94,13 +99,11 @@ export async function signIn(formData: unknown) {
       return { success: false, error: 'An unexpected server error occurred during sign in.' };
   }
   
-  // If we reach here, credentials are valid.
-  // Create session and then redirect.
-  await createSession(user.id, user.companyId);
+  await createSession(user._id.toHexString(), user.companyId.toHexString());
   redirect('/dashboard');
 }
 
-async function createSession(userId: number, companyId: number) {
+async function createSession(userId: string, companyId: string) {
   const expires = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000); // 7 days
   const session = await new SignJWT({ userId, companyId })
     .setProtectedHeader({ alg: 'HS256' })
@@ -130,35 +133,32 @@ export async function getCurrentUser() {
             algorithms: ['HS256'],
         });
         
-        if (!payload.userId) {
+        const userId = payload.userId as string;
+        if (!userId) {
             return null;
         }
         
-        const db = await getDb();
-        const user = await db.get(`
-            SELECT 
-                u.id, u.name, u.email, u.role, u.isSuperAdmin,
-                c.id as companyId, c.name as companyName, c.currencySymbol
-            FROM users u
-            JOIN companies c ON u.companyId = c.id
-            WHERE u.id = ?
-        `, payload.userId);
+        const { db } = await connectToDatabase();
+        const user = await db.collection('users').findOne({ _id: new ObjectId(userId) });
 
         if (!user) return null;
 
+        const company = await db.collection('companies').findOne({ _id: user.companyId });
+        
+        if (!company) return null;
+
         return {
-            uid: user.id.toString(),
+            uid: user._id.toHexString(),
             displayName: user.name,
             email: user.email,
-            companyId: user.companyId,
-            companyName: user.companyName,
-            publicCompanyId: `CMP-${user.companyId}`,
-            currencySymbol: user.currencySymbol,
+            companyId: company._id.toHexString(),
+            companyName: company.name,
+            publicCompanyId: `CMP-${company._id.toHexString().substring(0,8)}`,
+            currencySymbol: company.currencySymbol || '$',
             role: user.role,
             isSuperAdmin: !!user.isSuperAdmin,
         };
     } catch (e) {
-        // This can happen if the token is malformed or expired
         console.error('Session verification failed:', e);
         return null;
     }

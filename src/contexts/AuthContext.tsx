@@ -1,4 +1,3 @@
-
 'use client';
 
 import { createContext, useContext, useEffect, useState, type ReactNode } from 'react';
@@ -9,7 +8,7 @@ interface User {
   uid: string;
   email: string | null;
   displayName: string | null;
-  companyId: number; 
+  companyId: string; 
   companyName: string | null;
   publicCompanyId: string | null;
   currencySymbol: string;
