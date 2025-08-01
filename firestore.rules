@@ -1,114 +1,113 @@
+
 rules_version = '2';
 
 service cloud.firestore {
   match /databases/{database}/documents {
-    
-    // Helper function to check if a user is an admin of a company.
-    function isCompanyAdmin(companyId) {
-      let userRole = get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role;
-      return userRole == 'admin' && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.companyId == companyId;
+
+    // Helper functions to improve readability
+    function isSignedIn() {
+      return request.auth != null;
     }
 
-    // Helper function to check if a user is a member of a company.
+    function isSuperAdmin() {
+      // Define your super admin's email here
+      return isSignedIn() && request.auth.token.email == 'testuser1@gmail.com';
+    }
+
     function isCompanyMember(companyId) {
-      return get(/databases/$(database)/documents/users/$(request.auth.uid)).data.companyId == companyId;
+      return isSignedIn() && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.companyId == companyId;
     }
 
-    // Super Admins have full access to everything.
-    match /{path=**} {
-      allow read, write: if request.auth.token.isSuperAdmin == true;
-    }
-    
-    // User profile data
-    match /users/{userId} {
-      // Users can read and update their own profile.
-      allow read, update: if request.auth.uid == userId;
-      // Admins can read any user profile within their company.
-      allow read: if isCompanyAdmin(get(/databases/$(database)/documents/users/$(userId)).data.companyId);
-      // Allow creation during sign-up
-      allow create: if request.auth.uid == userId;
+    function isCompanyAdmin(companyId) {
+      return isCompanyMember(companyId) && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin';
     }
 
-    // Company profile data
+    // Rules for companyProfiles
     match /companyProfiles/{companyId} {
-      // Admins can manage their own company profile.
-      allow read, write: if isCompanyAdmin(companyId);
-      // Any authenticated user can read basic company profile info (e.g., for searching).
-      allow list, get: if request.auth != null;
+      allow read: if isCompanyMember(companyId) || isSuperAdmin();
+      allow create: if isSignedIn(); // Any signed-in user can create a company profile during signup
+      allow update: if isCompanyAdmin(companyId) || isSuperAdmin();
     }
 
-    // Access requests for companies
+    // Rules for users
+    match /users/{userId} {
+      allow read: if isSignedIn() && (request.auth.uid == userId || isSuperAdmin());
+      allow create: if isSignedIn();
+      allow update: if isSignedIn() && request.auth.uid == userId;
+    }
+
+    // Rules for accessRequests
     match /accessRequests/{requestId} {
-      // Logged-in users can create requests.
-      allow create: if request.auth.uid != null;
-      // Admins can read/update requests for their own company.
-      allow read, update: if isCompanyAdmin(resource.data.companyId);
-    }
-    
-    // Expenses
-    match /expenses/{expenseId} {
-      allow read, create, update, delete: if isCompanyMember(resource.data.companyId);
-    }
-    
-    // Revenue Entries
-    match /revenueEntries/{revenueId} {
-      allow read, create, update, delete: if isCompanyMember(resource.data.companyId);
+      allow read: if isCompanyAdmin(resource.data.companyId) || isSuperAdmin();
+      allow create: if isSignedIn();
+      allow update: if isCompanyAdmin(resource.data.companyId) || isSuperAdmin();
     }
 
-    // Invoices
+    // Rules for invoices
     match /invoices/{invoiceId} {
-      allow read, create, update, delete: if isCompanyMember(resource.data.companyId);
-    }
-
-    // Employees
-    match /employees/{employeeId} {
-      allow read, create, update, delete: if isCompanyMember(resource.data.companyId);
+      allow read, create, update, delete: if isCompanyMember(resource.data.companyId) || isSuperAdmin();
     }
     
-    // Bank Accounts & Transactions
-    match /bankAccounts/{accountId} {
-      allow read, create, update, delete: if isCompanyMember(resource.data.companyId);
+    // Rules for employees
+    match /employees/{employeeId} {
+      allow read, create, update, delete: if isCompanyMember(resource.data.companyId) || isSuperAdmin();
+    }
+    
+    // Rules for revenueEntries
+    match /revenueEntries/{entryId} {
+       allow read, create, update, delete: if isCompanyMember(resource.data.companyId) || isSuperAdmin();
+    }
+    
+    // Rules for expenses
+    match /expenses/{expenseId} {
+       allow read, create, update, delete: if isCompanyMember(resource.data.companyId) || isSuperAdmin();
+    }
 
+    // Rules for bankAccounts and their transactions subcollection
+    match /bankAccounts/{accountId} {
+      allow read, create, update, delete: if isCompanyMember(resource.data.companyId) || isSuperAdmin();
+      
       match /transactions/{transactionId} {
-        allow read, create, update, delete: if isCompanyMember(get(/databases/$(database)/documents/bankAccounts/$(accountId)).data.companyId);
+        allow read, create, update, delete: if isCompanyMember(get(/databases/$(database)/documents/bankAccounts/$(accountId)).data.companyId) || isSuperAdmin();
       }
     }
 
-    // Payrolls
+    // Rules for payrolls
     match /payrolls/{payrollId} {
-        allow read, create, update, delete: if isCompanyMember(resource.data.companyId);
+      allow read, create, update, delete: if isCompanyAdmin(resource.data.companyId) || isSuperAdmin();
     }
-    
-    // Products
+
+    // Rules for products
     match /products/{productId} {
-        allow read, create, update, delete: if isCompanyMember(resource.data.companyId);
+      allow read, create, update, delete: if isCompanyMember(resource.data.companyId) || isSuperAdmin();
     }
-    
-    // === Collection Group Queries ===
-    
-    // This rule allows listing expenses across all subcollections,
-    // as long as the user belongs to the company specified in the query's `where` clause.
+
+
+    // ====== COLLECTION GROUP RULES ======
+    // These rules are essential for queries that span across subcollections or different top-level collections.
+
     match /{path=**}/expenses/{expenseId} {
-      allow list: if isCompanyMember(resource.data.companyId);
+       allow list: if isCompanyMember(resource.data.companyId) || isSuperAdmin();
     }
 
-    // This rule allows listing employees across all companies,
-    // as long as the user belongs to the company specified in the query's `where` clause.
     match /{path=**}/employees/{employeeId} {
-      allow list: if isCompanyMember(resource.data.companyId);
-    }
-    
-    // This rule allows listing invoices across all companies,
-    // as long as the user belongs to the company specified in the query's `where` clause.
-    match /{path=**}/invoices/{invoiceId} {
-      allow list: if isCompanyMember(resource.data.companyId);
-    }
-    
-    // This rule allows listing transactions across all bank account subcollections,
-    // as long as the user belongs to the company specified in the query's `where` clause.
-    match /{path=**}/transactions/{transactionId} {
-      allow list: if isCompanyMember(resource.data.companyId);
+       allow list: if isCompanyMember(resource.data.companyId) || isSuperAdmin();
     }
 
+    match /{path=**}/invoices/{invoiceId} {
+       allow list: if isCompanyMember(resource.data.companyId) || isSuperAdmin();
+    }
+    
+    match /{path=**}/revenueEntries/{entryId} {
+       allow list: if isCompanyMember(resource.data.companyId) || isSuperAdmin();
+    }
+    
+    match /{path=**}/products/{productId} {
+       allow list: if isCompanyMember(resource.data.companyId) || isSuperAdmin();
+    }
+    
+     match /{path=**}/payrolls/{payrollId} {
+       allow list: if isCompanyAdmin(resource.data.companyId) || isSuperAdmin();
+    }
   }
 }
