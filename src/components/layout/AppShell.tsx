@@ -1,4 +1,3 @@
-
 'use client';
 
 import React, { useMemo } from 'react';
@@ -29,13 +28,6 @@ import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/comp
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { AssistantChat } from '@/components/AssistantChat';
 import { Badge } from '@/components/ui/badge';
-import { formatDistanceToNow } from 'date-fns';
-
-interface Notification {
-  id: string;
-  userName: string;
-  createdAt: any; // Using any since Timestamp is from a removed package
-}
 
 const AppShellLayout = ({ children }: { children: React.ReactNode }) => {
   const pathname = usePathname();
@@ -43,7 +35,6 @@ const AppShellLayout = ({ children }: { children: React.ReactNode }) => {
   const { user, signOut, isLoading: authLoading } = useAuth(); 
   const [isAssistantOpen, setIsAssistantOpen] = React.useState(false);
   const [pendingRequestCount, setPendingRequestCount] = React.useState(0);
-  const [notifications, setNotifications] = React.useState<Notification[]>([]);
   const CollapseIcon = state === 'expanded' ? ChevronLeft : ChevronRight;
   
   const getInitials = (name?: string | null) => {
@@ -70,6 +61,7 @@ const AppShellLayout = ({ children }: { children: React.ReactNode }) => {
       if (item.sidebar === false) {
         return false;
       }
+      if (!user) return false;
       if (item.href === '/admin' || item.href === '/payroll') {
         return user?.role === 'admin';
       }
@@ -105,7 +97,7 @@ const AppShellLayout = ({ children }: { children: React.ReactNode }) => {
           />
         </svg>
         <h1 className="text-xl font-headline font-bold text-foreground/80 group-data-[collapsible=icon]:hidden">
-          InvoPilot
+          BizSight
         </h1>
       </Link>
     </Button>
@@ -113,7 +105,7 @@ const AppShellLayout = ({ children }: { children: React.ReactNode }) => {
 
   return (
     <>
-      {!isAuthPage && (
+      {!isAuthPage && user && (
         <Sidebar collapsible="icon" variant="sidebar" className="border-r border-sidebar-border bg-sidebar backdrop-blur-lg print:hidden">
           <SidebarHeader className="p-2">
             <Logo />
@@ -176,8 +168,8 @@ const AppShellLayout = ({ children }: { children: React.ReactNode }) => {
         </Sidebar>
       )}
 
-      <SidebarInset className={cn(isAuthPage && "md:!ml-0")}>
-        {!isAuthPage && (
+      <SidebarInset className={cn((isAuthPage || !user) && "md:!ml-0")}>
+        {!isAuthPage && user && (
            <header className="sticky top-0 z-30 border-b border-header-border bg-header backdrop-blur-lg print:hidden">
               <div className="mx-auto flex h-14 max-w-7xl items-center gap-4 px-4 sm:px-6">
                 <SidebarTrigger className="md:hidden" />
@@ -235,26 +227,9 @@ const AppShellLayout = ({ children }: { children: React.ReactNode }) => {
                             <DropdownMenuContent className="w-80" align="end">
                               <DropdownMenuLabel>Notifications</DropdownMenuLabel>
                               <DropdownMenuSeparator />
-                              {notifications.length > 0 ? (
-                                  notifications.map((notif) => (
-                                  <DropdownMenuItem key={notif.id} asChild>
-                                      <Link href="/admin" className="cursor-pointer" onClick={handleNavigationClick}>
-                                      <div className="flex flex-col">
-                                          <p className="text-sm font-medium">
-                                          <span className="font-bold">{notif.userName}</span> requested to join.
-                                          </p>
-                                          <p className="text-xs text-muted-foreground">
-                                            {/* Since Timestamp is no longer available, we can't format the date */}
-                                          </p>
-                                      </div>
-                                      </Link>
-                                  </DropdownMenuItem>
-                                  ))
-                              ) : (
-                                  <div className="p-4 text-sm text-center text-muted-foreground">
+                                <div className="p-4 text-sm text-center text-muted-foreground">
                                       You have no new notifications.
-                                  </div>
-                              )}
+                                </div>
                             </DropdownMenuContent>
                         </DropdownMenu>
 
@@ -316,7 +291,7 @@ const AppShellLayout = ({ children }: { children: React.ReactNode }) => {
         </main>
       </SidebarInset>
       
-      {!isAuthPage && !authLoading && user && (
+      {!isAuthPage && user && (
         <Dialog open={isAssistantOpen} onOpenChange={setIsAssistantOpen}>
           <TooltipProvider>
             <Tooltip>
@@ -354,7 +329,7 @@ const AppShellLayout = ({ children }: { children: React.ReactNode }) => {
 
 const AppShell = ({ children }: { children: React.ReactNode }) => {
   return (
-    <SidebarProvider defaultOpen={false}>
+    <SidebarProvider defaultOpen={true}>
       <AppShellLayout>{children}</AppShellLayout>
     </SidebarProvider>
   );

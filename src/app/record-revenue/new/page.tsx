@@ -1,4 +1,3 @@
-
 'use client';
 
 import React, { useState, FormEvent } from 'react';
@@ -15,9 +14,15 @@ import { CalendarIcon, TrendingUp, Save, Loader2 } from 'lucide-react';
 import { format } from 'date-fns';
 import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/contexts/AuthContext';
-import { db } from '@/lib/firebaseConfig';
-import { collection, addDoc, Timestamp, serverTimestamp } from 'firebase/firestore';
 import Link from 'next/link';
+
+// Mock function since we removed the actions file
+async function addRevenueEntry(payload: any) {
+  console.log("Mock addRevenueEntry called with:", payload);
+  // In a real app, this would be a server action.
+  // For now, we simulate success.
+  return new Promise(resolve => setTimeout(() => resolve({ success: true, message: "Revenue recorded successfully (mock)." }), 1000));
+}
 
 export default function NewRevenuePage() {
   const { user, currencySymbol } = useAuth();
@@ -32,7 +37,7 @@ export default function NewRevenuePage() {
 
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
-    if (!user || !user.companyId) {
+    if (!user) {
       toast({ title: 'Authentication Error', variant: 'destructive' });
       return;
     }
@@ -49,22 +54,20 @@ export default function NewRevenuePage() {
 
     setIsSaving(true);
     const newEntryPayload = {
-      date: Timestamp.fromDate(date), 
+      date: date.toISOString(), 
       amount: amountNum,
       source: source,
       description: description || '',
-      companyId: user.companyId,
-      createdAt: serverTimestamp(),
-      addedById: user.uid,
-      addedBy: user.displayName || user.email || 'System'
+      userId: user.uid,
     };
 
-    try {
-      await addDoc(collection(db, 'revenueEntries'), newEntryPayload);
-      toast({ title: 'Revenue Recorded', description: `Successfully recorded ${currencySymbol}${amountNum.toFixed(2)} from ${source}.` });
+    const result: any = await addRevenueEntry(newEntryPayload);
+
+    if (result.success) {
+      toast({ title: 'Revenue Recorded', description: result.message });
       router.push('/record-revenue');
-    } catch (error: any) {
-      toast({ title: 'Save Failed', description: error.message, variant: 'destructive' });
+    } else {
+      toast({ title: 'Save Failed', description: result.message, variant: 'destructive' });
       setIsSaving(false);
     }
   };
@@ -120,5 +123,3 @@ export default function NewRevenuePage() {
     </div>
   );
 }
-
-    

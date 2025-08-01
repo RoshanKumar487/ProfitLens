@@ -1,8 +1,8 @@
-
 'use client';
 
 import { createContext, useContext, useEffect, useState, type ReactNode } from 'react';
 import { useRouter } from 'next/navigation';
+import { getCurrentUser, signOut as signOutAction } from '@/app/auth/actions';
 
 interface User {
   uid: string;
@@ -25,38 +25,38 @@ interface AuthContextType {
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
-// A mock user for displaying the UI without a real backend.
-const mockUser: User = {
-  uid: 'mock-user-123',
-  email: 'user@example.com',
-  displayName: 'Demo User',
-  companyId: 'mock-company-123',
-  publicCompanyId: 'MOCK-ID',
-  companyName: 'Demo Company Inc.',
-  currencySymbol: '$',
-  role: 'admin',
-  isSuperAdmin: true,
-};
-
 export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [user, setUser] = useState<User | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const router = useRouter();
 
   useEffect(() => {
-    setUser(mockUser);
-    setIsLoading(false);
+    const checkUser = async () => {
+        setIsLoading(true);
+        try {
+            const currentUser = await getCurrentUser();
+            setUser(currentUser as User | null);
+        } catch (error) {
+            console.error("Failed to fetch current user", error);
+            setUser(null);
+        } finally {
+            setIsLoading(false);
+        }
+    };
+    checkUser();
   }, []);
+
+  const signOut = async () => {
+    await signOutAction();
+    setUser(null);
+    router.push('/auth/signin');
+  };
 
   const authContextValue: AuthContextType = {
     user,
     isLoading,
     currencySymbol: user?.currencySymbol || '$',
-    signOut: async () => {
-      setUser(null);
-      router.push('/');
-      console.log("Signed out.");
-    },
+    signOut,
   };
 
   return (
