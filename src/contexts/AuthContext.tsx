@@ -1,7 +1,8 @@
+
 'use client';
 
 import { createContext, useContext, useEffect, useState, type ReactNode } from 'react';
-import { useRouter } from 'next/navigation';
+import { useRouter, usePathname } from 'next/navigation';
 import { getCurrentUser, signOut as signOutAction } from '@/app/auth/actions';
 
 interface User {
@@ -29,6 +30,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [user, setUser] = useState<User | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const router = useRouter();
+  const pathname = usePathname();
 
   useEffect(() => {
     const checkUser = async () => {
@@ -36,20 +38,25 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         try {
             const currentUser = await getCurrentUser();
             setUser(currentUser as User | null);
+            if (!currentUser && !pathname.startsWith('/auth')) {
+                router.push('/auth/signin');
+            }
         } catch (error) {
             console.error("Failed to fetch current user", error);
             setUser(null);
+            if (!pathname.startsWith('/auth')) {
+                router.push('/auth/signin');
+            }
         } finally {
             setIsLoading(false);
         }
     };
     checkUser();
-  }, []);
+  }, [pathname, router]);
 
   const signOut = async () => {
     await signOutAction();
     setUser(null);
-    router.push('/auth/signin');
   };
 
   const authContextValue: AuthContextType = {

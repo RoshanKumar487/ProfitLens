@@ -1,3 +1,4 @@
+
 'use client';
 
 import React, { useMemo } from 'react';
@@ -283,7 +284,7 @@ const AppShellLayout = ({ children }: { children: React.ReactNode }) => {
           </header>
         )}
         <main className="flex-1 print:p-0">
-          {authLoading ? (
+          {authLoading && !isAuthPage ? (
              <div className="flex justify-center items-center h-screen">
                 <Loader2 className="h-10 w-10 animate-spin text-primary" />
              </div>
