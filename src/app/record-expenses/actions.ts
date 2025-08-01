@@ -1,3 +1,4 @@
+
 'use server';
 
 import { getDb } from '@/lib/db';
@@ -48,7 +49,6 @@ export async function getExpenses(): Promise<Expense[]> {
 
   try {
     const db = await getDb();
-    // Note: In a multi-company setup, you'd filter by companyId. Here we filter by userId.
     const expenses = await db.all('SELECT * FROM expenses WHERE userId = ? ORDER BY date DESC', user.uid);
     return expenses;
   } catch (error) {

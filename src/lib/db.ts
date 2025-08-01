@@ -44,14 +44,14 @@ export async function getDb() {
   await db.exec(`
     CREATE TABLE IF NOT EXISTS expenses (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
-      companyId INTEGER NOT NULL,
+      userId INTEGER NOT NULL,
       date TEXT NOT NULL,
       amount REAL NOT NULL,
       category TEXT NOT NULL,
       vendor TEXT,
       description TEXT,
       employeeName TEXT,
-      FOREIGN KEY (companyId) REFERENCES companies(id)
+      FOREIGN KEY (userId) REFERENCES users(id)
     );
   `);
 
