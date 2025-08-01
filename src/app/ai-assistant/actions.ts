@@ -2,41 +2,12 @@
 'use server';
 
 import { askAssistantFlow } from '@/ai/flows/ask-assistant-flow';
-import { auth } from '@/lib/firebaseConfig';
 import { Message } from './page';
-import { getDoc, doc } from 'firebase/firestore';
-import { db } from '@/lib/firebaseConfig';
-import { headers } from 'next/headers';
-import { getAuth } from 'firebase-admin/auth';
-import { app as adminApp } from '@/lib/firebaseAdminConfig';
 
-
+// This function is now a mock since companyId cannot be retrieved without a user session.
 async function getCompanyIdForCurrentUser(): Promise<string | null> {
-  const headersList = headers();
-  const idToken = headersList.get('x-firebase-id-token');
-
-  if (!idToken) {
-    console.error("Action Error: No ID token provided.");
-    return null;
-  }
-  
-  try {
-    const decodedToken = await getAuth(adminApp).verifyIdToken(idToken);
-    const uid = decodedToken.uid;
-    
-    if (!uid) return null;
-
-    const userDocRef = doc(db, 'users', uid);
-    const userDocSnap = await getDoc(userDocRef);
-
-    if (userDocSnap.exists()) {
-      return userDocSnap.data().companyId || null;
-    }
-    return null;
-  } catch (error) {
-    console.error("Action Error: Could not verify ID token or get user data.", error);
-    return null;
-  }
+  console.log("Mocking companyId for AI Assistant");
+  return 'mock-company-123';
 }
 
 
@@ -50,11 +21,15 @@ export async function askAssistantAction(
     return "I'm sorry, I couldn't verify your company information. Please make sure you are logged in correctly.";
   }
 
-  const response = await askAssistantFlow({
-    history: history,
-    companyId: companyId,
-    currencySymbol: currencySymbol,
-  });
-
-  return response;
+  try {
+    const response = await askAssistantFlow({
+      history: history,
+      companyId: companyId,
+      currencySymbol: currencySymbol,
+    });
+    return response;
+  } catch (error) {
+    console.error("Error in askAssistantAction:", error);
+    return "Sorry, I encountered an error trying to respond. The AI service might be unavailable.";
+  }
 }

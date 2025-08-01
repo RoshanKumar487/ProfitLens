@@ -1,9 +1,9 @@
 
 'use client';
 
-import type { User as FirebaseUser, AuthError } from 'firebase/auth';
+import type { AuthError } from 'firebase/auth'; // Keep type for mock compatibility
 import { createContext, useContext, useEffect, useState, type ReactNode } from 'react';
-import { useRouter, usePathname } from 'next/navigation';
+import { useRouter } from 'next/navigation';
 
 interface User {
   uid: string;
@@ -13,7 +13,7 @@ interface User {
   companyName: string | null;
   country?: string;
   currencySymbol: string;
-  role: 'admin';
+  role: 'admin'; // Hardcoded for UI rendering
   isSuperAdmin: boolean;
   getIdToken: () => Promise<string | null>;
 }
@@ -21,12 +21,6 @@ interface User {
 interface SignUpCompanyInfo {
   id?: string; 
   name: string;
-  address: string;
-  city: string;
-  stateOrProvince: string;
-  country: string;
-  signatureFile?: File | null;
-  stampFile?: File | null;
 }
 
 interface AuthContextType {
@@ -34,6 +28,7 @@ interface AuthContextType {
   isLoading: boolean;
   error: AuthError | null;
   currencySymbol: string;
+  // All auth functions are now mock implementations
   signUp: (email: string, password: string, displayName: string, companyInfo: SignUpCompanyInfo) => Promise<any>;
   signIn: (email: string, password: string) => Promise<any>;
   signOut: () => Promise<void>;
@@ -60,6 +55,7 @@ const mockUser: User = {
 export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [user, setUser] = useState<User | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const router = useRouter();
 
   // On initial load, set the mock user and stop loading.
   useEffect(() => {
@@ -72,9 +68,9 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     isLoading,
     error: null,
     currencySymbol: user?.currencySymbol || '$',
-    signUp: async () => { console.log("Sign up is disabled."); return Promise.resolve(null); },
-    signIn: async () => { console.log("Sign in is disabled."); return Promise.resolve(null); },
-    signOut: async () => { setUser(null); console.log("Signed out."); },
+    signUp: async () => { console.log("Sign up is disabled."); router.push('/dashboard'); return Promise.resolve(null); },
+    signIn: async () => { console.log("Sign in is disabled."); router.push('/dashboard'); return Promise.resolve(null); },
+    signOut: async () => { setUser(null); router.push('/'); console.log("Signed out."); },
     sendPasswordReset: async () => { console.log("Password reset is disabled."); },
     getIdToken: async () => user?.getIdToken() || null,
   };
