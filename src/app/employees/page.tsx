@@ -56,8 +56,8 @@ interface EmployeeFirestore {
   addedById: string;
   addedBy: string;
   companyId: string;
-  createdAt: Timestamp;
-  updatedAt?: Timestamp;
+  createdAt: any;
+  updatedAt?: any;
   fatherName?: string;
   motherName?: string;
   permanentAddressHNo?: string;
@@ -68,11 +68,11 @@ interface EmployeeFirestore {
   permanentAddressPin?: string;
   qualification?: string;
   selfPhoneNo?: string;
-  dateOfBirth?: Timestamp;
+  dateOfBirth?: any;
   height?: string;
   weight?: string;
   identificationMarks?: string;
-  joiningDate?: Timestamp;
+  joiningDate?: any;
   guarantorName?: string;
   guarantorPhone?: string;
   experience?: string;
@@ -119,8 +119,6 @@ export default function EmployeesPage() {
   
   const [sortConfig, setSortConfig] = useState<{ key: keyof EmployeeDisplay; direction: 'desc' | 'asc' }>({ key: 'createdAt', direction: 'desc' });
   const [currentPage, setCurrentPage] = useState(1);
-  const [firstVisible, setFirstVisible] = useState<QueryDocumentSnapshot<DocumentData> | null>(null);
-  const [lastVisible, setLastVisible] = useState<QueryDocumentSnapshot<DocumentData> | null>(null);
 
   const bioDataPrintRef = useRef<HTMLDivElement>(null);
   const [isBioDataDialogOpen, setIsBioDataDialogOpen] = useState(false);
@@ -130,92 +128,17 @@ export default function EmployeesPage() {
   const [isPrinting, setIsPrinting] = useState(false);
   const [useLetterhead, setUseLetterhead] = useState(true);
 
-  const fetchEmployees = useCallback(async (direction: 'next' | 'prev' | 'reset' = 'reset') => {
-    if (authIsLoading || !user || !user.companyId) {
-      setIsLoadingEmployees(false);
-      setEmployees([]);
-      return;
-    }
-    setIsLoadingEmployees(true);
-    try {
-      const employeesRef = collection(db, 'employees');
-      
-      let q;
-      const sortKey = sortConfig.key === 'name' ? 'name_lowercase' : sortConfig.key;
-      const baseQuery = [
-        where('companyId', '==', user.companyId),
-        orderBy(sortKey, sortConfig.direction),
-      ];
-
-      if (sortKey !== 'createdAt') {
-        baseQuery.push(orderBy('createdAt', sortConfig.direction));
-      }
-
-      if (direction === 'next' && lastVisible) {
-        q = query(employeesRef, ...baseQuery, startAfter(lastVisible), limit(RECORDS_PER_PAGE));
-      } else if (direction === 'prev' && firstVisible) {
-        q = query(employeesRef, ...baseQuery, endBefore(firstVisible), limitToLast(RECORDS_PER_PAGE));
-      } else { // reset
-        q = query(employeesRef, ...baseQuery, limit(RECORDS_PER_PAGE));
-      }
-
-      const querySnapshot = await getDocs(q);
-      
-      const fetchedEmployees = querySnapshot.docs.map(docSnap => {
-        const data = docSnap.data() as Omit<EmployeeFirestore, 'id'>;
-        return {
-          id: docSnap.id,
-          ...data,
-          createdAt: data.createdAt.toDate(),
-          dateOfBirth: data.dateOfBirth?.toDate(),
-          joiningDate: data.joiningDate?.toDate(),
-        } as EmployeeDisplay;
-      });
-      setEmployees(fetchedEmployees);
-      
-      if (querySnapshot.docs.length > 0) {
-        setFirstVisible(querySnapshot.docs[0]);
-        setLastVisible(querySnapshot.docs[querySnapshot.docs.length - 1]);
-      }
-
-    } catch (error: any) {
-      console.error('Error fetching employees:', error);
-      toast({ title: 'Error Loading Employees', description: error.message, variant: 'destructive' });
-    } finally {
-      setIsLoadingEmployees(false);
-    }
-  }, [user, authIsLoading, toast, sortConfig, lastVisible, firstVisible]);
-
   useEffect(() => {
-    if (!authIsLoading) {
-      handleSortChange('createdAt');
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [user, authIsLoading]);
-
-  useEffect(() => {
-    if (!authIsLoading && user) {
-        fetchEmployees('reset');
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [sortConfig]);
-  
-  const handlePageChange = (direction: 'next' | 'prev') => {
-    let newPage = currentPage;
-    if (direction === 'next') newPage++;
-    if (direction === 'prev' && currentPage > 1) newPage--;
-    setCurrentPage(newPage);
-    fetchEmployees(direction);
-  };
+    // Removed all Firebase data fetching logic to prevent errors
+    // after backend disconnection.
+    setIsLoadingEmployees(false);
+  }, []);
   
   const handleSortChange = (key: keyof EmployeeDisplay) => {
     let direction: 'desc' | 'asc' = 'desc';
     if (sortConfig.key === key && sortConfig.direction === 'desc') {
       direction = 'asc';
     }
-    setCurrentPage(1);
-    setFirstVisible(null);
-    setLastVisible(null);
     setSortConfig({ key, direction });
   };
   
@@ -237,181 +160,31 @@ export default function EmployeesPage() {
   const confirmDeleteEmployee = async () => {
     if (!employeeToDeleteId || !user || !user.companyId) return;
     setIsSaving(true);
-    try {
-      const employeeToDelete = employees.find(emp => emp.id === employeeToDeleteId);
-      if (employeeToDelete) {
-        const pathsToDelete = [
-          employeeToDelete.profilePictureStoragePath,
-          employeeToDelete.associatedFileStoragePath,
-          employeeToDelete.signatureStoragePath,
-          employeeToDelete.leftThumbImpressionStoragePath,
-        ].filter(Boolean) as string[];
-
-        await Promise.all(pathsToDelete.map(path => deleteFileFromStorage(path)))
-            .catch(e => console.warn("Failed to delete all files from storage", e));
-      }
-      await deleteDoc(doc(db, 'employees', employeeToDeleteId));
-      toast({ title: "Employee Deleted", variant: "destructive"});
-      fetchEmployees('reset');
-    } catch (error: any) {
-      toast({ title: "Delete Failed", description: error.message, variant: "destructive"});
-    } finally {
-      setIsSaving(false);
-      setEmployeeToDeleteId(null);
-      setIsDeleteDialogOpen(false);
-    }
+    toast({ title: 'Action Disabled', description: 'Cannot delete data without a backend connection.', variant: 'destructive' });
+    setIsSaving(false);
+    setIsDeleteDialogOpen(false);
   };
   
   const handleImportClick = () => { fileInputRef.current?.click(); };
   const handleImportFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-    const reader = new FileReader();
-    reader.onload = (event) => {
-      try {
-        const data = event.target?.result;
-        const workbook = xlsx.read(data, { type: 'binary' });
-        const sheetName = workbook.SheetNames[0];
-        const worksheet = workbook.Sheets[sheetName];
-        const json: any[] = xlsx.utils.sheet_to_json(worksheet);
-
-        const requiredHeaders = ['name', 'position', 'salary'];
-        if (!requiredHeaders.every(h => Object.keys(json[0] || {}).includes(h))) {
-          return toast({ title: 'Invalid File Format', variant: 'destructive' });
-        }
-        const employeesToParse: ParsedEmployee[] = json.map(row => ({ name: String(row.name || ''), position: String(row.position || ''), salary: Number(row.salary || 0), description: String(row.description || '') })).filter(emp => emp.name && emp.position && !isNaN(emp.salary));
-        
-        if (employeesToParse.length === 0) return toast({ title: 'No Valid Data', variant: 'destructive' });
-        setEditableParsedEmployees(employeesToParse);
-        setIsImportDialogOpen(true);
-      } catch (error) { toast({ title: 'File Read Error', variant: 'destructive' }); } 
-      finally { if (e.target) e.target.value = ''; }
-    };
-    reader.readAsBinaryString(file);
+    toast({ title: 'Action Disabled', description: 'Cannot import data without a backend connection.', variant: 'destructive' });
   };
-
-  const handleParsedEmployeeChange = (index: number, field: keyof ParsedEmployee, value: string | number) => {
-    setEditableParsedEmployees(prev => { const newEmployees = [...prev]; (newEmployees[index] as any)[field] = value; return newEmployees; });
-  };
+  
   const handleConfirmImport = async () => {
-    if (!user || !user.companyId) return toast({ title: 'Authentication Error', variant: 'destructive' });
-    if (editableParsedEmployees.length === 0) return toast({ title: 'No Data', variant: 'destructive' });
-    setIsImporting(true);
-    const result = await bulkAddEmployees(editableParsedEmployees, user.companyId, user.uid, user.displayName || user.email || 'System');
-    toast({ title: result.success ? 'Import Successful' : 'Import Failed', description: result.message, variant: result.success ? 'default' : 'destructive'});
-    if (result.success) { fetchEmployees('reset'); setIsImportDialogOpen(false); setEditableParsedEmployees([]); }
-    setIsImporting(false);
+    toast({ title: 'Action Disabled', description: 'Cannot import data without a backend connection.', variant: 'destructive' });
   };
 
    const handleOpenBioDataDialog = async (employee: EmployeeDisplay) => {
     setEmployeeToPrint(employee);
-    if (!companyDetails && user?.companyId) {
-        const companyRef = doc(db, 'companyProfiles', user.companyId);
-        const companySnap = await getDoc(companyRef);
-        if (companySnap.exists()) {
-            setCompanyDetails(companySnap.data());
-        }
-    }
-    
-    setIsPrinting(true); 
     setIsBioDataDialogOpen(true);
-    const uris: Record<string, string | undefined> = {};
-    const urlMap = {
-        profile: employee.profilePictureUrl,
-        thumb: employee.leftThumbImpressionUrl,
-        signature: employee.signatureUrl,
-    };
-
-    for (const [key, url] of Object.entries(urlMap)) {
-        if (url) {
-            uris[key] = await urlToDataUri(url);
-        }
-    }
-    setBioDataImageUris(uris);
-    setIsPrinting(false);
   };
 
   const handlePrint = async () => {
-    if (!bioDataPrintRef.current) return;
-    setIsPrinting(true);
-
-    try {
-        const elementToPrint = bioDataPrintRef.current;
-        const canvas = await html2canvas(elementToPrint, {
-            scale: 3,
-            useCORS: true,
-            backgroundColor: '#ffffff',
-        });
-        const imgData = canvas.toDataURL('image/png');
-        if (!imgData || imgData === 'data:,') {
-            toast({
-                title: "Print Failed",
-                description: "Could not generate a printable image of the document. This can be caused by a temporary network issue with images. Please try again.",
-                variant: "destructive",
-            });
-            setIsPrinting(false);
-            return;
-        }
-        
-        const pdf = new jsPDF({ orientation: 'p', unit: 'mm', format: 'a4' });
-        const pdfWidth = pdf.internal.pageSize.getWidth();
-        const pdfHeight = pdf.internal.pageSize.getHeight();
-        pdf.addImage(imgData, 'PNG', 0, 0, pdfWidth, pdfHeight);
-
-        const pdfBlob = pdf.output('blob');
-        const pdfUrl = URL.createObjectURL(pdfBlob);
-        const printWindow = window.open(pdfUrl);
-        
-        if (printWindow) {
-            printWindow.onload = () => {
-                printWindow.print();
-                URL.revokeObjectURL(pdfUrl);
-            };
-        } else {
-             toast({ title: "Print Error", description: "Could not open print window. Please check your pop-up blocker.", variant: "destructive"});
-        }
-    } catch (error: any) {
-        toast({ title: "Print Failed", description: `Could not generate document for printing: ${error.message}`, variant: "destructive" });
-    } finally {
-        setIsPrinting(false);
-    }
+    toast({ title: 'Action Disabled', description: 'Cannot print data without a backend connection.', variant: 'destructive' });
   };
 
-    const handleDownloadBioDataPdf = async () => {
-    if (!bioDataPrintRef.current || !employeeToPrint) return;
-    setIsPrinting(true);
-
-    try {
-        const elementToPrint = bioDataPrintRef.current;
-        const canvas = await html2canvas(elementToPrint, {
-            scale: 3,
-            useCORS: true,
-            backgroundColor: '#ffffff',
-        });
-        const imgData = canvas.toDataURL('image/png');
-        if (!imgData || imgData === 'data:,') {
-            toast({
-                title: "Download Failed",
-                description: "Could not generate an image of the document. This may be due to a network issue. Please try again.",
-                variant: "destructive",
-            });
-            setIsPrinting(false);
-            return;
-        }
-        
-        const pdf = new jsPDF({ orientation: 'p', unit: 'mm', format: 'a4' });
-        const pdfWidth = pdf.internal.pageSize.getWidth();
-        const pdfHeight = pdf.internal.pageSize.getHeight();
-        pdf.addImage(imgData, 'PNG', 0, 0, pdfWidth, pdfHeight);
-
-        pdf.save(`BioData-${employeeToPrint.name.replace(/\s+/g, '_')}.pdf`);
-        toast({ title: "Download Started", description: "Bio-data PDF is being downloaded." });
-
-    } catch (error: any) {
-        toast({ title: "Download Failed", description: `Could not generate PDF: ${error.message}`, variant: "destructive" });
-    } finally {
-        setIsPrinting(false);
-    }
+  const handleDownloadBioDataPdf = async () => {
+    toast({ title: 'Action Disabled', description: 'Cannot download data without a backend connection.', variant: 'destructive' });
   };
 
 
@@ -480,15 +253,13 @@ export default function EmployeesPage() {
                         <PaginationItem>
                             <PaginationPrevious
                                 href="#"
-                                onClick={(e) => { e.preventDefault(); handlePageChange('prev'); }}
-                                className={currentPage === 1 ? 'pointer-events-none opacity-50' : undefined}
+                                className={'pointer-events-none opacity-50'}
                             />
                         </PaginationItem>
                         <PaginationItem>
                             <PaginationNext
                                 href="#"
-                                onClick={(e) => { e.preventDefault(); handlePageChange('next'); }}
-                                className={employees.length < RECORDS_PER_PAGE ? 'pointer-events-none opacity-50' : undefined}
+                                className={'pointer-events-none opacity-50'}
                             />
                         </PaginationItem>
                     </PaginationContent>
@@ -540,4 +311,3 @@ export default function EmployeesPage() {
     </div>
   );
 }
-

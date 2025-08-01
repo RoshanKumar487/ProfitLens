@@ -37,7 +37,7 @@ interface InvoiceDisplay {
   dueDate: Date;
   status: 'Paid' | 'Pending' | 'Overdue' | 'Draft';
   issuedDate: Date;
-  createdAt: Timestamp; // Keep as timestamp for sorting
+  createdAt: any; 
 }
 
 const RECORDS_PER_PAGE = 20;
@@ -54,100 +54,20 @@ export default function InvoicingPage() {
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
   const [invoiceToDeleteId, setInvoiceToDeleteId] = useState<string | null>(null);
 
-  const [firstVisible, setFirstVisible] = useState<QueryDocumentSnapshot<DocumentData> | null>(null);
-  const [lastVisible, setLastVisible] = useState<QueryDocumentSnapshot<DocumentData> | null>(null);
-
-  const fetchInvoices = useCallback(async (direction: 'next' | 'prev' | 'reset' = 'reset') => {
-    if (!user || !user.companyId) {
-      setInvoices([]);
-      setIsLoading(false);
-      return;
-    }
-    setIsLoading(true);
-    try {
-      const invoicesColRef = collection(db, 'invoices');
-      let q;
-      
-      const baseQuery = [
-        where('companyId', '==', user.companyId),
-        orderBy(sortConfig.key, sortConfig.direction),
-      ];
-      // Add a secondary sort field to ensure consistent pagination
-      if (sortConfig.key !== 'createdAt') {
-          baseQuery.push(orderBy('createdAt', 'desc'));
-      }
-
-      if (direction === 'next' && lastVisible) {
-        q = query(invoicesColRef, ...baseQuery, startAfter(lastVisible), limit(RECORDS_PER_PAGE));
-      } else if (direction === 'prev' && firstVisible) {
-        q = query(invoicesColRef, ...baseQuery, endBefore(firstVisible), limitToLast(RECORDS_PER_PAGE));
-      } else { // reset
-        q = query(invoicesColRef, ...baseQuery, limit(RECORDS_PER_PAGE));
-      }
-
-      const querySnapshot = await getDocs(q);
-      const fetchedInvoices = querySnapshot.docs.map(docSnap => {
-        const data = docSnap.data();
-        return {
-          id: docSnap.id,
-          ...data,
-          issuedDate: (data.issuedDate as Timestamp).toDate(),
-          dueDate: (data.dueDate as Timestamp).toDate(),
-        } as InvoiceDisplay;
-      });
-
-      setInvoices(fetchedInvoices);
-
-      if (querySnapshot.docs.length > 0) {
-        setFirstVisible(querySnapshot.docs[0]);
-        setLastVisible(querySnapshot.docs[querySnapshot.docs.length - 1]);
-      } else if (direction === 'prev' && currentPage > 1) {
-        // if we go back and there are no results, refetch the first page
-        fetchInvoices('reset');
-        setCurrentPage(1);
-      }
-
-    } catch (error: any) {
-      console.error('[InvoicingPage fetchInvoices] Error fetching invoices:', error);
-      toast({ title: 'Error Fetching Invoices', description: `Could not load invoices. ${error.message || 'An unknown error occurred.'}`, variant: 'destructive' });
-    } finally {
-      setIsLoading(false);
-    }
-  }, [user, toast, sortConfig, lastVisible, firstVisible, currentPage]);
-
   useEffect(() => {
-    if (!authIsLoading) {
-        handleSortChange(sortConfig.key);
-    }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [user, authIsLoading]);
-  
-  const handlePageChange = (direction: 'next' | 'prev') => {
-      let newPage = currentPage;
-      if (direction === 'next') newPage++;
-      if (direction === 'prev' && currentPage > 1) newPage--;
-      setCurrentPage(newPage);
-      fetchInvoices(direction);
-  };
+    // Removed all Firebase data fetching logic to prevent errors
+    // after backend disconnection.
+    setIsLoading(false);
+  }, []);
   
   const handleSortChange = (key: keyof InvoiceDisplay) => {
     let direction: 'desc' | 'asc' = 'desc';
     if (sortConfig.key === key && sortConfig.direction === 'desc') {
       direction = 'asc';
     }
-    setCurrentPage(1);
-    setFirstVisible(null);
-    setLastVisible(null);
     setSortConfig({ key, direction });
   };
 
-  useEffect(() => {
-    if (!authIsLoading && user) {
-        fetchInvoices('reset');
-    }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [sortConfig]);
-  
   const getSortIcon = (key: keyof InvoiceDisplay) => {
     if (sortConfig.key !== key) {
         return <ChevronsUpDown className="ml-2 h-4 w-4 text-muted-foreground/50" />;
@@ -181,16 +101,9 @@ export default function InvoicingPage() {
   const confirmDelete = async () => {
     if (!invoiceToDeleteId) return;
     setIsDeleting(true);
-    const result = await deleteInvoice(invoiceToDeleteId);
-    if (result.success) {
-      toast({ title: 'Invoice Deleted', description: result.message });
-      fetchInvoices('reset');
-    } else {
-      toast({ title: 'Error', description: result.message, variant: 'destructive' });
-    }
+    toast({ title: 'Action Disabled', description: 'Cannot delete data without a backend connection.', variant: 'destructive' });
     setIsDeleting(false);
     setIsDeleteDialogOpen(false);
-    setInvoiceToDeleteId(null);
   };
 
   if (authIsLoading) {
@@ -295,10 +208,10 @@ export default function InvoicingPage() {
                 <Pagination>
                     <PaginationContent>
                     <PaginationItem>
-                        <PaginationPrevious href="#" onClick={(e) => { e.preventDefault(); handlePageChange('prev'); }} className={currentPage === 1 ? 'pointer-events-none opacity-50' : undefined} />
+                        <PaginationPrevious href="#" className={'pointer-events-none opacity-50'} />
                     </PaginationItem>
                     <PaginationItem>
-                        <PaginationNext href="#" onClick={(e) => { e.preventDefault(); handlePageChange('next'); }} className={invoices.length < RECORDS_PER_PAGE ? 'pointer-events-none opacity-50' : undefined} />
+                        <PaginationNext href="#" className={'pointer-events-none opacity-50'} />
                     </PaginationItem>
                     </PaginationContent>
                 </Pagination>

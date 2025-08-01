@@ -27,14 +27,14 @@ import { Pagination, PaginationContent, PaginationItem, PaginationNext, Paginati
 
 interface RevenueEntryFirestore {
   id?: string; 
-  date: Timestamp; 
+  date: any; 
   amount: number;
   source: string;
   description?: string;
   companyId: string;
   addedById: string;
   addedBy: string;
-  createdAt: Timestamp;
+  createdAt: any;
 }
 
 interface RevenueEntryDisplay {
@@ -44,7 +44,7 @@ interface RevenueEntryDisplay {
   source: string;
   description?: string;
   addedBy: string;
-  createdAt: Timestamp;
+  createdAt: any;
 }
 
 const RECORDS_PER_PAGE = 20;
@@ -60,96 +60,23 @@ export default function RecordRevenuePage() {
 
   const [sortConfig, setSortConfig] = useState<{ key: keyof RevenueEntryDisplay; direction: 'desc' | 'asc' }>({ key: 'date', direction: 'desc' });
   const [currentPage, setCurrentPage] = useState(1);
-  const [firstVisible, setFirstVisible] = useState<QueryDocumentSnapshot<DocumentData> | null>(null);
-  const [lastVisible, setLastVisible] = useState<QueryDocumentSnapshot<DocumentData> | null>(null);
 
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
   const [currentRevenue, setCurrentRevenue] = useState<RevenueEntryDisplay | null>(null);
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
   const [revenueToDeleteId, setRevenueToDeleteId] = useState<string | null>(null);
 
-  const fetchRevenueEntries = useCallback(async (direction: 'next' | 'prev' | 'reset' = 'reset') => {
-    if (authIsLoading || !user || !user.companyId) {
-      setIsLoadingEntries(false);
-      setRecentEntries([]);
-      return;
-    }
-
-    setIsLoadingEntries(true);
-    try {
-      const entriesRef = collection(db, 'revenueEntries');
-      let q;
-
-      const baseQuery = [
-        where('companyId', '==', user.companyId),
-        orderBy(sortConfig.key, sortConfig.direction),
-      ];
-      if (sortConfig.key !== 'createdAt') {
-        baseQuery.push(orderBy('createdAt', sortConfig.direction));
-      }
-
-      if (direction === 'next' && lastVisible) {
-        q = query(entriesRef, ...baseQuery, startAfter(lastVisible), limit(RECORDS_PER_PAGE));
-      } else if (direction === 'prev' && firstVisible) {
-        q = query(entriesRef, ...baseQuery, endBefore(firstVisible), limitToLast(RECORDS_PER_PAGE));
-      } else { // reset
-        q = query(entriesRef, ...baseQuery, limit(RECORDS_PER_PAGE));
-      }
-      
-      const querySnapshot = await getDocs(q);
-      
-      const fetchedEntries = querySnapshot.docs.map(docSnap => {
-        const data = docSnap.data() as Omit<RevenueEntryFirestore, 'id'>;
-        return {
-          id: docSnap.id,
-          ...data,
-          date: data.date.toDate(),
-          addedBy: data.addedBy || 'N/A',
-        } as RevenueEntryDisplay;
-      });
-      setRecentEntries(fetchedEntries);
-
-      if (querySnapshot.docs.length > 0) {
-        setFirstVisible(querySnapshot.docs[0]);
-        setLastVisible(querySnapshot.docs[querySnapshot.docs.length - 1]);
-      }
-    } catch (error: any) {
-      toast({ title: 'Error Loading Entries', description: error.message, variant: 'destructive' });
-    } finally {
-      setIsLoadingEntries(false);
-    }
-  }, [user, authIsLoading, toast, sortConfig, lastVisible, firstVisible]);
-
   useEffect(() => {
-    if (!authIsLoading) {
-      handleSortChange('date');
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [user, authIsLoading]);
-
-  useEffect(() => {
-    if (!authIsLoading && user) {
-        fetchRevenueEntries('reset');
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [sortConfig]);
+    // Removed all Firebase data fetching logic to prevent errors
+    // after backend disconnection.
+    setIsLoadingEntries(false);
+  }, []);
   
-  const handlePageChange = (direction: 'next' | 'prev') => {
-    let newPage = currentPage;
-    if (direction === 'next') newPage++;
-    if (direction === 'prev' && currentPage > 1) newPage--;
-    setCurrentPage(newPage);
-    fetchRevenueEntries(direction);
-  };
-
   const handleSortChange = (key: keyof RevenueEntryDisplay) => {
     let direction: 'desc' | 'asc' = 'desc';
     if (sortConfig.key === key && sortConfig.direction === 'desc') {
       direction = 'asc';
     }
-    setCurrentPage(1);
-    setFirstVisible(null);
-    setLastVisible(null);
     setSortConfig({ key, direction });
   };
   
@@ -171,32 +98,8 @@ export default function RecordRevenuePage() {
   const handleUpdateSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!currentRevenue) return;
-
-    const amountNum = parseFloat(String(currentRevenue.amount));
-    if (isNaN(amountNum) || amountNum <= 0) {
-      toast({ title: 'Invalid Amount', variant: 'destructive' });
-      return;
-    }
-    if (!currentRevenue.date || !currentRevenue.source) {
-      toast({ title: 'Missing Information', description: 'Date and source are required.', variant: 'destructive' });
-      return;
-    }
-
     setIsSaving(true);
-    const updatePayload: RevenueUpdateData = {
-        date: currentRevenue.date,
-        amount: amountNum,
-        source: currentRevenue.source,
-        description: currentRevenue.description || '',
-    };
-    
-    const result = await updateRevenueEntry(currentRevenue.id, updatePayload);
-    toast({ title: result.success ? 'Success' : 'Error', description: result.message, variant: result.success ? 'default' : 'destructive' });
-    
-    if (result.success) {
-        setIsEditDialogOpen(false);
-        fetchRevenueEntries('reset');
-    }
+    toast({ title: 'Action Disabled', description: 'Cannot update data without a backend connection.', variant: 'destructive' });
     setIsSaving(false);
   };
   
@@ -208,15 +111,9 @@ export default function RecordRevenuePage() {
   const confirmDelete = async () => {
     if (!revenueToDeleteId) return;
     setIsSaving(true);
-    const result = await deleteRevenueEntry(revenueToDeleteId);
-    toast({ title: result.success ? 'Success' : 'Error', description: result.message, variant: result.success ? 'default' : 'destructive' });
-    
-    if (result.success) {
-      fetchRevenueEntries('reset');
-    }
-    setRevenueToDeleteId(null);
-    setIsDeleteDialogOpen(false);
+    toast({ title: 'Action Disabled', description: 'Cannot delete data without a backend connection.', variant: 'destructive' });
     setIsSaving(false);
+    setIsDeleteDialogOpen(false);
   };
 
   if (authIsLoading) {
@@ -306,10 +203,10 @@ export default function RecordRevenuePage() {
               <Pagination>
                 <PaginationContent>
                   <PaginationItem>
-                    <PaginationPrevious href="#" onClick={(e) => { e.preventDefault(); handlePageChange('prev'); }} className={currentPage === 1 ? 'pointer-events-none opacity-50' : ''} />
+                    <PaginationPrevious href="#" className={'pointer-events-none opacity-50'} />
                   </PaginationItem>
                   <PaginationItem>
-                    <PaginationNext href="#" onClick={(e) => { e.preventDefault(); handlePageChange('next'); }} className={recentEntries.length < RECORDS_PER_PAGE ? 'pointer-events-none opacity-50' : ''} />
+                    <PaginationNext href="#" className={'pointer-events-none opacity-50'} />
                   </PaginationItem>
                 </PaginationContent>
               </Pagination>

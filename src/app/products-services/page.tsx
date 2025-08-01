@@ -53,45 +53,12 @@ export default function ProductsServicesPage() {
     const [sortConfig, setSortConfig] = useState<{ key: keyof ProductDisplay; direction: 'asc' | 'desc' }>({ key: 'name', direction: 'asc' });
     const [productSettings, setProductSettings] = useState<ProductSettings | null>(null);
 
-    const fetchAllData = useCallback(async () => {
-      if (!user?.companyId) {
-        setIsLoading(false);
-        return;
-      }
-      setIsLoading(true);
-      
-      const settingsPromise = getProductSettings(user.companyId);
-      const productsPromise = new Promise<ProductDisplay[]>((resolve, reject) => {
-        const productQuery = query(collection(db, 'products'), where('companyId', '==', user.companyId));
-        const unsubscribe = onSnapshot(productQuery, (snapshot) => {
-            const fetchedProducts = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as ProductDisplay));
-            resolve(fetchedProducts);
-            // We don't unsubscribe here because we want real-time updates.
-            // In a more complex app, manage this lifecycle carefully.
-        }, (error) => { 
-            console.error("Error fetching products:", error); 
-            toast({ variant: 'destructive', title: "Error", description: "Could not fetch products." }); 
-            reject(error);
-        });
-      });
-
-      try {
-        const [settings, fetchedProducts] = await Promise.all([settingsPromise, productsPromise]);
-        setProductSettings(settings);
-        setProducts(fetchedProducts);
-      } catch (error) {
-        // Error is already toasted in the promises
-      } finally {
-        setIsLoading(false);
-      }
-
-    }, [user?.companyId, toast]);
-
     useEffect(() => {
-      if (!authIsLoading && user) {
-        fetchAllData();
-      }
-    }, [user, authIsLoading, fetchAllData]);
+      // Removed all Firebase data fetching logic to prevent errors
+      // after backend disconnection.
+      setIsLoading(false);
+      setProductSettings({ customFields: [] });
+    }, []);
     
     const filteredAndSortedProducts = useMemo(() => {
         let sortableItems = [...products];
@@ -186,15 +153,7 @@ export default function ProductsServicesPage() {
     const handleSaveAllProducts = async () => {
       if (!user?.companyId) return;
       setIsSaving(true);
-      
-      const result = await saveAllProducts(products, user.companyId);
-      
-      toast({
-        title: result.success ? "Success" : "Error",
-        description: result.message,
-        variant: result.success ? "default" : "destructive",
-      });
-      
+      toast({ title: 'Action Disabled', description: 'Cannot save data without a backend connection.', variant: 'destructive' });
       setIsSaving(false);
     };
     
@@ -209,14 +168,7 @@ export default function ProductsServicesPage() {
     const confirmDelete = async () => {
         if (!itemToDelete) return;
         setIsSaving(true);
-        const result = await deleteProduct(itemToDelete.id);
-
-        toast({
-            title: result.success ? "Success" : "Error",
-            description: result.message,
-            variant: result.success ? "default" : "destructive",
-        });
-
+        toast({ title: 'Action Disabled', description: 'Cannot delete data without a backend connection.', variant: 'destructive' });
         setItemToDelete(null);
         setIsSaving(false);
     };

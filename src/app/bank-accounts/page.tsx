@@ -41,210 +41,46 @@ export default function BankAccountsPage() {
   const { user, isLoading: authIsLoading, currencySymbol } = useAuth();
   const { toast } = useToast();
 
-  // Component State
   const [accounts, setAccounts] = useState<FullBankAccount[]>([]);
   const [selectedAccount, setSelectedAccount] = useState<FullBankAccount | null>(null);
   const [transactions, setTransactions] = useState<FullTransaction[]>([]);
   
-  // Loading States
   const [isLoadingAccounts, setIsLoadingAccounts] = useState(true);
   const [isLoadingTransactions, setIsLoadingTransactions] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
 
-  // Dialog States
   const [isAccountDialogOpen, setIsAccountDialogOpen] = useState(false);
   const [isTransactionDialogOpen, setIsTransactionDialogOpen] = useState(false);
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
   
-  // Form/Action States
   const [currentAccount, setCurrentAccount] = useState<Partial<FullBankAccount>>({});
   const [currentTransaction, setCurrentTransaction] = useState<Partial<TransactionData>>({ type: 'withdrawal', date: new Date() });
   const [itemToDelete, setItemToDelete] = useState<{ type: 'account' | 'transaction', id: string, accountId?: string } | null>(null);
   const [isEditing, setIsEditing] = useState(false);
 
-  // Pagination State for Transactions
   const [txCurrentPage, setTxCurrentPage] = useState(1);
   const [txFirstVisible, setTxFirstVisible] = useState<QueryDocumentSnapshot<DocumentData> | null>(null);
   const [txLastVisible, setTxLastVisible] = useState<QueryDocumentSnapshot<DocumentData> | null>(null);
 
-
-  // Fetch initial bank accounts (real-time)
   useEffect(() => {
-    if (!user || !user.companyId) {
-        setIsLoadingAccounts(false);
-        return;
-    }
-    setIsLoadingAccounts(true);
-    const q = query(collection(db, "bankAccounts"), where("companyId", "==", user.companyId), orderBy("createdAt", "desc"));
-    const unsubscribe = onSnapshot(q, (querySnapshot) => {
-        const fetchedAccounts = querySnapshot.docs.map(doc => ({
-            ...doc.data(),
-            id: doc.id,
-            createdAt: (doc.data().createdAt as Timestamp).toDate(),
-        } as FullBankAccount));
-        setAccounts(fetchedAccounts);
-        setIsLoadingAccounts(false);
-    }, (error) => {
-        console.error("Error fetching bank accounts:", error);
-        toast({ title: 'Error', description: 'Could not fetch bank accounts.', variant: 'destructive' });
-        setIsLoadingAccounts(false);
-    });
-    return () => unsubscribe();
-  }, [user, toast]);
+    // Removed all Firebase data fetching logic to prevent errors
+    // after backend disconnection.
+    setIsLoadingAccounts(false);
+  }, []);
 
-  // Fetch transactions when an account is selected (paginated)
-  const fetchTransactions = useCallback(async (direction: 'next' | 'prev' | 'reset' = 'reset') => {
-    if (!selectedAccount) return;
-    
-    setIsLoadingTransactions(true);
-
-    let newPage = txCurrentPage;
-    if (direction === 'reset') newPage = 1;
-    if (direction === 'next') newPage++;
-    if (direction === 'prev') newPage--;
-
-    const transRef = collection(db, 'bankAccounts', selectedAccount.id, 'transactions');
-    const baseQuery = [orderBy('date', 'desc')];
-    let q;
-
-    if (direction === 'next' && txLastVisible) {
-        q = query(transRef, ...baseQuery, startAfter(txLastVisible), limit(RECORDS_PER_PAGE));
-    } else if (direction === 'prev' && txFirstVisible) {
-        q = query(transRef, ...baseQuery, endBefore(txFirstVisible), limitToLast(RECORDS_PER_PAGE));
-    } else { // reset
-        q = query(transRef, ...baseQuery, limit(RECORDS_PER_PAGE));
-    }
-
-    try {
-        const snapshot = await getDocs(q);
-        const fetchedTransactions = snapshot.docs.map(doc => ({
-            ...doc.data(),
-            id: doc.id,
-            date: (doc.data().date as Timestamp).toDate(),
-            createdAt: (doc.data().createdAt as Timestamp).toDate(),
-        } as FullTransaction));
-
-        setTransactions(fetchedTransactions);
-
-        if (snapshot.docs.length > 0) {
-            setTxFirstVisible(snapshot.docs[0]);
-            setTxLastVisible(snapshot.docs[snapshot.docs.length - 1]);
-        }
-        setTxCurrentPage(newPage);
-
-    } catch(error) {
-        console.error("Error fetching transactions: ", error);
-        toast({ variant: 'destructive', title: "Error", description: "Could not load transactions for this account." });
-    } finally {
-        setIsLoadingTransactions(false);
-    }
-  }, [selectedAccount, toast, txCurrentPage, txFirstVisible, txLastVisible]);
-
-  useEffect(() => {
-    if (selectedAccount) {
-      setTxCurrentPage(1);
-      setTxFirstVisible(null);
-      setTxLastVisible(null);
-      fetchTransactions('reset');
-    } else {
-        setTransactions([]);
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [selectedAccount]);
-
-  const handleTxPageChange = (direction: 'next' | 'prev') => {
-    fetchTransactions(direction);
-  };
-
-
-  // Handle Account Form
-  const handleOpenAccountDialog = (account?: FullBankAccount) => {
-    if (account) {
-      setIsEditing(true);
-      setCurrentAccount(account);
-    } else {
-      setIsEditing(false);
-      setCurrentAccount({ accountType: 'checking' });
-    }
-    setIsAccountDialogOpen(true);
-  };
-  
   const handleAccountFormSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!user || !user.companyId) return;
     
-    const balance = parseFloat(String(currentAccount.balance));
-    if (!currentAccount.bankName || !currentAccount.accountHolderName || !currentAccount.accountNumberLast4 || isNaN(balance)) {
-      toast({ title: "Missing fields", description: "Please fill all required fields.", variant: "destructive"});
-      return;
-    }
-
-    setIsSaving(true);
-    const dataToSave = {
-      bankName: currentAccount.bankName,
-      accountHolderName: currentAccount.accountHolderName,
-      accountNumberLast4: currentAccount.accountNumberLast4,
-      accountType: currentAccount.accountType,
-      balance: balance,
-    };
-    
-    const result = isEditing && currentAccount.id
-      ? await updateBankAccount(currentAccount.id, dataToSave)
-      : await addBankAccount(dataToSave as any, user.companyId);
-
-    toast({ title: result.success ? 'Success' : 'Error', description: result.message, variant: result.success ? 'default' : 'destructive' });
-    if (result.success) {
-      setIsAccountDialogOpen(false);
-    }
-    setIsSaving(false);
+    toast({ title: "Action Disabled", description: "Cannot save data without a backend connection.", variant: "destructive"});
   };
 
-  // Handle Transaction Form
-  const handleOpenTransactionDialog = () => {
-    setIsTransactionDialogOpen(true);
-    setCurrentTransaction({ type: 'withdrawal', date: new Date(), amount: 0 });
-  };
-  
   const handleTransactionFormSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!user || !user.companyId || !selectedAccount) return;
-    
-    const amount = parseFloat(String(currentTransaction.amount));
-    if (!currentTransaction.date || isNaN(amount) || amount <= 0 || !currentTransaction.description || !currentTransaction.category) {
-      toast({ title: "Missing fields", description: "Date, amount, category, and description are required.", variant: "destructive"});
-      return;
-    }
-    
-    setIsSaving(true);
-    const dataToSave = {
-      accountId: selectedAccount.id,
-      date: currentTransaction.date,
-      amount: amount,
-      type: currentTransaction.type!,
-      category: currentTransaction.category,
-      description: currentTransaction.description,
-    };
-
-    const result = await addTransaction(dataToSave, user.companyId);
-    toast({ title: result.success ? 'Success' : 'Error', description: result.message, variant: result.success ? 'default' : 'destructive' });
-    if (result.success) {
-        setIsTransactionDialogOpen(false);
-        fetchTransactions('reset');
-        // Find and update the selected account's balance in the local state for immediate UI update
-        setAccounts(prevAccounts => prevAccounts.map(acc => {
-            if (acc.id === selectedAccount.id) {
-                const newBalance = dataToSave.type === 'deposit' ? acc.balance + dataToSave.amount : acc.balance - dataToSave.amount;
-                const updatedAccount = { ...acc, balance: newBalance };
-                setSelectedAccount(updatedAccount); // Also update the selected account state
-                return updatedAccount;
-            }
-            return acc;
-        }));
-    }
-    setIsSaving(false);
+    toast({ title: "Action Disabled", description: "Cannot save data without a backend connection.", variant: "destructive"});
   };
   
-  // Handle Deletion
   const promptDelete = (type: 'account' | 'transaction', id: string, accountId?: string) => {
     setItemToDelete({ type, id, accountId });
     setIsDeleteDialogOpen(true);
@@ -253,30 +89,10 @@ export default function BankAccountsPage() {
   const confirmDelete = async () => {
     if (!itemToDelete) return;
     setIsSaving(true);
-    
-    const { type, id, accountId } = itemToDelete;
-    let result;
-    if (type === 'account') {
-        result = await deleteBankAccount(id);
-    } else {
-        result = await deleteTransaction(accountId!, id);
-        if(result.success) {
-            fetchTransactions('reset');
-        }
-    }
-
-    toast({ title: result.success ? 'Success' : 'Error', description: result.message, variant: result.success ? 'default' : 'destructive' });
-    
-    if (result.success) {
-      if (type === 'account' && selectedAccount?.id === id) {
-        setSelectedAccount(null);
-      }
-      setIsDeleteDialogOpen(false);
-      setItemToDelete(null);
-    }
+    toast({ title: "Action Disabled", description: "Cannot delete data without a backend connection.", variant: "destructive"});
     setIsSaving(false);
+    setIsDeleteDialogOpen(false);
   };
-
 
   if (authIsLoading) {
     return <div className="flex justify-center items-center h-64"><Loader2 className="h-12 w-12 animate-spin text-primary" /></div>;
@@ -290,6 +106,23 @@ export default function BankAccountsPage() {
       </div>
     );
   }
+  
+    const handleOpenAccountDialog = (account?: FullBankAccount) => {
+    if (account) {
+      setIsEditing(true);
+      setCurrentAccount(account);
+    } else {
+      setIsEditing(false);
+      setCurrentAccount({ accountType: 'checking' });
+    }
+    setIsAccountDialogOpen(true);
+  };
+  
+    const handleOpenTransactionDialog = () => {
+    setIsTransactionDialogOpen(true);
+    setCurrentTransaction({ type: 'withdrawal', date: new Date(), amount: 0 });
+  };
+
 
   return (
     <div className="space-y-6 p-4 sm:p-6 lg:p-8">
@@ -300,7 +133,6 @@ export default function BankAccountsPage() {
       </PageTitle>
 
       <div className="grid gap-6 lg:grid-cols-3">
-        {/* Accounts List */}
         <div className="lg:col-span-1 space-y-4">
             <Card>
                 <CardHeader>
@@ -334,7 +166,6 @@ export default function BankAccountsPage() {
             </Card>
         </div>
 
-        {/* Transactions View */}
         <div className="lg:col-span-2">
             <Card className="min-h-[400px]">
                 <CardHeader>
@@ -396,8 +227,8 @@ export default function BankAccountsPage() {
                             </div>
                             <Pagination>
                                 <PaginationContent>
-                                    <PaginationItem><PaginationPrevious href="#" onClick={(e) => { e.preventDefault(); handleTxPageChange('prev'); }} className={txCurrentPage === 1 ? 'pointer-events-none opacity-50' : ''}/></PaginationItem>
-                                    <PaginationItem><PaginationNext href="#" onClick={(e) => { e.preventDefault(); handleTxPageChange('next'); }} className={transactions.length < RECORDS_PER_PAGE ? 'pointer-events-none opacity-50' : ''}/></PaginationItem>
+                                    <PaginationItem><PaginationPrevious href="#" className={'pointer-events-none opacity-50'}/></PaginationItem>
+                                    <PaginationItem><PaginationNext href="#" className={'pointer-events-none opacity-50'}/></PaginationItem>
                                 </PaginationContent>
                             </Pagination>
                          </div>

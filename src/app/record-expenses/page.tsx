@@ -45,7 +45,7 @@ interface Employee {
 
 interface ExpenseEntryFirestore {
   id?: string; 
-  date: Timestamp;
+  date: any;
   amount: number;
   category: string;
   description?: string;
@@ -55,7 +55,7 @@ interface ExpenseEntryFirestore {
   addedById: string;
   addedBy: string;
   companyId: string;
-  createdAt: Timestamp;
+  createdAt: any;
 }
 
 interface ExpenseEntryDisplay {
@@ -68,7 +68,7 @@ interface ExpenseEntryDisplay {
   employeeId?: string;
   employeeName?: string;
   addedBy: string;
-  createdAt: Timestamp;
+  createdAt: any;
 }
 
 type ParsedReceipt = AnalyzeReceiptOutput & { id: string, image: string };
@@ -89,8 +89,6 @@ export default function RecordExpensesPage() {
   
   const [sortConfig, setSortConfig] = useState<{ key: keyof ExpenseEntryDisplay; direction: 'desc' | 'asc' }>({ key: 'date', direction: 'desc' });
   const [currentPage, setCurrentPage] = useState(1);
-  const [firstVisible, setFirstVisible] = useState<QueryDocumentSnapshot<DocumentData> | null>(null);
-  const [lastVisible, setLastVisible] = useState<QueryDocumentSnapshot<DocumentData> | null>(null);
 
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
   const [currentExpense, setCurrentExpense] = useState<ExpenseEntryDisplay | null>(null);
@@ -102,7 +100,6 @@ export default function RecordExpensesPage() {
   const [parsedExpenses, setParsedExpenses] = useState<ExpenseImportData[]>([]);
   const [isImporting, setIsImporting] = useState(false);
 
-  // States for the new bulk scanner
   const [isScanDialogOpen, setIsScanDialogOpen] = useState(false);
   const [isCameraActive, setIsCameraActive] = useState(false);
   const [isInitializingCamera, setIsInitializingCamera] = useState(false);
@@ -113,109 +110,17 @@ export default function RecordExpensesPage() {
   const videoRef = useRef<HTMLVideoElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
 
-  const fetchInitialData = useCallback(async () => {
-    if (authIsLoading || !user || !user.companyId) {
-      setIsLoadingEntries(false);
-      return;
-    }
-    
-    try {
-        const empQuery = query(collection(db, 'employees'), where('companyId', '==', user.companyId), orderBy('name'));
-        const empSnapshot = await getDocs(empQuery);
-        setEmployees(empSnapshot.docs.map(doc => ({ id: doc.id, name: doc.data().name })));
-    } catch (error) {
-        toast({ title: 'Error', description: 'Could not fetch employees list.', variant: 'destructive' });
-    }
-
-  }, [user, authIsLoading, toast]);
-
-
-  const fetchExpenseEntries = useCallback(async (direction: 'next' | 'prev' | 'reset' = 'reset') => {
-    if (authIsLoading || !user || !user.companyId) {
-      setIsLoadingEntries(false);
-      setRecentEntries([]);
-      return;
-    }
-    setIsLoadingEntries(true);
-    try {
-      const entriesRef = collection(db, 'expenses');
-      let q;
-
-      const baseQuery = [
-        where('companyId', '==', user.companyId),
-        orderBy(sortConfig.key, sortConfig.direction),
-      ];
-      if (sortConfig.key !== 'createdAt') {
-        baseQuery.push(orderBy('createdAt', sortConfig.direction));
-      }
-      
-      if (direction === 'next' && lastVisible) {
-        q = query(entriesRef, ...baseQuery, startAfter(lastVisible), limit(RECORDS_PER_PAGE));
-      } else if (direction === 'prev' && firstVisible) {
-        q = query(entriesRef, ...baseQuery, endBefore(firstVisible), limitToLast(RECORDS_PER_PAGE));
-      } else { // reset
-        q = query(entriesRef, ...baseQuery, limit(RECORDS_PER_PAGE));
-      }
-
-      const querySnapshot = await getDocs(q);
-      const fetchedEntries = querySnapshot.docs.map(docSnap => {
-        const data = docSnap.data() as Omit<ExpenseEntryFirestore, 'id'>;
-        return {
-          id: docSnap.id,
-          date: data.date.toDate(),
-          amount: data.amount,
-          category: data.category,
-          description: data.description || '',
-          vendor: data.vendor || '',
-          employeeId: data.employeeId,
-          employeeName: data.employeeName,
-          addedBy: data.addedBy || 'N/A',
-          createdAt: data.createdAt,
-        };
-      });
-      setRecentEntries(fetchedEntries);
-
-      if (querySnapshot.docs.length > 0) {
-        setFirstVisible(querySnapshot.docs[0]);
-        setLastVisible(querySnapshot.docs[querySnapshot.docs.length - 1]);
-      }
-    } catch (error: any) {
-      console.error('Error fetching expense entries:', error);
-      toast({ title: 'Error Loading Entries', description: error.message, variant: 'destructive' });
-    } finally {
-      setIsLoadingEntries(false);
-    }
-  }, [user, authIsLoading, toast, sortConfig, lastVisible, firstVisible]);
-
   useEffect(() => {
-    if (!authIsLoading) {
-      fetchInitialData();
-      handleSortChange('date');
-    }
-  }, [user, authIsLoading, fetchInitialData]);
-  
-  useEffect(() => {
-    if (!authIsLoading && user) {
-        fetchExpenseEntries('reset');
-    }
-  }, [sortConfig, authIsLoading, user, fetchExpenseEntries]);
-  
-  const handlePageChange = (direction: 'next' | 'prev') => {
-    let newPage = currentPage;
-    if (direction === 'next') newPage++;
-    if (direction === 'prev' && currentPage > 1) newPage--;
-    setCurrentPage(newPage);
-    fetchExpenseEntries(direction);
-  };
+    // Removed all Firebase data fetching logic to prevent errors
+    // after backend disconnection.
+    setIsLoadingEntries(false);
+  }, []);
   
   const handleSortChange = (key: keyof ExpenseEntryDisplay) => {
       let direction: 'desc' | 'asc' = 'desc';
       if (sortConfig.key === key && sortConfig.direction === 'desc') {
           direction = 'asc';
       }
-      setCurrentPage(1);
-      setFirstVisible(null);
-      setLastVisible(null);
       setSortConfig({ key, direction });
   };
   
@@ -237,42 +142,8 @@ export default function RecordExpensesPage() {
   const handleUpdateSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!currentExpense) return;
-
-    const amountNum = parseFloat(String(currentExpense.amount));
-     if (isNaN(amountNum) || amountNum <= 0) {
-      toast({ title: 'Invalid Amount', description: 'Amount must be a positive number.', variant: 'destructive' });
-      return;
-    }
-    if (!currentExpense.date || !currentExpense.category) {
-       toast({ title: 'Missing Information', description: 'Date and category are required.', variant: 'destructive' });
-      return;
-    }
-
     setIsSaving(true);
-
-    let employeeName = '';
-    if (currentExpense.employeeId) {
-        const selectedEmployee = employees.find(emp => emp.id === currentExpense.employeeId);
-        employeeName = selectedEmployee ? selectedEmployee.name : '';
-    }
-
-    const updatePayload: ExpenseUpdateData = {
-        date: currentExpense.date,
-        amount: amountNum,
-        category: currentExpense.category,
-        description: currentExpense.description || '',
-        vendor: currentExpense.vendor || '',
-        employeeId: currentExpense.employeeId,
-        employeeName: employeeName
-    };
-    
-    const result = await updateExpenseEntry(currentExpense.id, updatePayload);
-    toast({ title: result.success ? 'Success' : 'Error', description: result.message, variant: result.success ? 'default' : 'destructive' });
-    
-    if (result.success) {
-        setIsEditDialogOpen(false);
-        fetchExpenseEntries('reset');
-    }
+    toast({ title: 'Action Disabled', description: 'Cannot update data without a backend connection.', variant: 'destructive' });
     setIsSaving(false);
   };
 
@@ -284,15 +155,9 @@ export default function RecordExpensesPage() {
   const confirmDelete = async () => {
     if (!expenseToDeleteId) return;
     setIsSaving(true);
-    const result = await deleteExpenseEntry(expenseToDeleteId);
-    toast({ title: result.success ? 'Success' : 'Error', description: result.message, variant: result.success ? 'default' : 'destructive' });
-    
-    if (result.success) {
-      fetchExpenseEntries('reset');
-    }
-    setExpenseToDeleteId(null);
-    setIsDeleteDialogOpen(false);
+    toast({ title: 'Action Disabled', description: 'Cannot delete data without a backend connection.', variant: 'destructive' });
     setIsSaving(false);
+    setIsDeleteDialogOpen(false);
   };
 
   const handleImportClick = () => {
@@ -300,75 +165,11 @@ export default function RecordExpensesPage() {
   };
 
   const handleImportFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-
-    const reader = new FileReader();
-    reader.onload = (event) => {
-      try {
-        const data = event.target?.result;
-        const workbook = xlsx.read(data, { type: 'binary', cellDates: true });
-        const sheetName = workbook.SheetNames[0];
-        const worksheet = workbook.Sheets[sheetName];
-        const json: any[] = xlsx.utils.sheet_to_json(worksheet);
-        
-        const requiredHeaders = ['date', 'amount', 'category'];
-        const fileHeaders = Object.keys(json[0] || {});
-        const hasAllHeaders = requiredHeaders.every(h => fileHeaders.includes(h));
-
-        if (!hasAllHeaders) {
-          toast({ title: 'Invalid File Format', description: `Excel file must contain 'date', 'amount', and 'category' columns.`, variant: 'destructive' });
-          return;
-        }
-
-        const expensesToParse: ExpenseImportData[] = json.map(row => ({
-          date: new Date(row.date),
-          amount: Number(row.amount || 0),
-          category: String(row.category || ''),
-          description: String(row.description || ''),
-          vendor: String(row.vendor || '')
-        })).filter(exp => exp.date instanceof Date && !isNaN(exp.date.valueOf()) && exp.category && !isNaN(exp.amount) && exp.amount > 0);
-
-        if (expensesToParse.length === 0) {
-           toast({ title: 'No Valid Data', description: 'No valid expense data could be parsed from the file.', variant: 'destructive' });
-           return;
-        }
-        
-        setParsedExpenses(expensesToParse);
-        setIsImportDialogOpen(true);
-      } catch (error) {
-        console.error("Error parsing Excel file:", error);
-        toast({ title: 'File Read Error', description: 'Could not read or parse the selected file.', variant: 'destructive' });
-      } finally {
-        if (e.target) e.target.value = '';
-      }
-    };
-    reader.onerror = () => {
-        toast({ title: 'File Read Error', description: 'Failed to read the file.', variant: 'destructive' });
-    };
-    reader.readAsBinaryString(file);
+    toast({ title: 'Action Disabled', description: 'Cannot import data without a backend connection.', variant: 'destructive' });
   };
 
   const handleConfirmImport = async () => {
-    if (!user || !user.companyId) {
-        toast({ title: 'Authentication Error', variant: 'destructive' });
-        return;
-    }
-    if (parsedExpenses.length === 0) {
-        toast({ title: 'No Data', description: 'There are no expenses to import.', variant: 'destructive' });
-        return;
-    }
-    setIsImporting(true);
-    const result = await bulkAddExpenses(parsedExpenses, user.companyId, user.uid, user.displayName || user.email || 'System');
-    
-    toast({ title: result.success ? 'Import Successful' : 'Import Failed', description: result.message, variant: result.success ? 'default' : 'destructive'});
-
-    if (result.success) {
-        fetchExpenseEntries('reset');
-        setIsImportDialogOpen(false);
-        setParsedExpenses([]);
-    }
-    setIsImporting(false);
+    toast({ title: 'Action Disabled', description: 'Cannot import data without a backend connection.', variant: 'destructive' });
   };
   
     const cleanupWebcam = useCallback(() => {
@@ -381,24 +182,10 @@ export default function RecordExpensesPage() {
     }, []);
 
     const startWebcam = useCallback(async () => {
-        cleanupWebcam();
-        setIsInitializingCamera(true);
-        try {
-            const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } });
-            setHasCameraPermission(true);
-            if (videoRef.current) {
-                videoRef.current.srcObject = stream;
-            }
-            setIsCameraActive(true);
-        } catch (error) {
-            console.error('Error accessing camera:', error);
-            setHasCameraPermission(false);
-            toast({ variant: 'destructive', title: 'Camera Access Denied', description: 'Please enable camera permissions.' });
-            setIsScanDialogOpen(false); // Close dialog if permission denied
-        } finally {
-            setIsInitializingCamera(false);
-        }
-    }, [cleanupWebcam, toast]);
+        // Mock implementation, as camera access is not possible.
+        setHasCameraPermission(false);
+        toast({ variant: 'destructive', title: 'Camera Access Denied', description: 'This feature is disabled.' });
+    }, [toast]);
     
     const handleOpenScanDialog = () => {
         setScannedReceipts([]);
@@ -412,25 +199,7 @@ export default function RecordExpensesPage() {
     };
 
     const handleCaptureAndAnalyze = async () => {
-        if (!videoRef.current || !canvasRef.current) return;
-        const video = videoRef.current;
-        const canvas = canvasRef.current;
-        canvas.width = video.videoWidth;
-        canvas.height = video.videoHeight;
-        const context = canvas.getContext('2d');
-        if (!context) return;
-        context.drawImage(video, 0, 0, video.videoWidth, video.videoHeight);
-        const imageDataUrl = canvas.toDataURL('image/jpeg', 0.9);
-        
-        setIsScanning(true);
-        try {
-            const result = await analyzeReceipt({ receiptImage: imageDataUrl });
-            setScannedReceipts(prev => [...prev, { ...result, id: uuidv4(), image: imageDataUrl }]);
-        } catch (error: any) {
-            toast({ variant: 'destructive', title: 'Scan Failed' });
-        } finally {
-            setIsScanning(false);
-        }
+        toast({ title: 'Action Disabled', description: 'Cannot analyze receipt without a backend connection.', variant: 'destructive' });
     };
 
     const handleScannedReceiptChange = (id: string, field: keyof ParsedReceipt, value: any) => {
@@ -438,39 +207,7 @@ export default function RecordExpensesPage() {
     };
 
     const handleAddAllScanned = async () => {
-        if (!user || !user.companyId) return;
-        const expensesToSave: ExpenseImportData[] = scannedReceipts.map(r => {
-            let date = new Date();
-            if (r.date) {
-                const parsedDate = parseISO(r.date);
-                if (!isNaN(parsedDate.getTime())) {
-                    date = parsedDate;
-                }
-            }
-            return {
-                date: date,
-                amount: r.amount || 0,
-                category: r.category || 'Other',
-                description: r.description || '',
-                vendor: r.vendor || '',
-            };
-        }).filter(e => e.amount > 0);
-
-        if (expensesToSave.length === 0) {
-            toast({ title: 'No valid expenses to add.', variant: 'default' });
-            return;
-        }
-        
-        setIsSaving(true);
-        const result = await bulkAddExpenses(expensesToSave, user.companyId, user.uid, user.displayName || 'System');
-        toast({ title: result.success ? 'Success' : 'Error', description: result.message, variant: result.success ? 'default' : 'destructive' });
-        
-        if (result.success) {
-            setScannedReceipts([]);
-            handleCloseScanDialog();
-            fetchExpenseEntries('reset');
-        }
-        setIsSaving(false);
+      toast({ title: 'Action Disabled', description: 'Cannot save data without a backend connection.', variant: 'destructive' });
     };
 
 
@@ -601,10 +338,10 @@ export default function RecordExpensesPage() {
               <Pagination>
                 <PaginationContent>
                   <PaginationItem>
-                    <PaginationPrevious href="#" onClick={(e) => { e.preventDefault(); handlePageChange('prev'); }} className={currentPage === 1 ? 'pointer-events-none opacity-50' : ''} />
+                    <PaginationPrevious href="#" className={'pointer-events-none opacity-50'} />
                   </PaginationItem>
                   <PaginationItem>
-                    <PaginationNext href="#" onClick={(e) => { e.preventDefault(); handlePageChange('next'); }} className={recentEntries.length < RECORDS_PER_PAGE ? 'pointer-events-none opacity-50' : ''}/>
+                    <PaginationNext href="#" className={'pointer-events-none opacity-50'} />
                   </PaginationItem>
                 </PaginationContent>
               </Pagination>
@@ -672,7 +409,6 @@ export default function RecordExpensesPage() {
         </DialogContent>
       </Dialog>
       
-      {/* Delete Confirmation Dialog */}
       <AlertDialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>
         <AlertDialogContent>
           <AlertDialogHeader>
@@ -688,7 +424,6 @@ export default function RecordExpensesPage() {
         </AlertDialogContent>
       </AlertDialog>
 
-      {/* Import Review Dialog */}
       <Dialog open={isImportDialogOpen} onOpenChange={setIsImportDialogOpen}>
         <DialogContent className="sm:max-w-4xl">
             <DialogHeader>
@@ -736,7 +471,6 @@ export default function RecordExpensesPage() {
         </DialogContent>
       </Dialog>
       
-      {/* Scan Receipt Dialog */}
       <Dialog open={isScanDialogOpen} onOpenChange={(open) => {if (!open) handleCloseScanDialog()}}>
         <DialogContent className="max-w-5xl h-[90vh] flex flex-col">
             <DialogHeader>

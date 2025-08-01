@@ -1,3 +1,4 @@
+
 'use client';
 
 import React, { useState, useEffect, type FormEvent } from 'react';
@@ -41,8 +42,8 @@ interface CompanyDetailsFirestore {
   stampUrl?: string;
   stampStoragePath?: string;
   publicCompanyId?: string;
-  createdAt?: Timestamp;
-  updatedAt?: Timestamp;
+  createdAt?: any;
+  updatedAt?: any;
 }
 
 export default function CompanyDetailsPage() {
@@ -65,88 +66,18 @@ export default function CompanyDetailsPage() {
   };
 
   useEffect(() => {
-    const fetchCompanyDetails = async () => {
-      if (authIsLoading) {
-        setIsFetching(true);
-        return;
-      }
-      if (!user || !user.companyId) {
-        setIsFetching(false);
-        return;
-      }
-
-      setIsFetching(true);
-      try {
-        const docRef = doc(db, 'companyProfiles', user.companyId);
-        const docSnap = await getDoc(docRef);
-
-        if (docSnap.exists()) {
-          let data = docSnap.data() as Partial<CompanyDetailsFirestore>;
-
-          if (!data.publicCompanyId) {
-            console.log("Generating missing publicCompanyId for company:", user.companyId);
-            try {
-              const generateUniquePublicId = async (): Promise<string> => {
-                let publicId: string = '';
-                let isUnique = false;
-                let attempts = 0;
-                const maxAttempts = 10;
-                
-                while (!isUnique && attempts < maxAttempts) {
-                    publicId = Math.floor(100000 + Math.random() * 900000).toString();
-                    const q = query(collection(db, 'companyProfiles'), where('publicCompanyId', '==', publicId));
-                    const snapshot = await getDocs(q);
-                    isUnique = snapshot.empty;
-                    if (!isUnique) {
-                      console.warn(`Company ID collision for ${publicId}, attempt ${attempts + 1}`);
-                    }
-                    attempts++;
-                }
-        
-                if (!isUnique) {
-                    throw new Error("Could not generate a unique Company ID. Please try again later.");
-                }
-                return publicId;
-              };
-              
-              const newPublicId = await generateUniquePublicId();
-              
-              await updateDoc(docRef, { publicCompanyId: newPublicId });
-              data = { ...data, publicCompanyId: newPublicId };
-
-              toast({
-                title: 'Company ID Generated',
-                description: `A new 6-digit Company ID has been generated for your company.`,
-              });
-
-            } catch (idError: any) {
-               console.error("Failed to generate and save unique public ID:", idError);
-               toast({
-                 title: 'Error Generating ID',
-                 description: idError.message || 'Could not generate a unique company ID.',
-                 variant: 'destructive',
-               });
-            }
-          }
-
-          setCompanyDetails(data);
-          setSignaturePreview(data.signatureUrl || null);
-          setStampPreview(data.stampUrl || null);
-        }
-      } catch (error: any) {
-        console.error('Error fetching company details from Firestore:', error);
-        toast({
-          title: 'Error Loading Details',
-          description: error.message || 'Could not load company details from Firestore.',
-          variant: 'destructive',
-        });
-      } finally {
-        setIsFetching(false);
-      }
-    };
-
-    fetchCompanyDetails();
-  }, [user, authIsLoading, toast]);
+    // Removed all Firebase data fetching logic to prevent errors
+    // after backend disconnection.
+    setIsFetching(false);
+    if(user){
+        setCompanyDetails({
+            name: user.companyName || 'Demo Company',
+            publicCompanyId: '123456',
+            country: user.country || 'US',
+            email: user.email || '',
+        })
+    }
+  }, [user]);
   
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>, fileType: 'signature' | 'stamp') => {
     const file = e.target.files?.[0] || null;
@@ -179,36 +110,16 @@ export default function CompanyDetailsPage() {
       toast({ title: 'Save Failed', description: 'User not authenticated.', variant: 'destructive' });
       return;
     }
-    if (!companyDetails.name || !companyDetails.address || !companyDetails.city || !companyDetails.state || !companyDetails.country || !companyDetails.gstin) {
-        toast({ title: "Missing Information", description: "Company Name, Address, City, State, Country and GSTIN/Tax ID are required.", variant: "destructive" });
-        return;
-    }
-
-    setIsSaving(true);
-    const detailsPayload = { ...companyDetails };
-
-    const result = await saveCompanyDetails(user.companyId, detailsPayload, { signatureFile, stampFile, signatureDataUrl });
-
-    toast({
-      title: result.success ? 'Details Saved' : 'Save Failed',
-      description: result.message,
-      variant: result.success ? 'default' : 'destructive',
-    });
-
-    if (result.success && result.updatedDetails) {
-        setCompanyDetails(prev => ({...prev, ...result.updatedDetails}));
-        if(result.updatedDetails.signatureUrl) setSignaturePreview(result.updatedDetails.signatureUrl);
-        if(result.updatedDetails.stampUrl) setStampPreview(result.updatedDetails.stampUrl);
-    }
     
+    setIsSaving(true);
+    toast({ title: 'Action Disabled', description: 'Cannot save data without a backend connection.', variant: 'destructive' });
     setIsSaving(false);
-    setIsSignatureDialogOpen(false);
-    setSignatureFile(null); // Clear file after saving
   };
   
   const handleSignatureSave = (dataUrl: string) => {
     setSignaturePreview(dataUrl);
-    handleSave(dataUrl);
+    setIsSignatureDialogOpen(false);
+    toast({ title: 'Signature Updated', description: 'This is a preview. Save all changes to persist.' });
   };
 
 

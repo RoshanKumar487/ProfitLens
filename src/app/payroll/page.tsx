@@ -99,66 +99,12 @@ export default function PayrollPage() {
   const [recipientEmail, setRecipientEmail] = useState('');
   const [isSendingEmail, setIsSendingEmail] = useState(false);
 
-  const fetchPayrollData = useCallback(async (period: Date) => {
-    if (!user?.companyId || payrollSettings === null) return;
-    setIsLoading(true);
-    try {
-      const periodString = format(period, 'yyyy-MM');
-      const data = await getPayrollDataForPeriod(user.companyId, periodString);
-      
-      const daysInMonth = getDaysInMonth(period);
-
-      const processedData = data.map(emp => {
-        const processedCustomFields: { [key: string]: any } = {};
-        if (emp.customFields && payrollSettings.customFields) {
-            for (const field of payrollSettings.customFields) {
-                const value = emp.customFields[field.id];
-                if (field.type === 'date' && typeof value === 'string' && !isNaN(Date.parse(value))) {
-                    processedCustomFields[field.id] = new Date(value);
-                } else {
-                    processedCustomFields[field.id] = value;
-                }
-            }
-        }
-        return { 
-          ...emp, 
-          baseSalary: emp.salary, // Rename for clarity
-          workingDays: emp.workingDays || daysInMonth,
-          presentDays: emp.presentDays || daysInMonth,
-          otDays: emp.otDays || 0,
-          customFields: processedCustomFields 
-        };
-      });
-      
-      setPayrollData(processedData);
-    } catch (error: any) {
-      toast({ title: "Error", description: `Could not fetch payroll data: ${error.message}`, variant: "destructive" });
-    } finally {
-      setIsLoading(false);
-    }
-  }, [user?.companyId, toast, payrollSettings]);
-
-  const fetchSettings = useCallback(async () => {
-    if (!user?.companyId) return;
-    try {
-      const settings = await getPayrollSettings(user.companyId);
-      setPayrollSettings(settings);
-    } catch (error: any) {
-      toast({ title: "Error", description: `Could not fetch payroll settings: ${error.message}`, variant: "destructive" });
-    }
-  }, [user?.companyId, toast]);
-
   useEffect(() => {
-    if (!authLoading && user) {
-      fetchSettings();
-    }
-  }, [user, authLoading, fetchSettings]);
-
-  useEffect(() => {
-    if (payrollSettings !== null) {
-      fetchPayrollData(payPeriod);
-    }
-  }, [payPeriod, payrollSettings, fetchPayrollData]);
+    // Removed all Firebase data fetching logic to prevent errors
+    // after backend disconnection.
+    setIsLoading(false);
+    setPayrollSettings({ customFields: [], pfPercentage: 12, esiPercentage: 0.75 });
+  }, []);
 
   const filteredAndCalculatedData = useMemo(() => {
     if (!payrollSettings) return [];
@@ -277,66 +223,7 @@ export default function PayrollPage() {
   const handleSaveAll = async () => {
     if (!user?.companyId) return;
     setIsSaving(true);
-    const periodString = format(payPeriod, 'yyyy-MM');
-    
-    const dataToSave = payrollData.map(p => {
-        const customFieldsForSave: { [key: string]: any } = {};
-        if (p.customFields) {
-            for (const key in p.customFields) {
-                const value = p.customFields[key];
-                if (value instanceof Date) {
-                    customFieldsForSave[key] = value.toISOString();
-                } else {
-                    customFieldsForSave[key] = value;
-                }
-            }
-        }
-        const payload: any = {
-            payrollId: p.payrollId,
-            baseSalary: p.baseSalary,
-            workingDays: p.workingDays,
-            presentDays: p.presentDays,
-            otDays: p.otDays,
-            advances: p.advances,
-            otherDeductions: p.otherDeductions,
-            status: p.status,
-            customFields: customFieldsForSave,
-            // Save calculated values for historical accuracy
-            proratedSalary: p.proratedSalary,
-            overtimePay: p.overtimePay,
-            grossEarnings: p.grossEarnings,
-            pfContribution: p.pfContribution,
-            esiContribution: p.esiContribution,
-            totalDeductions: p.totalDeductions,
-            netPayment: p.netPayment,
-        };
-
-        if (p.isNew) {
-            payload.isNew = true;
-            payload.name = p.name;
-            payload.employeeId = p.id;
-        } else {
-            payload.employeeId = p.id;
-        }
-      
-        return payload;
-    }).filter(p => !p.isNew || (p.isNew && p.name.trim() !== ''));
-
-    if (dataToSave.length === 0) {
-        toast({ title: "No Data to Save", description: "There are no changes or new employees to save.", variant: 'default' });
-        setIsSaving(false);
-        return;
-    }
-
-    const result = await savePayrollData(user.companyId, periodString, dataToSave);
-    toast({
-      title: result.success ? "Success" : "Error",
-      description: result.message,
-      variant: result.success ? "default" : "destructive"
-    });
-    if (result.success) {
-      fetchPayrollData(payPeriod);
-    }
+    toast({ title: 'Action Disabled', description: 'Cannot save data without a backend connection.', variant: 'destructive' });
     setIsSaving(false);
   };
   
@@ -346,26 +233,14 @@ export default function PayrollPage() {
   
   const handleConfirmDelete = async () => {
     if (!employeeToDelete) return;
-  
     if (employeeToDelete.isNew || !employeeToDelete.payrollId) {
       setPayrollData(prev => prev.filter(emp => emp.id !== employeeToDelete.id));
       setEmployeeToDelete(null);
       toast({ title: "Row Removed", description: `${employeeToDelete.name || 'New employee'} has been removed from this payroll view.` });
       return;
     }
-  
     setIsDeleting(true);
-    const result = await deletePayrollRecord(employeeToDelete.payrollId);
-    toast({
-      title: result.success ? "Record Deleted" : "Error",
-      description: result.message,
-      variant: result.success ? "default" : "destructive"
-    });
-  
-    if (result.success) {
-      fetchPayrollData(payPeriod);
-    }
-  
+    toast({ title: 'Action Disabled', description: 'Cannot delete data without a backend connection.', variant: 'destructive' });
     setIsDeleting(false);
     setEmployeeToDelete(null);
   };
@@ -395,166 +270,32 @@ export default function PayrollPage() {
         customFields: {} as { [key: string]: number } 
     });
   }, [filteredAndCalculatedData, payrollSettings]);
-
-  const fetchCompanyDetailsAndUris = async () => {
-    if (!companyDetails && user?.companyId) {
-        const companyRef = doc(db, 'companyProfiles', user.companyId);
-        const companySnap = await getDoc(companyRef);
-        if (companySnap.exists()) {
-            const companyData = companySnap.data();
-            setCompanyDetails(companyData);
-            const uris: { signature?: string; stamp?: string } = {};
-            if (companyData.signatureUrl) uris.signature = await urlToDataUri(companyData.signatureUrl);
-            if (companyData.stampUrl) uris.stamp = await urlToDataUri(companyData.stampUrl);
-            setPayslipImageDataUris(uris);
-            return companyData;
-        }
-    }
-    return companyDetails;
-  };
   
   const handleOpenPayslipDialog = async (employee: EmployeeWithPayroll) => {
     setEmployeeForAction(employee);
-    await fetchCompanyDetailsAndUris();
     setIsPayslipDialogOpen(true);
   };
 
   const handleOpenEmailDialog = async (employee: EmployeeWithPayroll) => {
     setEmployeeForAction(employee);
-    await fetchCompanyDetailsAndUris();
     setRecipientEmail('');
     setIsEmailDialogOpen(true);
   };
   
   const handleDownloadSheetPdf = async () => {
-    if (!payrollTableRef.current) return;
-    setIsPrinting(true);
-    toast({ title: 'Generating PDF...', description: 'Please wait, this may take a moment.'});
-    
-    try {
-      const canvas = await html2canvas(payrollTableRef.current, { scale: 2, useCORS: true });
-      const imgData = canvas.toDataURL('image/png');
-      
-      const pdf = new jsPDF({
-        orientation: 'landscape',
-        unit: 'mm',
-        format: 'a2' // Use a larger paper size to fit content
-      });
-
-      const pdfWidth = pdf.internal.pageSize.getWidth();
-      const pdfHeight = pdf.internal.pageSize.getHeight();
-      
-      const imgProps= pdf.getImageProperties(imgData);
-      const imgHeight = (imgProps.height * pdfWidth) / imgProps.width;
-
-      pdf.addImage(imgData, 'PNG', 0, 0, pdfWidth, imgHeight, undefined, 'FAST');
-      pdf.save(`PayrollSheet-${format(payPeriod, 'yyyy-MM')}.pdf`);
-
-      toast({ title: 'Download Complete', description: 'The payroll sheet has been downloaded as a PDF.' });
-    } catch(error: any) {
-        console.error("Error generating PDF:", error);
-        toast({ title: "PDF Generation Failed", description: error.message, variant: "destructive" });
-    } finally {
-        setIsPrinting(false);
-    }
+    toast({ title: 'Action Disabled', description: 'Cannot download data without a backend connection.', variant: 'destructive' });
   };
 
   const handlePrintPayslip = async () => {
-    if (!payslipPrintRef.current) return;
-    setIsPrinting(true);
-    try {
-      const elementToPrint = payslipPrintRef.current;
-      const canvas = await html2canvas(elementToPrint, { scale: 3, useCORS: true, backgroundColor: '#ffffff' });
-      const imgData = canvas.toDataURL('image/png');
-      const pdf = new jsPDF({ orientation: 'p', unit: 'mm', format: 'a4' });
-      pdf.addImage(imgData, 'PNG', 0, 0, pdf.internal.pageSize.getWidth(), pdf.internal.pageSize.getHeight());
-      const pdfBlob = pdf.output('blob');
-      const pdfUrl = URL.createObjectURL(pdfBlob);
-      const printWindow = window.open(pdfUrl);
-      if (printWindow) {
-        printWindow.onload = () => { printWindow.print(); URL.revokeObjectURL(pdfUrl); };
-      } else {
-        toast({ title: "Print Error", description: "Could not open print window.", variant: "destructive" });
-      }
-    } catch (error: any) {
-      toast({ title: "Print Failed", description: error.message, variant: "destructive" });
-    } finally {
-      setIsPrinting(false);
-    }
+    toast({ title: 'Action Disabled', description: 'Cannot print data without a backend connection.', variant: 'destructive' });
   };
 
   const handleDownloadPayslipPdf = async () => {
-    if (!payslipPrintRef.current || !employeeForAction) return;
-    setIsPrinting(true);
-    try {
-      const elementToPrint = payslipPrintRef.current;
-      const canvas = await html2canvas(elementToPrint, { scale: 3, useCORS: true, backgroundColor: '#ffffff' });
-      const imgData = canvas.toDataURL('image/png');
-      const pdf = new jsPDF({ orientation: 'p', unit: 'mm', format: 'a4' });
-      pdf.addImage(imgData, 'PNG', 0, 0, pdf.internal.pageSize.getWidth(), pdf.internal.pageSize.getHeight());
-      pdf.save(`Payslip-${employeeForAction.name.replace(/\s+/g, '_')}-${format(payPeriod, 'yyyy-MM')}.pdf`);
-      toast({ title: "Download Started" });
-    } catch (error: any) {
-      toast({ title: "Download Failed", description: error.message, variant: "destructive" });
-    } finally {
-      setIsPrinting(false);
-    }
+    toast({ title: 'Action Disabled', description: 'Cannot download data without a backend connection.', variant: 'destructive' });
   };
 
   const handleSendEmail = async () => {
-    if (!payslipPrintRef.current || !employeeForAction || !recipientEmail) return;
-
-    setIsSendingEmail(true);
-    toast({ title: 'Generating PDF...', description: 'Please wait while the payslip is being prepared.' });
-    try {
-        const elementToPrint = payslipPrintRef.current;
-        const canvas = await html2canvas(elementToPrint, { scale: 3, useCORS: true, backgroundColor: '#ffffff' });
-        const imgData = canvas.toDataURL('image/png');
-        
-        if (!imgData || imgData === 'data:,') {
-          throw new Error("Could not generate a valid image for the PDF.");
-        }
-
-        const pdf = new jsPDF({ orientation: 'p', unit: 'mm', format: 'a4' });
-        pdf.addImage(imgData, 'PNG', 0, 0, pdf.internal.pageSize.getWidth(), pdf.internal.pageSize.getHeight());
-        
-        const pdfBase64 = pdf.output('datauristring').split(',')[1];
-        
-        const subject = `Your Payslip for ${format(payPeriod, 'MMMM yyyy')}`;
-        const htmlBody = `
-            <p>Dear ${employeeForAction.name},</p>
-            <p>Please find your payslip for the month of ${format(payPeriod, 'MMMM yyyy')} attached to this email.</p>
-            <p>This is an automated message. If you have any questions regarding your payslip, please contact the HR or accounts department.</p>
-            <p>Best regards,<br/>${companyDetails?.name || 'Your Company'}</p>
-        `;
-        const filename = `Payslip-${employeeForAction.name.replace(/\s+/g, '_')}-${format(payPeriod, 'yyyy-MM')}.pdf`;
-        
-        const result = await sendPayslipEmail({
-            to: recipientEmail,
-            subject,
-            htmlBody,
-            attachment: {
-                filename,
-                content: pdfBase64
-            }
-        });
-
-        toast({
-            title: result.success ? "Success" : "Error",
-            description: result.message,
-            variant: result.success ? 'default' : 'destructive'
-        });
-
-        if (result.success) {
-            setIsEmailDialogOpen(false);
-        }
-
-    } catch (error: any) {
-        console.error("Error sending payslip email:", error);
-        toast({ title: "Email Failed", description: `Could not send email: ${error.message}`, variant: "destructive" });
-    } finally {
-        setIsSendingEmail(false);
-    }
+    toast({ title: 'Action Disabled', description: 'Cannot send email without a backend connection.', variant: 'destructive' });
   };
 
 

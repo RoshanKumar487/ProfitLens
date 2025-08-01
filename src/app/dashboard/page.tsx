@@ -55,96 +55,33 @@ export default function DashboardPage() {
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
-    if (!user || !user.companyId) {
-      setIsLoading(false);
-      return;
-    }
+    // Removed all Firebase data fetching logic to prevent errors
+    // after backend disconnection.
+    setIsLoading(false);
+    
+    // Set mock data
+    setFinancialData({
+        totalRevenue: 50000,
+        totalExpenses: 30000,
+        netProfit: 20000,
+        employeeCount: 5,
+    });
+    const mockChartData = Array.from({ length: 6 }, (_, i) => {
+        const month = format(subMonths(new Date(), i), 'MMM yyyy');
+        return {
+            month,
+            revenue: Math.random() * 10000 + 40000,
+            expenses: Math.random() * 8000 + 20000,
+        };
+    }).reverse();
+    setMonthlyChartData(mockChartData);
+    
+    setRecentActivity([
+        { id: '1', type: 'invoice', description: 'Invoice #INV001 to Acme Corp', amount: 5000, date: new Date(), status: 'Paid'},
+        { id: '2', type: 'expense', description: 'Office Supplies', amount: 150, date: new Date(), status: 'Expense'},
+    ]);
 
-    const fetchData = async () => {
-      setIsLoading(true);
-      const companyId = user.companyId;
-
-      try {
-        // Fetch financial data
-        const revenueQuery = query(collection(db, 'revenueEntries'), where('companyId', '==', companyId));
-        const expensesQuery = query(collection(db, 'expenses'), where('companyId', '==', companyId));
-        const employeesQuery = query(collection(db, 'employees'), where('companyId', '==', companyId));
-        const invoicesQuery = query(collection(db, 'invoices'), where('companyId', '==', companyId), orderBy('issuedDate', 'desc'), limit(3));
-        const recentExpensesQuery = query(collection(db, 'expenses'), where('companyId', '==', companyId), orderBy('date', 'desc'), limit(3));
-
-        const [revenueSnapshot, expensesSnapshot, employeesSnapshot, invoicesSnapshot, recentExpensesSnapshot] = await Promise.all([
-          getDocs(revenueQuery),
-          getDocs(expensesQuery),
-          getDocs(employeesQuery),
-          getDocs(invoicesQuery),
-          getDocs(recentExpensesQuery),
-        ]);
-
-        let totalRevenue = 0;
-        const revenueByMonth: { [key: string]: number } = {};
-        revenueSnapshot.forEach(doc => {
-          const data = doc.data();
-          totalRevenue += data.amount;
-          const month = format(data.date.toDate(), 'MMM yyyy');
-          revenueByMonth[month] = (revenueByMonth[month] || 0) + data.amount;
-        });
-
-        let totalExpenses = 0;
-        const expensesByMonth: { [key: string]: number } = {};
-        expensesSnapshot.forEach(doc => {
-          const data = doc.data();
-          totalExpenses += data.amount;
-          const month = format(data.date.toDate(), 'MMM yyyy');
-          expensesByMonth[month] = (expensesByMonth[month] || 0) + data.amount;
-        });
-
-        const employeeCount = employeesSnapshot.size;
-        const netProfit = totalRevenue - totalExpenses;
-
-        setFinancialData({ totalRevenue, totalExpenses, netProfit, employeeCount });
-
-        // Prepare chart data for the last 6 months
-        const months = Array.from({ length: 6 }, (_, i) => format(subMonths(new Date(), i), 'MMM yyyy')).reverse();
-        const chartData = months.map(month => ({
-          month,
-          revenue: revenueByMonth[month] || 0,
-          expenses: expensesByMonth[month] || 0,
-        }));
-        setMonthlyChartData(chartData);
-        
-        // Prepare recent activity feed
-        const invoiceActivities = invoicesSnapshot.docs.map(doc => ({
-          id: doc.id,
-          type: 'invoice' as const,
-          description: `Invoice #${doc.data().invoiceNumber} to ${doc.data().clientName}`,
-          amount: doc.data().amount,
-          date: (doc.data().issuedDate as Timestamp).toDate(),
-          status: doc.data().status
-        }));
-        const expenseActivities = recentExpensesSnapshot.docs.map(doc => ({
-            id: doc.id,
-            type: 'expense' as const,
-            description: doc.data().description || doc.data().category,
-            amount: doc.data().amount,
-            date: (doc.data().date as Timestamp).toDate(),
-            status: 'Expense'
-        }));
-        
-        const combinedActivities = [...invoiceActivities, ...expenseActivities]
-            .sort((a, b) => b.date.getTime() - a.date.getTime())
-            .slice(0, 5);
-
-        setRecentActivity(combinedActivities);
-
-      } catch (error) {
-        console.error("Error fetching dashboard data:", error);
-      } finally {
-        setIsLoading(false);
-      }
-    };
-
-    fetchData();
-  }, [user]);
+  }, []);
 
   const getStatusBadgeVariant = (status?: string) => {
     switch (status) {

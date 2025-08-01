@@ -46,119 +46,23 @@ export default function AdminPage() {
   const { toast } = useToast();
 
   const [requestsPage, setRequestsPage] = useState(1);
-  const [requestsFirstVisible, setRequestsFirstVisible] = useState<QueryDocumentSnapshot | null>(null);
-  const [requestsLastVisible, setRequestsLastVisible] = useState<QueryDocumentSnapshot | null>(null);
-
   const [usersPage, setUsersPage] = useState(1);
-  const [usersFirstVisible, setUsersFirstVisible] = useState<QueryDocumentSnapshot | null>(null);
-  const [usersLastVisible, setUsersLastVisible] = useState<QueryDocumentSnapshot | null>(null);
-
-  const fetchAdminData = useCallback(async () => {
-    if (!user || user.role !== 'admin' || !user.companyId) {
-      setRequests([]);
-      setUsers([]);
-      setIsLoading(false);
-      return;
-    }
-    setIsLoading(true);
-    try {
-      const companyId = user.companyId;
-
-      const requestsRef = collection(db, 'accessRequests');
-      const reqQuery = query(requestsRef, where('companyId', '==', companyId), orderBy('createdAt', 'desc'), limit(RECORDS_PER_PAGE));
-      const reqSnapshot = await getDocs(reqQuery);
-      const fetchedRequests = reqSnapshot.docs.map(doc => {
-        const data = doc.data();
-        return {
-          id: doc.id, userId: data.userId, userName: data.userName, userEmail: data.userEmail,
-          companyName: data.companyName, status: data.status, createdAt: (data.createdAt as Timestamp).toDate(),
-        };
-      });
-      setRequests(fetchedRequests);
-      if (reqSnapshot.docs.length > 0) {
-        setRequestsFirstVisible(reqSnapshot.docs[0]);
-        setRequestsLastVisible(reqSnapshot.docs[reqSnapshot.docs.length - 1]);
-      }
-      
-      const usersRef = collection(db, 'users');
-      const usersQuery = query(usersRef, where('companyId', '==', companyId), orderBy('displayName'), limit(RECORDS_PER_PAGE));
-      const usersSnapshot = await getDocs(usersQuery);
-      const fetchedUsers = usersSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as CompanyUser));
-      setUsers(fetchedUsers);
-      if (usersSnapshot.docs.length > 0) {
-        setUsersFirstVisible(usersSnapshot.docs[0]);
-        setUsersLastVisible(usersSnapshot.docs[usersSnapshot.docs.length - 1]);
-      }
-
-    } catch (error) {
-      console.error("Error fetching admin data:", error);
-      toast({ title: 'Error', description: 'Could not fetch administration data.', variant: 'destructive' });
-    } finally {
-      setIsLoading(false);
-    }
-  }, [user, toast]);
 
   useEffect(() => {
-    if (!authLoading) {
-      fetchAdminData();
-    }
-  }, [authLoading, fetchAdminData]);
-
-  const handleRequestsPageChange = async (direction: 'next' | 'prev') => {
-      if (!user?.companyId) return;
-      let q;
-      const baseQuery = [where('companyId', '==', user.companyId), orderBy('createdAt', 'desc')];
-      if (direction === 'next' && requestsLastVisible) {
-          q = query(collection(db, 'accessRequests'), ...baseQuery, startAfter(requestsLastVisible), limit(RECORDS_PER_PAGE));
-          setRequestsPage(p => p + 1);
-      } else if (direction === 'prev' && requestsFirstVisible) {
-          q = query(collection(db, 'accessRequests'), ...baseQuery, endBefore(requestsFirstVisible), limitToLast(RECORDS_PER_PAGE));
-          setRequestsPage(p => p - 1);
-      } else return;
-      
-      const snapshot = await getDocs(q);
-      const fetched = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as AccessRequest));
-      if (fetched.length > 0) {
-        setRequests(fetched);
-        setRequestsFirstVisible(snapshot.docs[0]);
-        setRequestsLastVisible(snapshot.docs[snapshot.docs.length - 1]);
-      }
-  };
-
-  const handleUsersPageChange = async (direction: 'next' | 'prev') => {
-      if (!user?.companyId) return;
-      let q;
-      const baseQuery = [where('companyId', '==', user.companyId), orderBy('displayName')];
-      if (direction === 'next' && usersLastVisible) {
-          q = query(collection(db, 'users'), ...baseQuery, startAfter(usersLastVisible), limit(RECORDS_PER_PAGE));
-          setUsersPage(p => p + 1);
-      } else if (direction === 'prev' && usersFirstVisible) {
-          q = query(collection(db, 'users'), ...baseQuery, endBefore(usersFirstVisible), limitToLast(RECORDS_PER_PAGE));
-          setUsersPage(p => p - 1);
-      } else return;
-
-      const snapshot = await getDocs(q);
-      const fetched = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as CompanyUser));
-      if(fetched.length > 0) {
-          setUsers(fetched);
-          setUsersFirstVisible(snapshot.docs[0]);
-          setUsersLastVisible(snapshot.docs[snapshot.docs.length - 1]);
-      }
-  };
+    // Removed all Firebase data fetching logic to prevent errors
+    // after backend disconnection.
+    setIsLoading(false);
+  }, []);
 
   const handleApprove = async (requestId: string, userId: string) => {
     setIsProcessing(requestId);
-    const result = await approveUserRequest(requestId, userId);
-    toast({ title: result.success ? 'Success' : 'Error', description: result.message, variant: result.success ? 'default' : 'destructive' });
-    if (result.success) fetchAdminData();
+    toast({ title: 'Action Disabled', description: 'Cannot approve user without a backend connection.', variant: 'destructive' });
     setIsProcessing(null);
   };
 
   const handleReject = async (requestId: string, userId: string) => {
     setIsProcessing(requestId);
-    const result = await rejectUserRequest(requestId, userId);
-    toast({ title: result.success ? 'Success' : 'Error', description: result.message, variant: result.success ? 'default' : 'destructive' });
-    if (result.success) fetchAdminData();
+    toast({ title: 'Action Disabled', description: 'Cannot reject user without a backend connection.', variant: 'destructive' });
     setIsProcessing(null);
   };
 
@@ -168,11 +72,7 @@ export default function AdminPage() {
         return;
     }
     setIsProcessing(userId);
-    const result = await updateUserRole(userId, newRole);
-    toast({ title: result.success ? 'Success' : 'Error', description: result.message, variant: result.success ? 'default' : 'destructive' });
-    if (result.success) {
-      setUsers(prev => prev.map(u => u.id === userId ? { ...u, role: newRole } : u));
-    }
+    toast({ title: 'Action Disabled', description: 'Cannot update role without a backend connection.', variant: 'destructive' });
     setIsProcessing(null);
   };
 
@@ -238,8 +138,8 @@ export default function AdminPage() {
                           </div>
                           <Pagination>
                               <PaginationContent>
-                                  <PaginationItem><PaginationPrevious href="#" onClick={(e) => {e.preventDefault(); handleRequestsPageChange('prev')}} className={requestsPage === 1 ? 'pointer-events-none opacity-50' : ''}/></PaginationItem>
-                                  <PaginationItem><PaginationNext href="#" onClick={(e) => {e.preventDefault(); handleRequestsPageChange('next')}} className={requests.length < RECORDS_PER_PAGE ? 'pointer-events-none opacity-50' : ''}/></PaginationItem>
+                                  <PaginationItem><PaginationPrevious href="#" className={'pointer-events-none opacity-50'}/></PaginationItem>
+                                  <PaginationItem><PaginationNext href="#" className={'pointer-events-none opacity-50'}/></PaginationItem>
                               </PaginationContent>
                           </Pagination>
                       </div>
@@ -281,8 +181,8 @@ export default function AdminPage() {
                           </div>
                           <Pagination>
                               <PaginationContent>
-                                  <PaginationItem><PaginationPrevious href="#" onClick={(e) => {e.preventDefault(); handleUsersPageChange('prev')}} className={usersPage === 1 ? 'pointer-events-none opacity-50' : ''}/></PaginationItem>
-                                  <PaginationItem><PaginationNext href="#" onClick={(e) => {e.preventDefault(); handleUsersPageChange('next')}} className={users.length < RECORDS_PER_PAGE ? 'pointer-events-none opacity-50' : ''}/></PaginationItem>
+                                  <PaginationItem><PaginationPrevious href="#" className={'pointer-events-none opacity-50'}/></PaginationItem>
+                                  <PaginationItem><PaginationNext href="#" className={'pointer-events-none opacity-50'}/></PaginationItem>
                               </PaginationContent>
                           </Pagination>
                       </div>
