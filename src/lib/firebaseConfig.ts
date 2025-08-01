@@ -1,4 +1,5 @@
 
+
 import { initializeApp, getApps, getApp, type FirebaseApp } from 'firebase/app';
 import { getFirestore, type Firestore, doc, getDoc } from 'firebase/firestore'; // Import doc and getDoc
 import { getAuth, type Auth } from 'firebase/auth';
@@ -7,12 +8,12 @@ import { getStorage, type FirebaseStorage } from 'firebase/storage'; // Ensure g
 
 
 const firebaseConfig = {
-  apiKey: "AIzaSyDhCyWZPBS6lNNzmp8F90mlyg4ikqtOd3o",
-  authDomain: "bizsight-k0icr.firebaseapp.com",
-  projectId: "bizsight-k0icr",
-  storageBucket: "bizsight-k0icr.appspot.com",
-  messagingSenderId: "859842469189",
-  appId: "1:859842469189:web:a3487310704050729cb22c"
+  apiKey: "AIzaSyBlPZet8aJ8zT9_h8iQo1d_fGf0V0",
+  authDomain: "profitlens-33431.firebaseapp.com",
+  projectId: "profitlens-33431",
+  storageBucket: "profitlens-33431.appspot.com",
+  messagingSenderId: "334254247291",
+  appId: "1:334254247291:web:12701181f3306917f8b929"
 };
 
 
@@ -64,3 +65,4 @@ try {
 }
 
 export { app, auth, db, storage, doc, getDoc }; // Export doc and getDoc
+
