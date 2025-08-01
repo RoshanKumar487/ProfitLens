@@ -130,6 +130,10 @@ export async function getCurrentUser() {
             algorithms: ['HS256'],
         });
         
+        if (!payload.userId) {
+            return null;
+        }
+        
         const db = await getDb();
         const user = await db.get(`
             SELECT 
@@ -154,6 +158,7 @@ export async function getCurrentUser() {
             isSuperAdmin: !!user.isSuperAdmin,
         };
     } catch (e) {
+        // This can happen if the token is malformed or expired
         console.error('Session verification failed:', e);
         return null;
     }

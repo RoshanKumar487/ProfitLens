@@ -52,11 +52,14 @@ export default function SignUpPage() {
       }
       // If successful, the action will redirect, and an error will be thrown.
     } catch (error: any) {
+        // This is the key change: we check if the error is the special
+        // NEXT_REDIRECT error thrown by the `redirect()` function.
         if (error.digest?.startsWith('NEXT_REDIRECT')) {
             toast({ title: 'Sign Up Successful', description: 'Welcome! You are now being redirected to the dashboard.' });
             router.refresh(); // Refresh the page to update auth state
             throw error; // Re-throw to complete the redirection
         }
+        // Handle other, unexpected errors
         console.error("Sign up failed:", error);
         toast({
             title: 'An Unexpected Error Occurred',

@@ -26,16 +26,18 @@ export async function middleware(request: NextRequest) {
   }
 
   try {
+    // Verify the JWT token
     await jwtVerify(sessionCookie, secretKey, { algorithms: ['HS256'] });
     
-    // If user is authenticated and tries to access a public route (like signin), redirect to dashboard
+    // If user is authenticated and tries to access a public route (like signin/signup), redirect to dashboard
     if (isPublicRoute) {
         return NextResponse.redirect(new URL('/dashboard', request.url));
     }
     
+    // Allow the request to proceed for authenticated users on protected routes
     return NextResponse.next();
   } catch (err) {
-    // If token is invalid, clear the cookie and redirect to sign-in
+    // If token is invalid (e.g., expired, malformed), clear the cookie and redirect to sign-in
     const response = NextResponse.redirect(new URL('/auth/signin', request.url));
     response.cookies.delete('session');
     return response;
@@ -43,5 +45,6 @@ export async function middleware(request: NextRequest) {
 }
 
 export const config = {
+  // This matcher ensures the middleware runs on all pages except for static assets and API routes.
   matcher: ['/((?!api|_next/static|_next/image|favicon.ico).*)'],
 };
