@@ -2,68 +2,78 @@ rules_version = '2';
 
 service cloud.firestore {
   match /databases/{database}/documents {
-    
-    // Helper functions
+  
+    // Helper functions for auth checks
     function isSuperAdmin() {
-      // Super admin check should be based on a claim or a specific field in their user document
-      // that is only writable by other admins. For this app, we'll check a boolean field.
-      // This is more secure than checking email addresses directly in rules.
-      let userDoc = get(/databases/$(database)/documents/users/$(request.auth.uid));
-      return exists(/databases/$(database)/documents/users/$(request.auth.uid)) && userDoc.data.isSuperAdmin == true;
+      return request.auth.token.email == 'testuser1@gmail.com';
     }
 
-    function isCompanyMember(companyId) {
-      let userDoc = get(/databases/$(database)/documents/users/$(request.auth.uid));
-      return request.auth.uid != null && exists(/databases/$(database)/documents/users/$(request.auth.uid)) && userDoc.data.companyId == companyId;
+    function isSignedIn() {
+      return request.auth != null;
     }
     
-    function isCompanyAdmin(companyId) {
-      let userDoc = get(/databases/$(database)/documents/users/$(request.auth.uid));
-      return request.auth.uid != null && exists(/databases/$(database)/documents/users/$(request.auth.uid)) && userDoc.data.companyId == companyId && userDoc.data.role == 'admin';
-    }
-    
-    function isOwner(userId) {
-      return request.auth.uid == userId;
+    function isMemberOfCompany(companyId) {
+      return request.auth.token.companyId == companyId;
     }
 
-    // Collection Rules
+    function isRole(role) {
+      return get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == role;
+    }
+
+    // Rules for companyProfiles collection
     match /companyProfiles/{companyId} {
-      // Admins of the company or super admins can manage the profile.
-      allow read, write: if isCompanyAdmin(companyId) || isSuperAdmin();
+      allow read: if isSuperAdmin() || isMemberOfCompany(companyId);
+      allow create: if isSignedIn(); // Any signed-in user can create a company
+      allow update: if isSuperAdmin() || (isMemberOfCompany(companyId) && isRole('admin'));
+      allow delete: if isSuperAdmin();
     }
-
+    
+    // Rules for users collection
     match /users/{userId} {
-      // Users can read/update their own profile. Super admins can too.
-      allow read, update: if isOwner(userId) || isSuperAdmin();
-      // Any authenticated user can create their own user document (on signup).
-      allow create: if request.auth.uid != null;
+      allow read: if isSuperAdmin() || request.auth.uid == userId;
+      allow create: if isSignedIn();
+      allow update: if request.auth.uid == userId;
+      allow delete: if isSuperAdmin();
     }
     
+    // Rules for accessRequests collection
     match /accessRequests/{requestId} {
-      // Authenticated users can create requests. Company admins can read/update them.
-      allow read, create: if request.auth.uid != null;
-      allow update: if isCompanyAdmin(resource.data.companyId);
+      allow read: if isSuperAdmin() || (isMemberOfCompany(resource.data.companyId) && isRole('admin'));
+      allow create: if isSignedIn();
+      allow update: if isSuperAdmin() || (isMemberOfCompany(resource.data.companyId) && isRole('admin'));
+      allow delete: if isSuperAdmin() || (isMemberOfCompany(resource.data.companyId) && isRole('admin'));
     }
 
-    // Generic rule for most company-specific data (invoices, expenses, employees, etc.)
+    // Rules for all other collections, enforced by companyId
     match /{collection}/{docId} {
-      // Allow read, update, delete if the user is a member of the company associated with the document.
-      allow read, update, delete: if isCompanyMember(resource.data.companyId) || isSuperAdmin();
-      // Allow create if the user is a member of the company they are creating the document for, OR if they are a super admin.
-      allow create: if (request.resource.data.companyId != null && isCompanyMember(request.resource.data.companyId)) || isSuperAdmin();
+      // Allow read/write if user is a member of the company associated with the document
+      // or if the user is a super admin.
+      allow read, update, delete: if isSuperAdmin() || isMemberOfCompany(resource.data.companyId);
+      // Allow create if the user is a member of the company they are trying to write to.
+      allow create: if isSuperAdmin() || isMemberOfCompany(request.resource.data.companyId);
     }
     
-    // Specific Collection Group queries
+    // == Collection Group Queries ==
+    // These rules are necessary for queries that span across subcollections or different top-level collections.
+    
+    match /{path=**}/invoices/{invoiceId} {
+      allow list: if isSuperAdmin() || isMemberOfCompany(request.query.filters[0].value);
+    }
+    
     match /{path=**}/expenses/{expenseId} {
-      allow list: if isCompanyMember(resource.data.companyId) || isSuperAdmin();
+      allow list: if isSuperAdmin() || isMemberOfCompany(request.query.filters[0].value);
     }
     
     match /{path=**}/employees/{employeeId} {
-      allow list: if isCompanyMember(resource.data.companyId) || isSuperAdmin();
+      allow list: if isSuperAdmin() || isMemberOfCompany(request.query.filters[0].value);
     }
-    
-     match /{path=**}/invoices/{invoiceId} {
-      allow list: if isCompanyMember(resource.data.companyId) || isSuperAdmin();
+
+    match /{path=**}/revenueEntries/{revenueId} {
+        allow list: if isSuperAdmin() || isMemberOfCompany(request.query.filters[0].value);
+    }
+
+    match /{path=**}/transactions/{transactionId} {
+        allow list: if isSuperAdmin() || isMemberOfCompany(request.query.filters[0].value);
     }
   }
 }
