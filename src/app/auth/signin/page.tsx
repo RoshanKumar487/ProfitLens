@@ -3,7 +3,7 @@
 
 import React from 'react';
 import Link from 'next/link';
-import { useActionState } from 'react';
+import { useActionState, useEffect } from 'react';
 import { useFormStatus } from 'react-dom';
 import { signIn } from '../actions';
 import { Button } from '@/components/ui/button';
@@ -12,6 +12,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { useToast } from '@/hooks/use-toast';
 import { Loader2 } from 'lucide-react';
+import { useRouter } from 'next/navigation';
 
 function SubmitButton() {
   const { pending } = useFormStatus();
@@ -26,8 +27,9 @@ function SubmitButton() {
 export default function SignInPage() {
   const [state, formAction] = useActionState(signIn, undefined);
   const { toast } = useToast();
+  const router = useRouter();
 
-  React.useEffect(() => {
+  useEffect(() => {
     if (state?.error) {
       toast({
         title: 'Sign In Failed',
@@ -35,7 +37,10 @@ export default function SignInPage() {
         variant: 'destructive',
       });
     }
-  }, [state, toast]);
+    if (state?.success) {
+      router.push('/dashboard');
+    }
+  }, [state, toast, router]);
 
   return (
     <div className="flex min-h-screen items-center justify-center bg-background p-4">

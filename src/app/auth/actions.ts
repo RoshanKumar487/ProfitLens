@@ -93,13 +93,10 @@ export async function signIn(previousState: any, formData: FormData) {
         
     } catch (error) {
         console.error('Sign in error:', error);
-        if (error instanceof Error && error.name === 'NEXT_REDIRECT') {
-          throw error;
-        }
         return { error: 'An unexpected error occurred.' };
     }
     
-    redirect('/dashboard');
+    return { success: true };
 }
 
 export async function signUp(previousState: any, formData: FormData) {
@@ -150,11 +147,8 @@ export async function signUp(previousState: any, formData: FormData) {
 
     } catch (error) {
         console.error('Sign up error:', error);
-        if (error instanceof Error && error.name === 'NEXT_REDIRECT') {
-          throw error;
-        }
         return { error: 'An unexpected error occurred during sign-up.' };
     }
     
-    redirect('/dashboard');
+    return { success: true };
 }
