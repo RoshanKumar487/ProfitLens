@@ -8,17 +8,14 @@ import { Loader2 } from 'lucide-react';
 
 export default function HomePage() {
   const router = useRouter();
-  const { user, isLoading } = useAuth();
+  const { isLoading } = useAuth();
 
   useEffect(() => {
     if (!isLoading) {
-      if (user) {
-        router.replace('/dashboard');
-      } else {
-        router.replace('/auth/signin');
-      }
+      // Since auth is removed, directly redirect to the dashboard.
+      router.replace('/dashboard');
     }
-  }, [user, isLoading, router]);
+  }, [isLoading, router]);
 
   return (
     <div className="flex h-screen w-full items-center justify-center">
