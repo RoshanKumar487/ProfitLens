@@ -138,7 +138,7 @@ export default function NewInvoicePage() {
     }, []);
     
     useEffect(() => {
-        if (!user || !user.companyId) return;
+        if (!user?.companyId) return;
 
         const fetchInitialData = async () => {
             setIsLoading(true);
@@ -205,7 +205,7 @@ export default function NewInvoicePage() {
         };
 
         fetchInitialData();
-    }, [user, toast]);
+    }, [user?.companyId, toast]);
 
     useEffect(() => {
         if (!currentInvoice) return;
