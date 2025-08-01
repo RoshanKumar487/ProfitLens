@@ -9,7 +9,6 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from '@/components/ui/card';
 import { useToast } from '@/hooks/use-toast';
-import { useRouter } from 'next/navigation';
 import { signUp } from '../actions';
 import { Loader2, UserPlus } from 'lucide-react';
 import Link from 'next/link';
@@ -26,7 +25,6 @@ type SignUpFormValues = z.infer<typeof SignUpSchema>;
 
 export default function SignUpPage() {
   const { toast } = useToast();
-  const router = useRouter();
   const [isLoading, setIsLoading] = useState(false);
 
   const form = useForm<SignUpFormValues>({
@@ -50,16 +48,13 @@ export default function SignUpPage() {
           variant: 'destructive',
         });
       }
-      // If successful, the action will redirect, and an error will be thrown.
+      // The action now throws an error for redirection, which should not be caught here.
     } catch (error: any) {
-        // This is the key change: we check if the error is the special
-        // NEXT_REDIRECT error thrown by the `redirect()` function.
+        // This catch block will now correctly handle the NEXT_REDIRECT error
+        // by simply allowing it to propagate, or handle other unexpected errors.
         if (error.digest?.startsWith('NEXT_REDIRECT')) {
-            toast({ title: 'Sign Up Successful', description: 'Welcome! You are now being redirected to the dashboard.' });
-            router.refresh(); // Refresh the page to update auth state
-            throw error; // Re-throw to complete the redirection
+            throw error;
         }
-        // Handle other, unexpected errors
         console.error("Sign up failed:", error);
         toast({
             title: 'An Unexpected Error Occurred',

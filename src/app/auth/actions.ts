@@ -30,9 +30,9 @@ export async function signUp(formData: unknown) {
   }
 
   const { name, email, password, companyName } = result.data;
-  const db = await getDb();
-
+  
   try {
+    const db = await getDb();
     const existingUser = await db.get('SELECT id FROM users WHERE email = ?', email);
     if (existingUser) {
       return { success: false, error: 'A user with this email already exists.' };
@@ -60,16 +60,13 @@ export async function signUp(formData: unknown) {
 
     await createSession(userId, companyId);
     
-    // Redirect after successful sign-up
-    redirect('/dashboard');
-
   } catch (e: any) {
-    if (e.digest?.startsWith('NEXT_REDIRECT')) {
-        throw e;
-    }
     console.error('Sign-up error:', e);
     return { success: false, error: 'An unexpected server error occurred during sign up.' };
   }
+  
+  // Redirect after successful sign-up
+  redirect('/dashboard');
 }
 
 export async function signIn(formData: unknown) {
@@ -79,10 +76,10 @@ export async function signIn(formData: unknown) {
   }
 
   const { email, password } = result.data;
-  const db = await getDb();
-  
   let user;
+  
   try {
+    const db = await getDb();
     user = await db.get('SELECT * FROM users WHERE email = ?', email);
     if (!user) {
       return { success: false, error: 'Invalid email or password.' };
