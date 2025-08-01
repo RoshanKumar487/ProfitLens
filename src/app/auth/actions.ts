@@ -60,13 +60,16 @@ export async function signUp(formData: unknown) {
 
     await createSession(userId, companyId);
     
+    // Redirect after successful sign-up
+    redirect('/dashboard');
+
   } catch (e: any) {
+    if (e.digest?.startsWith('NEXT_REDIRECT')) {
+        throw e;
+    }
     console.error('Sign-up error:', e);
     return { success: false, error: 'An unexpected server error occurred during sign up.' };
   }
-  
-  // Redirect after successful sign-up
-  redirect('/dashboard');
 }
 
 export async function signIn(formData: unknown) {
