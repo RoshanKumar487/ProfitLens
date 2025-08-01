@@ -66,29 +66,32 @@ export async function signOutAction() {
 export async function signIn(previousState: any, formData: FormData) {
     const email = formData.get('email') as string;
     const password = formData.get('password') as string;
+    const companyCode = formData.get('companyCode') as string;
 
-    if (!email || !password) {
-        return { error: 'Email and password are required.' };
+    if (!email || !password || !companyCode) {
+        return { error: 'Email, password, and company code are required.' };
     }
 
     try {
         const { db } = await connectToDatabase();
-        const user = await db.collection('users').findOne({ email });
+        
+        // First, find the company by its public code
+        const company = await db.collection('companyProfiles').findOne({ publicId: companyCode });
+        if (!company) {
+            return { error: 'Invalid company code.' };
+        }
 
+        // Now, find the user within that company
+        const user = await db.collection('users').findOne({ email, companyId: company._id });
         if (!user) {
-            return { error: 'Invalid email or password.' };
+            return { error: 'Invalid email or password for this company.' };
         }
 
         const passwordsMatch = await bcrypt.compare(password, user.password);
-
         if (!passwordsMatch) {
-            return { error: 'Invalid email or password.' };
+            return { error: 'Invalid email or password for this company.' };
         }
         
-        if (!user.companyId) {
-            return { error: 'User is not associated with a company.' };
-        }
-
         await createSession(user._id.toHexString(), user.companyId.toHexString());
         
     } catch (error) {
