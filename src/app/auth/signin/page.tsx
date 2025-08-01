@@ -37,17 +37,33 @@ export default function SignInPage() {
 
   const onSubmit = async (values: SignInFormValues) => {
     setIsLoading(true);
+    
     // The signIn action now handles redirection on success.
-    // We only need to handle the error case here.
-    const result = await signIn(values);
-    setIsLoading(false);
-
-    if (result?.error) {
-      toast({
-        title: 'Sign In Failed',
-        description: result.error,
-        variant: 'destructive',
-      });
+    // It will throw an error for redirection, which should not be caught here.
+    // We only need to handle the case where it returns an error object.
+    try {
+        const result = await signIn(values);
+        if (result?.error) {
+          toast({
+            title: 'Sign In Failed',
+            description: result.error,
+            variant: 'destructive',
+          });
+        }
+    } catch (error: any) {
+        // This catch block will now correctly handle the NEXT_REDIRECT error
+        // by simply allowing it to propagate, or handle other unexpected errors.
+        if (error.digest?.startsWith('NEXT_REDIRECT')) {
+            throw error;
+        }
+        console.error("Sign in failed:", error);
+        toast({
+            title: 'An Unexpected Error Occurred',
+            description: 'Please try signing in again.',
+            variant: 'destructive',
+        });
+    } finally {
+        setIsLoading(false);
     }
   };
 

@@ -1,3 +1,4 @@
+
 'use client';
 
 import React, { useState } from 'react';
@@ -44,7 +45,7 @@ export default function SignUpPage() {
     setIsLoading(false);
 
     if (result.success) {
-      toast({ title: 'Sign Up Successful', description: 'Welcome to BizSight!' });
+      toast({ title: 'Sign Up Successful', description: 'Welcome! You are now being redirected to the dashboard.' });
       router.push('/dashboard');
       router.refresh();
     } else {

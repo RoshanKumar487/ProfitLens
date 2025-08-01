@@ -58,12 +58,14 @@ export async function signUp(formData: unknown) {
 
     if (userId) {
       await createSession(userId, companyId);
+      // No redirect here, sign-up page handles it
       return { success: true };
     } else {
       return { success: false, error: 'Failed to create user.' };
     }
   } catch (e: any) {
-    return { success: false, error: e.message || 'An unexpected error occurred.' };
+    console.error('Sign-up error:', e);
+    return { success: false, error: 'An unexpected server error occurred during sign up.' };
   }
 }
 
@@ -75,9 +77,10 @@ export async function signIn(formData: unknown) {
 
   const { email, password } = result.data;
   const db = await getDb();
-
+  
+  let user;
   try {
-    const user = await db.get('SELECT * FROM users WHERE email = ?', email);
+    user = await db.get('SELECT * FROM users WHERE email = ?', email);
     if (!user) {
       return { success: false, error: 'Invalid email or password.' };
     }
@@ -86,12 +89,15 @@ export async function signIn(formData: unknown) {
     if (!isPasswordValid) {
       return { success: false, error: 'Invalid email or password.' };
     }
-
-    await createSession(user.id, user.companyId);
-    redirect('/dashboard');
   } catch (e: any) {
-    return { success: false, error: e.message || 'An unexpected error occurred.' };
+      console.error('Sign-in DB error:', e);
+      return { success: false, error: 'An unexpected server error occurred during sign in.' };
   }
+  
+  // If we reach here, credentials are valid.
+  // Create session and then redirect.
+  await createSession(user.id, user.companyId);
+  redirect('/dashboard');
 }
 
 async function createSession(userId: number, companyId: number) {
