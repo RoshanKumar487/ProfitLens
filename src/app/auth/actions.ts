@@ -95,12 +95,14 @@ export async function signIn(formData: unknown) {
     if (!isPasswordValid) {
       return { success: false, error: 'Invalid email or password.' };
     }
+    
+    await createSession(user._id.toHexString(), user.companyId.toHexString());
+    
   } catch (e: any) {
       console.error('Sign-in DB error:', e);
       return { success: false, error: 'An unexpected server error occurred during sign in.' };
   }
-  
-  await createSession(user._id.toHexString(), user.companyId.toHexString());
+
   redirect('/dashboard');
 }
 
