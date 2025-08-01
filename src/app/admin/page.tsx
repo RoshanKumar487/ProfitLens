@@ -1,82 +1,40 @@
 
 'use client';
 
-import React, { useState, useEffect, useCallback, useMemo } from 'react';
+import React from 'react';
 import PageTitle from '@/components/PageTitle';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow, TableCaption } from '@/components/ui/table';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { useAuth } from '@/contexts/AuthContext';
-import { db } from '@/lib/firebaseConfig';
-import { collection, query, where, getDocs, orderBy, Timestamp, doc, type DocumentData, limit, startAfter, endBefore, limitToLast, type QueryDocumentSnapshot } from 'firebase/firestore';
-import { Shield, Check, X, Loader2, Users } from 'lucide-react';
-import { useToast } from '@/hooks/use-toast';
-import { approveUserRequest, rejectUserRequest, updateUserRole } from './actions';
-import { format } from 'date-fns';
+import { Shield, Check, X, Users } from 'lucide-react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Pagination, PaginationContent, PaginationItem, PaginationPrevious, PaginationNext } from '@/components/ui/pagination';
+import { useToast } from '@/hooks/use-toast';
 
-interface AccessRequest {
-  id: string;
-  userId: string;
-  userName: string;
-  userEmail: string;
-  companyName: string;
-  status: 'pending' | 'approved' | 'rejected';
-  createdAt: Date;
-}
 
-interface CompanyUser extends DocumentData {
-  id: string;
-  displayName: string;
-  email: string;
-  role: 'admin' | 'member' | 'pending' | 'rejected';
-}
+const MOCK_REQUESTS = [
+    { id: 'req1', userId: 'user1', userName: 'Alice Johnson', userEmail: 'alice@example.com', createdAt: new Date(), status: 'pending' as const },
+    { id: 'req2', userId: 'user2', userName: 'Bob Williams', userEmail: 'bob@example.com', createdAt: new Date(Date.now() - 86400000), status: 'approved' as const },
+];
 
-const RECORDS_PER_PAGE = 20;
+const MOCK_USERS = [
+    { id: 'user1', displayName: 'Alice Johnson', email: 'alice@example.com', role: 'pending' as const },
+    { id: 'user2', displayName: 'Bob Williams', email: 'bob@example.com', role: 'member' as const },
+    { id: 'user3', displayName: 'Demo User', email: 'user@example.com', role: 'admin' as const },
+];
+
 
 export default function AdminPage() {
-  const { user, isLoading: authLoading } = useAuth();
-  const [requests, setRequests] = useState<AccessRequest[]>([]);
-  const [users, setUsers] = useState<CompanyUser[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
-  const [isProcessing, setIsProcessing] = useState<string | null>(null);
+  const { user } = useAuth();
   const { toast } = useToast();
 
-  const [requestsPage, setRequestsPage] = useState(1);
-  const [usersPage, setUsersPage] = useState(1);
-
-  useEffect(() => {
-    // Removed all Firebase data fetching logic to prevent errors
-    // after backend disconnection.
-    setIsLoading(false);
-  }, []);
-
-  const handleApprove = async (requestId: string, userId: string) => {
-    setIsProcessing(requestId);
-    toast({ title: 'Action Disabled', description: 'Cannot approve user without a backend connection.', variant: 'destructive' });
-    setIsProcessing(null);
+  const handleAction = () => {
+    toast({ title: 'Action Disabled', description: 'Cannot perform this action without a backend connection.', variant: 'destructive' });
   };
-
-  const handleReject = async (requestId: string, userId: string) => {
-    setIsProcessing(requestId);
-    toast({ title: 'Action Disabled', description: 'Cannot reject user without a backend connection.', variant: 'destructive' });
-    setIsProcessing(null);
-  };
-
-  const handleRoleChange = async (userId: string, newRole: 'admin' | 'member') => {
-    if(userId === user?.uid) {
-        toast({ title: 'Action Not Allowed', description: 'You cannot change your own role.', variant: 'destructive'});
-        return;
-    }
-    setIsProcessing(userId);
-    toast({ title: 'Action Disabled', description: 'Cannot update role without a backend connection.', variant: 'destructive' });
-    setIsProcessing(null);
-  };
-
-  const getStatusBadgeVariant = (status: AccessRequest['status']) => {
+  
+  const getStatusBadgeVariant = (status: 'pending' | 'approved' | 'rejected') => {
     switch (status) {
       case 'approved': return 'default';
       case 'pending': return 'secondary';
@@ -84,10 +42,6 @@ export default function AdminPage() {
       default: return 'outline';
     }
   };
-
-  if (authLoading || isLoading) {
-    return <div className="flex justify-center items-center h-64 p-4 sm:p-6 lg:p-8"><Loader2 className="h-12 w-12 animate-spin text-primary" /></div>;
-  }
 
   if (user?.role !== 'admin') {
     return (
@@ -103,7 +57,7 @@ export default function AdminPage() {
       <PageTitle title="Administration" subtitle="Manage user access and roles for your company." icon={Shield} />
       <Tabs defaultValue="requests">
         <TabsList className="grid w-full grid-cols-2">
-            <TabsTrigger value="requests">Access Requests <Badge className="ml-2">{requests.filter(r => r.status === 'pending').length}</Badge></TabsTrigger>
+            <TabsTrigger value="requests">Access Requests <Badge className="ml-2">{MOCK_REQUESTS.filter(r => r.status === 'pending').length}</Badge></TabsTrigger>
             <TabsTrigger value="users">User Management</TabsTrigger>
         </TabsList>
         <TabsContent value="requests">
@@ -111,20 +65,19 @@ export default function AdminPage() {
                 <CardHeader><CardTitle>Access Requests</CardTitle><CardDescription>Review and manage requests from users wanting to join your company profile.</CardDescription></CardHeader>
                 <CardContent>
                     <Table>
-                        <TableCaption>{requests.length === 0 ? "No access requests found." : `Page ${requestsPage} of access requests.`}</TableCaption>
-                        <TableHeader><TableRow><TableHead>User</TableHead><TableHead>Email</TableHead><TableHead>Requested On</TableHead><TableHead>Status</TableHead><TableHead className="text-right">Actions</TableHead></TableRow></TableHeader>
+                        <TableCaption>A list of recent access requests.</TableCaption>
+                        <TableHeader><TableRow><TableHead>User</TableHead><TableHead>Email</TableHead><TableHead>Status</TableHead><TableHead className="text-right">Actions</TableHead></TableRow></TableHeader>
                         <TableBody>
-                        {requests.map(req => (
+                        {MOCK_REQUESTS.map(req => (
                             <TableRow key={req.id}>
                             <TableCell className="font-medium">{req.userName}</TableCell>
                             <TableCell>{req.userEmail}</TableCell>
-                            <TableCell>{format(req.createdAt, 'PPP p')}</TableCell>
                             <TableCell><Badge variant={getStatusBadgeVariant(req.status)} className="capitalize">{req.status}</Badge></TableCell>
                             <TableCell className="text-right">
                                 {req.status === 'pending' ? (
                                 <div className="flex gap-2 justify-end">
-                                    <Button size="sm" variant="outline" onClick={() => handleApprove(req.id, req.userId)} disabled={isProcessing === req.id}>{isProcessing === req.id ? <Loader2 className="h-4 w-4 animate-spin" /> : <Check className="h-4 w-4 text-green-600" />}</Button>
-                                    <Button size="sm" variant="outline" onClick={() => handleReject(req.id, req.userId)} disabled={isProcessing === req.id}>{isProcessing === req.id ? <Loader2 className="h-4 w-4 animate-spin" /> : <X className="h-4 w-4 text-red-600" />}</Button>
+                                    <Button size="sm" variant="outline" onClick={handleAction}><Check className="h-4 w-4 text-green-600" /></Button>
+                                    <Button size="sm" variant="outline" onClick={handleAction}><X className="h-4 w-4 text-red-600" /></Button>
                                 </div>
                                 ) : (<span className="text-sm text-muted-foreground">Processed</span>)}
                             </TableCell>
@@ -132,17 +85,6 @@ export default function AdminPage() {
                         ))}
                         </TableBody>
                     </Table>
-                      <div className="flex items-center justify-between pt-4">
-                          <div className="text-sm text-muted-foreground">
-                              Page {requestsPage}
-                          </div>
-                          <Pagination>
-                              <PaginationContent>
-                                  <PaginationItem><PaginationPrevious href="#" className={'pointer-events-none opacity-50'}/></PaginationItem>
-                                  <PaginationItem><PaginationNext href="#" className={'pointer-events-none opacity-50'}/></PaginationItem>
-                              </PaginationContent>
-                          </Pagination>
-                      </div>
                 </CardContent>
             </Card>
         </TabsContent>
@@ -151,18 +93,18 @@ export default function AdminPage() {
                 <CardHeader><CardTitle>User Management</CardTitle><CardDescription>Assign roles to users within your company.</CardDescription></CardHeader>
                 <CardContent>
                     <Table>
-                        <TableCaption>{users.length === 0 ? "No users found." : `Page ${usersPage} of users.`}</TableCaption>
+                        <TableCaption>A list of users in your company.</TableCaption>
                         <TableHeader><TableRow><TableHead>User</TableHead><TableHead>Email</TableHead><TableHead className="w-[150px]">Role</TableHead></TableRow></TableHeader>
                         <TableBody>
-                            {users.map(u => (
+                            {MOCK_USERS.map(u => (
                                 <TableRow key={u.id}>
                                     <TableCell className="font-medium">{u.displayName}</TableCell>
                                     <TableCell>{u.email}</TableCell>
                                     <TableCell>
                                         <Select
                                             value={u.role}
-                                            onValueChange={(newRole: 'admin' | 'member') => handleRoleChange(u.id, newRole)}
-                                            disabled={isProcessing === u.id || u.id === user?.uid}
+                                            onValueChange={handleAction}
+                                            disabled={u.id === user?.uid}
                                         >
                                             <SelectTrigger className="capitalize"><SelectValue /></SelectTrigger>
                                             <SelectContent>
@@ -175,17 +117,6 @@ export default function AdminPage() {
                             ))}
                         </TableBody>
                     </Table>
-                      <div className="flex items-center justify-between pt-4">
-                          <div className="text-sm text-muted-foreground">
-                              Page {usersPage}
-                          </div>
-                          <Pagination>
-                              <PaginationContent>
-                                  <PaginationItem><PaginationPrevious href="#" className={'pointer-events-none opacity-50'}/></PaginationItem>
-                                  <PaginationItem><PaginationNext href="#" className={'pointer-events-none opacity-50'}/></PaginationItem>
-                              </PaginationContent>
-                          </Pagination>
-                      </div>
                 </CardContent>
             </Card>
         </TabsContent>

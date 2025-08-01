@@ -1,7 +1,6 @@
 
 'use client';
 
-import type { AuthError } from 'firebase/auth'; // Keep type for mock compatibility
 import { createContext, useContext, useEffect, useState, type ReactNode } from 'react';
 import { useRouter } from 'next/navigation';
 
@@ -11,29 +10,17 @@ interface User {
   displayName: string | null;
   companyId: string | null; 
   companyName: string | null;
-  country?: string;
+  publicCompanyId: string | null;
   currencySymbol: string;
-  role: 'admin'; // Hardcoded for UI rendering
+  role: 'admin' | 'member' | 'pending' | 'rejected';
   isSuperAdmin: boolean;
-  getIdToken: () => Promise<string | null>;
-}
-
-interface SignUpCompanyInfo {
-  id?: string; 
-  name: string;
 }
 
 interface AuthContextType {
   user: User | null;
   isLoading: boolean;
-  error: AuthError | null;
   currencySymbol: string;
-  // All auth functions are now mock implementations
-  signUp: (email: string, password: string, displayName: string, companyInfo: SignUpCompanyInfo) => Promise<any>;
-  signIn: (email: string, password: string) => Promise<any>;
   signOut: () => Promise<void>;
-  sendPasswordReset: (email: string) => Promise<void>;
-  getIdToken: () => Promise<string | null>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -44,12 +31,11 @@ const mockUser: User = {
   email: 'user@example.com',
   displayName: 'Demo User',
   companyId: 'mock-company-123',
+  publicCompanyId: 'MOCK-ID',
   companyName: 'Demo Company Inc.',
-  country: 'US',
   currencySymbol: '$',
   role: 'admin',
   isSuperAdmin: true,
-  getIdToken: async () => 'mock-token',
 };
 
 export const AuthProvider = ({ children }: { children: ReactNode }) => {
@@ -57,7 +43,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [isLoading, setIsLoading] = useState(true);
   const router = useRouter();
 
-  // On initial load, set the mock user and stop loading.
   useEffect(() => {
     setUser(mockUser);
     setIsLoading(false);
@@ -66,13 +51,12 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const authContextValue: AuthContextType = {
     user,
     isLoading,
-    error: null,
     currencySymbol: user?.currencySymbol || '$',
-    signUp: async () => { console.log("Sign up is disabled."); router.push('/dashboard'); return Promise.resolve(null); },
-    signIn: async () => { console.log("Sign in is disabled."); router.push('/dashboard'); return Promise.resolve(null); },
-    signOut: async () => { setUser(null); router.push('/'); console.log("Signed out."); },
-    sendPasswordReset: async () => { console.log("Password reset is disabled."); },
-    getIdToken: async () => user?.getIdToken() || null,
+    signOut: async () => {
+      setUser(null);
+      router.push('/');
+      console.log("Signed out.");
+    },
   };
 
   return (
