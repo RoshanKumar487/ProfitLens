@@ -64,12 +64,10 @@ export async function signOutAction() {
 }
 
 export async function signIn(previousState: any, formData: FormData) {
-    const email = formData.get('email') as string;
-    const password = formData.get('password') as string;
     const companyCode = formData.get('companyCode') as string;
 
-    if (!email || !password || !companyCode) {
-        return { error: 'Email, password, and company code are required.' };
+    if (!companyCode) {
+        return { error: 'Company code is required.' };
     }
 
     try {
@@ -81,18 +79,13 @@ export async function signIn(previousState: any, formData: FormData) {
             return { error: 'Invalid company code.' };
         }
 
-        // Now, find the user within that company
-        const user = await db.collection('users').findOne({ email, companyId: company._id });
-        if (!user) {
-            return { error: 'Invalid email or password for this company.' };
-        }
-
-        const passwordsMatch = await bcrypt.compare(password, user.password);
-        if (!passwordsMatch) {
-            return { error: 'Invalid email or password for this company.' };
+        // Find the first admin user for that company to create a session
+        const adminUser = await db.collection('users').findOne({ companyId: company._id, role: 'admin' });
+        if (!adminUser) {
+            return { error: 'Could not find an administrative user for this company.' };
         }
         
-        await createSession(user._id.toHexString(), user.companyId.toHexString());
+        await createSession(adminUser._id.toHexString(), adminUser.companyId.toHexString());
         
     } catch (error) {
         console.error('Sign in error:', error);

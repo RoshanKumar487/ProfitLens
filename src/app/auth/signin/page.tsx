@@ -43,20 +43,12 @@ export default function SignInPage() {
         <form action={formAction}>
           <CardHeader>
             <CardTitle className="text-2xl">Sign In</CardTitle>
-            <CardDescription>Enter your credentials to access your account.</CardDescription>
+            <CardDescription>Enter your company code to access your dashboard.</CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
             <div className="space-y-2">
-              <Label htmlFor="email">Email</Label>
-              <Input id="email" name="email" type="email" placeholder="m@example.com" required />
-            </div>
-            <div className="space-y-2">
               <Label htmlFor="companyCode">Company Code</Label>
               <Input id="companyCode" name="companyCode" type="text" placeholder="Your company's unique code" required />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="password">Password</Label>
-              <Input id="password" name="password" type="password" required />
             </div>
           </CardContent>
           <CardFooter className="flex-col gap-4">
