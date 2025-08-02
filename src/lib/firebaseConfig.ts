@@ -4,12 +4,14 @@ import { initializeApp, getApps } from "firebase/app";
 import { getAuth } from "firebase/auth";
 
 const firebaseConfig = {
-  apiKey: "REPLACE_WITH_YOUR_API_KEY",
-  authDomain: "REPLACE_WITH_YOUR_AUTH_DOMAIN",
-  projectId: "REPLACE_WITH_YOUR_PROJECT_ID",
-  storageBucket: "REPLACE_WITH_YOUR_STORAGE_BUCKET",
-  messagingSenderId: "REPLACE_WITH_YOUR_MESSAGING_SENDER_ID",
-  appId: "REPLACE_WITH_YOUR_APP_ID",
+  apiKey: "AIzaSyAW4JEuIEsVGMMRpQJYaGTf1dzLv_meXx8",
+  authDomain: "profitlenz-68b39.firebaseapp.com",
+  databaseURL: "https://profitlenz-68b39-default-rtdb.firebaseio.com",
+  projectId: "profitlenz-68b39",
+  storageBucket: "profitlenz-68b39.appspot.com",
+  messagingSenderId: "579389453160",
+  appId: "1:579389453160:web:424ddeedc575fa6b775cdd",
+  measurementId: "G-VTJZVVNFJ6"
 };
 
 // Initialize Firebase
