@@ -1,49 +1,32 @@
 
 'use server';
+import 'server-only';
 
-import { SignJWT, jwtVerify } from 'jose';
 import { cookies } from 'next/headers';
+import admin from './firebaseAdminConfig';
 
-const secretKey = process.env.SESSION_SECRET || 'your-fallback-secret-key';
-const key = new TextEncoder().encode(secretKey);
-
-if (!process.env.SESSION_SECRET) {
-    console.warn("SESSION_SECRET is not set in .env file. Using a default, insecure key.");
+export async function createSession(idToken: string) {
+  const expiresIn = 60 * 60 * 24 * 14 * 1000; // 14 days
+  const sessionCookie = await admin.auth().createSessionCookie(idToken, { expiresIn });
+  
+  cookies().set('session', sessionCookie, {
+    maxAge: expiresIn,
+    httpOnly: true,
+    secure: process.env.NODE_ENV === 'production',
+    path: '/',
+  });
 }
 
-export async function encrypt(payload: any) {
-  return await new SignJWT(payload)
-    .setProtectedHeader({ alg: 'HS256' })
-    .setIssuedAt()
-    .setExpirationTime('365d') // Session expires in 1 year
-    .sign(key);
-}
-
-export async function decrypt(input: string): Promise<any> {
+export async function getSession() {
   try {
-    const { payload } = await jwtVerify(input, key, {
-      algorithms: ['HS256'],
-    });
-    return payload;
+    const sessionCookie = cookies().get('session')?.value;
+    if (!sessionCookie) return null;
+    return await admin.auth().verifySessionCookie(sessionCookie, true);
   } catch (error) {
-    // This can happen if the token is expired or invalid
     return null;
   }
 }
 
-export async function createSession(userId: string, companyId: string) {
-  const expires = new Date(Date.now() + 365 * 24 * 60 * 60 * 1000); // Expires in 1 year
-  const session = await encrypt({ userId, companyId });
-
-  cookies().set('session', session, { expires, httpOnly: true });
-}
-
-export async function getSession() {
-  const sessionCookie = cookies().get('session')?.value;
-  if (!sessionCookie) return null;
-  return await decrypt(sessionCookie);
-}
-
 export async function deleteSession() {
-  cookies().set('session', '', { expires: new Date(0) });
+  cookies().delete('session');
 }

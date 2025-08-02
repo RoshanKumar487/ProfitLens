@@ -3,7 +3,9 @@
 
 import { createContext, useContext, useEffect, useState, type ReactNode } from 'react';
 import { useRouter, usePathname } from 'next/navigation';
-import { getCurrentUser, signOutAction } from '@/app/auth/actions';
+import { onAuthStateChanged, signOut as firebaseSignOut, type User as FirebaseUser } from 'firebase/auth';
+import { auth } from '@/lib/firebaseConfig';
+import { getCurrentUser } from '@/app/auth/actions';
 
 interface User {
   uid: string;
@@ -19,6 +21,7 @@ interface User {
 
 interface AuthContextType {
   user: User | null;
+  firebaseUser: FirebaseUser | null;
   isLoading: boolean;
   currencySymbol: string;
   signOut: () => Promise<void>;
@@ -28,39 +31,51 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [user, setUser] = useState<User | null>(null);
+  const [firebaseUser, setFirebaseUser] = useState<FirebaseUser | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const router = useRouter();
   const pathname = usePathname();
 
   useEffect(() => {
-    const checkUser = async () => {
-        setIsLoading(true);
+    const unsubscribe = onAuthStateChanged(auth, async (fbUser) => {
+      setIsLoading(true);
+      if (fbUser) {
+        setFirebaseUser(fbUser);
         try {
-            const currentUser = await getCurrentUser();
-            setUser(currentUser as User | null);
-            if (!currentUser && !pathname.startsWith('/auth')) {
-                router.push('/auth/signin');
-            }
+          const appUser = await getCurrentUser();
+          setUser(appUser as User | null);
+           if (!appUser && !pathname.startsWith('/auth/signup-details')) {
+             // This case handles when Firebase user exists but app user profile is not complete
+             router.push('/auth/signup-details');
+           }
         } catch (error) {
-            console.error("Failed to fetch current user", error);
-            setUser(null);
-            if (!pathname.startsWith('/auth')) {
-                router.push('/auth/signin');
-            }
-        } finally {
-            setIsLoading(false);
+           console.error("Failed to fetch app user data", error);
+           setUser(null);
+           router.push('/auth/signin');
         }
-    };
-    checkUser();
+      } else {
+        setFirebaseUser(null);
+        setUser(null);
+        if (!pathname.startsWith('/auth')) {
+          router.push('/auth/signin');
+        }
+      }
+      setIsLoading(false);
+    });
+
+    return () => unsubscribe();
   }, [pathname, router]);
 
   const signOut = async () => {
-    await signOutAction();
+    await firebaseSignOut(auth);
     setUser(null);
+    setFirebaseUser(null);
+    router.push('/auth/signin');
   };
 
   const authContextValue: AuthContextType = {
     user,
+    firebaseUser,
     isLoading,
     currencySymbol: user?.currencySymbol || '$',
     signOut,
