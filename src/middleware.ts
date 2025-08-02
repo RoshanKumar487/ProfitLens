@@ -10,13 +10,25 @@ export async function middleware(request: NextRequest) {
 
   if (isAuthPage) {
     if (sessionCookie) {
-      return NextResponse.redirect(new URL('/dashboard', request.url));
+       const session = await getSession();
+       if (session) {
+         return NextResponse.redirect(new URL('/dashboard', request.url));
+       }
     }
     return NextResponse.next();
   }
 
   if (!sessionCookie) {
     return NextResponse.redirect(new URL('/auth/signin', request.url));
+  }
+  
+  // Verify the session is still valid
+  const session = await getSession();
+  if (!session) {
+      const response = NextResponse.redirect(new URL('/auth/signin', request.url));
+      // Clear the invalid cookie
+      response.cookies.delete('session');
+      return response;
   }
   
   return NextResponse.next();

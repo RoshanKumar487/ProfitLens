@@ -129,6 +129,11 @@ export default function SignInPage() {
           </Tabs>
         </CardContent>
         <CardFooter className="flex-col gap-4">
+           <div className="text-sm">
+            <Link href="/auth/forgot-password" className="font-semibold text-primary underline-offset-4 hover:underline">
+              Forgot password?
+            </Link>
+          </div>
           <div className="text-sm text-muted-foreground">
             Don&apos;t have an account?{' '}
             <Link href="/auth/signup" className="font-semibold text-primary underline-offset-4 hover:underline">
