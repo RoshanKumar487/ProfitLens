@@ -21,14 +21,22 @@ const nextConfig: NextConfig = {
   },
   webpack(config) {
     config.experiments = { ...config.experiments, asyncWebAssembly: true };
-    // This is the fix for the "node:process" error
+    
+    // This is the comprehensive fix for "node:..." and other server-side module errors
     config.resolve.fallback = {
       ...config.resolve.fallback,
-      'fs': false,
-      'net': false,
-      'tls': false,
-      'cardinal': false,
+      "fs": false,
+      "net": false,
+      "tls": false,
+      "cardinal": false,
+      "mongodb-client-encryption": false,
+      "kerberos": false,
+      "aws4": false,
+      "snappy": false,
+      "@mongodb-js/zstd": false,
+      "@aws-sdk/credential-providers": false,
     };
+    
     return config;
   },
 };
