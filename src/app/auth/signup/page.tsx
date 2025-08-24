@@ -38,8 +38,10 @@ export default function SignUpPage() {
     const result = await signUpWithEmail(data);
 
     if (result.success) {
-      toast({ title: 'Account created!', description: 'Please provide your company details.' });
-      router.push('/auth/signup-details');
+      toast({ title: 'Account created!', description: 'Redirecting you to the dashboard.' });
+      // The signup action now directly logs the user in and returns a redirect path.
+      router.push(result.redirect || '/dashboard');
+      router.refresh();
     } else {
       setError(result.error || 'An unknown error occurred.');
       form.setValue('password', '');

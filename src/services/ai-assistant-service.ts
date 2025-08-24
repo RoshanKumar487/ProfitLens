@@ -2,9 +2,9 @@
 'use server';
 
 import { analyzeExpenseOpportunities } from '@/ai/flows/analyze-expense-opportunities';
-import { connectToDatabase } from '@/lib/mongodb';
-import { ObjectId } from 'mongodb';
 
+// NOTE: All database functionality has been removed.
+// These functions now return empty or mock data to prevent errors.
 
 // Interface Definitions
 interface Employee {
@@ -35,126 +35,67 @@ interface Expense {
 
 // == EMPLOYEE SERVICES ==
 export async function listEmployees(companyId: string): Promise<any[]> {
-  try {
-    const { db } = await connectToDatabase();
-    const employees = await db.collection('employees')
-      .find({ companyId })
-      .project({ name: 1, position: 1, salary: 1, description: 1 })
-      .toArray();
-    return employees.map(emp => ({ ...emp, _id: emp._id.toString() }));
-  } catch (error) {
-    console.error("[Service Error] Listing employees:", error);
-    return [];
-  }
+  console.log(`[Mock Service] Listing employees for company ${companyId}`);
+  return Promise.resolve([
+    { name: 'Alice Johnson', position: 'Software Engineer', salary: 95000, description: 'Frontend specialist' },
+    { name: 'Bob Williams', position: 'Project Manager', salary: 105000, description: 'Core product team lead' }
+  ]);
 }
 
 export async function addEmployee(companyId: string, employeeData: Employee): Promise<string> {
-    try {
-        const { db } = await connectToDatabase();
-        const result = await db.collection('employees').insertOne({
-            ...employeeData,
-            companyId,
-            createdAt: new Date(),
-        });
-        return result.insertedId.toHexString();
-    } catch (error) {
-        console.error("[Service Error] Adding employee:", error);
-        throw new Error("Failed to add employee.");
-    }
+    console.log(`[Mock Service] Adding employee to company ${companyId}:`, employeeData);
+    return Promise.resolve(`new-employee-${Date.now()}`);
 }
 
 export async function findEmployeeByName(companyId: string, name: string): Promise<any | null> {
-    try {
-        const { db } = await connectToDatabase();
-        const employee = await db.collection('employees').findOne({ name, companyId });
-        if (employee) {
-            return { ...employee, _id: employee._id.toString() };
-        }
-        return null;
-    } catch (error) {
-        console.error("[Service Error] Finding employee by name:", error);
-        return null;
+    console.log(`[Mock Service] Finding employee by name: ${name}`);
+    if (name.toLowerCase().includes('alice')) {
+        return Promise.resolve({ id: 'emp1', name: 'Alice Johnson', position: 'Software Engineer', salary: 95000 });
     }
+    return Promise.resolve(null);
 }
 
 
 // == INVOICE SERVICES ==
 export async function listInvoices(companyId: string): Promise<any[]> {
   console.log(`[Mock Service] Listing invoices for company ${companyId}`);
-  // This part is not yet migrated as it's more complex and requires more info on invoice structure
-  return Promise.resolve([]);
+  return Promise.resolve([
+    { invoiceNumber: 'INV001', clientName: 'Acme Corp', amount: 2500, status: 'Paid' },
+    { invoiceNumber: 'INV002', clientName: 'Stark Industries', amount: 8000, status: 'Pending' }
+  ]);
 }
 
 export async function updateInvoiceStatus(companyId: string, invoiceNumber: string, status: 'Paid' | 'Pending' | 'Overdue' | 'Draft'): Promise<boolean> {
     console.log(`[Mock Service] Updating invoice ${invoiceNumber} to status ${status}`);
-    // This part is not yet migrated
     return Promise.resolve(true);
 }
 
 
 // == EXPENSE SERVICES ==
 export async function listExpenses(companyId: string): Promise<any[]> {
-    try {
-        const { db } = await connectToDatabase();
-        const expenses = await db.collection('expenses').find({ companyId }).toArray();
-        return expenses.map(exp => ({ ...exp, _id: exp._id.toString() }));
-    } catch (error) {
-        console.error("[Service Error] Listing expenses:", error);
-        return [];
-    }
+    console.log(`[Mock Service] Listing expenses for company ${companyId}`);
+    return Promise.resolve([
+        { date: new Date(), amount: 150, category: 'Office Supplies', description: 'Printer paper' }
+    ]);
 }
 
 export async function addExpense(companyId: string, expenseData: Expense): Promise<string> {
-    try {
-        const { db } = await connectToDatabase();
-        const result = await db.collection('expenses').insertOne({
-            ...expenseData,
-            companyId,
-            createdAt: new Date(),
-        });
-        return result.insertedId.toHexString();
-    } catch (error) {
-        console.error("[Service Error] Adding expense:", error);
-        throw new Error("Failed to add expense.");
-    }
+    console.log(`[Mock Service] Adding expense to company ${companyId}:`, expenseData);
+    return Promise.resolve(`new-expense-${Date.now()}`);
 }
 
 export async function deleteLastExpense(companyId: string): Promise<boolean> {
-    try {
-        const { db } = await connectToDatabase();
-        const lastExpense = await db.collection('expenses').find({ companyId }).sort({ createdAt: -1 }).limit(1).toArray();
-        if (lastExpense.length > 0) {
-            await db.collection('expenses').deleteOne({ _id: lastExpense[0]._id });
-            return true;
-        }
-        return false;
-    } catch (error) {
-        console.error("[Service Error] Deleting last expense:", error);
-        return false;
-    }
+    console.log(`[Mock Service] Deleting last expense for company ${companyId}`);
+    return Promise.resolve(true);
 }
 
 // == REPORTING & ANALYSIS SERVICES ==
 export async function generateFinancialSummary(companyId: string): Promise<any> {
+  console.log(`[Mock Service] Generating financial summary for company ${companyId}`);
+  const totalRevenue = 50000;
+  const totalExpenses = 30000;
+  
   try {
-    const { db } = await connectToDatabase();
-    
-    // Fetch total revenue (using a simplified model for now)
-    const revenuePipeline = [
-      { $match: { companyId } },
-      { $group: { _id: null, total: { $sum: "$amount" } } }
-    ];
-    const revenueResult = await db.collection('revenues').aggregate(revenuePipeline).toArray();
-    const totalRevenue = revenueResult.length > 0 ? revenueResult[0].total : 0;
-    
-    // Fetch total expenses
-    const expensePipeline = [
-      { $match: { companyId } },
-      { $group: { _id: null, total: { $sum: "$amount" } } }
-    ];
-    const expenseResult = await db.collection('expenses').aggregate(expensePipeline).toArray();
-    const totalExpenses = expenseResult.length > 0 ? expenseResult[0].total : 0;
-
     const analysis = await analyzeExpenseOpportunities({
         revenue: totalRevenue,
         expenses: totalExpenses,
@@ -168,12 +109,11 @@ export async function generateFinancialSummary(companyId: string): Promise<any> 
     };
   } catch (error) {
     console.error("[Service Error] Generating financial summary:", error);
-    // Return a default structure on error
     return {
-      totalRevenue: 0,
-      totalExpenses: 0,
-      netProfit: 0,
-      analysis: { summary: "Could not generate analysis due to an error.", opportunities: [], recommendations: [] }
+      totalRevenue,
+      totalExpenses,
+      netProfit: totalRevenue - totalExpenses,
+      analysis: { summary: "AI analysis could not be generated.", opportunities: [], recommendations: [] }
     };
   }
 }
