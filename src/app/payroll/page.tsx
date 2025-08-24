@@ -13,7 +13,7 @@ import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { HandCoins, Loader2, Save, Calendar as CalendarIcon, Settings, Printer, PlusCircle, Trash2, Search, Download, MoreHorizontal, Mail, Send } from 'lucide-react';
 import { format, startOfMonth, getDaysInMonth } from 'date-fns';
 import { getPayrollDataForPeriod, savePayrollData, deletePayrollRecord, sendPayslipEmail } from './actions';
-import { getPayrollSettings, type PayrollSettings } from '../settings/actions';
+import { getPayrollSettings, type PayrollSettings } from '@/app/settings/actions';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Calendar } from '@/components/ui/calendar';
@@ -553,3 +553,7 @@ export default function PayrollPage() {
     </div>
   );
 }
+
+    
+
+    

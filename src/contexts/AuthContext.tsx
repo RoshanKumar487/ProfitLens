@@ -1,7 +1,11 @@
 
 'use client';
 
-import { createContext, useContext, useState, type ReactNode } from 'react';
+import React, { createContext, useContext, useState, useEffect, type ReactNode } from 'react';
+import { onAuthStateChanged, getAuth, User as FirebaseUser } from 'firebase/auth';
+import { app } from '@/lib/firebaseConfig';
+import { Loader2 } from 'lucide-react';
+import { getCurrentUser } from '@/app/auth/actions';
 
 interface User {
   uid: string;
@@ -19,39 +23,43 @@ interface AuthContextType {
   user: User | null;
   isLoading: boolean;
   currencySymbol: string;
-  signOut: () => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
-// Mock user data since authentication is removed
-const MOCK_USER: User = {
-    uid: 'mock-user-123',
-    email: 'user@example.com',
-    displayName: 'Demo User',
-    companyId: 'mock-company-123',
-    companyName: 'Demo Company Inc.',
-    publicCompanyId: 'CMP-DEMO123',
-    currencySymbol: '$',
-    role: 'admin',
-    isSuperAdmin: true,
-};
-
-
 export const AuthProvider = ({ children }: { children: ReactNode }) => {
-  const [user] = useState<User | null>(MOCK_USER);
-  const [isLoading] = useState(false);
+  const [user, setUser] = useState<User | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
 
-  const signOut = async () => {
-    console.log("Signing out is disabled as authentication is removed.");
-  };
+  useEffect(() => {
+    const unsubscribe = onAuthStateChanged(getAuth(app), async (firebaseUser) => {
+      if (firebaseUser) {
+        // User is signed in, fetch full profile from our DB
+        const fullUser = await getCurrentUser();
+        setUser(fullUser);
+      } else {
+        // User is signed out
+        setUser(null);
+      }
+      setIsLoading(false);
+    });
+
+    return () => unsubscribe();
+  }, []);
 
   const authContextValue: AuthContextType = {
     user,
     isLoading,
     currencySymbol: user?.currencySymbol || '$',
-    signOut,
   };
+  
+  if (isLoading) {
+    return (
+        <div className="flex h-screen w-screen items-center justify-center">
+            <Loader2 className="h-12 w-12 animate-spin text-primary" />
+        </div>
+    )
+  }
 
   return (
     <AuthContext.Provider value={authContextValue}>

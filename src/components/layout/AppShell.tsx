@@ -3,7 +3,7 @@
 
 import React, { useMemo } from 'react';
 import Link from 'next/link';
-import { usePathname } from 'next/navigation';
+import { usePathname, useRouter } from 'next/navigation';
 import {
   SidebarProvider,
   Sidebar,
@@ -21,7 +21,7 @@ import { NAV_ITEMS } from '@/lib/constants';
 import { Separator } from '@/components/ui/separator';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
-import { LogOut, Loader2, Building, LayoutTemplate, Bell, Bot, HelpCircle, User, Crown, ChevronLeft, ChevronRight, PlusCircle, ChevronDown, Receipt, TrendingDown, Users, Sparkles } from 'lucide-react';
+import { LogOut, Loader2, Building, LayoutTemplate, Bell, Bot, HelpCircle, User, Crown, ChevronLeft, ChevronRight, PlusCircle, ChevronDown, Receipt, TrendingDown, Users, Sparkles, Settings } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
@@ -29,11 +29,13 @@ import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/comp
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { AssistantChat } from '@/components/AssistantChat';
 import { Badge } from '@/components/ui/badge';
+import { signOut as signOutAction } from '@/app/auth/actions';
 
 const AppShellLayout = ({ children }: { children: React.ReactNode }) => {
   const pathname = usePathname();
+  const router = useRouter();
   const { isMobile, setOpenMobile, toggleSidebar, state } = useSidebar();
-  const { user, signOut, isLoading: authLoading } = useAuth(); 
+  const { user, isLoading: authLoading } = useAuth(); 
   const [isAssistantOpen, setIsAssistantOpen] = React.useState(false);
   const [pendingRequestCount, setPendingRequestCount] = React.useState(0);
   const CollapseIcon = state === 'expanded' ? ChevronLeft : ChevronRight;
@@ -48,6 +50,12 @@ const AppShellLayout = ({ children }: { children: React.ReactNode }) => {
     
     return (firstInitial + lastInitial).toUpperCase();
   };
+  
+  const handleSignOut = async () => {
+    await signOutAction();
+    router.refresh();
+  };
+
 
   const handleNavigationClick = () => {
     if (isMobile) {
@@ -57,10 +65,8 @@ const AppShellLayout = ({ children }: { children: React.ReactNode }) => {
   
   const visibleNavItems = useMemo(() => {
     return NAV_ITEMS.filter(item => {
-      if (item.sidebar === false) {
-        return false;
-      }
-      if (!user) return true; // Show all items if no user
+      if (item.sidebar === false) return false;
+      if (!user) return false;
       if (item.href === '/admin' || item.href === '/payroll') {
         return user?.role === 'admin';
       }
@@ -107,14 +113,6 @@ const AppShellLayout = ({ children }: { children: React.ReactNode }) => {
       <Sidebar collapsible="icon" variant="sidebar" className="border-r border-sidebar-border bg-sidebar backdrop-blur-lg print:hidden">
         <SidebarHeader className="p-2">
           <Logo />
-          {user && user.companyName && (
-            <div className="mt-1 px-2 group-data-[collapsible=icon]:hidden">
-              <div className="flex items-center gap-2 rounded-md bg-primary/10 p-2 shadow-inner">
-                <Building className="h-4 w-4 flex-shrink-0 text-primary/80" />
-                <p className="truncate text-sm font-semibold text-primary">{user.companyName}</p>
-              </div>
-            </div>
-          )}
         </SidebarHeader>
         <Separator className="bg-sidebar-border/50" />
         <SidebarContent className="p-2">
@@ -130,13 +128,72 @@ const AppShellLayout = ({ children }: { children: React.ReactNode }) => {
                   <Link href={item.href} onClick={handleNavigationClick}>
                     <item.icon />
                     <span className="group-data-[collapsible=icon]:hidden">{item.label}</span>
+                     {item.href === '/admin' && pendingRequestCount > 0 && (
+                      <Badge className="ml-auto group-data-[collapsible=icon]:hidden">{pendingRequestCount}</Badge>
+                    )}
                   </Link>
                 </SidebarMenuButton>
               </SidebarMenuItem>
             ))}
           </SidebarMenu>
         </SidebarContent>
-          <SidebarFooter className="mt-auto hidden p-2 md:block">
+        <SidebarFooter className="mt-auto p-2">
+             {authLoading ? (
+                 <div className="flex w-full items-center justify-start gap-2 p-2 group-data-[collapsible=icon]:justify-center">
+                     <Loader2 className="h-5 w-5 animate-spin" />
+                     <span className="text-sm group-data-[collapsible=icon]:hidden">Loading...</span>
+                 </div>
+             ) : user ? (
+                 <DropdownMenu>
+                     <DropdownMenuTrigger asChild>
+                         <Button variant="ghost" className="h-auto w-full justify-start p-2 text-left group-data-[collapsible=icon]:h-11 group-data-[collapsible=icon]:w-11 group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:px-0">
+                            <Avatar className="h-8 w-8 group-data-[collapsible=icon]:h-9 group-data-[collapsible=icon]:w-9">
+                                <AvatarFallback className="bg-primary/20 text-primary font-semibold">
+                                    {getInitials(user.displayName)}
+                                </AvatarFallback>
+                            </Avatar>
+                            <div className="ml-2 flex-grow truncate group-data-[collapsible=icon]:hidden">
+                                <p className="truncate text-sm font-semibold">{user.displayName}</p>
+                                <p className="truncate text-xs text-muted-foreground">{user.email}</p>
+                            </div>
+                            <ChevronDown className="ml-1 h-4 w-4 shrink-0 group-data-[collapsible=icon]:hidden" />
+                        </Button>
+                     </DropdownMenuTrigger>
+                     <DropdownMenuContent className="w-56 mb-2" side="top" align="start">
+                        <DropdownMenuLabel>My Account</DropdownMenuLabel>
+                        <DropdownMenuSeparator />
+                          {user.isSuperAdmin && (
+                           <DropdownMenuItem asChild>
+                              <Link href="/super-admin" className="cursor-pointer">
+                                  <Crown className="mr-2 h-4 w-4" />
+                                  <span>Super Admin</span>
+                              </Link>
+                          </DropdownMenuItem>
+                         )}
+                        <DropdownMenuItem asChild>
+                            <Link href="/company-details" className="cursor-pointer">
+                                <Building className="mr-2 h-4 w-4" />
+                                <span>Company Details</span>
+                            </Link>
+                        </DropdownMenuItem>
+                         <DropdownMenuItem asChild>
+                           <Link href="/settings" className="cursor-pointer">
+                             <Settings className="mr-2 h-4 w-4" />
+                             <span>Settings</span>
+                           </Link>
+                         </DropdownMenuItem>
+                        <DropdownMenuSeparator />
+                        <DropdownMenuItem onSelect={handleSignOut} className="cursor-pointer">
+                            <LogOut className="mr-2 h-4 w-4" />
+                            <span>Sign Out</span>
+                        </DropdownMenuItem>
+                     </DropdownMenuContent>
+                 </DropdownMenu>
+             ) : (
+                <SidebarMenuButton className="justify-start group-data-[collapsible=icon]:justify-center" asChild>
+                    <Link href="/auth/signin"><LogOut className="mr-2 h-4 w-4" /> <span className="group-data-[collapsible=icon]:hidden">Sign In</span></Link>
+                </SidebarMenuButton>
+             )}
             <TooltipProvider delayDuration={0}>
               <Tooltip>
                 <TooltipTrigger asChild>
@@ -177,8 +234,9 @@ const AppShellLayout = ({ children }: { children: React.ReactNode }) => {
                   <div className="flex items-center gap-2">
                       <DropdownMenu>
                           <DropdownMenuTrigger asChild>
-                              <Button variant="default" size="icon">
-                                  <PlusCircle className="h-5 w-5" />
+                              <Button variant="default" size="sm">
+                                  <PlusCircle className="mr-2 h-4 w-4" />
+                                  <span className="hidden sm:inline">Create New</span>
                               </Button>
                           </DropdownMenuTrigger>
                           <DropdownMenuContent align="end" className="w-56">
@@ -207,6 +265,7 @@ const AppShellLayout = ({ children }: { children: React.ReactNode }) => {
                           <DropdownMenuTrigger asChild>
                             <Button variant="ghost" size="icon" className="relative h-10 w-10 rounded-full hover:bg-accent hover:text-accent-foreground">
                                 <Bell className="h-5 w-5" />
+                                 {pendingRequestCount > 0 && <Badge variant="destructive" className="absolute -top-1 -right-1 h-5 w-5 justify-center p-0">{pendingRequestCount}</Badge>}
                             </Button>
                           </DropdownMenuTrigger>
                           <DropdownMenuContent className="w-80" align="end">
@@ -217,47 +276,6 @@ const AppShellLayout = ({ children }: { children: React.ReactNode }) => {
                               </div>
                           </DropdownMenuContent>
                       </DropdownMenu>
-
-                      <DropdownMenu>
-                          <DropdownMenuTrigger asChild>
-                            <Button variant="ghost" className="relative h-10 w-10 rounded-full hover:bg-accent hover:text-accent-foreground">
-                                  <Avatar className="h-10 w-10 border-2 border-primary/50">
-                                      <AvatarFallback className="bg-muted text-muted-foreground font-semibold">
-                                          {getInitials(user.displayName)}
-                                      </AvatarFallback>
-                                  </Avatar>
-                            </Button>
-                          </DropdownMenuTrigger>
-                          <DropdownMenuContent className="w-56" align="end" forceMount>
-                              <DropdownMenuLabel className="font-normal">
-                                <div className="flex flex-col space-y-1">
-                                  <p className="text-sm font-medium leading-none">{user.displayName}</p>
-                                  <p className="text-xs leading-none text-muted-foreground">{user.email}</p>
-                                </div>
-                              </DropdownMenuLabel>
-                              <DropdownMenuSeparator />
-                               {user.isSuperAdmin && (
-                                 <DropdownMenuItem asChild>
-                                    <Link href="/super-admin" className="cursor-pointer">
-                                        <Crown className="mr-2 h-4 w-4" />
-                                        <span>Super Admin</span>
-                                    </Link>
-                                </DropdownMenuItem>
-                               )}
-                              <DropdownMenuItem asChild>
-                                  <Link href="/company-details" className="cursor-pointer">
-                                      <Building className="mr-2 h-4 w-4" />
-                                      <span>Company Details</span>
-                                  </Link>
-                              </DropdownMenuItem>
-                              <DropdownMenuItem asChild>
-                                <Link href="/guide" className="cursor-pointer">
-                                  <HelpCircle className="mr-2 h-4 w-4" />
-                                  <span>Guide</span>
-                                </Link>
-                              </DropdownMenuItem>
-                        </DropdownMenuContent>
-                      </DropdownMenu>
                   </div>
               )}
             </div>
@@ -267,36 +285,38 @@ const AppShellLayout = ({ children }: { children: React.ReactNode }) => {
         </main>
       </SidebarInset>
       
-      <Dialog open={isAssistantOpen} onOpenChange={setIsAssistantOpen}>
-        <TooltipProvider>
-          <Tooltip>
-            <TooltipTrigger asChild>
-              <DialogTrigger asChild>
-                <Button className="fixed bottom-6 right-6 h-14 w-14 rounded-full shadow-2xl z-50 bg-[#7C3AED] hover:bg-[#6D28D9] text-white hover:scale-110 transition-transform duration-200 print:hidden">
-                  <Sparkles className="h-7 w-7" />
-                </Button>
-              </DialogTrigger>
-            </TooltipTrigger>
-            <TooltipContent side="left">
-              <p>AI Assistant</p>
-            </TooltipContent>
-          </Tooltip>
-        </TooltipProvider>
-        <DialogContent className="sm:max-w-2xl h-[calc(100vh-8rem)] flex flex-col p-0 gap-0">
-          <DialogHeader className="p-6 pb-4">
-            <DialogTitle className="flex items-center gap-2">
-              <Bot className="h-6 w-6 text-primary"/>
-              AI Assistant
-            </DialogTitle>
-            <DialogDescription>
-              Ask me to add employees, update invoices, or generate financial summaries.
-            </DialogDescription>
-          </DialogHeader>
-          <div className="flex-1 min-h-0">
-            <AssistantChat />
-          </div>
-        </DialogContent>
-      </Dialog>
+      {user && (
+        <Dialog open={isAssistantOpen} onOpenChange={setIsAssistantOpen}>
+          <TooltipProvider>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <DialogTrigger asChild>
+                  <Button className="fixed bottom-6 right-6 h-14 w-14 rounded-full shadow-2xl z-50 bg-primary hover:bg-primary/90 text-primary-foreground hover:scale-110 transition-transform duration-200 print:hidden">
+                    <Sparkles className="h-7 w-7" />
+                  </Button>
+                </DialogTrigger>
+              </TooltipTrigger>
+              <TooltipContent side="left">
+                <p>AI Assistant</p>
+              </TooltipContent>
+            </Tooltip>
+          </TooltipProvider>
+          <DialogContent className="sm:max-w-2xl h-[calc(100vh-8rem)] flex flex-col p-0 gap-0">
+            <DialogHeader className="p-6 pb-4">
+              <DialogTitle className="flex items-center gap-2">
+                <Bot className="h-6 w-6 text-primary"/>
+                AI Assistant
+              </DialogTitle>
+              <DialogDescription>
+                Ask me to add employees, update invoices, or generate financial summaries.
+              </DialogDescription>
+            </DialogHeader>
+            <div className="flex-1 min-h-0">
+              <AssistantChat />
+            </div>
+          </DialogContent>
+        </Dialog>
+      )}
     </>
   );
 };
