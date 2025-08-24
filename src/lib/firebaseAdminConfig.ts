@@ -12,6 +12,7 @@ if (!admin.apps.length) {
     const serviceAccount = JSON.parse(serviceAccountKey);
     admin.initializeApp({
       credential: admin.credential.cert(serviceAccount),
+      databaseURL: "https://profitlenz-68b39-default-rtdb.firebaseio.com"
     });
   } catch (error: any) {
     console.error('Firebase admin initialization error: Failed to parse FIREBASE_SERVICE_ACCOUNT_KEY. Make sure it is a valid JSON string.', error);
