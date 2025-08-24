@@ -5,33 +5,28 @@ import { revalidatePath } from 'next/cache';
 import { cookies } from 'next/headers';
 import { redirect } from 'next/navigation';
 import { getAuth, signInWithEmailAndPassword, createUserWithEmailAndPassword } from 'firebase/auth';
-import { auth as adminAuth } from '@/lib/firebaseAdminConfig';
 import { app } from '@/lib/firebaseConfig';
 import { SigninSchema, SignupSchema, type SignupInput, type SigninInput } from '@/lib/schemas';
 import { SESSION_COOKIE_NAME } from '@/lib/constants';
 
-// This function is now a mock since there's no database.
+// This function now returns a mock user as there is no backend.
 export async function getCurrentUser() {
-  const session = cookies().get(SESSION_COOKIE_NAME)?.value;
-  if (!session) return null;
-  try {
-    const decodedToken = await adminAuth.verifySessionCookie(session, true);
-    // Return a mock user object for consistency
-    return {
-      uid: decodedToken.uid,
-      email: decodedToken.email,
-      displayName: 'Demo User',
-      companyId: 'mock-company-123',
-      companyName: 'Demo Company Inc.',
-      publicCompanyId: 'CMP-DEMO123',
-      currencySymbol: '$',
-      role: 'admin' as const,
-      isSuperAdmin: true,
-    };
-  } catch (error) {
-    console.error("Session verification failed:", error);
-    return null;
-  }
+  const sessionCookie = cookies().get(SESSION_COOKIE_NAME);
+  if (!sessionCookie) return null;
+
+  // Since there is no admin SDK, we'll return a mock user object
+  // for any valid session cookie. In a real app, you would verify this.
+  return {
+    uid: 'mock-user-uid',
+    email: 'user@example.com',
+    displayName: 'Demo User',
+    companyId: 'mock-company-123',
+    companyName: 'Demo Company Inc.',
+    publicCompanyId: 'CMP-DEMO123',
+    currencySymbol: '$',
+    role: 'admin' as const,
+    isSuperAdmin: true,
+  };
 }
 
 export async function signInWithEmail(data: SigninInput) {
@@ -44,12 +39,13 @@ export async function signInWithEmail(data: SigninInput) {
   const auth = getAuth(app);
 
   try {
-    const userCredential = await signInWithEmailAndPassword(auth, email, password);
-    const idToken = await userCredential.user.getIdToken();
-    const expiresIn = 60 * 60 * 24 * 5 * 1000; // 5 days
+    // We sign in just to check if the user exists in Firebase Auth.
+    await signInWithEmailAndPassword(auth, email, password);
 
-    const sessionCookie = await adminAuth.createSessionCookie(idToken, { expiresIn });
-    cookies().set(SESSION_COOKIE_NAME, sessionCookie, { maxAge: expiresIn, httpOnly: true, secure: true });
+    // In a real app, you'd create a session cookie with the admin SDK.
+    // Here, we just set a simple cookie to simulate a session.
+    const expiresIn = 60 * 60 * 24 * 5 * 1000; // 5 days
+    cookies().set(SESSION_COOKIE_NAME, 'mock-session-cookie', { maxAge: expiresIn, httpOnly: true, secure: true });
 
     return { success: true };
   } catch (error: any) {
@@ -66,17 +62,13 @@ export async function signUpWithEmail(data: SignupInput) {
     const { email, password } = result.data;
     
     try {
-        const userCredential = await createUserWithEmailAndPassword(getAuth(app), email, password);
-        const { user } = userCredential;
+        await createUserWithEmailAndPassword(getAuth(app), email, password);
 
-        // Since we don't have a database, we'll just sign the user in directly
-        // and create a session for them.
-        const idToken = await user.getIdToken();
+        // Directly sign the user in by setting the mock session cookie.
         const expiresIn = 60 * 60 * 24 * 5 * 1000;
-        const sessionCookie = await adminAuth.createSessionCookie(idToken, { expiresIn });
-        cookies().set(SESSION_COOKIE_NAME, sessionCookie, { maxAge: expiresIn, httpOnly: true, secure: true });
+        cookies().set(SESSION_COOKIE_NAME, 'mock-session-cookie', { maxAge: expiresIn, httpOnly: true, secure: true });
 
-        // Redirect to dashboard, skipping the details page as it requires a DB.
+        // Redirect to dashboard.
         return { success: true, redirect: '/dashboard' };
     } catch (error: any) {
         if (error.code === 'auth/email-already-in-use') {
