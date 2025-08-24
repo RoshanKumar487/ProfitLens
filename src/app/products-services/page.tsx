@@ -15,7 +15,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { Package, PlusCircle, Trash2, Loader2, Save, Search, ArrowUp, ArrowDown, ChevronsUpDown, Settings } from 'lucide-react';
 import { v4 as uuidv4 } from 'uuid';
 import { getAllProducts, saveAllProducts, deleteProduct } from './actions';
-import { getProductSettings, type ProductSettings } from '../settings/actions';
+import { getProductSettings, type ProductSettings } from '@/app/settings/actions';
 import Link from 'next/link';
 import { type ProductDisplay } from './actions';
 
