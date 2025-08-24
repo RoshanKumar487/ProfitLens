@@ -21,6 +21,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
 import Link from 'next/link';
+import { useToast } from '@/hooks/use-toast';
 
 interface InvoiceDisplay {
   id: string;
@@ -41,9 +42,14 @@ const MOCK_INVOICES: InvoiceDisplay[] = [
 
 export default function InvoicingPage() {
   const { user, isLoading: authIsLoading, currencySymbol } = useAuth();
-  const [invoices] = useState<InvoiceDisplay[]>(MOCK_INVOICES);
-  const isLoading = false;
+  const { toast } = useToast();
+  const [invoices, setInvoices] = useState<InvoiceDisplay[]>(MOCK_INVOICES);
+  const [isLoading, setIsLoading] = useState(false);
 
+  const handleDelete = (invoiceId: string) => {
+    setInvoices(prev => prev.filter(inv => inv.id !== invoiceId));
+    toast({ title: 'Invoice Deleted', description: 'The invoice has been removed from the list.'});
+  };
 
   const getStatusBadgeVariant = (status: InvoiceDisplay['status']) => {
     switch (status) {
@@ -82,7 +88,7 @@ export default function InvoicingPage() {
 
   return (
     <div className="space-y-6 p-4 sm:p-6 lg:p-8">
-      <PageTitle title="Invoicing" subtitle="This is a read-only view of your customer invoices." icon={Receipt}>
+      <PageTitle title="Invoicing" subtitle="Create, manage, and track all your customer invoices." icon={Receipt}>
         <Button asChild>
             <Link href="/invoicing/new"><PlusCircle className="mr-2 h-4 w-4" /> Create Invoice</Link>
         </Button>
@@ -132,8 +138,8 @@ export default function InvoicingPage() {
                         <DropdownMenuTrigger asChild><Button variant="ghost" size="icon" className="h-8 w-8"><MoreHorizontal className="h-4 w-4" /></Button></DropdownMenuTrigger>
                          <DropdownMenuContent align="end">
                            <DropdownMenuItem asChild><Link href={`/invoicing/${invoice.id}/view`}>View / Print</Link></DropdownMenuItem>
-                           <DropdownMenuItem disabled>Edit</DropdownMenuItem>
-                           <DropdownMenuItem disabled className="text-destructive">Delete</DropdownMenuItem>
+                           <DropdownMenuItem asChild><Link href={`/invoicing/new?from=${invoice.id}`}>Duplicate</Link></DropdownMenuItem>
+                           <DropdownMenuItem onClick={() => handleDelete(invoice.id)} className="text-destructive focus:text-destructive">Delete</DropdownMenuItem>
                          </DropdownMenuContent>
                         </DropdownMenu>
                     </TableCell>

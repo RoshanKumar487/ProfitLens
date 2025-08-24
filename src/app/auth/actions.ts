@@ -7,7 +7,7 @@ import { redirect } from 'next/navigation';
 import { getAuth, signInWithEmailAndPassword, createUserWithEmailAndPassword } from 'firebase/auth';
 import { auth as adminAuth } from '@/lib/firebaseAdminConfig';
 import { app } from '@/lib/firebaseConfig';
-import { SigninSchema, SignupSchema, CompanyDetailsSchema, type SignupInput, type SigninInput, type CompanyDetailsInput } from '@/lib/schemas';
+import { SigninSchema, SignupSchema, type SignupInput, type SigninInput } from '@/lib/schemas';
 import { SESSION_COOKIE_NAME } from '@/lib/constants';
 
 // This function is now a mock since there's no database.
@@ -85,13 +85,6 @@ export async function signUpWithEmail(data: SignupInput) {
         console.error('Sign-up error:', error);
         return { success: false, error: "Could not create account. Please try again." };
     }
-}
-
-// This function is no longer needed as we removed the multi-step sign-up process.
-// It remains here to prevent build errors if it's imported elsewhere, but it does nothing.
-export async function completeSignUp(data: CompanyDetailsInput) {
-    console.log("completeSignUp is deprecated and does nothing.");
-    return { success: true };
 }
 
 

@@ -1,7 +1,7 @@
 
 'use client';
 
-import React, { useState, useEffect, useCallback, useRef } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { useRouter, useParams } from 'next/navigation';
 import { useForm, Controller } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -12,18 +12,20 @@ import { Textarea } from '@/components/ui/textarea';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from '@/components/ui/card';
 import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/contexts/AuthContext';
-import { Loader2, Save, User, Camera, UploadCloud, Trash2, ArrowLeft } from 'lucide-react';
+import { Loader2, Save, User, Camera, UploadCloud, Trash2, ArrowLeft, CalendarIcon } from 'lucide-react';
 import Link from 'next/link';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Popover, PopoverTrigger, PopoverContent } from '@/components/ui/popover';
 import { Calendar } from '@/components/ui/calendar';
 import { format, parseISO } from 'date-fns';
-import { CalendarIcon } from 'lucide-react';
 import Image from 'next/image';
 import { updateEmployee, getEmployeeById, uploadFile } from '../../actions';
 import { EmployeeSchema, type EmployeeInput } from '@/lib/schemas';
 import SignaturePad from '@/components/SignaturePad';
 import { Dialog, DialogTrigger, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
+import PageTitle from '@/components/PageTitle';
+import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
+
 
 export default function EmployeeFormPage() {
     const { user } = useAuth();
@@ -55,7 +57,6 @@ export default function EmployeeFormPage() {
         try {
             const employee = await getEmployeeById(employeeId, user.companyId);
             if (employee) {
-                // Populate form with fetched data
                 form.reset({
                     ...employee,
                     joiningDate: employee.joiningDate ? new Date(employee.joiningDate) : undefined,
@@ -118,7 +119,6 @@ export default function EmployeeFormPage() {
         }
         setIsSaving(true);
         try {
-             // 1. Upload files and get URLs
             const uploadPromises = [
                 profilePictureFile ? uploadFile(profilePictureFile, `employees/${employeeId || 'new'}/profile.jpg`, user.companyId) : Promise.resolve(profilePicturePreview),
                 signatureFile ? uploadFile(signatureFile, `employees/${employeeId || 'new'}/signature.png`, user.companyId) : Promise.resolve(signaturePreview),
@@ -166,6 +166,7 @@ export default function EmployeeFormPage() {
                 </Button>
             </PageTitle>
 
+            <Form {...form}>
             <form onSubmit={form.handleSubmit(onSubmit)} className="max-w-4xl mx-auto">
                 <Card className="mb-6">
                     <CardHeader><CardTitle>Identity</CardTitle></CardHeader>
@@ -207,7 +208,7 @@ export default function EmployeeFormPage() {
                             render={({ field }) => (
                                 <FormItem>
                                     <FormLabel>Father's Name</FormLabel>
-                                    <FormControl><Input placeholder="e.g., Richard Doe" {...field} /></FormControl>
+                                    <FormControl><Input placeholder="e.g., Richard Doe" {...field} value={field.value ?? ''} /></FormControl>
                                     <FormMessage />
                                 </FormItem>
                             )}
@@ -218,7 +219,7 @@ export default function EmployeeFormPage() {
                             render={({ field }) => (
                                 <FormItem>
                                     <FormLabel>Mother's Name</FormLabel>
-                                    <FormControl><Input placeholder="e.g., Jane Doe" {...field} /></FormControl>
+                                    <FormControl><Input placeholder="e.g., Jane Doe" {...field} value={field.value ?? ''} /></FormControl>
                                     <FormMessage />
                                 </FormItem>
                             )}
@@ -232,24 +233,24 @@ export default function EmployeeFormPage() {
                         <FormField control={form.control} name="position" render={({ field }) => (<FormItem><FormLabel>Position / Role</FormLabel><FormControl><Input placeholder="e.g., Software Engineer" {...field} /></FormControl><FormMessage /></FormItem>)} />
                         <FormField control={form.control} name="salary" render={({ field }) => (<FormItem><FormLabel>Salary (per month)</FormLabel><FormControl><Input type="number" placeholder="e.g., 50000" {...field} onChange={e => field.onChange(parseFloat(e.target.value) || 0)} /></FormControl><FormMessage /></FormItem>)} />
                         <FormField control={form.control} name="joiningDate" render={({ field }) => (<FormItem className="flex flex-col"><FormLabel>Joining Date</FormLabel><Popover><PopoverTrigger asChild><FormControl><Button variant="outline" className="pl-3 text-left font-normal"><>{field.value ? format(field.value, 'PPP') : <span>Pick a date</span>}<CalendarIcon className="ml-auto h-4 w-4 opacity-50" /></Button></FormControl></PopoverTrigger><PopoverContent className="w-auto p-0" align="start"><Calendar mode="single" selected={field.value} onSelect={field.onChange} initialFocus /></PopoverContent></Popover><FormMessage /></FormItem>)} />
-                        <FormField control={form.control} name="experience" render={({ field }) => (<FormItem><FormLabel>Previous Experience</FormLabel><FormControl><Input placeholder="e.g., 5 years at XYZ Corp" {...field} /></FormControl><FormMessage /></FormItem>)} />
-                        <FormField control={form.control} name="qualification" render={({ field }) => (<FormItem><FormLabel>Qualification</FormLabel><FormControl><Input placeholder="e.g., B.Tech in CS" {...field} /></FormControl><FormMessage /></FormItem>)} />
+                        <FormField control={form.control} name="experience" render={({ field }) => (<FormItem><FormLabel>Previous Experience</FormLabel><FormControl><Input placeholder="e.g., 5 years at XYZ Corp" {...field} value={field.value ?? ''} /></FormControl><FormMessage /></FormItem>)} />
+                        <FormField control={form.control} name="qualification" render={({ field }) => (<FormItem><FormLabel>Qualification</FormLabel><FormControl><Input placeholder="e.g., B.Tech in CS" {...field} value={field.value ?? ''} /></FormControl><FormMessage /></FormItem>)} />
                     </CardContent>
                 </Card>
 
                 <Card className="mb-6">
                     <CardHeader><CardTitle>Contact & Address</CardTitle></CardHeader>
                     <CardContent className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                        <FormField control={form.control} name="selfPhoneNo" render={({ field }) => (<FormItem><FormLabel>Phone Number</FormLabel><FormControl><Input placeholder="Employee's phone" {...field} /></FormControl><FormMessage /></FormItem>)} />
+                        <FormField control={form.control} name="selfPhoneNo" render={({ field }) => (<FormItem><FormLabel>Phone Number</FormLabel><FormControl><Input placeholder="Employee's phone" {...field} value={field.value ?? ''} /></FormControl><FormMessage /></FormItem>)} />
                         <div className="md:col-span-2 space-y-4">
                            <h3 className="text-md font-semibold">Permanent Address</h3>
                             <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-                                <FormField control={form.control} name="permanentAddressHNo" render={({ field }) => (<FormItem><FormLabel>House No / Village</FormLabel><FormControl><Input {...field} /></FormControl><FormMessage /></FormItem>)} />
-                                <FormField control={form.control} name="permanentAddressPS" render={({ field }) => (<FormItem><FormLabel>Police Station</FormLabel><FormControl><Input {...field} /></FormControl><FormMessage /></FormItem>)} />
-                                <FormField control={form.control} name="permanentAddressPost" render={({ field }) => (<FormItem><FormLabel>Post Office</FormLabel><FormControl><Input {...field} /></FormControl><FormMessage /></FormItem>)} />
-                                <FormField control={form.control} name="permanentAddressDist" render={({ field }) => (<FormItem><FormLabel>District</FormLabel><FormControl><Input {...field} /></FormControl><FormMessage /></FormItem>)} />
-                                <FormField control={form.control} name="permanentAddressState" render={({ field }) => (<FormItem><FormLabel>State</FormLabel><FormControl><Input {...field} /></FormControl><FormMessage /></FormItem>)} />
-                                <FormField control={form.control} name="permanentAddressPin" render={({ field }) => (<FormItem><FormLabel>PIN Code</FormLabel><FormControl><Input {...field} /></FormControl><FormMessage /></FormItem>)} />
+                                <FormField control={form.control} name="permanentAddressHNo" render={({ field }) => (<FormItem><FormLabel>House No / Village</FormLabel><FormControl><Input {...field} value={field.value ?? ''} /></FormControl><FormMessage /></FormItem>)} />
+                                <FormField control={form.control} name="permanentAddressPS" render={({ field }) => (<FormItem><FormLabel>Police Station</FormLabel><FormControl><Input {...field} value={field.value ?? ''} /></FormControl><FormMessage /></FormItem>)} />
+                                <FormField control={form.control} name="permanentAddressPost" render={({ field }) => (<FormItem><FormLabel>Post Office</FormLabel><FormControl><Input {...field} value={field.value ?? ''} /></FormControl><FormMessage /></FormItem>)} />
+                                <FormField control={form.control} name="permanentAddressDist" render={({ field }) => (<FormItem><FormLabel>District</FormLabel><FormControl><Input {...field} value={field.value ?? ''} /></FormControl><FormMessage /></FormItem>)} />
+                                <FormField control={form.control} name="permanentAddressState" render={({ field }) => (<FormItem><FormLabel>State</FormLabel><FormControl><Input {...field} value={field.value ?? ''} /></FormControl><FormMessage /></FormItem>)} />
+                                <FormField control={form.control} name="permanentAddressPin" render={({ field }) => (<FormItem><FormLabel>PIN Code</FormLabel><FormControl><Input {...field} value={field.value ?? ''} /></FormControl><FormMessage /></FormItem>)} />
                             </div>
                         </div>
                     </CardContent>
@@ -258,11 +259,11 @@ export default function EmployeeFormPage() {
                 <Card className="mb-6">
                     <CardHeader><CardTitle>Guarantor & Physical Details</CardTitle></CardHeader>
                     <CardContent className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                         <FormField control={form.control} name="guarantorName" render={({ field }) => (<FormItem><FormLabel>Guarantor Name</FormLabel><FormControl><Input placeholder="Guarantor's full name" {...field} /></FormControl><FormMessage /></FormItem>)} />
-                        <FormField control={form.control} name="guarantorPhone" render={({ field }) => (<FormItem><FormLabel>Guarantor Phone</FormLabel><FormControl><Input placeholder="Guarantor's phone number" {...field} /></FormControl><FormMessage /></FormItem>)} />
-                        <FormField control={form.control} name="height" render={({ field }) => (<FormItem><FormLabel>Height</FormLabel><FormControl><Input placeholder="e.g., 5' 10&quot;" {...field} /></FormControl><FormMessage /></FormItem>)} />
-                        <FormField control={form.control} name="weight" render={({ field }) => (<FormItem><FormLabel>Weight</FormLabel><FormControl><Input placeholder="e.g., 75 kg" {...field} /></FormControl><FormMessage /></FormItem>)} />
-                        <FormField control={form.control} name="identificationMarks" render={({ field }) => (<FormItem className="md:col-span-2"><FormLabel>Identification Marks</FormLabel><FormControl><Input placeholder="e.g., Mole on right cheek" {...field} /></FormControl><FormMessage /></FormItem>)} />
+                         <FormField control={form.control} name="guarantorName" render={({ field }) => (<FormItem><FormLabel>Guarantor Name</FormLabel><FormControl><Input placeholder="Guarantor's full name" {...field} value={field.value ?? ''} /></FormControl><FormMessage /></FormItem>)} />
+                        <FormField control={form.control} name="guarantorPhone" render={({ field }) => (<FormItem><FormLabel>Guarantor Phone</FormLabel><FormControl><Input placeholder="Guarantor's phone number" {...field} value={field.value ?? ''} /></FormControl><FormMessage /></FormItem>)} />
+                        <FormField control={form.control} name="height" render={({ field }) => (<FormItem><FormLabel>Height</FormLabel><FormControl><Input placeholder="e.g., 5' 10&quot;" {...field} value={field.value ?? ''} /></FormControl><FormMessage /></FormItem>)} />
+                        <FormField control={form.control} name="weight" render={({ field }) => (<FormItem><FormLabel>Weight</FormLabel><FormControl><Input placeholder="e.g., 75 kg" {...field} value={field.value ?? ''} /></FormControl><FormMessage /></FormItem>)} />
+                        <FormField control={form.control} name="identificationMarks" render={({ field }) => (<FormItem className="md:col-span-2"><FormLabel>Identification Marks</FormLabel><FormControl><Input placeholder="e.g., Mole on right cheek" {...field} value={field.value ?? ''} /></FormControl><FormMessage /></FormItem>)} />
                     </CardContent>
                 </Card>
 
@@ -308,7 +309,7 @@ export default function EmployeeFormPage() {
                     </Button>
                 </div>
             </form>
+            </Form>
         </div>
     );
 }
-

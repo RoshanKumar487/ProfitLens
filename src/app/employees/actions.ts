@@ -1,12 +1,11 @@
 
 'use server';
 
-import { connectToDatabase } from '@/lib/mongodb';
 import { revalidatePath } from 'next/cache';
-import { getCurrentUser } from '@/app/auth/actions';
 import { uploadFileToStorage, deleteFileFromStorage } from '@/lib/firebaseStorageUtils';
-import { ObjectId } from 'mongodb';
-import type { EmployeeInput } from '@/lib/schemas';
+import { type EmployeeInput } from '@/lib/schemas';
+
+// This file now uses a mock in-memory store instead of a database.
 
 export interface EmployeeDisplay {
   id: string;
@@ -37,123 +36,75 @@ export interface EmployeeDisplay {
   leftThumbImpressionUrl?: string;
 }
 
+// Mock in-memory store
+let MOCK_EMPLOYEES: EmployeeDisplay[] = [
+    { id: '1', name: 'Alice Johnson', position: 'Software Engineer', salary: 95000, description: 'Frontend specialist with 5 years of experience.', joiningDate: new Date('2021-06-01') },
+    { id: '2', name: 'Bob Williams', position: 'Project Manager', salary: 105000, description: 'Manages the core product development team.', joiningDate: new Date('2020-02-15') },
+    { id: '3', name: 'Charlie Brown', position: 'UX/UI Designer', salary: 85000, description: 'Focuses on user experience and interface design.', joiningDate: new Date('2022-09-01') },
+];
+
 export async function uploadFile(file: File, path: string, companyId: string): Promise<string> {
     const companyPath = `companies/${companyId}/${path}`;
-    const fileBuffer = Buffer.from(await file.arrayBuffer());
-    // This function now needs to be defined, assuming firebaseStorageUtils.ts
     const downloadURL = await uploadFileToStorage(file, companyPath);
     return downloadURL;
 }
 
 export async function getEmployees(companyId: string): Promise<EmployeeDisplay[]> {
-  try {
-    const { db } = await connectToDatabase();
-    const employees = await db.collection('employees')
-      .find({ companyId: new ObjectId(companyId) })
-      .sort({ createdAt: -1 })
-      .toArray();
-
-    return employees.map(emp => ({
-      ...emp,
-      id: emp._id.toString(),
-      companyId: emp.companyId.toString(),
-      joiningDate: emp.joiningDate,
-      dateOfBirth: emp.dateOfBirth
-    })) as EmployeeDisplay[];
-  } catch (error) {
-    console.error("Failed to get employees:", error);
-    return [];
-  }
+  // companyId is unused in mock, but kept for signature consistency
+  return Promise.resolve([...MOCK_EMPLOYEES]);
 }
 
 export async function getEmployeeById(employeeId: string, companyId: string): Promise<EmployeeDisplay | null> {
-    try {
-        const { db } = await connectToDatabase();
-        const employee = await db.collection('employees').findOne({
-            _id: new ObjectId(employeeId),
-            companyId: new ObjectId(companyId)
-        });
-
-        if (!employee) return null;
-
-        return {
-            ...employee,
-            id: employee._id.toString(),
-            companyId: employee.companyId.toString(),
-        } as EmployeeDisplay;
-    } catch (error) {
-        console.error("Failed to get employee by ID:", error);
-        return null;
-    }
+    const employee = MOCK_EMPLOYEES.find(emp => emp.id === employeeId);
+    return Promise.resolve(employee || null);
 }
-
 
 export async function updateEmployee(
   employeeId: string | null,
   companyId: string,
   data: EmployeeInput & { profilePictureUrl?: string | null, signatureUrl?: string | null, leftThumbImpressionUrl?: string | null }
 ) {
-  try {
-    const { db } = await connectToDatabase();
-    const { profilePictureUrl, signatureUrl, leftThumbImpressionUrl, ...employeeData } = data;
-    
-    const payload = {
-      ...employeeData,
-      companyId: new ObjectId(companyId),
-      profilePictureUrl: profilePictureUrl || undefined,
-      signatureUrl: signatureUrl || undefined,
-      leftThumbImpressionUrl: leftThumbImpressionUrl || undefined,
-      updatedAt: new Date(),
-    };
+  const { profilePictureUrl, signatureUrl, leftThumbImpressionUrl, ...employeeData } = data;
 
-    if (employeeId) {
-      // Update existing employee
-      await db.collection('employees').updateOne(
-        { _id: new ObjectId(employeeId), companyId: new ObjectId(companyId) },
-        { $set: payload }
-      );
-    } else {
-      // Create new employee
-      await db.collection('employees').insertOne({
-        ...payload,
-        createdAt: new Date(),
-      });
-    }
-    
-    revalidatePath('/employees');
-    return { success: true, message: `Employee ${employeeId ? 'updated' : 'added'} successfully.` };
-  } catch (error: any) {
-    console.error('Failed to save employee:', error);
-    return { success: false, message: `Failed to save employee: ${error.message}` };
+  const payload = {
+    ...employeeData,
+    profilePictureUrl: profilePictureUrl || undefined,
+    signatureUrl: signatureUrl || undefined,
+    leftThumbImpressionUrl: leftThumbImpressionUrl || undefined,
+  };
+
+  if (employeeId) {
+    // Update existing
+    MOCK_EMPLOYEES = MOCK_EMPLOYEES.map(emp =>
+      emp.id === employeeId ? { ...emp, ...payload } : emp
+    );
+  } else {
+    // Create new
+    const newEmployee: EmployeeDisplay = {
+      id: `emp-${Date.now()}`,
+      ...payload,
+      name: payload.name || 'New Employee',
+      position: payload.position || 'N/A',
+      salary: payload.salary || 0,
+    };
+    MOCK_EMPLOYEES.push(newEmployee);
   }
+
+  revalidatePath('/employees');
+  return { success: true, message: `Employee ${employeeId ? 'updated' : 'added'} successfully.` };
 }
 
 export async function deleteEmployee(employeeId: string, companyId: string) {
-    try {
-        const { db } = await connectToDatabase();
-        // Also delete associated files from storage
-        const employee = await db.collection('employees').findOne({ _id: new ObjectId(employeeId), companyId: new ObjectId(companyId) });
-        if (employee) {
-            const deletePromises: Promise<void>[] = [];
-            if (employee.profilePictureUrl) deletePromises.push(deleteFileFromStorage(employee.profilePictureUrl));
-            if (employee.signatureUrl) deletePromises.push(deleteFileFromStorage(employee.signatureUrl));
-            if (employee.leftThumbImpressionUrl) deletePromises.push(deleteFileFromStorage(employee.leftThumbImpressionUrl));
-            await Promise.all(deletePromises);
-        }
-
-        const result = await db.collection('employees').deleteOne({
-            _id: new ObjectId(employeeId),
-            companyId: new ObjectId(companyId)
-        });
-
-        if (result.deletedCount === 0) {
-            return { success: false, message: "Employee not found or you don't have permission." };
-        }
-
+    const employee = MOCK_EMPLOYEES.find(emp => emp.id === employeeId);
+    if (employee) {
+        // Mock file deletion
+        if (employee.profilePictureUrl) console.log(`[Mock Delete] Deleting ${employee.profilePictureUrl}`);
+        if (employee.signatureUrl) console.log(`[Mock Delete] Deleting ${employee.signatureUrl}`);
+        if (employee.leftThumbImpressionUrl) console.log(`[Mock Delete] Deleting ${employee.leftThumbImpressionUrl}`);
+        
+        MOCK_EMPLOYEES = MOCK_EMPLOYEES.filter(emp => emp.id !== employeeId);
         revalidatePath('/employees');
         return { success: true, message: "Employee deleted successfully." };
-    } catch (error: any) {
-        console.error("Failed to delete employee:", error);
-        return { success: false, message: "Failed to delete employee." };
     }
+    return { success: false, message: "Employee not found." };
 }

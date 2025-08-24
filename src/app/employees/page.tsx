@@ -15,12 +15,14 @@ import {
 } from '@/components/ui/table';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
-import { Users2, MoreHorizontal } from 'lucide-react';
+import { Users2, MoreHorizontal, PlusCircle, Edit, Trash2 } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { Skeleton } from '@/components/ui/skeleton';
-import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger, DropdownMenuSeparator } from '@/components/ui/dropdown-menu';
+import Link from 'next/link';
+import { useToast } from '@/hooks/use-toast';
 
-interface EmployeeDisplay {
+export interface EmployeeDisplay {
   id: string;
   name: string;
   position: string;
@@ -47,8 +49,14 @@ const getInitials = (name: string = "") => {
 
 export default function EmployeesPage() {
   const { user, isLoading: authIsLoading, currencySymbol } = useAuth();
-  const [employees] = useState<EmployeeDisplay[]>(MOCK_EMPLOYEES);
+  const { toast } = useToast();
+  const [employees, setEmployees] = useState<EmployeeDisplay[]>(MOCK_EMPLOYEES);
   const isLoadingEmployees = false;
+
+  const handleDelete = (employeeId: string) => {
+    setEmployees(prev => prev.filter(emp => emp.id !== employeeId));
+    toast({ title: 'Employee Deleted', description: 'The employee has been removed from the list.' });
+  }
 
   if (authIsLoading) {
     return ( <div className="flex items-center justify-center h-[calc(100vh-200px)]"><Skeleton className="h-12 w-12" /></div> );
@@ -65,14 +73,18 @@ export default function EmployeesPage() {
 
   return (
     <div className="space-y-6 p-4 sm:p-6 lg:p-8">
-      <PageTitle title="Employees" subtitle="Manage your team members." icon={Users2} />
+      <PageTitle title="Employees" subtitle="Manage your team members, documents, and bio-data." icon={Users2}>
+        <Button asChild>
+          <Link href="/employees/new"><PlusCircle className="mr-2 h-4 w-4" /> Add Employee</Link>
+        </Button>
+      </PageTitle>
 
       <Card>
         <CardHeader>
           <div className="flex flex-col sm:flex-row items-center justify-between gap-2">
             <div>
               <CardTitle>Team Members</CardTitle>
-              <CardDescription>This is a read-only view of your employees' information.</CardDescription>
+              <CardDescription>A list of all employees in your company.</CardDescription>
             </div>
           </div>
         </CardHeader>
@@ -92,13 +104,15 @@ export default function EmployeesPage() {
                   <TableCell className="text-right">
                     <DropdownMenu>
                       <DropdownMenuTrigger asChild>
-                        <Button variant="ghost" size="icon" className="h-8 w-8" disabled>
+                        <Button variant="ghost" size="icon" className="h-8 w-8">
                             <MoreHorizontal className="h-4 w-4" />
                         </Button>
                       </DropdownMenuTrigger>
                        <DropdownMenuContent align="end">
-                         <DropdownMenuItem disabled>Edit</DropdownMenuItem>
-                         <DropdownMenuItem disabled className="text-destructive">Delete</DropdownMenuItem>
+                         <DropdownMenuItem asChild><Link href={`/employees/${employee.id}`}><Users2 className="mr-2 h-4 w-4" />View Bio-Data</Link></DropdownMenuItem>
+                         <DropdownMenuSeparator />
+                         <DropdownMenuItem asChild><Link href={`/employees/${employee.id}/edit`}><Edit className="mr-2 h-4 w-4" />Edit Details</Link></DropdownMenuItem>
+                         <DropdownMenuItem className="text-destructive focus:text-destructive" onClick={() => handleDelete(employee.id)}><Trash2 className="mr-2 h-4 w-4" />Delete</DropdownMenuItem>
                        </DropdownMenuContent>
                     </DropdownMenu>
                   </TableCell>

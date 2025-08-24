@@ -5,6 +5,7 @@ import React, { createContext, useContext, useState, useEffect, type ReactNode }
 import { onAuthStateChanged, getAuth, User as FirebaseUser } from 'firebase/auth';
 import { app } from '@/lib/firebaseConfig';
 import { Loader2 } from 'lucide-react';
+import { getCurrentUser } from '@/app/auth/actions';
 
 interface User {
   uid: string;
@@ -17,20 +18,6 @@ interface User {
   role: 'admin' | 'member' | 'pending' | 'rejected';
   isSuperAdmin: boolean;
 }
-
-// Mock user data since there is no backend
-const MOCK_USER: User = {
-    uid: 'mock-user-123',
-    email: 'user@example.com',
-    displayName: 'Demo User',
-    companyId: 'mock-company-123',
-    companyName: 'Demo Company Inc.',
-    publicCompanyId: 'CMP-DEMO123',
-    currencySymbol: '$',
-    role: 'admin',
-    isSuperAdmin: true,
-};
-
 
 interface AuthContextType {
   user: User | null;
@@ -45,19 +32,18 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
-    const auth = getAuth(app);
-    const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
-      if (firebaseUser) {
-        // User is signed in via Firebase, so we'll use our mock user data
-        setUser(MOCK_USER);
-      } else {
-        // User is signed out
+    async function checkUserSession() {
+      try {
+        const fullUser = await getCurrentUser();
+        setUser(fullUser);
+      } catch (error) {
+        console.error("Failed to get current user session:", error);
         setUser(null);
+      } finally {
+        setIsLoading(false);
       }
-      setIsLoading(false);
-    });
-
-    return () => unsubscribe();
+    }
+    checkUserSession();
   }, []);
 
   const authContextValue: AuthContextType = {
