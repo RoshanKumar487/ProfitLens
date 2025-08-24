@@ -21,7 +21,7 @@ export type SignupInput = z.infer<typeof SignupSchema>;
 export const CompanyDetailsSchema = z.object({
     userName: z.string().min(2, 'Name is required.'),
     companyName: z.string().min(2, 'Company name is required.'),
-    country: z.string().min(2, 'Country is required.'),
+    country: z.string().min(1, 'Country is required.'),
 });
 export type CompanyDetailsInput = z.infer<typeof CompanyDetailsSchema>;
 

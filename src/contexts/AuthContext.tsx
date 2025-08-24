@@ -32,18 +32,31 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
-    async function checkUserSession() {
-      try {
-        const fullUser = await getCurrentUser();
+    // onAuthStateChanged is useful for real-time client-side updates,
+    // but our primary source of truth is the session cookie verified by the server.
+    const auth = getAuth(app);
+    const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
+        try {
+            const fullUser = await getCurrentUser();
+            setUser(fullUser);
+        } catch (error) {
+            console.error("Failed to get current user session:", error);
+            setUser(null);
+        } finally {
+            setIsLoading(false);
+        }
+    });
+
+    // Initial check in case onAuthStateChanged doesn't fire immediately
+    getCurrentUser().then(fullUser => {
         setUser(fullUser);
-      } catch (error) {
-        console.error("Failed to get current user session:", error);
-        setUser(null);
-      } finally {
         setIsLoading(false);
-      }
-    }
-    checkUserSession();
+    }).catch(() => {
+        setUser(null);
+        setIsLoading(false);
+    });
+
+    return () => unsubscribe();
   }, []);
 
   const authContextValue: AuthContextType = {
@@ -74,3 +87,4 @@ export const useAuth = (): AuthContextType => {
   }
   return context;
 };
+
