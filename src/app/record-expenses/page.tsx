@@ -11,8 +11,23 @@ import { TrendingDown, MoreHorizontal, Loader2, PlusCircle } from 'lucide-react'
 import { format } from 'date-fns';
 import { useAuth } from '@/contexts/AuthContext';
 import { Skeleton } from '@/components/ui/skeleton';
-import { getExpenses, type Expense } from './actions';
 import Link from 'next/link';
+
+interface Expense {
+  id?: string;
+  date: string; // Stored as YYYY-MM-DD string
+  amount: number;
+  category: string;
+  vendor?: string;
+  description?: string;
+  employeeName?: string;
+}
+
+const MOCK_EXPENSES: Expense[] = [
+    { id: '1', date: '2024-07-28', amount: 55.00, category: 'Office Supplies', vendor: 'Staples', description: 'Printer paper and pens' },
+    { id: '2', date: '2024-07-27', amount: 1500.00, category: 'Salary / Advance', employeeName: 'Alice Johnson', description: 'Salary advance for July' },
+    { id: '3', date: '2024-07-25', amount: 250.00, category: 'Software & Subscriptions', vendor: 'Figma', description: 'Monthly subscription' },
+];
 
 export default function RecordExpensesPage() {
   const { user, currencySymbol, isLoading: authIsLoading } = useAuth();
@@ -21,13 +36,12 @@ export default function RecordExpensesPage() {
   const [isLoadingEntries, setIsLoadingEntries] = useState(true);
 
   useEffect(() => {
-    async function loadExpenses() {
-      setIsLoadingEntries(true);
-      const expenses = await getExpenses();
-      setRecentEntries(expenses);
-      setIsLoadingEntries(false);
-    }
-    loadExpenses();
+    setIsLoadingEntries(true);
+    // Mock fetching expenses
+    setTimeout(() => {
+        setRecentEntries(MOCK_EXPENSES);
+        setIsLoadingEntries(false);
+    }, 1000);
   }, []);
 
 
@@ -38,18 +52,6 @@ export default function RecordExpensesPage() {
          <p className="ml-2">Loading authentication...</p>
       </div>
     );
-  }
-
-  if (!user && !authIsLoading) {
-     return (
-      <div className="space-y-6 p-4 sm:p-6 lg:p-8">
-        <PageTitle title="Record Expenses" subtitle="Log your business expenditures." icon={TrendingDown} />
-        <Card className="shadow-lg">
-          <CardHeader><CardTitle>Access Denied</CardTitle></CardHeader>
-          <CardContent><p>Please sign in to record expenses.</p></CardContent>
-        </Card>
-      </div>
-    )
   }
 
   return (
@@ -63,7 +65,7 @@ export default function RecordExpensesPage() {
       <Card className="shadow-lg">
         <CardHeader>
             <CardTitle className="font-headline">Expense History</CardTitle>
-            <CardDescription>A list of your recorded expense entries from the local database.</CardDescription>
+            <CardDescription>A list of your recorded expense entries.</CardDescription>
         </CardHeader>
         <CardContent>
           <Table>

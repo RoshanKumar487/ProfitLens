@@ -17,7 +17,6 @@ import { format, parseISO } from 'date-fns';
 import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/contexts/AuthContext';
 import Link from 'next/link';
-import { searchEmployees, addExpense } from '../actions'; 
 
 const EXPENSE_CATEGORIES = [
   'Software & Subscriptions', 'Marketing & Advertising', 'Office Supplies',
@@ -94,24 +93,11 @@ export default function NewExpensePage() {
 
     setIsSaving(true);
     
-    const finalEmployeeName = category === 'Salary / Advance' ? employeeName : undefined;
-
-    const result = await addExpense({
-      date: format(date, 'yyyy-MM-dd'),
-      amount: amountNum,
-      category: category,
-      description: description || undefined,
-      vendor: vendor || undefined,
-      employeeName: finalEmployeeName,
-    });
-
-    if (result.success) {
-      toast({ title: 'Expense Recorded', description: result.message });
-      router.push('/record-expenses');
-    } else {
-      toast({ title: 'Save Failed', description: result.message, variant: 'destructive' });
-      setIsSaving(false);
-    }
+    // Mock save
+    setTimeout(() => {
+        toast({ title: 'Expense Recorded', description: 'Your expense has been saved locally.' });
+        router.push('/record-expenses');
+    }, 1000);
   };
 
   return (

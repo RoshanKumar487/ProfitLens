@@ -21,7 +21,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger, DropdownMenuSeparator } from '@/components/ui/dropdown-menu';
 import Link from 'next/link';
 import { useToast } from '@/hooks/use-toast';
-import { getEmployees, deleteEmployee } from './actions';
+import { deleteEmployee } from './actions';
 
 export interface EmployeeDisplay {
   id: string;
@@ -31,6 +31,13 @@ export interface EmployeeDisplay {
   description?: string;
   profilePictureUrl?: string;
 }
+
+const MOCK_EMPLOYEES: EmployeeDisplay[] = [
+    { id: '1', name: 'Alice Johnson', position: 'Software Engineer', salary: 95000, description: 'Frontend specialist' },
+    { id: '2', name: 'Bob Williams', position: 'Project Manager', salary: 110000, description: 'Leads the core product team' },
+    { id: '3', name: 'Charlie Brown', position: 'UX/UI Designer', salary: 85000, description: 'Focuses on mobile application design' },
+];
+
 
 const getInitials = (name: string = "") => {
   const names = name.split(' ');
@@ -48,54 +55,23 @@ export default function EmployeesPage() {
   const [employees, setEmployees] = useState<EmployeeDisplay[]>([]);
   const [isLoadingEmployees, setIsLoadingEmployees] = useState(true);
 
-  const fetchEmployees = useCallback(async () => {
-    if (!user?.companyId) {
-        setIsLoadingEmployees(false);
-        return;
-    };
-    setIsLoadingEmployees(true);
-    try {
-        const data = await getEmployees(user.companyId);
-        setEmployees(data);
-    } catch (error) {
-        toast({ title: "Error", description: "Could not load employees.", variant: "destructive" });
-    } finally {
-        setIsLoadingEmployees(false);
-    }
-  }, [user?.companyId, toast]);
-
   useEffect(() => {
-    if (!authIsLoading) {
-        fetchEmployees();
-    }
-  }, [authIsLoading, fetchEmployees]);
+    setIsLoadingEmployees(true);
+    // Simulate fetching data
+    setTimeout(() => {
+        setEmployees(MOCK_EMPLOYEES);
+        setIsLoadingEmployees(false);
+    }, 1000);
+  }, []);
 
   const handleDelete = async (employeeId: string, employeeName: string) => {
-    if (!user?.companyId) return;
-    
     const originalEmployees = [...employees];
     setEmployees(prev => prev.filter(emp => emp.id !== employeeId));
-
-    const result = await deleteEmployee(employeeId, user.companyId);
-    if (result.success) {
-        toast({ title: 'Employee Deleted', description: `${employeeName} has been removed.` });
-    } else {
-        toast({ title: 'Error', description: result.message, variant: 'destructive' });
-        setEmployees(originalEmployees);
-    }
+    toast({ title: 'Employee Deleted', description: `${employeeName} has been removed (mock).` });
   }
 
   if (authIsLoading) {
     return ( <div className="flex items-center justify-center h-[calc(100vh-200px)]"><Loader2 className="h-12 w-12 animate-spin text-primary" /></div> );
-  }
-
-  if (!user && !authIsLoading) {
-     return (
-      <div className="space-y-6 p-4 sm:p-6 lg:p-8">
-        <PageTitle title="Employees" subtitle="Manage your team members." />
-        <Card><CardHeader><CardTitle>Access Denied</CardTitle></CardHeader><CardContent><p>Please sign in to manage employees.</p></CardContent></Card>
-      </div>
-    )
   }
 
   return (

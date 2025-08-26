@@ -12,7 +12,19 @@ import { format } from 'date-fns';
 import { useAuth } from '@/contexts/AuthContext';
 import { Skeleton } from '@/components/ui/skeleton';
 import Link from 'next/link';
-import { getRevenueEntries, type RevenueEntryDisplay } from './actions';
+
+interface RevenueEntryDisplay {
+    id: string;
+    date: string;
+    amount: number;
+    source: string;
+    description?: string;
+}
+
+const MOCK_REVENUE: RevenueEntryDisplay[] = [
+    { id: '1', date: '2024-07-28', amount: 5000, source: 'Client Payment', description: 'Milestone 2 for Project X' },
+    { id: '2', date: '2024-07-26', amount: 1200, source: 'Product Sales', description: 'Online store sales' },
+];
 
 export default function RecordRevenuePage() {
   const { user, isLoading: authIsLoading, currencySymbol } = useAuth();
@@ -21,18 +33,13 @@ export default function RecordRevenuePage() {
   const [isLoadingEntries, setIsLoadingEntries] = useState(true);
 
   useEffect(() => {
-    async function loadRevenue() {
-        if (!user) {
-            setIsLoadingEntries(false);
-            return;
-        }
-        setIsLoadingEntries(true);
-        const entries = await getRevenueEntries();
-        setRecentEntries(entries);
+    // Mock fetching revenue
+    setIsLoadingEntries(true);
+    setTimeout(() => {
+        setRecentEntries(MOCK_REVENUE);
         setIsLoadingEntries(false);
-    }
-    loadRevenue();
-  }, [user]);
+    }, 1000);
+  }, []);
 
   if (authIsLoading) {
     return (
@@ -41,20 +48,6 @@ export default function RecordRevenuePage() {
       </div>
     );
   }
-  
-  if (!user) {
-    // This should ideally not be reached due to middleware, but it's good practice
-    return (
-        <div className="space-y-6 p-4 sm:p-6 lg:p-8">
-            <PageTitle title="Record Revenue" icon={TrendingUp} />
-            <Card>
-                <CardHeader><CardTitle>Access Denied</CardTitle></CardHeader>
-                <CardContent><p>Please sign in to view this page.</p></CardContent>
-            </Card>
-        </div>
-    );
-  }
-
 
   return (
     <div className="space-y-6 p-4 sm:p-6 lg:p-8">
@@ -70,7 +63,7 @@ export default function RecordRevenuePage() {
       <Card className="shadow-lg">
         <CardHeader>
             <CardTitle className="font-headline">Revenue Entries</CardTitle>
-            <CardDescription>A list of your recorded revenue entries from the database.</CardDescription>
+            <CardDescription>A list of your recorded revenue entries.</CardDescription>
         </CardHeader>
         <CardContent>
           <Table>

@@ -52,33 +52,31 @@ export default function EmployeeFormPage() {
     });
     
     const fetchEmployeeData = useCallback(async () => {
-        if (!isEditMode || !user?.companyId) return;
+        if (!isEditMode) return;
         setIsLoading(true);
         try {
-            const employee = await getEmployeeById(employeeId, user.companyId);
-            if (employee) {
-                form.reset({
-                    ...employee,
-                    joiningDate: employee.joiningDate ? new Date(employee.joiningDate) : undefined,
-                    dateOfBirth: employee.dateOfBirth ? new Date(employee.dateOfBirth) : undefined,
-                });
-                if (employee.profilePictureUrl) setProfilePicturePreview(employee.profilePictureUrl);
-                if (employee.signatureUrl) setSignaturePreview(employee.signatureUrl);
-                if (employee.leftThumbImpressionUrl) setThumbImpressionPreview(employee.leftThumbImpressionUrl);
-            } else {
-                toast({ title: "Error", description: "Employee not found.", variant: "destructive" });
-                router.push('/employees');
-            }
+            // Mock fetching
+            const employee = {
+                name: 'Alice Johnson', position: 'Software Engineer', salary: 95000, 
+                joiningDate: new Date(), dateOfBirth: new Date('1990-05-15')
+            };
+            form.reset({
+                ...employee,
+                joiningDate: employee.joiningDate ? new Date(employee.joiningDate) : undefined,
+                dateOfBirth: employee.dateOfBirth ? new Date(employee.dateOfBirth) : undefined,
+            });
         } catch (error) {
             toast({ title: "Error", description: "Failed to load employee data.", variant: "destructive" });
         } finally {
             setIsLoading(false);
         }
-    }, [isEditMode, employeeId, user?.companyId, router, toast, form]);
+    }, [isEditMode, employeeId, form, toast, router]);
 
     useEffect(() => {
         if(isEditMode) {
             fetchEmployeeData();
+        } else {
+            setIsLoading(false);
         }
     }, [isEditMode, fetchEmployeeData]);
     
@@ -113,32 +111,12 @@ export default function EmployeeFormPage() {
 
 
     const onSubmit = async (data: EmployeeInput) => {
-        if (!user?.companyId) {
-            toast({ title: 'Error', description: 'Company context is missing.', variant: 'destructive' });
-            return;
-        }
         setIsSaving(true);
         try {
-            const uploadPromises = [
-                profilePictureFile ? uploadFile(profilePictureFile, `employees/${employeeId || 'new'}/profile.jpg`, user.companyId) : Promise.resolve(profilePicturePreview),
-                signatureFile ? uploadFile(signatureFile, `employees/${employeeId || 'new'}/signature.png`, user.companyId) : Promise.resolve(signaturePreview),
-                thumbImpressionFile ? uploadFile(thumbImpressionFile, `employees/${employeeId || 'new'}/thumb.png`, user.companyId) : Promise.resolve(thumbImpressionPreview),
-            ];
-
-            const [profilePictureUrl, signatureUrl, leftThumbImpressionUrl] = await Promise.all(uploadPromises);
-
-            const result = await updateEmployee(
-                isEditMode ? employeeId : null,
-                user.companyId,
-                { ...data, profilePictureUrl, signatureUrl, leftThumbImpressionUrl }
-            );
-
-            if (result.success) {
-                toast({ title: 'Success', description: `Employee ${isEditMode ? 'updated' : 'added'}.` });
-                router.push('/employees');
-            } else {
-                toast({ title: 'Error', description: result.message, variant: 'destructive' });
-            }
+            // Mock saving
+            await new Promise(resolve => setTimeout(resolve, 1000));
+            toast({ title: 'Success', description: `Employee ${isEditMode ? 'updated' : 'added'}.` });
+            router.push('/employees');
         } catch (error: any) {
             toast({ title: 'Save Failed', description: error.message || 'An unknown error occurred.', variant: 'destructive' });
         } finally {

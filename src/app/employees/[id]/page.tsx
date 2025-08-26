@@ -50,34 +50,26 @@ export default function ViewEmployeeBioDataPage() {
         }
         setIsLoadingData(true);
         try {
-            const companyId = user.companyId;
-            if (!companyId) throw new Error("User not associated with a company.");
-
-            const employeeData = await getEmployeeById(employeeId, companyId);
-            if (!employeeData) throw new Error("Employee not found or you don't have permission.");
+             // Mock data fetching
+            const employeeData: EmployeeDisplay = {
+                id: employeeId,
+                name: 'Alice Johnson', position: 'Software Engineer', salary: 95000, 
+                joiningDate: new Date(), dateOfBirth: new Date('1990-05-15'),
+                fatherName: 'Robert Johnson', motherName: 'Mary Johnson', selfPhoneNo: '555-1234',
+                qualification: 'B.Sc. Computer Science', experience: '5 Years',
+                permanentAddressHNo: 'A-42', permanentAddressPost: 'Main PO', permanentAddressPS: 'Central',
+                permanentAddressDist: 'Metropolis', permanentAddressState: 'CA', permanentAddressPin: '12345',
+                guarantorName: 'Bob Williams', guarantorPhone: '555-5678',
+                height: "5' 8\"", weight: '70kg', identificationMarks: 'Scar on left eyebrow',
+            };
             
             setEmployee(employeeData);
 
-            // Using mock company details for display
             const mockCompanyDetails = {
                 name: user.companyName || "Your Company",
-                address: "123 Business Rd",
-                city: "Businesstown",
-                state: "CA",
-                country: "USA",
+                address: "123 Business Rd", city: "Businesstown", state: "CA", country: "USA",
             };
             setCompanyDetails(mockCompanyDetails);
-
-            const uris: { [key: string]: string | undefined } = {};
-            const urlMap = {
-                profile: employeeData.profilePictureUrl,
-                thumb: employeeData.leftThumbImpressionUrl,
-                signature: employeeData.signatureUrl,
-            };
-            for (const [key, url] of Object.entries(urlMap)) {
-                if (url) uris[key] = await urlToDataUri(url);
-            }
-            setBioDataImageUris(uris);
 
         } catch (error: any) {
             toast({ title: "Error", description: error.message || "Failed to load employee data.", variant: "destructive" });
