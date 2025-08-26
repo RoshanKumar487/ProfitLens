@@ -24,13 +24,15 @@ export async function getCurrentUser() {
       return null;
     }
     const userData = userDoc.data();
-    if (!userData) {
+    if (!userData || !userData.companyId) {
+      console.warn(`User ${decodedToken.uid} is missing companyId.`);
       return null;
     }
 
     const companyDocRef = db.collection('companies').doc(userData.companyId);
     const companyDoc = await companyDocRef.get();
     if (!companyDoc.exists) {
+      console.warn(`Company ${userData.companyId} not found for user ${decodedToken.uid}.`);
       return null;
     }
     const companyData = companyDoc.data();
@@ -51,6 +53,7 @@ export async function getCurrentUser() {
     };
   } catch (error) {
     console.error('Error verifying session cookie:', error);
+    // Clear the invalid cookie
     cookies().delete(SESSION_COOKIE_NAME);
     return null;
   }
@@ -93,21 +96,27 @@ export async function signUpWithEmail(data: SignupInput) {
         const userCredential = await createUserWithEmailAndPassword(auth, email, password);
         const user = userCredential.user;
 
+        // Use a batch to ensure atomicity
+        const batch = db.batch();
+
         const companyRef = db.collection('companies').doc();
-        await companyRef.set({
+        batch.set(companyRef, {
             name: 'My New Company', // Temporary name
             ownerId: user.uid,
             createdAt: new Date(),
             publicId: `CMP-${Date.now().toString().slice(-6)}`,
+            country: 'US', // Default country
         });
 
         const userRef = db.collection('users').doc(user.uid);
-        await userRef.set({
+        batch.set(userRef, {
             email: user.email,
             companyId: companyRef.id,
             role: 'admin', // First user is always an admin
             createdAt: new Date(),
         });
+        
+        await batch.commit();
         
         const idToken = await user.getIdToken();
         const expiresIn = 60 * 60 * 24 * 5 * 1000;
@@ -138,13 +147,15 @@ export async function completeSignUp(data: CompanyDetailsInput) {
 
     try {
         const userRef = db.collection('users').doc(user.uid);
-        await userRef.update({ name: result.data.userName });
-
         const companyRef = db.collection('companies').doc(user.companyId);
-        await companyRef.update({
+
+        const batch = db.batch();
+        batch.update(userRef, { name: result.data.userName });
+        batch.update(companyRef, {
             name: result.data.companyName,
             country: result.data.country
         });
+        await batch.commit();
 
         revalidatePath('/', 'layout');
         return { success: true };

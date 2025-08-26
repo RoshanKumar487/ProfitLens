@@ -2,10 +2,11 @@
 'use client';
 
 import React, { createContext, useContext, useState, useEffect, type ReactNode } from 'react';
-import { onAuthStateChanged, getAuth, User as FirebaseUser } from 'firebase/auth';
+import { onAuthStateChanged, getAuth } from 'firebase/auth';
 import { app } from '@/lib/firebaseConfig';
 import { Loader2 } from 'lucide-react';
 import { getCurrentUser } from '@/app/auth/actions';
+import { usePathname, useRouter } from 'next/navigation';
 
 interface User {
   uid: string;
@@ -30,32 +31,34 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined);
 export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [user, setUser] = useState<User | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const pathname = usePathname();
+  const router = useRouter();
+
+  const syncUser = async () => {
+    try {
+        const fullUser = await getCurrentUser();
+        setUser(fullUser);
+    } catch (error) {
+        console.error("Failed to sync user session:", error);
+        setUser(null);
+    } finally {
+        setIsLoading(false);
+    }
+  };
 
   useEffect(() => {
-    // onAuthStateChanged is useful for real-time client-side updates,
-    // but our primary source of truth is the session cookie verified by the server.
+    syncUser();
+    // This effect should re-run when navigation happens to keep the user state fresh,
+    // especially after actions like sign-in/sign-up which use router.refresh().
+  }, [pathname]);
+
+  useEffect(() => {
     const auth = getAuth(app);
     const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
-        try {
-            const fullUser = await getCurrentUser();
-            setUser(fullUser);
-        } catch (error) {
-            console.error("Failed to get current user session:", error);
-            setUser(null);
-        } finally {
-            setIsLoading(false);
-        }
+        // onAuthStateChanged is useful for client-side events like token refresh.
+        // We re-sync with our server-side session to get the full user profile.
+        await syncUser();
     });
-
-    // Initial check in case onAuthStateChanged doesn't fire immediately
-    getCurrentUser().then(fullUser => {
-        setUser(fullUser);
-        setIsLoading(false);
-    }).catch(() => {
-        setUser(null);
-        setIsLoading(false);
-    });
-
     return () => unsubscribe();
   }, []);
 
@@ -87,4 +90,3 @@ export const useAuth = (): AuthContextType => {
   }
   return context;
 };
-
