@@ -29,11 +29,9 @@ import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/comp
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { AssistantChat } from '@/components/AssistantChat';
 import { Badge } from '@/components/ui/badge';
-import { signOut as signOutAction } from '@/app/auth/actions';
 
 const AppShellLayout = ({ children }: { children: React.ReactNode }) => {
   const pathname = usePathname();
-  const router = useRouter();
   const { isMobile, setOpenMobile, toggleSidebar, state } = useSidebar();
   const { user, isLoading: authLoading } = useAuth(); 
   const [isAssistantOpen, setIsAssistantOpen] = React.useState(false);
@@ -52,10 +50,8 @@ const AppShellLayout = ({ children }: { children: React.ReactNode }) => {
   };
   
   const handleSignOut = async () => {
-    await signOutAction();
-    router.refresh();
+    // No-op since authentication is removed
   };
-
 
   const handleNavigationClick = () => {
     if (isMobile) {
@@ -183,7 +179,7 @@ const AppShellLayout = ({ children }: { children: React.ReactNode }) => {
                            </Link>
                          </DropdownMenuItem>
                         <DropdownMenuSeparator />
-                        <DropdownMenuItem onSelect={handleSignOut} className="cursor-pointer">
+                        <DropdownMenuItem onSelect={handleSignOut} className="cursor-pointer" disabled>
                             <LogOut className="mr-2 h-4 w-4" />
                             <span>Sign Out</span>
                         </DropdownMenuItem>
@@ -191,7 +187,7 @@ const AppShellLayout = ({ children }: { children: React.ReactNode }) => {
                  </DropdownMenu>
              ) : (
                 <SidebarMenuButton className="justify-start group-data-[collapsible=icon]:justify-center" asChild>
-                    <Link href="/auth/signin"><LogOut className="mr-2 h-4 w-4" /> <span className="group-data-[collapsible=icon]:hidden">Sign In</span></Link>
+                  {/* This part is effectively dead code now but kept for structural integrity */}
                 </SidebarMenuButton>
              )}
             <TooltipProvider delayDuration={0}>
@@ -253,7 +249,7 @@ const AppShellLayout = ({ children }: { children: React.ReactNode }) => {
                                   </Link>
                               </DropdownMenuItem>
                               <DropdownMenuItem asChild>
-                                  <Link href="/employees/new" onClick={handleNavigationClick}>
+                                  <Link href="/employees/new/edit" onClick={handleNavigationClick}>
                                       <Users className="mr-2 h-4 w-4" />
                                       <span>New Employee</span>
                                   </Link>

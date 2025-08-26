@@ -1,12 +1,9 @@
 
 'use client';
 
-import React, { createContext, useContext, useState, useEffect, type ReactNode } from 'react';
-import { onAuthStateChanged, getAuth } from 'firebase/auth';
-import { app } from '@/lib/firebaseConfig';
+import React, { createContext, useContext, useState, type ReactNode } from 'react';
 import { Loader2 } from 'lucide-react';
-import { getCurrentUser } from '@/app/auth/actions';
-import { usePathname, useRouter } from 'next/navigation';
+import { getCurrencySymbol } from '@/lib/countries';
 
 interface User {
   uid: string;
@@ -20,6 +17,20 @@ interface User {
   isSuperAdmin: boolean;
 }
 
+// Create a mock user for the application
+const MOCK_USER: User = {
+    uid: 'mock-user-123',
+    email: 'user@example.com',
+    displayName: 'Demo User',
+    companyId: 'mock-company-456',
+    companyName: 'BizSight Demo Inc.',
+    publicCompanyId: 'CMP-DEMO-01',
+    currencySymbol: getCurrencySymbol('US'),
+    role: 'admin',
+    isSuperAdmin: true,
+};
+
+
 interface AuthContextType {
   user: User | null;
   isLoading: boolean;
@@ -29,38 +40,8 @@ interface AuthContextType {
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 export const AuthProvider = ({ children }: { children: ReactNode }) => {
-  const [user, setUser] = useState<User | null>(null);
-  const [isLoading, setIsLoading] = useState(true);
-  const pathname = usePathname();
-  const router = useRouter();
-
-  const syncUser = async () => {
-    try {
-        const fullUser = await getCurrentUser();
-        setUser(fullUser);
-    } catch (error) {
-        console.error("Failed to sync user session:", error);
-        setUser(null);
-    } finally {
-        setIsLoading(false);
-    }
-  };
-
-  useEffect(() => {
-    syncUser();
-    // This effect should re-run when navigation happens to keep the user state fresh,
-    // especially after actions like sign-in/sign-up which use router.refresh().
-  }, [pathname]);
-
-  useEffect(() => {
-    const auth = getAuth(app);
-    const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
-        // onAuthStateChanged is useful for client-side events like token refresh.
-        // We re-sync with our server-side session to get the full user profile.
-        await syncUser();
-    });
-    return () => unsubscribe();
-  }, []);
+  const [user, setUser] = useState<User | null>(MOCK_USER);
+  const [isLoading, setIsLoading] = useState(false);
 
   const authContextValue: AuthContextType = {
     user,

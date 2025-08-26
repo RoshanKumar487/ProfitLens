@@ -1,2 +1,2 @@
-// This file is no longer needed as the authentication system has been removed.
-// You can safely delete this file.
+// This file is no longer needed and has been intentionally left blank.
+// It can be safely deleted.

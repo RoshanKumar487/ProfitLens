@@ -31,7 +31,7 @@ export default function AdminPage() {
   const { toast } = useToast();
 
   const handleAction = () => {
-    toast({ title: 'Action Disabled', description: 'Cannot perform this action without a backend connection.', variant: 'destructive' });
+    toast({ title: 'Action Disabled', description: 'This is a mock action.', variant: 'destructive' });
   };
   
   const getStatusBadgeVariant = (status: 'pending' | 'approved' | 'rejected') => {

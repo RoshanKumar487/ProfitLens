@@ -12,11 +12,8 @@ export default function HomePage() {
 
   useEffect(() => {
     if (!isLoading) {
-      if (user) {
-        router.replace('/dashboard');
-      } else {
-        router.replace('/auth/signin');
-      }
+      // Since there is no more login, directly redirect to the dashboard.
+      router.replace('/dashboard');
     }
   }, [router, user, isLoading]);
 
