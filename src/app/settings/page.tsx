@@ -254,7 +254,7 @@ export default function SettingsPage() {
         </Card>
 
         <Card>
-            <CardHeader><CardTitle className="flex items-center gap-2"><Palette className="h-5 w-5 text-primary" />Appearance</CardTitle><CardDescription>Choose how ProfitLens looks and feels. Your selection is saved automatically.</CardDescription></CardHeader>
+            <CardHeader><CardTitle className="flex items-center gap-2"><Palette className="h-5 w-5 text-primary" />Appearance</CardTitle><CardDescription>Choose how InvoPilot looks and feels. Your selection is saved automatically.</CardDescription></CardHeader>
             <CardContent>
                 <RadioGroup value={theme} onValueChange={setTheme} className="space-y-1">
                     <Label className="flex items-center gap-3 p-3 rounded-md hover:bg-accent cursor-pointer" htmlFor="light"><RadioGroupItem value="light" id="light" />Light</Label>

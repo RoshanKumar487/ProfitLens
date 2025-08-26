@@ -7,8 +7,8 @@ import { AuthProvider } from '@/contexts/AuthContext';
 import { ThemeProvider } from 'next-themes';
 
 export const metadata: Metadata = {
-  title: 'BizSight',
-  description: 'Your Business Financial Sight',
+  title: 'InvoPilot',
+  description: 'Your Business Financial Autopilot',
 };
 
 export default function RootLayout({

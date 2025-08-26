@@ -11,11 +11,11 @@ import { HelpCircle, LayoutDashboard, Receipt, Banknote, Users, Sparkles, FileBa
 export default function GuidePage() {
   return (
     <div className="space-y-8 p-4 sm:p-6 lg:p-8">
-      <PageTitle title="User Guide" subtitle="Your complete guide to mastering ProfitLens." icon={HelpCircle} />
+      <PageTitle title="User Guide" subtitle="Your complete guide to mastering InvoPilot." icon={HelpCircle} />
 
       <Card>
         <CardHeader>
-          <CardTitle>Welcome to ProfitLens!</CardTitle>
+          <CardTitle>Welcome to InvoPilot!</CardTitle>
           <CardDescription>This guide provides detailed instructions on how to use each feature of the application to manage your business finances effectively.</CardDescription>
         </CardHeader>
         <CardContent>

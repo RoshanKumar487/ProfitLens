@@ -23,7 +23,7 @@ const MOCK_USER: User = {
     email: 'user@example.com',
     displayName: 'Demo User',
     companyId: 'mock-company-456',
-    companyName: 'BizSight Demo Inc.',
+    companyName: 'InvoPilot Demo Inc.',
     publicCompanyId: 'CMP-DEMO-01',
     currencySymbol: getCurrencySymbol('US'),
     role: 'admin',

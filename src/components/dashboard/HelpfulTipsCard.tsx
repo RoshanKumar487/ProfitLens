@@ -15,7 +15,7 @@ const HelpfulTipsCard = () => {
       </CardHeader>
       <CardContent className="flex-grow flex flex-col justify-between">
         <p className="text-sm text-muted-foreground mb-4">
-          Unsure how a feature works? Check out our detailed user guide for step-by-step instructions and tips on how to get the most out of ProfitLens.
+          Unsure how a feature works? Check out our detailed user guide for step-by-step instructions and tips on how to get the most out of InvoPilot.
         </p>
         <div className="aspect-video w-full relative rounded-lg overflow-hidden mb-4">
            <Image
