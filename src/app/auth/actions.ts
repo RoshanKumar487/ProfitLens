@@ -8,68 +8,49 @@ import { getAuth, signInWithEmailAndPassword, createUserWithEmailAndPassword } f
 import { app } from '@/lib/firebaseConfig';
 import { SigninSchema, SignupSchema, CompanyDetailsSchema, type SignupInput, type SigninInput, type CompanyDetailsInput } from '@/lib/schemas';
 import { SESSION_COOKIE_NAME } from '@/lib/constants';
-import { connectToDatabase } from '@/lib/mongodb';
-import { ObjectId } from 'mongodb';
 import { getCurrencySymbol } from '@/lib/countries';
-import admin from 'firebase-admin';
-
-// Helper function to initialize Firebase Admin SDK
-function initializeFirebaseAdmin() {
-  if (admin.apps.length > 0) {
-    return admin.app();
-  }
-
-  const serviceAccountKey = process.env.FIREBASE_SERVICE_ACCOUNT_KEY;
-  if (!serviceAccountKey) {
-    throw new Error('The FIREBASE_SERVICE_ACCOUNT_KEY environment variable is not set. Please add it to your .env file.');
-  }
-
-  try {
-    const serviceAccount = JSON.parse(serviceAccountKey);
-    return admin.initializeApp({
-      credential: admin.credential.cert(serviceAccount),
-      databaseURL: "https://profitlenz-68b39-default-rtdb.firebaseio.com"
-    });
-  } catch (error: any) {
-    console.error('Firebase admin initialization error: Failed to parse FIREBASE_SERVICE_ACCOUNT_KEY.', error);
-    throw new Error('Failed to initialize Firebase Admin SDK. Please check the FIREBASE_SERVICE_ACCOUNT_KEY in your environment variables.');
-  }
-}
-
+import { adminAuth, db } from '@/lib/firebaseAdmin';
 
 export async function getCurrentUser() {
   const sessionCookie = cookies().get(SESSION_COOKIE_NAME);
   if (!sessionCookie) return null;
 
   try {
-    const adminAuth = initializeFirebaseAdmin().auth();
     const decodedToken = await adminAuth.verifySessionCookie(sessionCookie.value, true);
-    const { db } = await connectToDatabase();
+    const userDocRef = db.collection('users').doc(decodedToken.uid);
+    const userDoc = await userDocRef.get();
     
-    const userDoc = await db.collection('users').findOne({ _id: new ObjectId(decodedToken.uid) });
-    if (!userDoc) {
+    if (!userDoc.exists) {
+      return null;
+    }
+    const userData = userDoc.data();
+    if (!userData) {
       return null;
     }
 
-    const companyDoc = await db.collection('companies').findOne({ _id: userDoc.companyId });
-    if (!companyDoc) {
+    const companyDocRef = db.collection('companies').doc(userData.companyId);
+    const companyDoc = await companyDocRef.get();
+    if (!companyDoc.exists) {
+      return null;
+    }
+    const companyData = companyDoc.data();
+     if (!companyData) {
       return null;
     }
 
     return {
-      uid: userDoc._id.toString(),
-      email: userDoc.email,
-      displayName: userDoc.name,
-      companyId: companyDoc._id.toString(),
-      companyName: companyDoc.name,
-      publicCompanyId: companyDoc.publicId,
-      currencySymbol: getCurrencySymbol(companyDoc.country),
-      role: userDoc.role,
-      isSuperAdmin: userDoc.isSuperAdmin || false,
+      uid: userDoc.id,
+      email: userData.email,
+      displayName: userData.name,
+      companyId: companyDoc.id,
+      companyName: companyData.name,
+      publicCompanyId: companyData.publicId,
+      currencySymbol: getCurrencySymbol(companyData.country),
+      role: userData.role,
+      isSuperAdmin: userData.isSuperAdmin || false,
     };
   } catch (error) {
     console.error('Error verifying session cookie:', error);
-    // Clear the invalid cookie
     cookies().delete(SESSION_COOKIE_NAME);
     return null;
   }
@@ -86,11 +67,9 @@ export async function signInWithEmail(data: SigninInput) {
   const auth = getAuth(app);
 
   try {
-    const adminAuth = initializeFirebaseAdmin().auth();
     const userCredential = await signInWithEmailAndPassword(auth, email, password);
     const idToken = await userCredential.user.getIdToken();
 
-    // Create session cookie
     const expiresIn = 60 * 60 * 24 * 5 * 1000; // 5 days
     const sessionCookie = await adminAuth.createSessionCookie(idToken, { expiresIn });
     cookies().set(SESSION_COOKIE_NAME, sessionCookie, { maxAge: expiresIn, httpOnly: true, secure: process.env.NODE_ENV === 'production' });
@@ -111,25 +90,21 @@ export async function signUpWithEmail(data: SignupInput) {
     const auth = getAuth(app);
     
     try {
-        const adminAuth = initializeFirebaseAdmin().auth();
         const userCredential = await createUserWithEmailAndPassword(auth, email, password);
         const user = userCredential.user;
 
-        const { db } = await connectToDatabase();
-        
-        // Create a new company for the user
-        const newCompany = await db.collection('companies').insertOne({
+        const companyRef = db.collection('companies').doc();
+        await companyRef.set({
             name: 'My New Company', // Temporary name
-            ownerId: new ObjectId(user.uid),
+            ownerId: user.uid,
             createdAt: new Date(),
             publicId: `CMP-${Date.now().toString().slice(-6)}`,
         });
 
-        // Create the user document in the database
-        await db.collection('users').insertOne({
-            _id: new ObjectId(user.uid),
+        const userRef = db.collection('users').doc(user.uid);
+        await userRef.set({
             email: user.email,
-            companyId: newCompany.insertedId,
+            companyId: companyRef.id,
             role: 'admin', // First user is always an admin
             createdAt: new Date(),
         });
@@ -162,19 +137,14 @@ export async function completeSignUp(data: CompanyDetailsInput) {
     }
 
     try {
-        const { db } = await connectToDatabase();
-        
-        // Update user's name
-        await db.collection('users').updateOne(
-            { _id: new ObjectId(user.uid) },
-            { $set: { name: result.data.userName } }
-        );
+        const userRef = db.collection('users').doc(user.uid);
+        await userRef.update({ name: result.data.userName });
 
-        // Update company details
-        await db.collection('companies').updateOne(
-            { _id: new ObjectId(user.companyId) },
-            { $set: { name: result.data.companyName, country: result.data.country } }
-        );
+        const companyRef = db.collection('companies').doc(user.companyId);
+        await companyRef.update({
+            name: result.data.companyName,
+            country: result.data.country
+        });
 
         revalidatePath('/', 'layout');
         return { success: true };

@@ -28,13 +28,6 @@ const nextConfig: NextConfig = {
       "fs": false,
       "net": false,
       "tls": false,
-      "cardinal": false,
-      "mongodb-client-encryption": false,
-      "kerberos": false,
-      "aws4": false,
-      "snappy": false,
-      "@mongodb-js/zstd": false,
-      "@aws-sdk/credential-providers": false,
     };
     
     return config;

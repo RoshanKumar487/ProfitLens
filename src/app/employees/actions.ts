@@ -4,8 +4,8 @@
 import { revalidatePath } from 'next/cache';
 import { uploadFileToStorage, deleteFileFromStorage } from '@/lib/firebaseStorageUtils';
 import { type EmployeeInput } from '@/lib/schemas';
-
-// This file now uses a mock in-memory store instead of a database.
+import { db } from '@/lib/firebaseAdmin';
+import { Timestamp } from 'firebase-admin/firestore';
 
 export interface EmployeeDisplay {
   id: string;
@@ -36,13 +36,6 @@ export interface EmployeeDisplay {
   leftThumbImpressionUrl?: string;
 }
 
-// Mock in-memory store
-let MOCK_EMPLOYEES: EmployeeDisplay[] = [
-    { id: '1', name: 'Alice Johnson', position: 'Software Engineer', salary: 95000, description: 'Frontend specialist with 5 years of experience.', joiningDate: new Date('2021-06-01') },
-    { id: '2', name: 'Bob Williams', position: 'Project Manager', salary: 105000, description: 'Manages the core product development team.', joiningDate: new Date('2020-02-15') },
-    { id: '3', name: 'Charlie Brown', position: 'UX/UI Designer', salary: 85000, description: 'Focuses on user experience and interface design.', joiningDate: new Date('2022-09-01') },
-];
-
 export async function uploadFile(file: File, path: string, companyId: string): Promise<string> {
     const companyPath = `companies/${companyId}/${path}`;
     const downloadURL = await uploadFileToStorage(file, companyPath);
@@ -50,13 +43,40 @@ export async function uploadFile(file: File, path: string, companyId: string): P
 }
 
 export async function getEmployees(companyId: string): Promise<EmployeeDisplay[]> {
-  // companyId is unused in mock, but kept for signature consistency
-  return Promise.resolve([...MOCK_EMPLOYEES]);
+  const snapshot = await db.collection('employees').where('companyId', '==', companyId).get();
+  return snapshot.docs.map(doc => {
+      const data = doc.data();
+      return {
+        id: doc.id,
+        name: data.name,
+        position: data.position,
+        salary: data.salary,
+        description: data.description,
+        profilePictureUrl: data.profilePictureUrl,
+      } as EmployeeDisplay;
+  });
 }
 
 export async function getEmployeeById(employeeId: string, companyId: string): Promise<EmployeeDisplay | null> {
-    const employee = MOCK_EMPLOYEES.find(emp => emp.id === employeeId);
-    return Promise.resolve(employee || null);
+    const docRef = db.collection('employees').doc(employeeId);
+    const doc = await docRef.get();
+
+    if (!doc.exists || doc.data()?.companyId !== companyId) {
+        return null;
+    }
+
+    const data = doc.data();
+    if (!data) return null;
+
+    // Convert Firestore Timestamps to JS Dates
+    const convertTimestamp = (field: any) => field instanceof Timestamp ? field.toDate() : undefined;
+
+    return {
+        id: doc.id,
+        ...data,
+        joiningDate: convertTimestamp(data.joiningDate),
+        dateOfBirth: convertTimestamp(data.dateOfBirth),
+    } as EmployeeDisplay;
 }
 
 export async function updateEmployee(
@@ -64,47 +84,53 @@ export async function updateEmployee(
   companyId: string,
   data: EmployeeInput & { profilePictureUrl?: string | null, signatureUrl?: string | null, leftThumbImpressionUrl?: string | null }
 ) {
-  const { profilePictureUrl, signatureUrl, leftThumbImpressionUrl, ...employeeData } = data;
+  try {
+    const { profilePictureUrl, signatureUrl, leftThumbImpressionUrl, ...employeeData } = data;
 
-  const payload = {
-    ...employeeData,
-    profilePictureUrl: profilePictureUrl || undefined,
-    signatureUrl: signatureUrl || undefined,
-    leftThumbImpressionUrl: leftThumbImpressionUrl || undefined,
-  };
-
-  if (employeeId) {
-    // Update existing
-    MOCK_EMPLOYEES = MOCK_EMPLOYEES.map(emp =>
-      emp.id === employeeId ? { ...emp, ...payload } : emp
-    );
-  } else {
-    // Create new
-    const newEmployee: EmployeeDisplay = {
-      id: `emp-${Date.now()}`,
-      ...payload,
-      name: payload.name || 'New Employee',
-      position: payload.position || 'N/A',
-      salary: payload.salary || 0,
+    const payload = {
+        ...employeeData,
+        companyId,
+        profilePictureUrl: profilePictureUrl || null,
+        signatureUrl: signatureUrl || null,
+        leftThumbImpressionUrl: leftThumbImpressionUrl || null,
+        updatedAt: Timestamp.now(),
     };
-    MOCK_EMPLOYEES.push(newEmployee);
-  }
 
-  revalidatePath('/employees');
-  return { success: true, message: `Employee ${employeeId ? 'updated' : 'added'} successfully.` };
+    if (employeeId) {
+        await db.collection('employees').doc(employeeId).update(payload);
+    } else {
+        await db.collection('employees').add({ ...payload, createdAt: Timestamp.now() });
+    }
+
+    revalidatePath('/employees');
+    return { success: true, message: `Employee ${employeeId ? 'updated' : 'added'} successfully.` };
+  } catch(error) {
+    console.error("Error updating employee:", error);
+    return { success: false, message: "Failed to save employee data." };
+  }
 }
 
 export async function deleteEmployee(employeeId: string, companyId: string) {
-    const employee = MOCK_EMPLOYEES.find(emp => emp.id === employeeId);
-    if (employee) {
-        // Mock file deletion
-        if (employee.profilePictureUrl) console.log(`[Mock Delete] Deleting ${employee.profilePictureUrl}`);
-        if (employee.signatureUrl) console.log(`[Mock Delete] Deleting ${employee.signatureUrl}`);
-        if (employee.leftThumbImpressionUrl) console.log(`[Mock Delete] Deleting ${employee.leftThumbImpressionUrl}`);
+    try {
+        const docRef = db.collection('employees').doc(employeeId);
+        const doc = await docRef.get();
+        const data = doc.data();
+
+        if (!doc.exists || data?.companyId !== companyId) {
+            return { success: false, message: "Employee not found or permission denied." };
+        }
+
+        // Delete associated files from storage
+        if (data.profilePictureUrl) await deleteFileFromStorage(data.profilePictureUrl);
+        if (data.signatureUrl) await deleteFileFromStorage(data.signatureUrl);
+        if (data.leftThumbImpressionUrl) await deleteFileFromStorage(data.leftThumbImpressionUrl);
+
+        await docRef.delete();
         
-        MOCK_EMPLOYEES = MOCK_EMPLOYEES.filter(emp => emp.id !== employeeId);
         revalidatePath('/employees');
         return { success: true, message: "Employee deleted successfully." };
+    } catch (error) {
+        console.error("Error deleting employee:", error);
+        return { success: false, message: "Failed to delete employee." };
     }
-    return { success: false, message: "Employee not found." };
 }
