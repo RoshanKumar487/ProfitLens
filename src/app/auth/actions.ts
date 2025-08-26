@@ -8,16 +8,41 @@ import { getAuth, signInWithEmailAndPassword, createUserWithEmailAndPassword } f
 import { app } from '@/lib/firebaseConfig';
 import { SigninSchema, SignupSchema, CompanyDetailsSchema, type SignupInput, type SigninInput, type CompanyDetailsInput } from '@/lib/schemas';
 import { SESSION_COOKIE_NAME } from '@/lib/constants';
-import { auth as adminAuth } from '@/lib/firebaseAdminConfig';
 import { connectToDatabase } from '@/lib/mongodb';
 import { ObjectId } from 'mongodb';
 import { getCurrencySymbol } from '@/lib/countries';
+import admin from 'firebase-admin';
+
+// Helper function to initialize Firebase Admin SDK
+function initializeFirebaseAdmin() {
+  if (admin.apps.length > 0) {
+    return admin.app();
+  }
+
+  const serviceAccountKey = process.env.FIREBASE_SERVICE_ACCOUNT_KEY;
+  if (!serviceAccountKey) {
+    throw new Error('The FIREBASE_SERVICE_ACCOUNT_KEY environment variable is not set. Please add it to your .env file.');
+  }
+
+  try {
+    const serviceAccount = JSON.parse(serviceAccountKey);
+    return admin.initializeApp({
+      credential: admin.credential.cert(serviceAccount),
+      databaseURL: "https://profitlenz-68b39-default-rtdb.firebaseio.com"
+    });
+  } catch (error: any) {
+    console.error('Firebase admin initialization error: Failed to parse FIREBASE_SERVICE_ACCOUNT_KEY.', error);
+    throw new Error('Failed to initialize Firebase Admin SDK. Please check the FIREBASE_SERVICE_ACCOUNT_KEY in your environment variables.');
+  }
+}
+
 
 export async function getCurrentUser() {
   const sessionCookie = cookies().get(SESSION_COOKIE_NAME);
   if (!sessionCookie) return null;
 
   try {
+    const adminAuth = initializeFirebaseAdmin().auth();
     const decodedToken = await adminAuth.verifySessionCookie(sessionCookie.value, true);
     const { db } = await connectToDatabase();
     
@@ -61,6 +86,7 @@ export async function signInWithEmail(data: SigninInput) {
   const auth = getAuth(app);
 
   try {
+    const adminAuth = initializeFirebaseAdmin().auth();
     const userCredential = await signInWithEmailAndPassword(auth, email, password);
     const idToken = await userCredential.user.getIdToken();
 
@@ -85,6 +111,7 @@ export async function signUpWithEmail(data: SignupInput) {
     const auth = getAuth(app);
     
     try {
+        const adminAuth = initializeFirebaseAdmin().auth();
         const userCredential = await createUserWithEmailAndPassword(auth, email, password);
         const user = userCredential.user;
 
@@ -163,4 +190,3 @@ export async function signOut() {
   revalidatePath('/', 'layout');
   redirect('/auth/signin');
 }
-
