@@ -1,10 +1,10 @@
 
 'use server';
 
-import { connectToDatabase } from '@/lib/mongodb';
 import { revalidatePath } from 'next/cache';
-import { getCurrentUser } from '@/app/auth/actions';
-import { ObjectId } from 'mongodb';
+import { db } from '@/lib/firebaseAdmin';
+import { Timestamp } from 'firebase-admin/firestore';
+
 
 export interface EmployeeWithPayroll {
   id: string; // employeeId for existing, tempId for new
@@ -37,29 +37,28 @@ export interface EmployeeWithPayroll {
 
 export async function getPayrollDataForPeriod(companyId: string, period: string): Promise<EmployeeWithPayroll[]> {
   try {
-    const { db } = await connectToDatabase();
-    
-    // 1. Get all employees for the company
-    const employees = await db.collection('employees').find({ companyId }).toArray();
-    
-    // 2. Get existing payroll records for the period
-    const payrolls = await db.collection('payrolls').find({ companyId, period }).toArray();
-    const payrollsMap = new Map(payrolls.map(p => [p.employeeId.toString(), p]));
+    const employeesSnapshot = await db.collection('employees').where('companyId', '==', companyId).get();
+    const employees = employeesSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
 
-    // 3. Combine employee data with payroll data
+    const payrollsSnapshot = await db.collection('payrolls').where('companyId', '==', companyId).where('period', '==', period).get();
+    const payrollsMap = new Map(payrollsSnapshot.docs.map(p => [p.data().employeeId, { id: p.id, ...p.data() }]));
+
     const combinedData = employees.map(emp => {
-      const payrollRecord = payrollsMap.get(emp._id.toString());
+      const payrollRecord = payrollsMap.get(emp.id);
+      
+      const workingDaysInMonth = new Date(parseInt(period.split('-')[0]), parseInt(period.split('-')[1]), 0).getDate();
+
       return {
-        id: emp._id.toString(),
+        id: emp.id,
         name: emp.name,
         position: emp.position,
         uan: emp.uan,
-        joiningDate: emp.joiningDate,
+        joiningDate: emp.joiningDate instanceof Timestamp ? emp.joiningDate.toDate() : emp.joiningDate,
         profilePictureUrl: emp.profilePictureUrl,
         baseSalary: emp.salary || 0,
-        payrollId: payrollRecord ? payrollRecord._id.toString() : null,
-        workingDays: payrollRecord ? payrollRecord.workingDays : new Date(period).getDate(),
-        presentDays: payrollRecord ? payrollRecord.presentDays : new Date(period).getDate(),
+        payrollId: payrollRecord ? payrollRecord.id : null,
+        workingDays: payrollRecord ? payrollRecord.workingDays : workingDaysInMonth,
+        presentDays: payrollRecord ? payrollRecord.presentDays : workingDaysInMonth,
         otDays: payrollRecord ? payrollRecord.otDays : 0,
         advances: payrollRecord ? payrollRecord.advances : 0,
         otherDeductions: payrollRecord ? payrollRecord.otherDeductions : 0,
@@ -77,38 +76,30 @@ export async function getPayrollDataForPeriod(companyId: string, period: string)
 
 export async function savePayrollData(companyId: string, period: string, payrollData: EmployeeWithPayroll[]) {
   try {
-    const { db } = await connectToDatabase();
-    const bulkOps = payrollData.map(p => {
+    const batch = db.batch();
+    
+    payrollData.forEach(p => {
       const { id, name, position, uan, joiningDate, profilePictureUrl, baseSalary, isNew, ...payrollRecord } = p;
       
-      const payload = {
+      const payload: any = {
         companyId,
         period,
-        employeeId: new ObjectId(id),
+        employeeId: id,
         ...payrollRecord
       };
-
-      if (payrollRecord.payrollId && ObjectId.isValid(payrollRecord.payrollId)) {
-        return {
-          updateOne: {
-            filter: { _id: new ObjectId(payrollRecord.payrollId), companyId },
-            update: { $set: payload },
-            upsert: true
-          }
-        };
+      
+      let docRef;
+      if (payrollRecord.payrollId) {
+         docRef = db.collection('payrolls').doc(payrollRecord.payrollId);
       } else {
-        // Remove null payrollId before insert
-        delete (payload as any).payrollId;
-        return {
-          insertOne: {
-            document: payload
-          }
-        };
+         docRef = db.collection('payrolls').doc();
       }
+      
+      batch.set(docRef, payload, { merge: true });
     });
 
-    if (bulkOps.length > 0) {
-      await db.collection('payrolls').bulkWrite(bulkOps);
+    if (payrollData.length > 0) {
+      await batch.commit();
     }
 
     revalidatePath('/payroll');
@@ -121,19 +112,14 @@ export async function savePayrollData(companyId: string, period: string, payroll
 
 
 export async function deletePayrollRecord(companyId: string, payrollId: string) {
-    if (!ObjectId.isValid(payrollId)) {
-        return { success: false, message: "Invalid payroll record ID." };
-    }
     try {
-        const { db } = await connectToDatabase();
-        const result = await db.collection('payrolls').deleteOne({
-            _id: new ObjectId(payrollId),
-            companyId: companyId,
-        });
+        const docRef = db.collection('payrolls').doc(payrollId);
+        const doc = await docRef.get();
 
-        if (result.deletedCount === 0) {
+        if (!doc.exists || doc.data()?.companyId !== companyId) {
             return { success: false, message: "Record not found or you don't have permission." };
         }
+        await docRef.delete();
 
         revalidatePath('/payroll');
         return { success: true, message: 'Payroll record deleted successfully.' };

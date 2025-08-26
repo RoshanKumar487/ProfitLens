@@ -1,9 +1,9 @@
 
 'use server';
 
-import { connectToDatabase } from '@/lib/mongodb';
 import { revalidatePath } from 'next/cache';
-import { ObjectId } from 'mongodb';
+import { type ProductSettings } from '@/app/settings/actions';
+import { db } from '@/lib/firebaseAdmin';
 
 export interface Product {
   name: string;
@@ -26,16 +26,20 @@ export interface ProductDisplay extends Product {
 
 export async function getAllProducts(companyId: string): Promise<ProductDisplay[]> {
   try {
-    const { db } = await connectToDatabase();
-    const products = await db.collection('products')
-      .find({ companyId })
-      .sort({ name: 1 })
-      .toArray();
-
-    return products.map(p => ({
-      ...p,
-      id: p._id.toHexString(),
+    const snapshot = await db.collection('products')
+      .where('companyId', '==', companyId)
+      .orderBy('name')
+      .get();
+      
+    if (snapshot.empty) {
+        return [];
+    }
+    
+    return snapshot.docs.map(doc => ({
+      ...doc.data(),
+      id: doc.id,
     })) as ProductDisplay[];
+    
   } catch (error) {
     console.error("Failed to get products:", error);
     throw new Error("Could not fetch products.");
@@ -44,31 +48,27 @@ export async function getAllProducts(companyId: string): Promise<ProductDisplay[
 
 export async function saveAllProducts(companyId: string, products: ProductDisplay[]) {
   try {
-    const { db } = await connectToDatabase();
-    const bulkOps = products.map(p => {
+    const batch = db.batch();
+    
+    products.forEach(p => {
       const { id, isNew, ...productData } = p;
-      if (isNew || !ObjectId.isValid(id)) {
-        return {
-          insertOne: {
-            document: { ...productData, companyId, createdAt: new Date() }
-          }
-        };
+      const docRef = isNew ? db.collection('products').doc() : db.collection('products').doc(id);
+      
+      const payload: any = { ...productData, companyId };
+      if (isNew) {
+        payload.createdAt = new Date();
       } else {
-        return {
-          updateOne: {
-            filter: { _id: new ObjectId(id), companyId },
-            update: { $set: { ...productData, updatedAt: new Date() } },
-            upsert: true
-          }
-        };
+        payload.updatedAt = new Date();
       }
+      
+      batch.set(docRef, payload, { merge: true });
     });
 
-    if (bulkOps.length === 0) {
+    if (products.length === 0) {
       return { success: true, message: "No changes to save." };
     }
 
-    await db.collection('products').bulkWrite(bulkOps);
+    await batch.commit();
     revalidatePath('/products-services');
     return { success: true, message: 'Products saved successfully.' };
   } catch (error: any) {
@@ -78,24 +78,36 @@ export async function saveAllProducts(companyId: string, products: ProductDispla
 }
 
 export async function deleteProduct(companyId: string, productId: string) {
-  if (!ObjectId.isValid(productId)) {
-    return { success: false, message: "Invalid product ID." };
-  }
   try {
-    const { db } = await connectToDatabase();
-    const result = await db.collection('products').deleteOne({
-      _id: new ObjectId(productId),
-      companyId: companyId,
-    });
-
-    if (result.deletedCount === 0) {
-      return { success: false, message: "Product not found or you don't have permission to delete it." };
+    const docRef = db.collection('products').doc(productId);
+    const doc = await docRef.get();
+    
+    if (!doc.exists || doc.data()?.companyId !== companyId) {
+       return { success: false, message: "Product not found or you don't have permission to delete it." };
     }
+
+    await docRef.delete();
 
     revalidatePath('/products-services');
     return { success: true, message: 'Product deleted successfully.' };
   } catch (error: any) {
     console.error('Failed to delete product:', error);
     return { success: false, message: `Failed to delete product: ${error.message}` };
+  }
+}
+
+export async function getProductSettingsForCompany(companyId: string): Promise<ProductSettings> {
+  try {
+    const settingsDoc = await db.collection('settings').doc(companyId).get();
+    if (settingsDoc.exists) {
+      const settingsData = settingsDoc.data();
+      if (settingsData && settingsData.productSettings) {
+        return settingsData.productSettings;
+      }
+    }
+    return { customFields: [] };
+  } catch (error) {
+    console.error("Failed to get product settings:", error);
+    return { customFields: [] };
   }
 }
