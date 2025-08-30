@@ -1,31 +1,6 @@
 
 import { z } from 'zod';
 
-// Authentication Schemas
-export const SigninSchema = z.object({
-  email: z.string().email('Invalid email address.'),
-  password: z.string().min(1, 'Password is required.'),
-});
-export type SigninInput = z.infer<typeof SigninSchema>;
-
-export const SignupSchema = z.object({
-    email: z.string().email('Invalid email address.'),
-    password: z.string().min(8, 'Password must be at least 8 characters.'),
-    confirmPassword: z.string()
-}).refine(data => data.password === data.confirmPassword, {
-    message: "Passwords don't match",
-    path: ["confirmPassword"],
-});
-export type SignupInput = z.infer<typeof SignupSchema>;
-
-export const CompanyDetailsSchema = z.object({
-    userName: z.string().min(2, 'Name is required.'),
-    companyName: z.string().min(2, 'Company name is required.'),
-    country: z.string().min(1, 'Country is required.'),
-});
-export type CompanyDetailsInput = z.infer<typeof CompanyDetailsSchema>;
-
-
 // Employee Schema
 export const EmployeeSchema = z.object({
     name: z.string().min(2, 'Name is required'),

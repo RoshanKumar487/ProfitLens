@@ -3,7 +3,6 @@ import './globals.css';
 import { Toaster } from '@/components/ui/toaster';
 import BackgroundAnimation from '@/components/BackgroundAnimation';
 import AppShell from '@/components/layout/AppShell';
-import { AuthProvider } from '@/contexts/AuthContext';
 import { ThemeProvider } from 'next-themes';
 
 export const metadata: Metadata = {
@@ -25,13 +24,11 @@ export default function RootLayout({
       </head>
       <body className="font-body antialiased">
         <ThemeProvider attribute="class" defaultTheme="system" enableSystem>
-            <AuthProvider>
             <BackgroundAnimation />
             <AppShell>
                 {children}
             </AppShell>
             <Toaster />
-            </AuthProvider>
         </ThemeProvider>
       </body>
     </html>

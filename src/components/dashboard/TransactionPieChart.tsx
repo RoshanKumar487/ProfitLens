@@ -4,7 +4,6 @@
 import * as React from "react"
 import Link from "next/link"
 import { Pie, PieChart, ResponsiveContainer, Cell, Tooltip } from "recharts"
-import { useAuth } from "@/contexts/AuthContext"
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Skeleton } from "@/components/ui/skeleton"
@@ -25,7 +24,7 @@ const COLORS = [
 ];
 
 export default function TransactionPieChart() {
-  const { currencySymbol } = useAuth();
+  const currencySymbol = '$'; // Mock currency symbol
   const [data, setData] = React.useState<any[]>([]);
   const [totalExpenses, setTotalExpenses] = React.useState(0);
   const [isLoading, setIsLoading] = React.useState(true);

@@ -1,7 +1,7 @@
 
 'use client';
 
-import React, { useMemo } from 'react';
+import React, { useMemo, useState } from 'react';
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import {
@@ -22,7 +22,6 @@ import { Separator } from '@/components/ui/separator';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { LogOut, Loader2, Building, LayoutTemplate, Bell, Bot, HelpCircle, User, Crown, ChevronLeft, ChevronRight, PlusCircle, ChevronDown, Receipt, TrendingDown, Users, Sparkles, Settings } from 'lucide-react';
-import { useAuth } from '@/contexts/AuthContext';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
@@ -30,10 +29,23 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, Di
 import { AssistantChat } from '@/components/AssistantChat';
 import { Badge } from '@/components/ui/badge';
 
+// Mock user data since AuthProvider is removed
+const MOCK_USER = {
+    uid: 'mock-user-123',
+    email: 'user@example.com',
+    displayName: 'Demo User',
+    companyId: 'mock-company-456',
+    companyName: 'InvoPilot Demo Inc.',
+    publicCompanyId: 'CMP-DEMO-01',
+    currencySymbol: '$',
+    role: 'admin' as const,
+    isSuperAdmin: true,
+};
+
+
 const AppShellLayout = ({ children }: { children: React.ReactNode }) => {
   const pathname = usePathname();
   const { isMobile, setOpenMobile, toggleSidebar, state } = useSidebar();
-  const { user, isLoading: authLoading } = useAuth(); 
   const [isAssistantOpen, setIsAssistantOpen] = React.useState(false);
   const [pendingRequestCount, setPendingRequestCount] = React.useState(0);
   const CollapseIcon = state === 'expanded' ? ChevronLeft : ChevronRight;
@@ -48,10 +60,6 @@ const AppShellLayout = ({ children }: { children: React.ReactNode }) => {
     
     return (firstInitial + lastInitial).toUpperCase();
   };
-  
-  const handleSignOut = async () => {
-    // No-op since authentication is removed
-  };
 
   const handleNavigationClick = () => {
     if (isMobile) {
@@ -62,16 +70,15 @@ const AppShellLayout = ({ children }: { children: React.ReactNode }) => {
   const visibleNavItems = useMemo(() => {
     return NAV_ITEMS.filter(item => {
       if (item.sidebar === false) return false;
-      if (!user) return false;
       if (item.href === '/admin' || item.href === '/payroll') {
-        return user?.role === 'admin';
+        return MOCK_USER?.role === 'admin';
       }
       if (item.href === '/super-admin') {
-        return user?.isSuperAdmin;
+        return MOCK_USER?.isSuperAdmin;
       }
       return true;
     });
-  }, [user]);
+  }, []);
   
   const Logo = () => (
     <Button
@@ -134,62 +141,52 @@ const AppShellLayout = ({ children }: { children: React.ReactNode }) => {
           </SidebarMenu>
         </SidebarContent>
         <SidebarFooter className="mt-auto p-2">
-             {authLoading ? (
-                 <div className="flex w-full items-center justify-start gap-2 p-2 group-data-[collapsible=icon]:justify-center">
-                     <Loader2 className="h-5 w-5 animate-spin" />
-                     <span className="text-sm group-data-[collapsible=icon]:hidden">Loading...</span>
-                 </div>
-             ) : user ? (
-                 <DropdownMenu>
-                     <DropdownMenuTrigger asChild>
-                         <Button variant="ghost" className="h-auto w-full justify-start p-2 text-left group-data-[collapsible=icon]:h-11 group-data-[collapsible=icon]:w-11 group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:px-0">
-                            <Avatar className="h-8 w-8 group-data-[collapsible=icon]:h-9 group-data-[collapsible=icon]:w-9">
-                                <AvatarFallback className="bg-primary/20 text-primary font-semibold">
-                                    {getInitials(user.displayName)}
-                                </AvatarFallback>
-                            </Avatar>
-                            <div className="ml-2 flex-grow truncate group-data-[collapsible=icon]:hidden">
-                                <p className="truncate text-sm font-semibold">{user.displayName}</p>
-                                <p className="truncate text-xs text-muted-foreground">{user.email}</p>
-                            </div>
-                            <ChevronDown className="ml-1 h-4 w-4 shrink-0 group-data-[collapsible=icon]:hidden" />
-                        </Button>
-                     </DropdownMenuTrigger>
-                     <DropdownMenuContent className="w-56 mb-2" side="top" align="start">
-                        <DropdownMenuLabel>My Account</DropdownMenuLabel>
-                        <DropdownMenuSeparator />
-                          {user.isSuperAdmin && (
-                           <DropdownMenuItem asChild>
-                              <Link href="/super-admin" className="cursor-pointer">
-                                  <Crown className="mr-2 h-4 w-4" />
-                                  <span>Super Admin</span>
-                              </Link>
-                          </DropdownMenuItem>
-                         )}
-                        <DropdownMenuItem asChild>
-                            <Link href="/company-details" className="cursor-pointer">
-                                <Building className="mr-2 h-4 w-4" />
-                                <span>Company Details</span>
-                            </Link>
-                        </DropdownMenuItem>
-                         <DropdownMenuItem asChild>
-                           <Link href="/settings" className="cursor-pointer">
-                             <Settings className="mr-2 h-4 w-4" />
-                             <span>Settings</span>
-                           </Link>
-                         </DropdownMenuItem>
-                        <DropdownMenuSeparator />
-                        <DropdownMenuItem onSelect={handleSignOut} className="cursor-pointer" disabled>
-                            <LogOut className="mr-2 h-4 w-4" />
-                            <span>Sign Out</span>
-                        </DropdownMenuItem>
-                     </DropdownMenuContent>
-                 </DropdownMenu>
-             ) : (
-                <SidebarMenuButton className="justify-start group-data-[collapsible=icon]:justify-center" asChild>
-                  {/* This part is effectively dead code now but kept for structural integrity */}
-                </SidebarMenuButton>
-             )}
+             <DropdownMenu>
+                 <DropdownMenuTrigger asChild>
+                     <Button variant="ghost" className="h-auto w-full justify-start p-2 text-left group-data-[collapsible=icon]:h-11 group-data-[collapsible=icon]:w-11 group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:px-0">
+                        <Avatar className="h-8 w-8 group-data-[collapsible=icon]:h-9 group-data-[collapsible=icon]:w-9">
+                            <AvatarFallback className="bg-primary/20 text-primary font-semibold">
+                                {getInitials(MOCK_USER.displayName)}
+                            </AvatarFallback>
+                        </Avatar>
+                        <div className="ml-2 flex-grow truncate group-data-[collapsible=icon]:hidden">
+                            <p className="truncate text-sm font-semibold">{MOCK_USER.displayName}</p>
+                            <p className="truncate text-xs text-muted-foreground">{MOCK_USER.email}</p>
+                        </div>
+                        <ChevronDown className="ml-1 h-4 w-4 shrink-0 group-data-[collapsible=icon]:hidden" />
+                    </Button>
+                 </DropdownMenuTrigger>
+                 <DropdownMenuContent className="w-56 mb-2" side="top" align="start">
+                    <DropdownMenuLabel>My Account</DropdownMenuLabel>
+                    <DropdownMenuSeparator />
+                      {MOCK_USER.isSuperAdmin && (
+                       <DropdownMenuItem asChild>
+                          <Link href="/super-admin" className="cursor-pointer">
+                              <Crown className="mr-2 h-4 w-4" />
+                              <span>Super Admin</span>
+                          </Link>
+                      </DropdownMenuItem>
+                     )}
+                    <DropdownMenuItem asChild>
+                        <Link href="/company-details" className="cursor-pointer">
+                            <Building className="mr-2 h-4 w-4" />
+                            <span>Company Details</span>
+                        </Link>
+                    </DropdownMenuItem>
+                     <DropdownMenuItem asChild>
+                       <Link href="/settings" className="cursor-pointer">
+                         <Settings className="mr-2 h-4 w-4" />
+                         <span>Settings</span>
+                       </Link>
+                     </DropdownMenuItem>
+                    <DropdownMenuSeparator />
+                    <DropdownMenuItem className="cursor-pointer" disabled>
+                        <LogOut className="mr-2 h-4 w-4" />
+                        <span>Sign Out</span>
+                    </DropdownMenuItem>
+                 </DropdownMenuContent>
+             </DropdownMenu>
+
             <TooltipProvider delayDuration={0}>
               <Tooltip>
                 <TooltipTrigger asChild>
@@ -217,63 +214,59 @@ const AppShellLayout = ({ children }: { children: React.ReactNode }) => {
             <div className="mx-auto flex h-14 max-w-7xl items-center gap-4 px-4 sm:px-6">
               <SidebarTrigger className="md:hidden" />
               
-              {user && user.companyName && (
-                <div className="hidden items-center gap-2 md:flex">
-                    <Building className="h-5 w-5 flex-shrink-0 text-primary" />
-                    <p className="truncate text-lg font-semibold">{user.companyName}</p>
-                </div>
-              )}
+              <div className="hidden items-center gap-2 md:flex">
+                  <Building className="h-5 w-5 flex-shrink-0 text-primary" />
+                  <p className="truncate text-lg font-semibold">{MOCK_USER.companyName}</p>
+              </div>
 
               <div className="flex-1" />
 
-              {user && (
-                  <div className="flex items-center gap-2">
-                      <DropdownMenu>
-                          <DropdownMenuTrigger asChild>
-                              <Button variant="default" size="sm">
-                                  <PlusCircle className="mr-2 h-4 w-4" />
-                                  <span className="hidden sm:inline">Create New</span>
-                              </Button>
-                          </DropdownMenuTrigger>
-                          <DropdownMenuContent align="end" className="w-56">
-                              <DropdownMenuItem asChild>
-                                  <Link href="/invoicing/new" onClick={handleNavigationClick}>
-                                      <Receipt className="mr-2 h-4 w-4" />
-                                      <span>New Invoice</span>
-                                  </Link>
-                              </DropdownMenuItem>
-                              <DropdownMenuItem asChild>
-                                  <Link href="/record-expenses/new" onClick={handleNavigationClick}>
-                                      <TrendingDown className="mr-2 h-4 w-4" />
-                                      <span>New Expense</span>
-                                  </Link>
-                              </DropdownMenuItem>
-                              <DropdownMenuItem asChild>
-                                  <Link href="/employees/new/edit" onClick={handleNavigationClick}>
-                                      <Users className="mr-2 h-4 w-4" />
-                                      <span>New Employee</span>
-                                  </Link>
-                              </DropdownMenuItem>
-                          </DropdownMenuContent>
-                      </DropdownMenu>
+              <div className="flex items-center gap-2">
+                  <DropdownMenu>
+                      <DropdownMenuTrigger asChild>
+                          <Button variant="default" size="sm">
+                              <PlusCircle className="mr-2 h-4 w-4" />
+                              <span className="hidden sm:inline">Create New</span>
+                          </Button>
+                      </DropdownMenuTrigger>
+                      <DropdownMenuContent align="end" className="w-56">
+                          <DropdownMenuItem asChild>
+                              <Link href="/invoicing/new" onClick={handleNavigationClick}>
+                                  <Receipt className="mr-2 h-4 w-4" />
+                                  <span>New Invoice</span>
+                              </Link>
+                          </DropdownMenuItem>
+                          <DropdownMenuItem asChild>
+                              <Link href="/record-expenses/new" onClick={handleNavigationClick}>
+                                  <TrendingDown className="mr-2 h-4 w-4" />
+                                  <span>New Expense</span>
+                              </Link>
+                          </DropdownMenuItem>
+                          <DropdownMenuItem asChild>
+                              <Link href="/employees/new/edit" onClick={handleNavigationClick}>
+                                  <Users className="mr-2 h-4 w-4" />
+                                  <span>New Employee</span>
+                              </Link>
+                          </DropdownMenuItem>
+                      </DropdownMenuContent>
+                  </DropdownMenu>
 
-                      <DropdownMenu>
-                          <DropdownMenuTrigger asChild>
-                            <Button variant="ghost" size="icon" className="relative h-10 w-10 rounded-full hover:bg-accent hover:text-accent-foreground">
-                                <Bell className="h-5 w-5" />
-                                 {pendingRequestCount > 0 && <Badge variant="destructive" className="absolute -top-1 -right-1 h-5 w-5 justify-center p-0">{pendingRequestCount}</Badge>}
-                            </Button>
-                          </DropdownMenuTrigger>
-                          <DropdownMenuContent className="w-80" align="end">
-                            <DropdownMenuLabel>Notifications</DropdownMenuLabel>
-                            <DropdownMenuSeparator />
-                              <div className="p-4 text-sm text-center text-muted-foreground">
-                                    You have no new notifications.
-                              </div>
-                          </DropdownMenuContent>
-                      </DropdownMenu>
-                  </div>
-              )}
+                  <DropdownMenu>
+                      <DropdownMenuTrigger asChild>
+                        <Button variant="ghost" size="icon" className="relative h-10 w-10 rounded-full hover:bg-accent hover:text-accent-foreground">
+                            <Bell className="h-5 w-5" />
+                             {pendingRequestCount > 0 && <Badge variant="destructive" className="absolute -top-1 -right-1 h-5 w-5 justify-center p-0">{pendingRequestCount}</Badge>}
+                        </Button>
+                      </DropdownMenuTrigger>
+                      <DropdownMenuContent className="w-80" align="end">
+                        <DropdownMenuLabel>Notifications</DropdownMenuLabel>
+                        <DropdownMenuSeparator />
+                          <div className="p-4 text-sm text-center text-muted-foreground">
+                                You have no new notifications.
+                          </div>
+                      </DropdownMenuContent>
+                  </DropdownMenu>
+              </div>
             </div>
         </header>
         <main className="flex-1 print:p-0">
@@ -281,8 +274,7 @@ const AppShellLayout = ({ children }: { children: React.ReactNode }) => {
         </main>
       </SidebarInset>
       
-      {user && (
-        <Dialog open={isAssistantOpen} onOpenChange={setIsAssistantOpen}>
+      <Dialog open={isAssistantOpen} onOpenChange={setIsAssistantOpen}>
           <TooltipProvider>
             <Tooltip>
               <TooltipTrigger asChild>
@@ -312,7 +304,6 @@ const AppShellLayout = ({ children }: { children: React.ReactNode }) => {
             </div>
           </DialogContent>
         </Dialog>
-      )}
     </>
   );
 };

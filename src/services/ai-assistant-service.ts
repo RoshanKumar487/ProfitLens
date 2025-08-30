@@ -2,7 +2,25 @@
 'use server';
 
 import { analyzeExpenseOpportunities } from '@/ai/flows/analyze-expense-opportunities';
-import { db } from '@/lib/firebaseAdmin';
+
+// MOCK DATABASE - Replace with your actual database client
+const db = {
+  collection: (name: string) => ({
+    where: (field: string, op: string, value: any) => ({
+      get: async () => ({ docs: [], empty: true }),
+      limit: (n: number) => ({
+        get: async () => ({ docs: [], empty: true }),
+      }),
+       orderBy: (field: string, dir: string) => ({
+        limit: (n: number) => ({
+          get: async () => ({ docs: [], empty: true }),
+        }),
+      }),
+    }),
+    add: async (data: any) => ({ id: 'new-mock-id' }),
+  }),
+};
+
 
 // Interface Definitions
 interface Employee {
@@ -21,7 +39,7 @@ interface Expense {
 }
 
 // Helper function to get docs from a snapshot
-const getDocsFromSnapshot = (snapshot: FirebaseFirestore.QuerySnapshot) => {
+const getDocsFromSnapshot = (snapshot: { docs: any[] }) => {
     return snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
 };
 
@@ -69,7 +87,9 @@ export async function updateInvoiceStatus(companyId: string, invoiceNumber: stri
         
     if (snapshot.empty) return false;
     
-    await snapshot.docs[0].ref.update({ status });
+    // In a real app, you would call update on the doc ref.
+    // await snapshot.docs[0].ref.update({ status });
+    console.log(`Mock: Updated invoice ${invoiceNumber} to ${status}`);
     return true;
 }
 
@@ -96,8 +116,9 @@ export async function deleteLastExpense(companyId: string): Promise<boolean> {
         .get();
 
     if (snapshot.empty) return false;
-
-    await snapshot.docs[0].ref.delete();
+    
+    // In a real app: await snapshot.docs[0].ref.delete();
+    console.log('Mock: Deleted last expense');
     return true;
 }
 

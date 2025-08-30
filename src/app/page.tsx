@@ -3,19 +3,15 @@
 
 import React, { useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import { useAuth } from '@/contexts/AuthContext';
 import { Loader2 } from 'lucide-react';
 
 export default function HomePage() {
   const router = useRouter();
-  const { user, isLoading } = useAuth();
 
   useEffect(() => {
-    if (!isLoading) {
-      // Since there is no more login, directly redirect to the dashboard.
-      router.replace('/dashboard');
-    }
-  }, [router, user, isLoading]);
+    // Since there is no more login, directly redirect to the dashboard.
+    router.replace('/dashboard');
+  }, [router]);
 
   return (
       <div className="flex h-screen w-screen items-center justify-center">

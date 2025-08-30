@@ -3,7 +3,6 @@
 
 import React, { useState, useEffect } from 'react';
 import dynamic from 'next/dynamic';
-import { useAuth } from '@/contexts/AuthContext';
 import { format, subMonths } from 'date-fns';
 
 import PageTitle from '@/components/PageTitle';
@@ -46,7 +45,7 @@ interface RecentActivity {
 }
 
 export default function DashboardPage() {
-  const { currencySymbol, isLoading: authIsLoading } = useAuth();
+  const currencySymbol = '$'; // Mock currency symbol
   const [financialData, setFinancialData] = useState<FinancialData | null>(null);
   const [monthlyChartData, setMonthlyChartData] = useState<MonthlyData[]>([]);
   const [recentActivity, setRecentActivity] = useState<RecentActivity[]>([]);
@@ -97,7 +96,7 @@ export default function DashboardPage() {
   };
 
 
-  if (authIsLoading || isLoading) {
+  if (isLoading) {
     return (
       <div className="p-4 sm:p-6 lg:p-8">
         <PageTitle title="Dashboard" icon={LayoutDashboard} />

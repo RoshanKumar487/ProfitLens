@@ -1,7 +1,7 @@
+
 'use client';
 
 import React, { useState, useRef, useEffect } from 'react';
-import { useAuth } from '@/contexts/AuthContext';
 import { Bot, Loader2, Send } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
@@ -26,12 +26,13 @@ const EXAMPLE_PROMPTS = [
 ];
 
 export function AssistantChat() {
-  const { user, currencySymbol } = useAuth();
   const { toast } = useToast();
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const scrollAreaRef = useRef<HTMLDivElement>(null);
+  
+  const currencySymbol = '$'; // Mock currency symbol
 
   useEffect(() => {
     if (scrollAreaRef.current) {
@@ -85,14 +86,6 @@ export function AssistantChat() {
     handleSubmit(undefined, prompt);
   };
 
-  if (!user) {
-    return (
-        <div className="flex justify-center items-center h-full">
-            <p>You must be signed in to use the AI Assistant.</p>
-      </div>
-    );
-  }
-
   return (
     <div className="h-full flex flex-col overflow-hidden">
         <ScrollArea className="flex-1 p-4" ref={scrollAreaRef}>
@@ -143,7 +136,7 @@ export function AssistantChat() {
                 </div>
                 {message.role === 'user' && (
                     <Avatar className="h-8 w-8">
-                        <AvatarFallback className="flex h-full w-full items-center justify-center rounded-full bg-muted text-muted-foreground">{user?.displayName?.charAt(0) || 'U'}</AvatarFallback>
+                        <AvatarFallback className="flex h-full w-full items-center justify-center rounded-full bg-muted text-muted-foreground">U</AvatarFallback>
                     </Avatar>
                 )}
                 </div>
