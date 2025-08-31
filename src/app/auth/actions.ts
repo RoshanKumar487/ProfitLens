@@ -17,11 +17,14 @@ const serviceAccount = process.env.FIREBASE_SERVICE_ACCOUNT_KEY
 
 if (!getApps().length) {
   if (!serviceAccount) {
-    throw new Error('Firebase service account key is not set in environment variables.');
+    // This check is important for server-side rendering and build processes
+    // where the env var might not be present.
+    console.warn("Firebase service account key not found. Firebase Admin SDK not initialized.");
+  } else {
+      initializeApp({
+        credential: cert(serviceAccount),
+      });
   }
-  initializeApp({
-    credential: cert(serviceAccount),
-  });
 }
 
 const auth = getAuth();
@@ -35,6 +38,9 @@ interface SignUpData {
 }
 
 export async function signUpWithEmail(data: SignUpData) {
+  if (!serviceAccount) {
+    return { success: false, error: 'Firebase Admin SDK not initialized on the server.' };
+  }
   try {
     const { email, password, displayName, companyName } = data;
 
@@ -75,6 +81,9 @@ export async function signUpWithEmail(data: SignUpData) {
 }
 
 export async function signInWithIdToken(idToken: string) {
+   if (!serviceAccount) {
+    return { success: false, error: 'Firebase Admin SDK not initialized on the server.' };
+  }
   try {
     const decodedToken = await auth.verifyIdToken(idToken);
     const expiresIn = 60 * 60 * 24 * 5 * 1000;
@@ -91,6 +100,9 @@ export async function signOutAction() {
 }
 
 export async function getSession() {
+   if (!serviceAccount) {
+    return null;
+  }
   try {
     const sessionCookie = cookies().get(SESSION_COOKIE_NAME)?.value;
     if (!sessionCookie) return null;
