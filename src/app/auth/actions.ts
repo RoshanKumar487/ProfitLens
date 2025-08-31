@@ -15,20 +15,51 @@ const serviceAccount = process.env.FIREBASE_SERVICE_ACCOUNT_KEY
   ? JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT_KEY)
   : null;
 
-if (!getApps().length) {
-  if (!serviceAccount) {
-    // This check is important for server-side rendering and build processes
-    // where the env var might not be present.
-    console.warn("Firebase service account key not found. Firebase Admin SDK not initialized.");
-  } else {
-      initializeApp({
-        credential: cert(serviceAccount),
-      });
-  }
+if (serviceAccount && !getApps().length) {
+  initializeApp({
+    credential: cert(serviceAccount),
+  });
 }
 
-const auth = getAuth();
-const db = getFirestore();
+function getAdminAuth() {
+    if (!getApps().length) {
+        if (!serviceAccount) {
+            console.error("FIREBASE_SERVICE_ACCOUNT_KEY is not set. Firebase Admin SDK cannot be initialized.");
+            // Return a mock or throw an error, depending on desired behavior in a non-initialized state
+            return {
+                createUser: () => Promise.reject(new Error("Firebase not initialized")),
+                setCustomUserClaims: () => Promise.reject(new Error("Firebase not initialized")),
+                createCustomToken: () => Promise.reject(new Error("Firebase not initialized")),
+                verifyIdToken: () => Promise.reject(new Error("Firebase not initialized")),
+                createSessionCookie: () => Promise.reject(new Error("Firebase not initialized")),
+                verifySessionCookie: () => Promise.reject(new Error("Firebase not initialized")),
+            };
+        }
+        initializeApp({
+          credential: cert(serviceAccount),
+        });
+    }
+    return getAuth();
+}
+
+function getAdminFirestore() {
+    if (!getApps().length) {
+        if (!serviceAccount) {
+            console.error("FIREBASE_SERVICE_ACCOUNT_KEY is not set. Firebase Admin SDK cannot be initialized.");
+            // Return a mock or throw an error
+            return {
+                collection: () => ({
+                    add: () => Promise.reject(new Error("Firebase not initialized")),
+                }),
+            };
+        }
+        initializeApp({
+            credential: cert(serviceAccount),
+        });
+    }
+    return getFirestore();
+}
+
 
 interface SignUpData {
   email: string;
@@ -38,6 +69,8 @@ interface SignUpData {
 }
 
 export async function signUpWithEmail(data: SignUpData) {
+  const auth = getAdminAuth();
+  const db = getAdminFirestore();
   if (!serviceAccount) {
     return { success: false, error: 'Firebase Admin SDK not initialized on the server.' };
   }
@@ -71,7 +104,9 @@ export async function signUpWithEmail(data: SignUpData) {
     });
 
     // Create session cookie
-    const sessionCookie = await auth.createSessionCookie(await auth.createCustomToken(userRecord.uid), { expiresIn: 60 * 60 * 24 * 5 * 1000 });
+    const token = await auth.createCustomToken(userRecord.uid);
+    const expiresIn = 60 * 60 * 24 * 5 * 1000;
+    const sessionCookie = await auth.createSessionCookie(token, { expiresIn });
     cookies().set(SESSION_COOKIE_NAME, sessionCookie, { httpOnly: true, secure: process.env.NODE_ENV === 'production' });
 
     return { success: true, userId: userRecord.uid };
@@ -81,6 +116,7 @@ export async function signUpWithEmail(data: SignUpData) {
 }
 
 export async function signInWithIdToken(idToken: string) {
+   const auth = getAdminAuth();
    if (!serviceAccount) {
     return { success: false, error: 'Firebase Admin SDK not initialized on the server.' };
   }
@@ -100,6 +136,7 @@ export async function signOutAction() {
 }
 
 export async function getSession() {
+   const auth = getAdminAuth();
    if (!serviceAccount) {
     return null;
   }
