@@ -1,6 +1,9 @@
 
 'use server';
 
+import { config } from 'dotenv';
+config({ path: '.env' });
+
 import { cookies } from 'next/headers';
 import { initializeApp, getApps, cert } from 'firebase-admin/app';
 import { getAuth } from 'firebase-admin/auth';
