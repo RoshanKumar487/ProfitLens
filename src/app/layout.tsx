@@ -4,6 +4,7 @@ import { Toaster } from '@/components/ui/toaster';
 import BackgroundAnimation from '@/components/BackgroundAnimation';
 import AppShell from '@/components/layout/AppShell';
 import { ThemeProvider } from 'next-themes';
+import { AuthProvider } from '@/contexts/AuthContext';
 
 export const metadata: Metadata = {
   title: 'InvoPilot',
@@ -24,11 +25,13 @@ export default function RootLayout({
       </head>
       <body className="font-body antialiased">
         <ThemeProvider attribute="class" defaultTheme="system" enableSystem>
+          <AuthProvider>
             <BackgroundAnimation />
             <AppShell>
                 {children}
             </AppShell>
             <Toaster />
+          </AuthProvider>
         </ThemeProvider>
       </body>
     </html>

@@ -28,27 +28,24 @@ import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/comp
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { AssistantChat } from '@/components/AssistantChat';
 import { Badge } from '@/components/ui/badge';
-
-// Mock user data since AuthProvider is removed
-const MOCK_USER = {
-    uid: 'mock-user-123',
-    email: 'user@example.com',
-    displayName: 'Demo User',
-    companyId: 'mock-company-456',
-    companyName: 'InvoPilot Demo Inc.',
-    publicCompanyId: 'CMP-DEMO-01',
-    currencySymbol: '$',
-    role: 'admin' as const,
-    isSuperAdmin: true,
-};
-
+import { useAuth } from '@/contexts/AuthContext';
+import { signOutAction } from '@/app/auth/actions';
 
 const AppShellLayout = ({ children }: { children: React.ReactNode }) => {
   const pathname = usePathname();
   const { isMobile, setOpenMobile, toggleSidebar, state } = useSidebar();
   const [isAssistantOpen, setIsAssistantOpen] = React.useState(false);
-  const [pendingRequestCount, setPendingRequestCount] = React.useState(0);
-  const CollapseIcon = state === 'expanded' ? ChevronLeft : ChevronRight;
+  const { user, isLoading } = useAuth();
+  const router = useRouter();
+
+  const [isSigningOut, setIsSigningOut] = useState(false);
+
+  const handleSignOut = async () => {
+    setIsSigningOut(true);
+    await signOutAction();
+    router.push('/auth/sign-in');
+    setIsSigningOut(false);
+  };
   
   const getInitials = (name?: string | null) => {
     if (!name) return 'U';
@@ -68,17 +65,18 @@ const AppShellLayout = ({ children }: { children: React.ReactNode }) => {
   };
   
   const visibleNavItems = useMemo(() => {
+    if (!user) return [];
     return NAV_ITEMS.filter(item => {
       if (item.sidebar === false) return false;
       if (item.href === '/admin' || item.href === '/payroll') {
-        return MOCK_USER?.role === 'admin';
+        return user?.role === 'admin';
       }
       if (item.href === '/super-admin') {
-        return MOCK_USER?.isSuperAdmin;
+        return user?.isSuperAdmin;
       }
       return true;
     });
-  }, []);
+  }, [user]);
   
   const Logo = () => (
     <Button
@@ -131,9 +129,6 @@ const AppShellLayout = ({ children }: { children: React.ReactNode }) => {
                   <Link href={item.href} onClick={handleNavigationClick}>
                     <item.icon />
                     <span className="group-data-[collapsible=icon]:hidden">{item.label}</span>
-                     {item.href === '/admin' && pendingRequestCount > 0 && (
-                      <Badge className="ml-auto group-data-[collapsible=icon]:hidden">{pendingRequestCount}</Badge>
-                    )}
                   </Link>
                 </SidebarMenuButton>
               </SidebarMenuItem>
@@ -142,16 +137,16 @@ const AppShellLayout = ({ children }: { children: React.ReactNode }) => {
         </SidebarContent>
         <SidebarFooter className="mt-auto p-2">
              <DropdownMenu>
-                 <DropdownMenuTrigger asChild>
+                 <DropdownMenuTrigger asChild disabled={isLoading}>
                      <Button variant="ghost" className="h-auto w-full justify-start p-2 text-left group-data-[collapsible=icon]:h-11 group-data-[collapsible=icon]:w-11 group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:px-0">
                         <Avatar className="h-8 w-8 group-data-[collapsible=icon]:h-9 group-data-[collapsible=icon]:w-9">
                             <AvatarFallback className="bg-primary/20 text-primary font-semibold">
-                                {getInitials(MOCK_USER.displayName)}
+                                {isLoading ? <Loader2 className="animate-spin h-4 w-4" /> : getInitials(user?.displayName)}
                             </AvatarFallback>
                         </Avatar>
                         <div className="ml-2 flex-grow truncate group-data-[collapsible=icon]:hidden">
-                            <p className="truncate text-sm font-semibold">{MOCK_USER.displayName}</p>
-                            <p className="truncate text-xs text-muted-foreground">{MOCK_USER.email}</p>
+                            <p className="truncate text-sm font-semibold">{user?.displayName || 'Loading...'}</p>
+                            <p className="truncate text-xs text-muted-foreground">{user?.email}</p>
                         </div>
                         <ChevronDown className="ml-1 h-4 w-4 shrink-0 group-data-[collapsible=icon]:hidden" />
                     </Button>
@@ -159,7 +154,7 @@ const AppShellLayout = ({ children }: { children: React.ReactNode }) => {
                  <DropdownMenuContent className="w-56 mb-2" side="top" align="start">
                     <DropdownMenuLabel>My Account</DropdownMenuLabel>
                     <DropdownMenuSeparator />
-                      {MOCK_USER.isSuperAdmin && (
+                      {user?.isSuperAdmin && (
                        <DropdownMenuItem asChild>
                           <Link href="/super-admin" className="cursor-pointer">
                               <Crown className="mr-2 h-4 w-4" />
@@ -180,8 +175,8 @@ const AppShellLayout = ({ children }: { children: React.ReactNode }) => {
                        </Link>
                      </DropdownMenuItem>
                     <DropdownMenuSeparator />
-                    <DropdownMenuItem className="cursor-pointer" disabled>
-                        <LogOut className="mr-2 h-4 w-4" />
+                    <DropdownMenuItem className="cursor-pointer" onClick={handleSignOut} disabled={isSigningOut}>
+                        {isSigningOut ? <Loader2 className="mr-2 h-4 w-4 animate-spin"/> : <LogOut className="mr-2 h-4 w-4" />}
                         <span>Sign Out</span>
                     </DropdownMenuItem>
                  </DropdownMenuContent>
@@ -216,7 +211,7 @@ const AppShellLayout = ({ children }: { children: React.ReactNode }) => {
               
               <div className="hidden items-center gap-2 md:flex">
                   <Building className="h-5 w-5 flex-shrink-0 text-primary" />
-                  <p className="truncate text-lg font-semibold">{MOCK_USER.companyName}</p>
+                  <p className="truncate text-lg font-semibold">{user?.companyName || 'Loading...'}</p>
               </div>
 
               <div className="flex-1" />
@@ -255,7 +250,6 @@ const AppShellLayout = ({ children }: { children: React.ReactNode }) => {
                       <DropdownMenuTrigger asChild>
                         <Button variant="ghost" size="icon" className="relative h-10 w-10 rounded-full hover:bg-accent hover:text-accent-foreground">
                             <Bell className="h-5 w-5" />
-                             {pendingRequestCount > 0 && <Badge variant="destructive" className="absolute -top-1 -right-1 h-5 w-5 justify-center p-0">{pendingRequestCount}</Badge>}
                         </Button>
                       </DropdownMenuTrigger>
                       <DropdownMenuContent className="w-80" align="end">
@@ -309,6 +303,13 @@ const AppShellLayout = ({ children }: { children: React.ReactNode }) => {
 };
 
 const AppShell = ({ children }: { children: React.ReactNode }) => {
+  const pathname = usePathname();
+
+  // Don't render the shell for auth pages
+  if (pathname.startsWith('/auth')) {
+    return <>{children}</>;
+  }
+  
   return (
     <SidebarProvider defaultOpen={true}>
       <AppShellLayout>{children}</AppShellLayout>

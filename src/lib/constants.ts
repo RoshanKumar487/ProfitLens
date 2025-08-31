@@ -23,7 +23,8 @@ export const NAV_ITEMS: NavItem[] = [
     label: 'Record Revenue',
     href: '/record-revenue',
     icon: TrendingUp,
-    description: 'Manually log all incoming revenue from various sources.'
+    description: 'Manually log all incoming revenue from various sources.',
+    sidebar: false,
   },
   {
     label: 'Record Expenses',
@@ -98,5 +99,6 @@ export const NAV_ITEMS: NavItem[] = [
     href: '/super-admin',
     icon: Crown,
     description: 'Manage all companies and users across the platform.',
+    sidebar: false,
   }
 ];
