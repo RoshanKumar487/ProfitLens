@@ -15,36 +15,36 @@ import {
   SidebarTrigger,
   SidebarInset,
   useSidebar,
-  SidebarFooter,
 } from '@/components/ui/sidebar';
 import { NAV_ITEMS } from '@/lib/constants';
 import { Separator } from '@/components/ui/separator';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
-import { LogOut, Loader2, Building, LayoutTemplate, Bell, Bot, HelpCircle, User, Crown, ChevronLeft, ChevronRight, PlusCircle, ChevronDown, Receipt, TrendingDown, Users, Sparkles, Settings } from 'lucide-react';
+import { LogOut, Loader2, Building, HelpCircle, User, Crown, ChevronDown, PlusCircle, Receipt, TrendingDown, Users, Sparkles, Settings } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
-import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
+import { Tooltip, TooltipProvider, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { AssistantChat } from '@/components/AssistantChat';
-import { Badge } from '@/components/ui/badge';
 import { useAuth } from '@/contexts/AuthContext';
-import { signOutAction } from '@/app/auth/actions';
+
+const CollapseIcon = ({ className }: { className?: string }) => (
+    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={cn("group-data-[state=expanded]:hidden", className)}><rect width="18" height="18" x="3" y="3" rx="2"/><path d="M9 3v18"/><path d="m14 9 3-3 3 3"/></svg>
+);
+
 
 const AppShellLayout = ({ children }: { children: React.ReactNode }) => {
   const pathname = usePathname();
-  const { isMobile, setOpenMobile, toggleSidebar, state } = useSidebar();
+  const { isMobile, setOpenMobile, state } = useSidebar();
   const [isAssistantOpen, setIsAssistantOpen] = React.useState(false);
   const { user, isLoading } = useAuth();
   const router = useRouter();
 
-  const [isSigningOut, setIsSigningOut] = useState(false);
-
   const handleSignOut = async () => {
-    setIsSigningOut(true);
-    await signOutAction();
-    router.push('/auth/sign-in');
-    setIsSigningOut(false);
+    // Since auth is disabled, this is a mock sign out.
+    // In a real app, this would call signOutAction().
+    console.log("Mock sign out successful");
+    router.push('/auth/sign-in'); // Redirect to a nominal sign-in page
   };
   
   const getInitials = (name?: string | null) => {
@@ -135,7 +135,7 @@ const AppShellLayout = ({ children }: { children: React.ReactNode }) => {
             ))}
           </SidebarMenu>
         </SidebarContent>
-        <SidebarFooter className="mt-auto p-2">
+        <SidebarHeader className="mt-auto p-2">
              <DropdownMenu>
                  <DropdownMenuTrigger asChild disabled={isLoading}>
                      <Button variant="ghost" className="h-auto w-full justify-start p-2 text-left group-data-[collapsible=icon]:h-11 group-data-[collapsible=icon]:w-11 group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:px-0">
@@ -174,34 +174,20 @@ const AppShellLayout = ({ children }: { children: React.ReactNode }) => {
                          <span>Settings</span>
                        </Link>
                      </DropdownMenuItem>
+                      <DropdownMenuItem asChild>
+                       <Link href="/guide" className="cursor-pointer">
+                         <HelpCircle className="mr-2 h-4 w-4" />
+                         <span>User Guide</span>
+                       </Link>
+                     </DropdownMenuItem>
                     <DropdownMenuSeparator />
-                    <DropdownMenuItem className="cursor-pointer" onClick={handleSignOut} disabled={isSigningOut}>
-                        {isSigningOut ? <Loader2 className="mr-2 h-4 w-4 animate-spin"/> : <LogOut className="mr-2 h-4 w-4" />}
+                    <DropdownMenuItem className="cursor-pointer" onClick={handleSignOut}>
+                        <LogOut className="mr-2 h-4 w-4" />
                         <span>Sign Out</span>
                     </DropdownMenuItem>
                  </DropdownMenuContent>
              </DropdownMenu>
-
-            <TooltipProvider delayDuration={0}>
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <Button
-                    variant="ghost"
-                    className="h-10 w-full justify-start group-data-[collapsible=icon]:h-10 group-data-[collapsible=icon]:w-10 group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:px-0"
-                    onClick={toggleSidebar}
-                  >
-                    <CollapseIcon className="size-5 shrink-0" />
-                    <span className="group-data-[collapsible=icon]:hidden">
-                      {state === 'expanded' ? 'Collapse' : 'Expand'}
-                    </span>
-                  </Button>
-                </TooltipTrigger>
-                <TooltipContent side="right" hidden={state === "expanded"}>
-                  Expand sidebar
-                </TooltipContent>
-              </Tooltip>
-            </TooltipProvider>
-        </SidebarFooter>
+        </SidebarHeader>
       </Sidebar>
 
       <SidebarInset>
@@ -245,21 +231,16 @@ const AppShellLayout = ({ children }: { children: React.ReactNode }) => {
                           </DropdownMenuItem>
                       </DropdownMenuContent>
                   </DropdownMenu>
-
-                  <DropdownMenu>
-                      <DropdownMenuTrigger asChild>
-                        <Button variant="ghost" size="icon" className="relative h-10 w-10 rounded-full hover:bg-accent hover:text-accent-foreground">
-                            <Bell className="h-5 w-5" />
-                        </Button>
-                      </DropdownMenuTrigger>
-                      <DropdownMenuContent className="w-80" align="end">
-                        <DropdownMenuLabel>Notifications</DropdownMenuLabel>
-                        <DropdownMenuSeparator />
-                          <div className="p-4 text-sm text-center text-muted-foreground">
-                                You have no new notifications.
-                          </div>
-                      </DropdownMenuContent>
-                  </DropdownMenu>
+                   <TooltipProvider>
+                        <Tooltip>
+                        <TooltipTrigger asChild>
+                            <Button variant="ghost" size="icon" className="h-10 w-10 rounded-full hover:bg-accent hover:text-accent-foreground" onClick={() => setIsAssistantOpen(true)}>
+                                <Sparkles className="h-5 w-5" />
+                            </Button>
+                        </TooltipTrigger>
+                        <TooltipContent><p>AI Assistant</p></TooltipContent>
+                        </Tooltip>
+                    </TooltipProvider>
               </div>
             </div>
         </header>
@@ -269,24 +250,10 @@ const AppShellLayout = ({ children }: { children: React.ReactNode }) => {
       </SidebarInset>
       
       <Dialog open={isAssistantOpen} onOpenChange={setIsAssistantOpen}>
-          <TooltipProvider>
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <DialogTrigger asChild>
-                  <Button className="fixed bottom-6 right-6 h-14 w-14 rounded-full shadow-2xl z-50 bg-primary hover:bg-primary/90 text-primary-foreground hover:scale-110 transition-transform duration-200 print:hidden">
-                    <Sparkles className="h-7 w-7" />
-                  </Button>
-                </DialogTrigger>
-              </TooltipTrigger>
-              <TooltipContent side="left">
-                <p>AI Assistant</p>
-              </TooltipContent>
-            </Tooltip>
-          </TooltipProvider>
           <DialogContent className="sm:max-w-2xl h-[calc(100vh-8rem)] flex flex-col p-0 gap-0">
             <DialogHeader className="p-6 pb-4">
               <DialogTitle className="flex items-center gap-2">
-                <Bot className="h-6 w-6 text-primary"/>
+                <Sparkles className="h-6 w-6 text-primary"/>
                 AI Assistant
               </DialogTitle>
               <DialogDescription>
@@ -305,9 +272,14 @@ const AppShellLayout = ({ children }: { children: React.ReactNode }) => {
 const AppShell = ({ children }: { children: React.ReactNode }) => {
   const pathname = usePathname();
 
-  // Don't render the shell for auth pages
+  // Don't render the shell for auth pages when auth is disabled,
+  // as they are not meant to be accessed directly.
   if (pathname.startsWith('/auth')) {
-    return <>{children}</>;
+    return (
+         <div className="flex h-screen w-screen items-center justify-center">
+            <p>Redirecting...</p>
+        </div>
+    );
   }
   
   return (

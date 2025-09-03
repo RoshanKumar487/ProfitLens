@@ -3,22 +3,15 @@
 
 import React, { useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import { useAuth } from '@/contexts/AuthContext';
 import { Loader2 } from 'lucide-react';
 
 export default function HomePage() {
   const router = useRouter();
-  const { user, isLoading } = useAuth();
 
   useEffect(() => {
-    if (!isLoading) {
-      if (user) {
-        router.replace('/dashboard');
-      } else {
-        router.replace('/auth/sign-in');
-      }
-    }
-  }, [router, user, isLoading]);
+    // Since auth is disabled, redirect directly to the dashboard
+    router.replace('/dashboard');
+  }, [router]);
 
   return (
       <div className="flex h-screen w-screen items-center justify-center">
