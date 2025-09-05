@@ -60,9 +60,17 @@ export default function NewInvoicePage() {
     const { toast } = useToast();
     const router = useRouter();
 
-    const [currentInvoice, setCurrentInvoice] = useState<Partial<InvoiceDisplay>>({
+    const [currentInvoice, setCurrentInvoice] = useState<Partial<InvoiceDisplay>>({});
+    const [isSaving, setIsSaving] = useState(false);
+    const [invoiceSettings, setInvoiceSettings] = useState<InvoiceSettings | null>(MOCK_INVOICE_SETTINGS);
+    
+    useEffect(() => {
+        // Use a useEffect to set initial state that relies on external data or randomness
+        // to avoid hydration errors.
+        setCurrentInvoice({
+            id: uuidv4(),
             status: 'Draft',
-            items: [], 
+            items: [{ id: uuidv4(), description: '', hsnNo: MOCK_INVOICE_SETTINGS.defaultHsnCode || '', quantity: 1, unitPrice: 0, customFields: {} }], 
             invoiceNumber: `INV${(Date.now()).toString().slice(-6)}`,
             clientName: '',
             notes: MOCK_INVOICE_SETTINGS.defaultNotes,
@@ -70,18 +78,10 @@ export default function NewInvoicePage() {
             discountValue: 0,
             taxRate: 0,
             isRcmApplicable: false,
-    });
-    const [isSaving, setIsSaving] = useState(false);
-    const [invoiceSettings] = useState<InvoiceSettings | null>(MOCK_INVOICE_SETTINGS);
-    
-    useEffect(() => {
-        setCurrentInvoice(prev => ({
-            ...prev,
             issuedDate: new Date(),
-            dueDate: new Date(new Date().setDate(new Date().getDate() + (invoiceSettings?.defaultPaymentTermsDays || 30))),
-            items: [{ id: uuidv4(), description: '', hsnNo: invoiceSettings?.defaultHsnCode || '', quantity: 1, unitPrice: 0, customFields: {} }]
-        }));
-    }, [invoiceSettings]);
+            dueDate: new Date(new Date().setDate(new Date().getDate() + (MOCK_INVOICE_SETTINGS?.defaultPaymentTermsDays || 30))),
+        });
+    }, []);
 
     useEffect(() => {
         if (!currentInvoice) return;
@@ -219,31 +219,26 @@ export default function NewInvoicePage() {
                     <section className="mb-8">
                         <div className="w-full">
                             {/* Table Header */}
-                            <div className={`grid ${itemGridCols} gap-2 text-sm font-semibold text-muted-foreground px-2 py-1`}>
-                                <div className="">Description</div>
-                                <div className="text-center">HSN No.</div>
-                                {customColumns.map(col => <div key={col.id} className="text-right">{col.label}</div>)}
-                                <div className="text-right">Quantity</div>
-                                <div className="text-right">Price</div>
-                                <div className="text-right">Total</div>
+                            <div className="grid grid-cols-[minmax(0,4fr)_minmax(0,1.5fr)_minmax(0,1fr)_minmax(0,1.5fr)_minmax(0,1.5fr)_minmax(0,0.5fr)] gap-2 text-sm font-semibold text-muted-foreground px-2 py-1">
+                                <Label>Description</Label>
+                                <Label className="text-center">HSN No.</Label>
+                                <Label className="text-right">Quantity</Label>
+                                <Label className="text-right">Price</Label>
+                                <Label className="text-right">Total</Label>
                                 <div className=""></div>
                             </div>
                              {/* Table Body */}
                             <div className="space-y-2">
                             {(currentInvoice.items || []).map((item, index) => (
-                                <div key={item.id} className={`grid ${itemGridCols} gap-2 items-start p-2 rounded-md hover:bg-muted/50`}>
+                                <div key={item.id} className="grid grid-cols-[minmax(0,4fr)_minmax(0,1.5fr)_minmax(0,1fr)_minmax(0,1.5fr)_minmax(0,1.5fr)_minmax(0,0.5fr)] gap-2 items-start p-2 rounded-md hover:bg-muted/50">
                                     <Input placeholder="Item description" value={item.description} onChange={e => handleItemChange(item.id, 'description', e.target.value)} />
                                     <Input placeholder="HSN" className="text-center" value={item.hsnNo || ''} onChange={e => handleItemChange(item.id, 'hsnNo', e.target.value)} />
                                     
-                                    {customColumns.map(col => (
-                                        <Input key={col.id} placeholder={col.label} className="text-right" value={item.customFields?.[col.id] || ''} onChange={e => handleCustomFieldChange(item.id, col.id, e.target.value)} />
-                                    ))}
-
                                     <Input type="number" placeholder="1" className="text-right" value={item.quantity} onChange={e => handleItemChange(item.id, 'quantity', e.target.value)} />
                                     <Input type="number" placeholder="0.00" className="text-right" value={item.unitPrice} onChange={e => handleItemChange(item.id, 'unitPrice', e.target.value)} />
                                     
                                     <div className="text-right font-medium pr-2 pt-2">
-                                        {currencySymbol}{(item.quantity * item.unitPrice).toFixed(2)}
+                                        {currencySymbol}{((item.quantity || 0) * (item.unitPrice || 0)).toFixed(2)}
                                     </div>
                                     <div className="flex justify-center items-center pt-1">
                                         <Button type="button" variant="ghost" size="icon" className="text-destructive h-8 w-8" onClick={() => handleRemoveItem(item.id)}><Trash2 className="h-4 w-4" /></Button>
@@ -294,3 +289,4 @@ export default function NewInvoicePage() {
         </div>
     );
 }
+
