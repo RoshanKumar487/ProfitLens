@@ -22,22 +22,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
 import Link from 'next/link';
 import { useToast } from '@/hooks/use-toast';
-
-interface InvoiceDisplay {
-  id: string;
-  invoiceNumber: string;
-  clientName: string;
-  amount: number;
-  dueDate: Date;
-  status: 'Paid' | 'Pending' | 'Overdue' | 'Draft';
-  issuedDate: Date;
-}
-
-const MOCK_INVOICES: InvoiceDisplay[] = [
-    { id: '1', invoiceNumber: 'INV001', clientName: 'Acme Corp', amount: 2500, dueDate: new Date(), status: 'Paid', issuedDate: new Date(Date.now() - 10 * 86400000) },
-    { id: '2', invoiceNumber: 'INV002', clientName: 'Stark Industries', amount: 8000, dueDate: new Date(Date.now() + 15 * 86400000), status: 'Pending', issuedDate: new Date(Date.now() - 5 * 86400000) },
-    { id: '3', invoiceNumber: 'INV003', clientName: 'Wayne Enterprises', amount: 12000, dueDate: new Date(Date.now() - 5 * 86400000), status: 'Overdue', issuedDate: new Date(Date.now() - 35 * 86400000) },
-];
+import { MOCK_INVOICES, type InvoiceDisplay } from '@/lib/mock-data';
 
 
 export default function InvoicingPage() {

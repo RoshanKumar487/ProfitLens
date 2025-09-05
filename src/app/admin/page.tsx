@@ -12,18 +12,7 @@ import { Shield, Check, X, Users } from 'lucide-react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useToast } from '@/hooks/use-toast';
-
-
-const MOCK_REQUESTS = [
-    { id: 'req1', userId: 'user1', userName: 'Alice Johnson', userEmail: 'alice@example.com', createdAt: new Date(), status: 'pending' as const },
-    { id: 'req2', userId: 'user2', userName: 'Bob Williams', userEmail: 'bob@example.com', createdAt: new Date(Date.now() - 86400000), status: 'approved' as const },
-];
-
-const MOCK_USERS = [
-    { id: 'user1', displayName: 'Alice Johnson', email: 'alice@example.com', role: 'pending' as const },
-    { id: 'user2', displayName: 'Bob Williams', email: 'bob@example.com', role: 'member' as const },
-    { id: 'user3', displayName: 'Demo User', email: 'user@example.com', role: 'admin' as const },
-];
+import { MOCK_REQUESTS, MOCK_USERS } from '@/lib/mock-data';
 
 
 export default function AdminPage() {

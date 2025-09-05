@@ -12,22 +12,7 @@ import { format } from 'date-fns';
 import { useAuth } from '@/contexts/AuthContext';
 import { Skeleton } from '@/components/ui/skeleton';
 import Link from 'next/link';
-
-interface Expense {
-  id?: string;
-  date: string; // Stored as YYYY-MM-DD string
-  amount: number;
-  category: string;
-  vendor?: string;
-  description?: string;
-  employeeName?: string;
-}
-
-const MOCK_EXPENSES: Expense[] = [
-    { id: '1', date: '2024-07-28', amount: 55.00, category: 'Office Supplies', vendor: 'Staples', description: 'Printer paper and pens' },
-    { id: '2', date: '2024-07-27', amount: 1500.00, category: 'Salary / Advance', employeeName: 'Alice Johnson', description: 'Salary advance for July' },
-    { id: '3', date: '2024-07-25', amount: 250.00, category: 'Software & Subscriptions', vendor: 'Figma', description: 'Monthly subscription' },
-];
+import { MOCK_EXPENSES, type Expense } from '@/lib/mock-data';
 
 export default function RecordExpensesPage() {
   const { user, currencySymbol, isLoading: authIsLoading } = useAuth();

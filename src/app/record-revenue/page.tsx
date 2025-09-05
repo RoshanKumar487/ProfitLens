@@ -12,19 +12,7 @@ import { format } from 'date-fns';
 import { useAuth } from '@/contexts/AuthContext';
 import { Skeleton } from '@/components/ui/skeleton';
 import Link from 'next/link';
-
-interface RevenueEntryDisplay {
-    id: string;
-    date: string;
-    amount: number;
-    source: string;
-    description?: string;
-}
-
-const MOCK_REVENUE: RevenueEntryDisplay[] = [
-    { id: '1', date: '2024-07-28', amount: 5000, source: 'Client Payment', description: 'Milestone 2 for Project X' },
-    { id: '2', date: '2024-07-26', amount: 1200, source: 'Product Sales', description: 'Online store sales' },
-];
+import { MOCK_REVENUE, type RevenueEntryDisplay } from '@/lib/mock-data';
 
 export default function RecordRevenuePage() {
   const { user, isLoading: authIsLoading, currencySymbol } = useAuth();

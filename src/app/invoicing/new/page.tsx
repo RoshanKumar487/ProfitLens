@@ -20,7 +20,7 @@ import Link from 'next/link';
 import { type InvoiceSettings, type CustomItemColumn } from '@/app/settings/actions';
 import { v4 as uuidv4 } from 'uuid';
 import { Checkbox } from '@/components/ui/checkbox';
-
+import { MOCK_INVOICE_SETTINGS } from '@/lib/mock-data';
 
 interface InvoiceItem {
   id: string;
@@ -62,13 +62,6 @@ interface ExistingClient {
   gstin?: string;
 }
 
-const MOCK_INVOICE_SETTINGS: InvoiceSettings = {
-    customItemColumns: [{id: 'col1', label: 'S/N'}],
-    defaultHsnCode: '',
-    defaultNotes: 'Thank you for your business. Please make the payment by the due date.',
-    defaultPaymentTermsDays: 30
-};
-
 export default function NewInvoicePage() {
     const { currencySymbol } = useAuth();
     const { toast } = useToast();
@@ -76,9 +69,9 @@ export default function NewInvoicePage() {
 
     const [currentInvoice, setCurrentInvoice] = useState<Partial<InvoiceDisplay>>({
             issuedDate: new Date(),
-            dueDate: new Date(new Date().setDate(new Date().getDate() + 30)),
+            dueDate: new Date(new Date().setDate(new Date().getDate() + (MOCK_INVOICE_SETTINGS.defaultPaymentTermsDays || 30))),
             status: 'Draft',
-            items: [{ id: crypto.randomUUID(), description: '', hsnNo: '', quantity: 1, unitPrice: 0, customFields: {} }],
+            items: [{ id: crypto.randomUUID(), description: '', hsnNo: MOCK_INVOICE_SETTINGS.defaultHsnCode || '', quantity: 1, unitPrice: 0, customFields: {} }],
             invoiceNumber: `INV${(Date.now()).toString().slice(-6)}`,
             clientName: '',
             notes: MOCK_INVOICE_SETTINGS.defaultNotes,

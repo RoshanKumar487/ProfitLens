@@ -13,6 +13,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { Badge } from '@/components/ui/badge';
 import { TrendingUp, TrendingDown, Users, Wallet, LayoutDashboard } from 'lucide-react';
 import type { MonthlyData } from '@/components/dashboard/RevenueVsExpensesChart';
+import { MOCK_RECENT_ACTIVITY, type RecentActivity } from '@/lib/mock-data';
 
 const DynamicPieChart = dynamic(() => import('@/components/dashboard/TransactionPieChart'), {
   loading: () => <Skeleton className="h-[450px]" />,
@@ -33,15 +34,6 @@ interface FinancialData {
   totalExpenses: number;
   netProfit: number;
   employeeCount: number;
-}
-
-interface RecentActivity {
-  id: string;
-  type: 'invoice' | 'expense';
-  description: string;
-  amount: number;
-  date: Date;
-  status?: string;
 }
 
 export default function DashboardPage() {
@@ -73,10 +65,7 @@ export default function DashboardPage() {
     }).reverse();
     setMonthlyChartData(mockChartData);
     
-    setRecentActivity([
-        { id: '1', type: 'invoice', description: 'Invoice #INV001 to Acme Corp', amount: 5000, date: new Date(), status: 'Paid'},
-        { id: '2', type: 'expense', description: 'Office Supplies', amount: 150, date: new Date(), status: 'Expense'},
-    ]);
+    setRecentActivity(MOCK_RECENT_ACTIVITY);
 
   }, []);
 

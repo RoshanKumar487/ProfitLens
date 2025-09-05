@@ -4,6 +4,7 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import type { User as FirebaseUser } from 'firebase/auth';
 import { getCurrencySymbol } from '@/lib/countries';
+import { MOCK_USER } from '@/lib/mock-data';
 
 export interface UserProfile {
   uid: string;
@@ -23,19 +24,6 @@ export interface AuthContextType {
   isLoading: boolean;
   currencySymbol: string;
 }
-
-const MOCK_USER: UserProfile = {
-  uid: 'mock-user-123',
-  email: 'user@example.com',
-  displayName: 'Demo User',
-  companyId: 'mock-company-123',
-  companyName: 'Demo Company Inc.',
-  role: 'admin',
-  isSuperAdmin: true,
-  country: 'US',
-  publicCompanyId: 'pub-mock-abc-789',
-};
-
 
 const AuthContext = createContext<AuthContextType>({
   user: null,

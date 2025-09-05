@@ -12,16 +12,7 @@ import { Banknote, PlusCircle, Edit, Info, Landmark } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Alert, AlertTitle } from '@/components/ui/alert';
 import { Badge } from '@/components/ui/badge';
-
-const MOCK_ACCOUNTS = [
-    { id: 'acc1', bankName: 'Global Bank', accountNumberLast4: '1234', balance: 50250.75, accountType: 'checking' as const },
-    { id: 'acc2', bankName: 'National Savings', accountNumberLast4: '5678', balance: 125000.00, accountType: 'savings' as const },
-];
-
-const MOCK_TRANSACTIONS = [
-    { id: 'tx1', date: 'Jul 20, 2024', description: 'Monthly Server Costs', category: 'Software', amount: 150.00, type: 'withdrawal' as const },
-    { id: 'tx2', date: 'Jul 19, 2024', description: 'Client Payment', category: 'Sales', amount: 5000.00, type: 'deposit' as const },
-];
+import { MOCK_ACCOUNTS, MOCK_TRANSACTIONS } from '@/lib/mock-data';
 
 export default function BankAccountsPage() {
   const { user, currencySymbol } = useAuth();

@@ -9,17 +9,8 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Crown, Building, Users } from 'lucide-react';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
+import { MOCK_COMPANIES, MOCK_SUPER_ADMIN_EMPLOYEES } from '@/lib/mock-data';
 
-
-const MOCK_COMPANIES = [
-    { id: 'comp1', name: 'Demo Company Inc.', email: 'user@example.com', createdAt: new Date() },
-    { id: 'comp2', name: 'Innovate LLC', email: 'innovate@example.com', createdAt: new Date(Date.now() - 86400000 * 5) },
-];
-
-const MOCK_EMPLOYEES = [
-    { id: 'emp1', name: 'Alice Johnson', position: 'Developer', companyName: 'Demo Company Inc.', createdAt: new Date() },
-    { id: 'emp2', name: 'Bob Williams', position: 'Designer', companyName: 'Innovate LLC', createdAt: new Date(Date.now() - 86400000 * 2) },
-];
 
 const getInitials = (name: string = "") => {
   const names = name.split(' ');
@@ -47,7 +38,7 @@ export default function SuperAdminPage() {
 
       <div className="grid gap-6 md:grid-cols-2">
           <DataCard title="Total Companies" value={MOCK_COMPANIES.length.toLocaleString()} icon={Building} />
-          <DataCard title="Total Employees" value={MOCK_EMPLOYEES.length.toLocaleString()} icon={Users} />
+          <DataCard title="Total Employees" value={MOCK_SUPER_ADMIN_EMPLOYEES.length.toLocaleString()} icon={Users} />
       </div>
       
       <Card>
@@ -73,7 +64,7 @@ export default function SuperAdminPage() {
               <Table>
                   <TableHeader><TableRow><TableHead>Employee</TableHead><TableHead>Position</TableHead><TableHead>Company</TableHead></TableRow></TableHeader>
                   <TableBody>
-                      {MOCK_EMPLOYEES.map(employee => (
+                      {MOCK_SUPER_ADMIN_EMPLOYEES.map(employee => (
                           <TableRow key={employee.id}>
                               <TableCell><div className="flex items-center gap-2"><Avatar className="h-8 w-8"><AvatarFallback>{getInitials(employee.name)}</AvatarFallback></Avatar><span className="font-medium">{employee.name}</span></div></TableCell>
                               <TableCell>{employee.position}</TableCell>

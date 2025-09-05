@@ -22,22 +22,7 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigge
 import Link from 'next/link';
 import { useToast } from '@/hooks/use-toast';
 import { deleteEmployee } from './actions';
-
-export interface EmployeeDisplay {
-  id: string;
-  name: string;
-  position: string;
-  salary: number;
-  description?: string;
-  profilePictureUrl?: string;
-}
-
-const MOCK_EMPLOYEES: EmployeeDisplay[] = [
-    { id: '1', name: 'Alice Johnson', position: 'Software Engineer', salary: 95000, description: 'Frontend specialist' },
-    { id: '2', name: 'Bob Williams', position: 'Project Manager', salary: 110000, description: 'Leads the core product team' },
-    { id: '3', name: 'Charlie Brown', position: 'UX/UI Designer', salary: 85000, description: 'Focuses on mobile application design' },
-];
-
+import { MOCK_EMPLOYEES, type EmployeeDisplay } from '@/lib/mock-data';
 
 const getInitials = (name: string = "") => {
   const names = name.split(' ');

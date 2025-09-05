@@ -21,104 +21,7 @@ import { type InvoiceSettings } from '@/app/settings/actions';
 import { Switch } from '@/components/ui/switch';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import SignaturePad from '@/components/SignaturePad';
-
-// Interface definitions mirrored for component props
-interface InvoiceItem {
-  id: string;
-  description: string;
-  hsnNo?: string;
-  quantity: number;
-  unitPrice: number;
-  customFields?: { [key: string]: string };
-}
-
-interface InvoiceDisplay {
-  id: string;
-  invoiceNumber: string;
-  clientName: string;
-  clientEmail?: string;
-  clientAddress?: string;
-  clientGstin?: string;
-  subtotal: number;
-  discountType: 'fixed' | 'percentage';
-  discountValue: number;
-  discountAmount: number;
-  taxRate: number;
-  taxAmount: number;
-  amount: number;
-  dueDate: Date;
-  status: 'Paid' | 'Pending' | 'Overdue' | 'Draft';
-  issuedDate: Date;
-  items: InvoiceItem[];
-  notes?: string;
-  isRcmApplicable?: boolean;
-}
-
-interface CompanyDetailsFirestore {
-  name: string;
-  address: string;
-  city: string;
-  state: string;
-  country: string;
-  gstin: string;
-  pan?: string;
-  phone: string;
-  email: string;
-  website: string;
-  accountNumber?: string;
-  ifscCode?: string;
-  bankName?: string;
-  branch?: string;
-  signatureUrl?: string;
-  stampUrl?: string;
-}
-
-const MOCK_INVOICE: InvoiceDisplay = {
-    id: '1',
-    invoiceNumber: 'INV001',
-    clientName: 'Acme Corp',
-    clientAddress: '123 Main St\nAnytown, USA 12345',
-    clientEmail: 'contact@acme.com',
-    status: 'Paid',
-    issuedDate: new Date(),
-    dueDate: new Date(Date.now() + 30 * 86400000),
-    items: [
-        { id: 'item1', description: 'Premium Web Development', quantity: 1, unitPrice: 2000, hsnNo: '998314' },
-        { id: 'item2', description: 'Logo Design & Branding', quantity: 1, unitPrice: 500, hsnNo: '998313' },
-    ],
-    subtotal: 2500,
-    discountType: 'fixed',
-    discountValue: 0,
-    discountAmount: 0,
-    taxRate: 10,
-    taxAmount: 250,
-    amount: 2750,
-    notes: 'Thank you for your business!',
-    isRcmApplicable: false,
-};
-
-const MOCK_COMPANY_PROFILE: CompanyDetailsFirestore = {
-    name: 'Demo Company Inc.',
-    address: '456 Business Ave',
-    city: 'Metropolis',
-    state: 'CA',
-    country: 'USA',
-    gstin: '1234567890ABC',
-    phone: '555-123-4567',
-    email: 'billing@demo.com',
-    website: 'demo.com',
-    accountNumber: '1234567890',
-    ifscCode: 'DEMO0001234',
-    bankName: 'Global Bank',
-    branch: 'Main Branch'
-};
-
-const MOCK_INVOICE_SETTINGS: InvoiceSettings = {
-    customItemColumns: [{id: 'col1', label: 'S/N'}],
-    defaultHsnCode: '',
-    defaultNotes: 'Thank you for your business.',
-    defaultPaymentTermsDays: 30
-};
+import { MOCK_FULL_INVOICE, MOCK_COMPANY_PROFILE, MOCK_INVOICE_SETTINGS, type FullInvoiceDisplay, type CompanyDetailsFirestore } from '@/lib/mock-data';
 
 
 export default function ViewInvoicePage() {
@@ -126,7 +29,7 @@ export default function ViewInvoicePage() {
     const { toast } = useToast();
     const router = useRouter();
 
-    const [invoice] = useState<InvoiceDisplay | null>(MOCK_INVOICE);
+    const [invoice] = useState<FullInvoiceDisplay | null>(MOCK_FULL_INVOICE);
     const [companyProfile] = useState<CompanyDetailsFirestore | null>(MOCK_COMPANY_PROFILE);
     const [invoiceSettings] = useState<InvoiceSettings | null>(MOCK_INVOICE_SETTINGS);
     
