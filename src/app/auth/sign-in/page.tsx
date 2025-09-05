@@ -45,7 +45,6 @@ export default function SignInPage() {
       if (response.ok) {
         toast({ title: 'Success', description: 'Signed in successfully.' });
         router.refresh();
-        router.push('/dashboard');
       } else {
         throw new Error(result.message || 'Failed to sign in.');
       }

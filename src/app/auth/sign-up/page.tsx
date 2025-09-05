@@ -47,7 +47,6 @@ export default function SignUpPage() {
       if (response.ok) {
         toast({ title: 'Success', description: 'Your account has been created.' });
         router.refresh();
-        router.push('/dashboard');
       } else {
         throw new Error(result.message || 'An unknown error occurred.');
       }
