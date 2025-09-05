@@ -1,7 +1,7 @@
 
 'use server';
 
-import { askAssistantFlow } from '@/ai/flows/ask-assistant-flow';
+import { askAssistant, askAssistantFlow } from '@/ai/flows/ask-assistant-flow';
 import type { Message } from '@/components/AssistantChat';
 
 // This function is now a mock since authentication is disabled.
@@ -22,7 +22,9 @@ export async function askAssistantAction(
   }
 
   try {
-    const response = await askAssistantFlow({
+    // We can call the exported function directly or the flow.
+    // Calling the function directly might be slightly simpler if we don't need flow-specific features here.
+    const response = await askAssistant({
       history: history,
       companyId: companyId,
       currencySymbol: currencySymbol,
