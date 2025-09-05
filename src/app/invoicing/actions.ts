@@ -132,7 +132,7 @@ export async function getInvoiceById(invoiceId: string): Promise<FullInvoiceDisp
 
         if (!doc) return null;
 
-        const { _id, ...rest } = doc;
+        const { _id, companyId: docCompanyId, ...rest } = doc;
         return {
             id: _id.toHexString(),
             ...rest,
