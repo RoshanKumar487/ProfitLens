@@ -138,7 +138,7 @@ const AppShellLayout = ({ children }: { children: React.ReactNode }) => {
         <SidebarHeader className="mt-auto p-2">
              <DropdownMenu>
                  <DropdownMenuTrigger asChild disabled={isLoading}>
-                     <Button variant="ghost" className="h-auto w-full justify-start p-2 text-left group-data-[collapsible=icon]:h-11 group-data-[collapsible=icon]:w-11 group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:px-0">
+                     <Button variant="ghost" className="h-auto w-full justify-start p-2 text-left group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:p-0 group-data-[collapsible=icon]:h-11 group-data-[collapsible=icon]:w-11">
                         <Avatar className="h-8 w-8 group-data-[collapsible=icon]:h-9 group-data-[collapsible=icon]:w-9">
                             <AvatarFallback className="bg-primary/20 text-primary font-semibold">
                                 {isLoading ? <Loader2 className="animate-spin h-4 w-4" /> : getInitials(user?.displayName)}
