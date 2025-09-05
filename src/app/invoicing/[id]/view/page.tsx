@@ -23,6 +23,8 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, Di
 import SignaturePad from '@/components/SignaturePad';
 import { Slider } from '@/components/ui/slider';
 import { getInvoiceById, getCompanyProfile, type FullInvoiceDisplay, type CompanyDetailsFirestore } from '../../actions';
+import jsPDF from 'jspdf';
+import html2canvas from 'html2canvas';
 
 export default function ViewInvoicePage() {
     const { user, currencySymbol, isLoading: authIsLoading } = useAuth();
@@ -84,9 +86,44 @@ export default function ViewInvoicePage() {
     }, [authIsLoading, fetchInvoiceData]);
 
 
-    const handleDisabledAction = () => {
-        toast({ title: 'Action Disabled', description: 'This action is disabled in the demo.', variant: 'destructive' });
-    }
+    const processDocument = async (action: 'download' | 'print' | 'email', email?: string) => {
+        if (!printRef.current || !invoice) return;
+        setIsProcessing(true);
+        toast({ title: "Processing...", description: `Generating PDF for ${action}.` });
+        try {
+            const elementToPrint = printRef.current;
+            const canvas = await html2canvas(elementToPrint, { scale: 3, useCORS: true, backgroundColor: '#ffffff' });
+            const imgData = canvas.toDataURL('image/png');
+            if (!imgData || imgData === 'data:,') {
+                throw new Error("Could not generate an image of the document.");
+            }
+            const pdf = new jsPDF({ orientation: 'p', unit: 'mm', format: 'a4' });
+            const pdfWidth = pdf.internal.pageSize.getWidth();
+            const pdfHeight = pdf.internal.pageSize.getHeight();
+            pdf.addImage(imgData, 'PNG', 0, 0, pdfWidth, pdfHeight);
+
+            if (action === 'download') {
+                pdf.save(`Invoice-${invoice.invoiceNumber}.pdf`);
+                toast({ title: "Download Started" });
+            } else if (action === 'print') {
+                const pdfBlob = pdf.output('blob');
+                const pdfUrl = URL.createObjectURL(pdfBlob);
+                const printWindow = window.open(pdfUrl);
+                if (printWindow) {
+                    printWindow.onload = () => { printWindow.print(); URL.revokeObjectURL(pdfUrl); };
+                } else {
+                    throw new Error("Could not open print window. Please disable pop-up blockers.");
+                }
+            } else if (action === 'email') {
+                // Email sending is disabled on the frontend for this example.
+                 toast({ title: "Action Disabled", description: "Emailing invoices requires backend setup.", variant: "destructive"});
+            }
+        } catch (error: any) {
+            toast({ title: `${action.charAt(0).toUpperCase() + action.slice(1)} Failed`, description: error.message, variant: "destructive" });
+        } finally {
+            setIsProcessing(false);
+        }
+    };
     
     const handleSignatureSave = (dataUrl: string) => {
         setLocalSignatureUri(dataUrl);
@@ -211,13 +248,13 @@ export default function ViewInvoicePage() {
                             </SelectContent>
                         </Select>
                     </div>
-                    <Button size="sm" onClick={handleDisabledAction} disabled={isProcessing || !companyProfile}>
+                    <Button size="sm" onClick={() => processDocument('download')} disabled={isProcessing || !companyProfile}>
                         {isProcessing ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Download className="mr-2 h-4 w-4" />} PDF
                     </Button>
-                    <Button size="sm" onClick={handleDisabledAction} disabled={isProcessing || !companyProfile}>
+                    <Button size="sm" onClick={() => processDocument('email')} disabled={isProcessing || !companyProfile}>
                         {isProcessing ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Mail className="mr-2 h-4 w-4" />} Email
                     </Button>
-                     <Button size="sm" onClick={handleDisabledAction} disabled={isProcessing || !companyProfile}>
+                     <Button size="sm" onClick={() => processDocument('print')} disabled={isProcessing || !companyProfile}>
                         {isProcessing ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Printer className="mr-2 h-4 w-4" />} Print
                     </Button>
                 </div>

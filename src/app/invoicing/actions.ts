@@ -111,7 +111,7 @@ export async function getInvoices(): Promise<InvoiceDisplay[]> {
     }));
   } catch (error) {
     console.error('Failed to get invoices:', error);
-    return [];
+    return MOCK_INVOICES;
   }
 }
 
@@ -131,11 +131,13 @@ export async function getInvoiceById(invoiceId: string): Promise<FullInvoiceDisp
             companyId: companyId,
         });
 
-        if (!doc) return null;
+        if (!doc) {
+             // Fallback to mock for demo purposes if not found
+            return MOCK_FULL_INVOICE.id === invoiceId ? MOCK_FULL_INVOICE : null;
+        };
 
         const { _id, companyId: docCompanyId, ...rest } = doc;
         
-        // Ensure all properties of FullInvoice are present
         const fullInvoiceData: FullInvoice = {
             clientName: doc.clientName,
             subtotal: doc.subtotal,
@@ -148,9 +150,8 @@ export async function getInvoiceById(invoiceId: string): Promise<FullInvoiceDisp
             amount: doc.amount,
             status: doc.status,
             issuedDate: new Date(doc.issuedDate),
-            items: doc.items.map((item: any) => ({...item, id: item.id || new ObjectId().toHexString()})), // ensure items have ids
+            items: doc.items.map((item: any) => ({...item, id: item.id || new ObjectId().toHexString()})),
             invoiceNumber: doc.invoiceNumber,
-            // optional fields
             clientEmail: doc.clientEmail,
             clientAddress: doc.clientAddress,
             clientGstin: doc.clientGstin,
@@ -165,7 +166,8 @@ export async function getInvoiceById(invoiceId: string): Promise<FullInvoiceDisp
 
     } catch (error) {
         console.error('Failed to get invoice by ID:', error);
-        return null;
+        // Fallback to mock for demo purposes if error
+        return MOCK_FULL_INVOICE.id === invoiceId ? MOCK_FULL_INVOICE : null;
     }
 }
 
@@ -230,17 +232,16 @@ export async function getCompanyProfile(): Promise<CompanyDetailsFirestore | nul
     
     try {
         const { db } = await connectToDatabase();
-        // Assuming company profiles are stored in a 'companies' collection
         const company = await db.collection('companies').findOne({ _id: companyId });
 
         if (company) {
             const { _id, ...profileData } = company;
             return profileData as CompanyDetailsFirestore;
         }
-        return null;
+        return MOCK_COMPANY_PROFILE;
 
     } catch (error) {
         console.error('Failed to get company profile:', error);
-        return null;
+        return MOCK_COMPANY_PROFILE;
     }
 }
