@@ -88,8 +88,8 @@ export default function ViewInvoicePage() {
     }
 
     return (
-      <div className="w-full flex flex-col h-full overflow-hidden">
-        <header className="w-full bg-background/80 border-b shadow-sm sticky top-14 sm:top-16 z-10 p-2 print:hidden backdrop-blur-sm shrink-0">
+      <div className="w-full flex flex-col h-[calc(100vh-4rem)] overflow-hidden">
+        <header className="w-full bg-background/80 border-b shadow-sm z-10 p-2 print:hidden backdrop-blur-sm shrink-0">
             <div className="max-w-7xl mx-auto flex justify-between items-center flex-wrap gap-2 px-4">
                 <div className="flex items-center gap-2">
                     <Receipt className="h-5 w-5 text-primary" />
