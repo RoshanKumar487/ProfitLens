@@ -135,59 +135,6 @@ const AppShellLayout = ({ children }: { children: React.ReactNode }) => {
             ))}
           </SidebarMenu>
         </SidebarContent>
-        <SidebarHeader className="mt-auto p-2">
-             <DropdownMenu>
-                 <DropdownMenuTrigger asChild disabled={isLoading}>
-                     <Button variant="ghost" className="h-auto w-full justify-start p-2 text-left group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:p-0 group-data-[collapsible=icon]:h-11 group-data-[collapsible=icon]:w-11">
-                        <Avatar className="h-8 w-8 group-data-[collapsible=icon]:h-9 group-data-[collapsible=icon]:w-9">
-                            <AvatarFallback className="bg-primary/20 text-primary font-semibold">
-                                {isLoading ? <Loader2 className="animate-spin h-4 w-4" /> : getInitials(user?.displayName)}
-                            </AvatarFallback>
-                        </Avatar>
-                        <div className="ml-2 flex-grow truncate group-data-[collapsible=icon]:hidden">
-                            <p className="truncate text-sm font-semibold">{user?.displayName || 'Loading...'}</p>
-                            <p className="truncate text-xs text-muted-foreground">{user?.email}</p>
-                        </div>
-                        <ChevronDown className="ml-1 h-4 w-4 shrink-0 group-data-[collapsible=icon]:hidden" />
-                    </Button>
-                 </DropdownMenuTrigger>
-                 <DropdownMenuContent className="w-56 mb-2" side="top" align="start">
-                    <DropdownMenuLabel>My Account</DropdownMenuLabel>
-                    <DropdownMenuSeparator />
-                      {user?.isSuperAdmin && (
-                       <DropdownMenuItem asChild>
-                          <Link href="/super-admin" className="cursor-pointer">
-                              <Crown className="mr-2 h-4 w-4" />
-                              <span>Super Admin</span>
-                          </Link>
-                      </DropdownMenuItem>
-                     )}
-                    <DropdownMenuItem asChild>
-                        <Link href="/company-details" className="cursor-pointer">
-                            <Building className="mr-2 h-4 w-4" />
-                            <span>Company Details</span>
-                        </Link>
-                    </DropdownMenuItem>
-                     <DropdownMenuItem asChild>
-                       <Link href="/settings" className="cursor-pointer">
-                         <Settings className="mr-2 h-4 w-4" />
-                         <span>Settings</span>
-                       </Link>
-                     </DropdownMenuItem>
-                      <DropdownMenuItem asChild>
-                       <Link href="/guide" className="cursor-pointer">
-                         <HelpCircle className="mr-2 h-4 w-4" />
-                         <span>User Guide</span>
-                       </Link>
-                     </DropdownMenuItem>
-                    <DropdownMenuSeparator />
-                    <DropdownMenuItem className="cursor-pointer" onClick={handleSignOut}>
-                        <LogOut className="mr-2 h-4 w-4" />
-                        <span>Sign Out</span>
-                    </DropdownMenuItem>
-                 </DropdownMenuContent>
-             </DropdownMenu>
-        </SidebarHeader>
       </Sidebar>
 
       <SidebarInset>
@@ -241,6 +188,59 @@ const AppShellLayout = ({ children }: { children: React.ReactNode }) => {
                         <TooltipContent><p>AI Assistant</p></TooltipContent>
                         </Tooltip>
                     </TooltipProvider>
+
+                     <DropdownMenu>
+                         <DropdownMenuTrigger asChild disabled={isLoading}>
+                             <Button variant="ghost" className="h-10 w-10 rounded-full p-0">
+                                <Avatar className="h-9 w-9">
+                                    <AvatarFallback className="bg-primary/20 text-primary font-semibold">
+                                        {isLoading ? <Loader2 className="animate-spin h-4 w-4" /> : getInitials(user?.displayName)}
+                                    </AvatarFallback>
+                                </Avatar>
+                            </Button>
+                         </DropdownMenuTrigger>
+                         <DropdownMenuContent className="w-56" side="bottom" align="end">
+                            <DropdownMenuLabel className="font-normal">
+                                <div className="flex flex-col space-y-1">
+                                    <p className="text-sm font-medium leading-none">{user?.displayName}</p>
+                                    <p className="text-xs leading-none text-muted-foreground">{user?.email}</p>
+                                </div>
+                            </DropdownMenuLabel>
+                            <DropdownMenuSeparator />
+                              {user?.isSuperAdmin && (
+                               <DropdownMenuItem asChild>
+                                  <Link href="/super-admin" className="cursor-pointer">
+                                      <Crown className="mr-2 h-4 w-4" />
+                                      <span>Super Admin</span>
+                                  </Link>
+                              </DropdownMenuItem>
+                             )}
+                            <DropdownMenuItem asChild>
+                                <Link href="/company-details" className="cursor-pointer">
+                                    <Building className="mr-2 h-4 w-4" />
+                                    <span>Company Details</span>
+                                </Link>
+                            </DropdownMenuItem>
+                             <DropdownMenuItem asChild>
+                               <Link href="/settings" className="cursor-pointer">
+                                 <Settings className="mr-2 h-4 w-4" />
+                                 <span>Settings</span>
+                               </Link>
+                             </DropdownMenuItem>
+                              <DropdownMenuItem asChild>
+                               <Link href="/guide" className="cursor-pointer">
+                                 <HelpCircle className="mr-2 h-4 w-4" />
+                                 <span>User Guide</span>
+                               </Link>
+                             </DropdownMenuItem>
+                            <DropdownMenuSeparator />
+                            <DropdownMenuItem className="cursor-pointer" onClick={handleSignOut}>
+                                <LogOut className="mr-2 h-4 w-4" />
+                                <span>Sign Out</span>
+                            </DropdownMenuItem>
+                         </DropdownMenuContent>
+                     </DropdownMenu>
+
               </div>
             </div>
         </header>
