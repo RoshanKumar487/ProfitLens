@@ -15,14 +15,15 @@ import {
 } from '@/components/ui/table';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
-import { Users2, MoreHorizontal, PlusCircle, Edit, Trash2, Loader2 } from 'lucide-react';
+import { Users2, MoreHorizontal, PlusCircle, Edit, Trash2, Loader2, FileSearch } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { Skeleton } from '@/components/ui/skeleton';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger, DropdownMenuSeparator } from '@/components/ui/dropdown-menu';
 import Link from 'next/link';
 import { useToast } from '@/hooks/use-toast';
-import { deleteEmployee } from './actions';
-import { MOCK_EMPLOYEES, type EmployeeDisplay } from '@/lib/mock-data';
+import { getEmployees, deleteEmployee, type EmployeeDisplay } from './actions';
+import { MOCK_EMPLOYEES } from '@/lib/mock-data';
+
 
 const getInitials = (name: string = "") => {
   const names = name.split(' ');
@@ -40,19 +41,36 @@ export default function EmployeesPage() {
   const [employees, setEmployees] = useState<EmployeeDisplay[]>([]);
   const [isLoadingEmployees, setIsLoadingEmployees] = useState(true);
 
-  useEffect(() => {
+  const fetchEmployees = useCallback(async () => {
+    if (!user) return;
     setIsLoadingEmployees(true);
-    // Simulate fetching data
-    setTimeout(() => {
-        setEmployees(MOCK_EMPLOYEES);
+    try {
+        const fetchedEmployees = await getEmployees();
+        setEmployees(fetchedEmployees);
+    } catch(error: any) {
+        toast({ title: 'Error', description: 'Could not fetch employees.', variant: 'destructive' });
+    } finally {
         setIsLoadingEmployees(false);
-    }, 1000);
-  }, []);
+    }
+  }, [user, toast]);
+
+  useEffect(() => {
+    if(!authIsLoading) {
+      fetchEmployees();
+    }
+  }, [authIsLoading, fetchEmployees]);
 
   const handleDelete = async (employeeId: string, employeeName: string) => {
     const originalEmployees = [...employees];
     setEmployees(prev => prev.filter(emp => emp.id !== employeeId));
-    toast({ title: 'Employee Deleted', description: `${employeeName} has been removed (mock).` });
+    
+    const result = await deleteEmployee(employeeId);
+    if (!result.success) {
+      toast({ title: 'Error', description: result.message, variant: 'destructive' });
+      setEmployees(originalEmployees); // Revert on failure
+    } else {
+      toast({ title: 'Employee Deleted', description: `${employeeName} has been removed.` });
+    }
   }
 
   if (authIsLoading) {
@@ -97,7 +115,7 @@ export default function EmployeesPage() {
                         </Button>
                       </DropdownMenuTrigger>
                        <DropdownMenuContent align="end">
-                         <DropdownMenuItem asChild><Link href={`/employees/${employee.id}`}><Users2 className="mr-2 h-4 w-4" />View Bio-Data</Link></DropdownMenuItem>
+                         <DropdownMenuItem asChild><Link href={`/employees/${employee.id}`}><FileSearch className="mr-2 h-4 w-4" />View Bio-Data</Link></DropdownMenuItem>
                          <DropdownMenuSeparator />
                          <DropdownMenuItem asChild><Link href={`/employees/${employee.id}/edit`}><Edit className="mr-2 h-4 w-4" />Edit Details</Link></DropdownMenuItem>
                          <DropdownMenuItem className="text-destructive focus:text-destructive" onClick={() => handleDelete(employee.id, employee.name)}><Trash2 className="mr-2 h-4 w-4" />Delete</DropdownMenuItem>
@@ -113,3 +131,5 @@ export default function EmployeesPage() {
     </div>
   );
 }
+
+    

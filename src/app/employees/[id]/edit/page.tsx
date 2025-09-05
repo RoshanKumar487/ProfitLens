@@ -144,7 +144,7 @@ export default function EmployeeFormPage() {
                 router.push('/employees');
             } else {
                 toast({ title: 'Save Failed', description: result.message, variant: 'destructive' });
-                 setIsSaving(false);
+                setIsSaving(false);
             }
         } catch (error: any) {
             toast({ title: 'Save Failed', description: error.message || 'An unknown error occurred.', variant: 'destructive' });
@@ -245,7 +245,7 @@ export default function EmployeeFormPage() {
                 </Card>
 
                 <Card className="mb-6">
-                    <CardHeader><CardTitle>Contact &amp; Address</CardTitle></CardHeader>
+                    <CardHeader><CardTitle>Contact & Address</CardTitle></CardHeader>
                     <CardContent className="grid grid-cols-1 md:grid-cols-2 gap-6">
                         <FormField control={form.control} name="selfPhoneNo" render={({ field }) => (<FormItem><FormLabel>Phone Number</FormLabel><FormControl><Input placeholder="Employee's phone" {...field} value={field.value ?? ''} /></FormControl><FormMessage /></FormItem>)} />
                         <div className="md:col-span-2 space-y-4">
@@ -263,7 +263,7 @@ export default function EmployeeFormPage() {
                 </Card>
 
                 <Card className="mb-6">
-                    <CardHeader><CardTitle>Guarantor &amp; Physical Details</CardTitle></CardHeader>
+                    <CardHeader><CardTitle>Guarantor & Physical Details</CardTitle></CardHeader>
                     <CardContent className="grid grid-cols-1 md:grid-cols-2 gap-6">
                          <FormField control={form.control} name="guarantorName" render={({ field }) => (<FormItem><FormLabel>Guarantor Name</FormLabel><FormControl><Input placeholder="Guarantor's full name" {...field} value={field.value ?? ''} /></FormControl><FormMessage /></FormItem>)} />
                         <FormField control={form.control} name="guarantorPhone" render={({ field }) => (<FormItem><FormLabel>Guarantor Phone</FormLabel><FormControl><Input placeholder="Guarantor's phone number" {...field} value={field.value ?? ''} /></FormControl><FormMessage /></FormItem>)} />
@@ -274,7 +274,7 @@ export default function EmployeeFormPage() {
                 </Card>
 
                 <Card className="mb-6">
-                    <CardHeader><CardTitle>Documents &amp; Files</CardTitle></CardHeader>
+                    <CardHeader><CardTitle>Documents & Files</CardTitle></CardHeader>
                     <CardContent className="grid grid-cols-1 md:grid-cols-3 gap-6">
                         <div className="space-y-2">
                             <Label>Passport Photo</Label>

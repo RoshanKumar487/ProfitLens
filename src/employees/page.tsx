@@ -1,4 +1,3 @@
-
 'use client';
 
 import React, { useState, useEffect, useCallback } from 'react';
@@ -15,13 +14,14 @@ import {
 } from '@/components/ui/table';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
-import { Users2, MoreHorizontal, PlusCircle, Edit, Trash2, Loader2 } from 'lucide-react';
+import { Users2, MoreHorizontal, PlusCircle, Edit, Trash2, Loader2, FileSearch } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { Skeleton } from '@/components/ui/skeleton';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger, DropdownMenuSeparator } from '@/components/ui/dropdown-menu';
 import Link from 'next/link';
 import { useToast } from '@/hooks/use-toast';
 import { getEmployees, deleteEmployee, type EmployeeDisplay } from './actions';
+import { MOCK_EMPLOYEES } from '@/lib/mock-data';
 
 
 const getInitials = (name: string = "") => {
@@ -114,7 +114,7 @@ export default function EmployeesPage() {
                         </Button>
                       </DropdownMenuTrigger>
                        <DropdownMenuContent align="end">
-                         <DropdownMenuItem asChild><Link href={`/employees/${employee.id}`}><Users2 className="mr-2 h-4 w-4" />View Bio-Data</Link></DropdownMenuItem>
+                         <DropdownMenuItem asChild><Link href={`/employees/${employee.id}`}><FileSearch className="mr-2 h-4 w-4" />View Bio-Data</Link></DropdownMenuItem>
                          <DropdownMenuSeparator />
                          <DropdownMenuItem asChild><Link href={`/employees/${employee.id}/edit`}><Edit className="mr-2 h-4 w-4" />Edit Details</Link></DropdownMenuItem>
                          <DropdownMenuItem className="text-destructive focus:text-destructive" onClick={() => handleDelete(employee.id, employee.name)}><Trash2 className="mr-2 h-4 w-4" />Delete</DropdownMenuItem>

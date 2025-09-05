@@ -50,26 +50,28 @@ export default function ViewEmployeeBioDataPage() {
         }
         setIsLoadingData(true);
         try {
-             // Mock data fetching
-            const employeeData: EmployeeDisplay = {
-                id: employeeId,
-                name: 'Alice Johnson', position: 'Software Engineer', salary: 95000, 
-                joiningDate: new Date(), dateOfBirth: new Date('1990-05-15'),
-                fatherName: 'Robert Johnson', motherName: 'Mary Johnson', selfPhoneNo: '555-1234',
-                qualification: 'B.Sc. Computer Science', experience: '5 Years',
-                permanentAddressHNo: 'A-42', permanentAddressPost: 'Main PO', permanentAddressPS: 'Central',
-                permanentAddressDist: 'Metropolis', permanentAddressState: 'CA', permanentAddressPin: '12345',
-                guarantorName: 'Bob Williams', guarantorPhone: '555-5678',
-                height: "5' 8\"", weight: '70kg', identificationMarks: 'Scar on left eyebrow',
-            };
-            
+            const employeeData = await getEmployeeById(employeeId);
+            if (!employeeData) {
+                toast({ title: "Error", description: "Employee not found.", variant: "destructive" });
+                router.push('/employees');
+                return;
+            }
             setEmployee(employeeData);
 
+            // In a real app, company details would be fetched from a DB
             const mockCompanyDetails = {
                 name: user.companyName || "Your Company",
                 address: "123 Business Rd", city: "Businesstown", state: "CA", country: "USA",
             };
             setCompanyDetails(mockCompanyDetails);
+
+            // Fetch images and convert to data URIs
+            const [profile, signature, thumb] = await Promise.all([
+                employeeData.profilePictureUrl ? urlToDataUri(employeeData.profilePictureUrl) : Promise.resolve(undefined),
+                employeeData.signatureUrl ? urlToDataUri(employeeData.signatureUrl) : Promise.resolve(undefined),
+                employeeData.leftThumbImpressionUrl ? urlToDataUri(employeeData.leftThumbImpressionUrl) : Promise.resolve(undefined),
+            ]);
+            setBioDataImageUris({ profile, signature, thumb });
 
         } catch (error: any) {
             toast({ title: "Error", description: error.message || "Failed to load employee data.", variant: "destructive" });
@@ -173,3 +175,5 @@ export default function ViewEmployeeBioDataPage() {
         </div>
     )
 }
+
+    

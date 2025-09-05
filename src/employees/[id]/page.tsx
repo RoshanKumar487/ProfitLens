@@ -1,177 +1,132 @@
-
 'use client';
 
-import React, { useState, useEffect, useRef, useCallback } from 'react';
-import { useParams, useRouter } from 'next/navigation';
-import { Button } from '@/components/ui/button';
-import { ArrowLeft, Loader2, Edit, Download, Printer } from 'lucide-react';
-import { useToast } from '@/hooks/use-toast';
-import { useAuth } from '@/contexts/AuthContext';
-import jsPDF from 'jspdf';
-import html2canvas from 'html2canvas';
-import { Skeleton } from '@/components/ui/skeleton';
-import { urlToDataUri } from '@/lib/utils';
-import Link from 'next/link';
-import { Label } from '@/components/ui/label';
-import { Switch } from '@/components/ui/switch';
-import BioDataTemplate from '../BioDataTemplate';
-import { getEmployeeById, type EmployeeDisplay } from '../actions';
+import React, { useState, useEffect, useCallback } from 'react';
 import PageTitle from '@/components/PageTitle';
+import { Button } from '@/components/ui/button';
+import {
+  Table,
+  TableHeader,
+  TableBody,
+  TableRow,
+  TableHead,
+  TableCell,
+  TableCaption,
+} from '@/components/ui/table';
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
+import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
+import { Users2, MoreHorizontal, PlusCircle, Edit, Trash2, Loader2, FileSearch } from 'lucide-react';
+import { useAuth } from '@/contexts/AuthContext';
+import { Skeleton } from '@/components/ui/skeleton';
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger, DropdownMenuSeparator } from '@/components/ui/dropdown-menu';
+import Link from 'next/link';
+import { useToast } from '@/hooks/use-toast';
+import { getEmployees, deleteEmployee, type EmployeeDisplay } from './actions';
+import { MOCK_EMPLOYEES } from '@/lib/mock-data';
 
-interface CompanyDetails {
-  name: string;
-  address?: string;
-  city?: string;
-  state?: string;
-  country?: string;
-  signatureUrl?: string;
-  stampUrl?: string;
-}
 
-export default function ViewEmployeeBioDataPage() {
-    const { user, isLoading: authIsLoading } = useAuth();
-    const { toast } = useToast();
-    const router = useRouter();
-    const params = useParams();
-    const employeeId = params.id as string;
+const getInitials = (name: string = "") => {
+  const names = name.split(' ');
+  let initials = names[0] ? names[0][0] : '';
+  if (names.length > 1 && names[names.length - 1]) {
+    initials += names[names.length - 1][0];
+  }
+  return initials.toUpperCase();
+};
 
-    const [employee, setEmployee] = useState<EmployeeDisplay | null>(null);
-    const [companyDetails, setCompanyDetails] = useState<CompanyDetails | null>(null);
-    const [bioDataImageUris, setBioDataImageUris] = useState<Record<string, string | undefined>>({});
-    const [isLoadingData, setIsLoadingData] = useState(true);
-    const [isProcessing, setIsProcessing] = useState(false);
-    const [useLetterhead, setUseLetterhead] = useState(true);
-    const printRef = useRef<HTMLDivElement>(null);
-    
-    const fetchAllData = useCallback(async () => {
-        if (!user || !employeeId) {
-            setIsLoadingData(false);
-            return;
-        }
-        setIsLoadingData(true);
-        try {
-            const employeeData = await getEmployeeById(employeeId);
-            if (!employeeData) {
-                toast({ title: "Error", description: "Employee not found.", variant: "destructive" });
-                router.push('/employees');
-                return;
-            }
-            setEmployee(employeeData);
 
-            // In a real app, company details would be fetched from a DB
-            const mockCompanyDetails = {
-                name: user.companyName || "Your Company",
-                address: "123 Business Rd", city: "Businesstown", state: "CA", country: "USA",
-            };
-            setCompanyDetails(mockCompanyDetails);
+export default function EmployeesPage() {
+  const { user, isLoading: authIsLoading, currencySymbol } = useAuth();
+  const { toast } = useToast();
+  const [employees, setEmployees] = useState<EmployeeDisplay[]>([]);
+  const [isLoadingEmployees, setIsLoadingEmployees] = useState(true);
 
-            // Fetch images and convert to data URIs
-            const [profile, signature, thumb] = await Promise.all([
-                employeeData.profilePictureUrl ? urlToDataUri(employeeData.profilePictureUrl) : Promise.resolve(undefined),
-                employeeData.signatureUrl ? urlToDataUri(employeeData.signatureUrl) : Promise.resolve(undefined),
-                employeeData.leftThumbImpressionUrl ? urlToDataUri(employeeData.leftThumbImpressionUrl) : Promise.resolve(undefined),
-            ]);
-            setBioDataImageUris({ profile, signature, thumb });
-
-        } catch (error: any) {
-            toast({ title: "Error", description: error.message || "Failed to load employee data.", variant: "destructive" });
-            router.push('/employees');
-        } finally {
-            setIsLoadingData(false);
-        }
-    }, [employeeId, user, toast, router]);
-
-    useEffect(() => {
-        if (!authIsLoading) {
-            fetchAllData();
-        }
-    }, [authIsLoading, fetchAllData]);
-    
-    const processDocument = async (action: 'download' | 'print') => {
-        if (!printRef.current || !employee) return;
-        setIsProcessing(true);
-        try {
-            const elementToPrint = printRef.current;
-            const canvas = await html2canvas(elementToPrint, { scale: 3, useCORS: true, backgroundColor: '#ffffff' });
-            const imgData = canvas.toDataURL('image/png');
-            if (!imgData || imgData === 'data:,') {
-                throw new Error("Could not generate an image of the document.");
-            }
-            const pdf = new jsPDF({ orientation: 'p', unit: 'mm', format: 'a4' });
-            pdf.addImage(imgData, 'PNG', 0, 0, pdf.internal.pageSize.getWidth(), pdf.internal.pageSize.getHeight());
-            
-            if (action === 'download') {
-                pdf.save(`BioData-${employee.name.replace(/\s+/g, '_')}.pdf`);
-                toast({ title: "Download Started" });
-            } else if (action === 'print') {
-                const pdfBlob = pdf.output('blob');
-                const pdfUrl = URL.createObjectURL(pdfBlob);
-                const printWindow = window.open(pdfUrl);
-                if (printWindow) {
-                    printWindow.onload = () => { printWindow.print(); URL.revokeObjectURL(pdfUrl); };
-                } else {
-                    throw new Error("Could not open print window. Please disable pop-up blockers.");
-                }
-            }
-        } catch (error: any) {
-            toast({ title: `${action === 'download' ? 'Download' : 'Print'} Failed`, description: error.message, variant: "destructive" });
-        } finally {
-            setIsProcessing(false);
-        }
-    };
-  
-  if (authIsLoading || isLoadingData) {
-        return (
-            <div className="flex flex-col items-center justify-center p-8 bg-muted min-h-screen">
-                 <div className="w-[210mm] min-h-[297mm] mx-auto p-4 border shadow-lg bg-white">
-                    <Skeleton className="h-24 w-full mb-4" />
-                    <Skeleton className="h-[800px] w-full mt-4" />
-                </div>
-            </div>
-        )
+  const fetchEmployees = useCallback(async () => {
+    if (!user) return;
+    setIsLoadingEmployees(true);
+    try {
+        const fetchedEmployees = await getEmployees();
+        setEmployees(fetchedEmployees);
+    } catch(error: any) {
+        toast({ title: 'Error', description: 'Could not fetch employees.', variant: 'destructive' });
+    } finally {
+        setIsLoadingEmployees(false);
     }
+  }, [user, toast]);
 
-    if (!employee || !companyDetails) {
-        return (
-            <div className="p-8">
-                <PageTitle title="Error" subtitle="Could not load employee data."/>
-                 <Button variant="outline" asChild className="mt-4"><Link href="/employees"><ArrowLeft className="mr-2 h-4 w-4" />Back to Employees</Link></Button>
-            </div>
-        )
+  useEffect(() => {
+    if(!authIsLoading) {
+      fetchEmployees();
     }
+  }, [authIsLoading, fetchEmployees]);
+
+  const handleDelete = async (employeeId: string, employeeName: string) => {
+    const originalEmployees = [...employees];
+    setEmployees(prev => prev.filter(emp => emp.id !== employeeId));
     
-    return (
-        <div className="w-full">
-            <header className="w-full bg-background/80 border-b shadow-sm sticky top-14 sm:top-16 z-10 p-2 print:hidden backdrop-blur-sm">
-                <div className="max-w-7xl mx-auto flex justify-between items-center flex-wrap gap-2 px-4">
-                    <div className="flex items-center gap-2">
-                        <Button variant="outline" size="icon" asChild><Link href="/employees"><ArrowLeft className="h-4 w-4"/></Link></Button>
-                        <h1 className="text-lg font-bold truncate">Bio-Data: {employee.name}</h1>
-                    </div>
-                     <div className="flex items-center gap-2 flex-wrap justify-end">
-                        <div className="flex items-center gap-2 border-l pl-2">
-                            <Switch id="use-letterhead-bio" checked={useLetterhead} onCheckedChange={setUseLetterhead} disabled={isProcessing} />
-                            <Label htmlFor="use-letterhead-bio" className="text-xs cursor-pointer">Letterhead</Label>
-                        </div>
-                        <Button variant="secondary" asChild size="sm"><Link href={`/employees/${employeeId}/edit`}><Edit className="mr-2 h-4 w-4" /> Edit</Link></Button>
-                        <Button size="sm" onClick={() => processDocument('download')} disabled={isProcessing}>{isProcessing ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Download className="mr-2 h-4 w-4" />} PDF</Button>
-                        <Button size="sm" onClick={() => processDocument('print')} disabled={isProcessing}>{isProcessing ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Printer className="mr-2 h-4 w-4" />} Print</Button>
-                    </div>
-                </div>
-            </header>
-             <main className="w-full bg-muted py-8">
-                <div className="bg-white shadow-lg mx-auto">
-                    <BioDataTemplate 
-                        ref={printRef} 
-                        employee={employee} 
-                        companyDetails={companyDetails}
-                        profilePictureDataUri={bioDataImageUris.profile}
-                        leftThumbImpressionDataUri={bioDataImageUris.thumb}
-                        signatureDataUri={bioDataImageUris.signature}
-                        letterheadTemplate={useLetterhead ? 'simple' : 'none'}
-                    />
-                </div>
-            </main>
-        </div>
-    )
+    const result = await deleteEmployee(employeeId);
+    if (!result.success) {
+      toast({ title: 'Error', description: result.message, variant: 'destructive' });
+      setEmployees(originalEmployees); // Revert on failure
+    } else {
+      toast({ title: 'Employee Deleted', description: `${employeeName} has been removed.` });
+    }
+  }
+
+  if (authIsLoading) {
+    return ( <div className="flex items-center justify-center h-[calc(100vh-200px)]"><Loader2 className="h-12 w-12 animate-spin text-primary" /></div> );
+  }
+
+  return (
+    <div className="space-y-6 p-4 sm:p-6 lg:p-8">
+      <PageTitle title="Employees" subtitle="Manage your team members, documents, and bio-data." icon={Users2}>
+        <Button asChild>
+          <Link href="/employees/new/edit"><PlusCircle className="mr-2 h-4 w-4" /> Add Employee</Link>
+        </Button>
+      </PageTitle>
+
+      <Card>
+        <CardHeader>
+          <div className="flex flex-col sm:flex-row items-center justify-between gap-2">
+            <div>
+              <CardTitle>Team Members</CardTitle>
+              <CardDescription>A list of all employees in your company.</CardDescription>
+            </div>
+          </div>
+        </CardHeader>
+        <CardContent>
+          <Table>
+            <TableCaption>{!isLoadingEmployees && employees.length === 0 ? "No employees found." : `A list of your employees.`}</TableCaption>
+            <TableHeader><TableRow><TableHead className="w-[60px]">Avatar</TableHead><TableHead>Name</TableHead><TableHead>Position</TableHead><TableHead>Description</TableHead><TableHead className="text-right">Salary</TableHead><TableHead className="text-right w-[100px]">Actions</TableHead></TableRow></TableHeader>
+            <TableBody>
+              {isLoadingEmployees && ([...Array(3)].map((_, i) => (<TableRow key={`skel-${i}`}><TableCell><Skeleton className="h-10 w-10 rounded-full" /></TableCell><TableCell><Skeleton className="h-4 w-3/4" /></TableCell><TableCell><Skeleton className="h-4 w-1/2" /></TableCell><TableCell><Skeleton className="h-4 w-3/4" /></TableCell><TableCell className="text-right"><Skeleton className="h-4 w-1/4 ml-auto" /></TableCell><TableCell className="text-right"><Skeleton className="h-8 w-8 ml-auto" /></TableCell></TableRow>)))}
+              {!isLoadingEmployees && employees.map((employee) => (
+                <TableRow key={employee.id}>
+                  <TableCell><Avatar className="h-10 w-10"><AvatarImage src={employee.profilePictureUrl || `https://placehold.co/40x40.png?text=${getInitials(employee.name)}`} alt={employee.name} data-ai-hint="person portrait" /><AvatarFallback>{getInitials(employee.name)}</AvatarFallback></Avatar></TableCell>
+                  <TableCell className="font-medium">{employee.name}</TableCell>
+                  <TableCell>{employee.position}</TableCell>
+                  <TableCell className="max-w-[200px] truncate text-sm text-muted-foreground" title={employee.description}>{employee.description || '-'}</TableCell>
+                  <TableCell className="text-right">{currencySymbol}{employee.salary.toLocaleString()}</TableCell>
+                  <TableCell className="text-right">
+                    <DropdownMenu>
+                      <DropdownMenuTrigger asChild>
+                        <Button variant="ghost" size="icon" className="h-8 w-8">
+                            <MoreHorizontal className="h-4 w-4" />
+                        </Button>
+                      </DropdownMenuTrigger>
+                       <DropdownMenuContent align="end">
+                         <DropdownMenuItem asChild><Link href={`/employees/${employee.id}`}><FileSearch className="mr-2 h-4 w-4" />View Bio-Data</Link></DropdownMenuItem>
+                         <DropdownMenuSeparator />
+                         <DropdownMenuItem asChild><Link href={`/employees/${employee.id}/edit`}><Edit className="mr-2 h-4 w-4" />Edit Details</Link></DropdownMenuItem>
+                         <DropdownMenuItem className="text-destructive focus:text-destructive" onClick={() => handleDelete(employee.id, employee.name)}><Trash2 className="mr-2 h-4 w-4" />Delete</DropdownMenuItem>
+                       </DropdownMenuContent>
+                    </DropdownMenu>
+                  </TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+        </CardContent>
+      </Card>
+    </div>
+  );
 }
