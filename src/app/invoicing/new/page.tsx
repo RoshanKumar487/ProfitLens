@@ -21,6 +21,7 @@ import { type InvoiceSettings, type CustomItemColumn } from '@/app/settings/acti
 import { v4 as uuidv4 } from 'uuid';
 import { Checkbox } from '@/components/ui/checkbox';
 import { MOCK_INVOICE_SETTINGS } from '@/lib/mock-data';
+import PageTitle from '@/components/PageTitle';
 
 interface InvoiceItem {
   id: string;
@@ -245,4 +246,5 @@ export default function NewInvoicePage() {
             </form>
         </div>
     );
-}
+
+    
