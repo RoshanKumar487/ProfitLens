@@ -3,8 +3,6 @@
 
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
-import { db } from '@/lib/firebaseConfig';
-import { collection, query, where, orderBy, onSnapshot } from 'firebase/firestore';
 import { useToast } from '@/hooks/use-toast';
 import PageTitle from '@/components/PageTitle';
 import { Button } from '@/components/ui/button';
@@ -16,25 +14,10 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Skeleton } from '@/components/ui/skeleton';
 import { Package, PlusCircle, Trash2, Loader2, Save, Search, ArrowUp, ArrowDown, ChevronsUpDown, Settings } from 'lucide-react';
 import { v4 as uuidv4 } from 'uuid';
-import { saveAllProducts, deleteProduct } from './actions';
-import { getProductSettings, type ProductSettings } from '../settings/actions';
+import { getAllProducts, saveAllProducts, deleteProduct, getProductSettingsForCompany } from './actions';
+import { type ProductSettings } from '@/app/settings/actions';
 import Link from 'next/link';
-
-type ProductDisplay = {
-  id: string;
-  name: string;
-  sku: string;
-  category: string;
-  itemType: 'Goods' | 'Service';
-  unit: string;
-  salePrice: number;
-  purchasePrice: number;
-  gstRate: number;
-  quantity?: number;
-  lowStockThreshold?: number;
-  customFields?: { [key: string]: string };
-  isNew?: boolean;
-};
+import { type ProductDisplay } from './actions';
 
 const UNITS_OF_MEASURE = [
     'pcs', 'nos', 'kg', 'g', 'ltr', 'ml', 'm', 'ft', 'in', 'box', 'set', 'pair', 'dozen'
@@ -52,46 +35,29 @@ export default function ProductsServicesPage() {
     const [searchTerm, setSearchTerm] = useState('');
     const [sortConfig, setSortConfig] = useState<{ key: keyof ProductDisplay; direction: 'asc' | 'desc' }>({ key: 'name', direction: 'asc' });
     const [productSettings, setProductSettings] = useState<ProductSettings | null>(null);
-
-    const fetchAllData = useCallback(async () => {
-      if (!user?.companyId) {
-        setIsLoading(false);
-        return;
-      }
-      setIsLoading(true);
-      
-      const settingsPromise = getProductSettings(user.companyId);
-      const productsPromise = new Promise<ProductDisplay[]>((resolve, reject) => {
-        const productQuery = query(collection(db, 'products'), where('companyId', '==', user.companyId));
-        const unsubscribe = onSnapshot(productQuery, (snapshot) => {
-            const fetchedProducts = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as ProductDisplay));
-            resolve(fetchedProducts);
-            // We don't unsubscribe here because we want real-time updates.
-            // In a more complex app, manage this lifecycle carefully.
-        }, (error) => { 
-            console.error("Error fetching products:", error); 
-            toast({ variant: 'destructive', title: "Error", description: "Could not fetch products." }); 
-            reject(error);
-        });
-      });
-
-      try {
-        const [settings, fetchedProducts] = await Promise.all([settingsPromise, productsPromise]);
-        setProductSettings(settings);
-        setProducts(fetchedProducts);
-      } catch (error) {
-        // Error is already toasted in the promises
-      } finally {
-        setIsLoading(false);
-      }
-
-    }, [user?.companyId, toast]);
+    
+    const fetchProducts = useCallback(async () => {
+        if (!user) return;
+        setIsLoading(true);
+        try {
+            const [fetchedProducts, fetchedSettings] = await Promise.all([
+                getAllProducts(),
+                getProductSettingsForCompany()
+            ]);
+            setProducts(fetchedProducts);
+            setProductSettings(fetchedSettings);
+        } catch (error) {
+            toast({ title: "Error", description: "Failed to load products.", variant: "destructive" });
+        } finally {
+            setIsLoading(false);
+        }
+    }, [user, toast]);
 
     useEffect(() => {
-      if (!authIsLoading && user) {
-        fetchAllData();
-      }
-    }, [user, authIsLoading, fetchAllData]);
+       if (!authIsLoading) {
+           fetchProducts();
+       }
+    }, [authIsLoading, fetchProducts]);
     
     const filteredAndSortedProducts = useMemo(() => {
         let sortableItems = [...products];
@@ -135,7 +101,7 @@ export default function ProductsServicesPage() {
         return sortConfig.direction === 'asc' ? <ArrowUp className="ml-2 h-4 w-4" /> : <ArrowDown className="ml-2 h-4 w-4" />;
     };
 
-    const handleProductInputChange = (productId: string, field: keyof Omit<ProductDisplay, 'customFields'>, value: any) => {
+    const handleProductInputChange = (productId: string, field: keyof Omit<ProductDisplay, 'customFields' | 'id'>, value: any) => {
       setProducts(prev =>
         prev.map(p => {
           if (p.id === productId) {
@@ -184,17 +150,15 @@ export default function ProductsServicesPage() {
     };
     
     const handleSaveAllProducts = async () => {
-      if (!user?.companyId) return;
+      if (!user) return;
       setIsSaving(true);
-      
-      const result = await saveAllProducts(products, user.companyId);
-      
-      toast({
-        title: result.success ? "Success" : "Error",
-        description: result.message,
-        variant: result.success ? "default" : "destructive",
-      });
-      
+      const result = await saveAllProducts(products);
+      if (result.success) {
+        toast({ title: "Success", description: result.message });
+        await fetchProducts();
+      } else {
+        toast({ title: "Error", description: result.message, variant: "destructive" });
+      }
       setIsSaving(false);
     };
     
@@ -207,16 +171,15 @@ export default function ProductsServicesPage() {
     };
 
     const confirmDelete = async () => {
-        if (!itemToDelete) return;
+        if (!itemToDelete || !user) return;
         setIsSaving(true);
         const result = await deleteProduct(itemToDelete.id);
-
-        toast({
-            title: result.success ? "Success" : "Error",
-            description: result.message,
-            variant: result.success ? "default" : "destructive",
-        });
-
+        if (result.success) {
+            toast({ title: "Success", description: result.message });
+            setProducts(prev => prev.filter(p => p.id !== itemToDelete.id));
+        } else {
+            toast({ title: "Error", description: result.message, variant: "destructive" });
+        }
         setItemToDelete(null);
         setIsSaving(false);
     };

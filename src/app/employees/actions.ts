@@ -1,65 +1,155 @@
 
 'use server';
 
-import { db } from '@/lib/firebaseConfig';
-import { collection, doc, updateDoc, deleteDoc, writeBatch, serverTimestamp } from 'firebase/firestore';
+import { connectToDatabase } from '@/lib/mongodb';
+import { ObjectId } from 'mongodb';
+import { revalidatePath } from 'next/cache';
+import { getSession } from '@/app/auth/actions';
+import { type EmployeeInput } from '@/lib/schemas';
 
-// Explicitly define the types for employee data to ensure consistency.
-// Note: This matches the structure in the employees page component.
-interface EmployeeData {
+export interface EmployeeDisplay {
+  id: string;
   name: string;
   position: string;
   salary: number;
   description?: string;
+  dateOfBirth?: Date;
+  joiningDate?: Date;
+  fatherName?: string;
+  motherName?: string;
+  selfPhoneNo?: string;
+  qualification?: string;
+  experience?: string;
+  permanentAddressHNo?: string;
+  permanentAddressPS?: string;
+  permanentAddressPost?: string;
+  permanentAddressDist?: string;
+  permanentAddressState?: string;
+  permanentAddressPin?: string;
+  guarantorName?: string;
+  guarantorPhone?: string;
+  height?: string;
+  weight?: string;
+  identificationMarks?: string;
+  profilePictureUrl?: string;
+  signatureUrl?: string;
+  leftThumbImpressionUrl?: string;
 }
 
-export async function bulkAddEmployees(
-  employees: EmployeeData[],
-  companyId: string,
-  addedById: string,
-  addedBy: string
-): Promise<{ success: boolean; message: string; count: number }> {
-  if (!companyId || !addedById) {
-    return { success: false, message: 'User or company information is missing.', count: 0 };
-  }
-  if (!employees || employees.length === 0) {
-    return { success: false, message: 'No employee data provided.', count: 0 };
-  }
+async function getCompanyId(): Promise<ObjectId | null> {
+    const session = await getSession();
+    if (!session?.companyId) {
+        return null;
+    }
+    return new ObjectId(session.companyId);
+}
 
-  const batch = writeBatch(db);
-  let processedCount = 0;
 
-  try {
-    employees.forEach(employee => {
-      // Basic validation for each employee record
-      if (employee.name && employee.position && typeof employee.salary === 'number' && employee.salary >= 0) {
-        const newEmployeeRef = doc(collection(db, 'employees'));
-        batch.set(newEmployeeRef, {
-          ...employee,
-          name_lowercase: employee.name.toLowerCase(),
-          companyId,
-          addedById,
-          addedBy,
-          createdAt: serverTimestamp(),
-          updatedAt: serverTimestamp(),
-          profilePictureUrl: '',
-          profilePictureStoragePath: '',
-          associatedFileUrl: '',
-          associatedFileName: '',
-          associatedFileStoragePath: '',
+export async function uploadFile(file: File, path: string): Promise<string> {
+    // This requires a proper file storage service like Firebase Storage or AWS S3.
+    // Returning a placeholder for now.
+    console.log(`Mock Upload: Uploading ${file.name} to ${path}`);
+    return `https://placehold.co/200x200.png?text=Uploaded`;
+}
+
+
+export async function getEmployees(): Promise<EmployeeDisplay[]> {
+    const companyId = await getCompanyId();
+    if (!companyId) return [];
+
+    try {
+        const { db } = await connectToDatabase();
+        const employees = await db.collection('employees')
+            .find({ companyId })
+            .sort({ name: 1 })
+            .toArray();
+        
+        return employees.map(doc => {
+            const { _id, companyId, ...rest } = doc;
+            return { id: _id.toHexString(), ...rest } as unknown as EmployeeDisplay;
         });
-        processedCount++;
-      }
-    });
-    
-    if (processedCount === 0) {
-        return { success: false, message: "No valid employee records found to import.", count: 0 };
+    } catch (error) {
+        console.error("Failed to get employees:", error);
+        return [];
+    }
+}
+
+
+export async function getEmployeeById(employeeId: string): Promise<EmployeeDisplay | null> {
+    const companyId = await getCompanyId();
+    if (!companyId || !ObjectId.isValid(employeeId)) return null;
+
+    try {
+        const { db } = await connectToDatabase();
+        const doc = await db.collection('employees').findOne({ 
+            _id: new ObjectId(employeeId),
+            companyId: companyId
+        });
+
+        if (!doc) return null;
+        
+        const { _id, companyId: docCompanyId, ...rest } = doc;
+        return { id: _id.toHexString(), ...rest } as unknown as EmployeeDisplay;
+
+    } catch (error) {
+        console.error(`Failed to get employee ${employeeId}:`, error);
+        return null;
+    }
+}
+
+export async function updateEmployee(
+  employeeId: string | null,
+  companyIdString: string,
+  data: EmployeeInput & { profilePictureUrl?: string | null, signatureUrl?: string | null, leftThumbImpressionUrl?: string | null }
+) {
+    const companyId = new ObjectId(companyIdString);
+    if (!companyId) {
+        return { success: false, message: "User is not associated with a company." };
     }
 
-    await batch.commit();
-    return { success: true, message: `Successfully imported ${processedCount} employees.`, count: processedCount };
-  } catch (error: any) {
-    console.error("Error bulk adding employees:", error);
-    return { success: false, message: `Failed to import employees: ${error.message}`, count: 0 };
-  }
+    try {
+        const { db } = await connectToDatabase();
+        const collection = db.collection('employees');
+
+        if (employeeId && ObjectId.isValid(employeeId)) {
+            // Update existing employee
+            const result = await collection.updateOne(
+                { _id: new ObjectId(employeeId), companyId: companyId },
+                { $set: data }
+            );
+            if (result.matchedCount === 0) {
+                 return { success: false, message: "Employee not found or you don't have permission to edit." };
+            }
+        } else {
+            // Add new employee
+            await collection.insertOne({ ...data, companyId, createdAt: new Date() });
+        }
+        
+        revalidatePath('/employees');
+        return { success: true, message: `Employee ${employeeId ? 'updated' : 'added'} successfully.` };
+    } catch (error: any) {
+        return { success: false, message: `Failed to save employee: ${error.message}` };
+    }
 }
+
+
+export async function deleteEmployee(employeeId: string) {
+    const companyId = await getCompanyId();
+    if (!companyId || !ObjectId.isValid(employeeId)) {
+        return { success: false, message: 'Invalid employee ID or company.' };
+    }
+
+    try {
+        const { db } = await connectToDatabase();
+        await db.collection('employees').deleteOne({
+            _id: new ObjectId(employeeId),
+            companyId,
+        });
+        revalidatePath('/employees');
+        return { success: true, message: 'Employee deleted successfully.' };
+    } catch (error: any) {
+        return { success: false, message: `Failed to delete employee: ${error.message}` };
+    }
+}
+
+    

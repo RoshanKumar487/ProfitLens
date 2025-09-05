@@ -9,7 +9,7 @@ export function cn(...inputs: ClassValue[]) {
 export function downloadCsv(csvString: string, filename: string) {
   const blob = new Blob([csvString], { type: 'text/csv;charset=utf-8;' });
   const link = document.createElement('a');
-  if (link.download !== undefined) { // Feature detection
+  if (link.download !== undefined) {
     const url = URL.createObjectURL(blob);
     link.setAttribute('href', url);
     link.setAttribute('download', filename);
@@ -25,37 +25,6 @@ export function formatAmount(amount: number, currencySymbol = '$') {
   return `${currencySymbol}${amount.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 }
 
-export async function urlToDataUri(url: string): Promise<string> {
-  if (!url) return '';
-  try {
-    const response = await fetch(url);
-    if (!response.ok) {
-      console.error(`Failed to fetch image: ${response.statusText} for URL: ${url}`);
-      return '';
-    }
-    const blob = await response.blob();
-    return new Promise((resolve, reject) => {
-      const reader = new FileReader();
-      reader.onloadend = () => {
-        if (typeof reader.result === 'string') {
-          resolve(reader.result);
-        } else {
-          console.error('Failed to convert blob to data URI.');
-          resolve('');
-        }
-      };
-      reader.onerror = (error) => {
-        console.error('FileReader error:', error);
-        reject(error);
-      };
-      reader.readAsDataURL(blob);
-    });
-  } catch (error) {
-    console.error(`Could not convert URL to data URI: ${url}`, error);
-    return ''; // Return empty string on failure
-  }
-}
-
 export function stringToHslColor(str: string, saturation: number, lightness: number): string {
   let hash = 0;
   for (let i = 0; i < str.length; i++) {
@@ -63,4 +32,30 @@ export function stringToHslColor(str: string, saturation: number, lightness: num
   }
   const hue = hash % 360;
   return `hsl(${hue}, ${saturation}%, ${lightness}%)`;
+}
+
+// Function to convert a URL to a data URI, with error handling
+export async function urlToDataUri(url: string): Promise<string | undefined> {
+  try {
+    const response = await fetch(url);
+    if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+    }
+    const blob = await response.blob();
+    return new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onloadend = () => {
+            if (typeof reader.result === 'string') {
+                resolve(reader.result);
+            } else {
+                reject(new Error("Failed to read blob as Data URI."));
+            }
+        };
+        reader.onerror = reject;
+        reader.readAsDataURL(blob);
+    });
+  } catch (error) {
+    console.error(`Failed to convert URL to Data URI: ${url}`, error);
+    return undefined;
+  }
 }

@@ -1,36 +1,70 @@
+
 'use server';
 
-import { db } from '@/lib/firebaseConfig';
-import { doc, updateDoc, deleteDoc, Timestamp, serverTimestamp } from 'firebase/firestore';
+import { connectToDatabase } from '@/lib/mongodb';
+import { ObjectId } from 'mongodb';
+import { revalidatePath } from 'next/cache';
+import { getSession } from '@/app/auth/actions';
 
-export interface RevenueUpdateData {
-  date: Date;
-  amount: number;
-  source: string;
-  description: string;
+export interface RevenueEntry {
+    date: Date;
+    amount: number;
+    source: string;
+    description?: string;
 }
 
-export async function updateRevenueEntry(id: string, updates: RevenueUpdateData): Promise<{ success: boolean; message: string }> {
-  try {
-    const revenueRef = doc(db, 'revenueEntries', id);
-    await updateDoc(revenueRef, { 
-      ...updates,
-      date: Timestamp.fromDate(updates.date),
-      updatedAt: serverTimestamp() 
-    });
-    return { success: true, message: 'Revenue entry updated successfully.' };
-  } catch (error: any) {
-    console.error("Error updating revenue entry:", error);
-    return { success: false, message: `Failed to update revenue entry: ${error.message}` };
-  }
+export interface RevenueEntryDisplay extends RevenueEntry {
+    id: string;
 }
 
-export async function deleteRevenueEntry(id: string): Promise<{ success: boolean; message: string }> {
-  try {
-    await deleteDoc(doc(db, 'revenueEntries', id));
-    return { success: true, message: 'Revenue entry deleted successfully.' };
-  } catch (error: any) {
-    console.error("Error deleting revenue entry:", error);
-    return { success: false, message: `Failed to delete revenue entry: ${error.message}` };
-  }
+async function getCompanyId(): Promise<ObjectId | null> {
+    const session = await getSession();
+    if (!session?.companyId) {
+        return null;
+    }
+    return new ObjectId(session.companyId);
+}
+
+export async function addRevenueEntry(data: RevenueEntry) {
+    const companyId = await getCompanyId();
+    if (!companyId) {
+        return { success: false, message: 'User not associated with a company.' };
+    }
+    
+    try {
+        const { db } = await connectToDatabase();
+        await db.collection('revenue').insertOne({ ...data, companyId, createdAt: new Date() });
+        revalidatePath('/record-revenue');
+        return { success: true, message: 'Revenue recorded successfully.' };
+    } catch (error: any) {
+        return { success: false, message: `Failed to record revenue: ${error.message}` };
+    }
+}
+
+export async function getRecentRevenue(): Promise<RevenueEntryDisplay[]> {
+    const companyId = await getCompanyId();
+    if (!companyId) return [];
+
+    try {
+        const { db } = await connectToDatabase();
+        const revenue = await db.collection('revenue')
+            .find({ companyId })
+            .sort({ date: -1 })
+            .limit(50)
+            .toArray();
+            
+        return revenue.map(doc => {
+            const { _id, companyId, ...rest } = doc;
+            return {
+                id: _id.toHexString(),
+                date: new Date(doc.date),
+                amount: doc.amount,
+                source: doc.source,
+                description: doc.description,
+            };
+        });
+    } catch (error) {
+        console.error('Failed to get revenue:', error);
+        return [];
+    }
 }

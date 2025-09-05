@@ -194,7 +194,13 @@ const InvoiceTemplateBusiness = React.forwardRef<HTMLDivElement, InvoiceTemplate
                     </table>
                 </div>
             </div>
-             <div className="h-16 w-full mt-4"></div> {/* Spacer for bottom letterhead */}
+             <div className="flex justify-between items-end mt-16">
+                 <div>{/* Spacer */}</div>
+                 <div className="w-1/3 text-center">
+                    <div className="border-b-2 border-black w-full"></div>
+                    <p className="text-sm font-semibold mt-2">Authorised Signature</p>
+                 </div>
+             </div>
         </footer>
       </div>
     );

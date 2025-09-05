@@ -2,6 +2,8 @@
 import type { LucideIcon } from 'lucide-react';
 import { LayoutDashboard, TrendingUp, TrendingDown, Sparkles, Receipt, Users, Shield, Banknote, Settings, LayoutGrid, Crown, HandCoins, ShieldCheck, BarChart2, Package, Warehouse } from 'lucide-react';
 
+export const SESSION_COOKIE_NAME = "profiitlens_session";
+
 export interface NavItem {
   label: string;
   href: string;
@@ -21,7 +23,8 @@ export const NAV_ITEMS: NavItem[] = [
     label: 'Record Revenue',
     href: '/record-revenue',
     icon: TrendingUp,
-    description: 'Manually log all incoming revenue from various sources.'
+    description: 'Manually log all incoming revenue from various sources.',
+    sidebar: false,
   },
   {
     label: 'Record Expenses',
@@ -51,7 +54,8 @@ export const NAV_ITEMS: NavItem[] = [
     label: 'My Tools',
     href: '/',
     icon: LayoutGrid,
-    description: 'Access all your business management tools from one central hub.'
+    description: 'Access all your business management tools from one central hub.',
+    sidebar: false,
   },
   {
     label: 'Bank Accounts',
@@ -95,6 +99,6 @@ export const NAV_ITEMS: NavItem[] = [
     href: '/super-admin',
     icon: Crown,
     description: 'Manage all companies and users across the platform.',
+    sidebar: false,
   }
 ];
-

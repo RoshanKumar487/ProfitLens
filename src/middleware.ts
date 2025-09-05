@@ -1,26 +1,44 @@
 
-import { NextResponse } from 'next/server'
-import type { NextRequest } from 'next/server'
+import { NextRequest, NextResponse } from 'next/server';
+import { verifySession } from '@/lib/auth';
 
-export function middleware(request: NextRequest) {
-  // Use 'firebaseIdToken' to match what's set in AuthContext
-  const idToken = request.cookies.get('firebaseIdToken')?.value
+const PROTECTED_ROUTES = ['/dashboard', '/invoicing', '/employees', '/settings', '/reports', '/record-expenses', '/record-revenue', '/payroll', '/products-services', '/company-details', '/admin', '/ai-assistant', '/bank-accounts'];
+const AUTH_ROUTES = ['/auth/sign-in', '/auth/sign-up'];
 
-  const requestHeaders = new Headers(request.headers)
-  if (idToken) {
-    // Pass the token in a consistent header name
-    requestHeaders.set('x-firebase-id-token', idToken)
+export async function middleware(request: NextRequest) {
+  const { pathname } = request.nextUrl;
+  const session = await verifySession();
+
+  const isAuthPage = AUTH_ROUTES.some(route => pathname.startsWith(route));
+  const isProtectedRoute = PROTECTED_ROUTES.some(route => pathname.startsWith(route)) || pathname === '/';
+  
+  if (isAuthPage) {
+    if (session) {
+      return NextResponse.redirect(new URL('/dashboard', request.url));
+    }
+    return NextResponse.next();
   }
 
-  return NextResponse.next({
-    request: {
-      headers: requestHeaders,
-    },
-  })
+  if (isProtectedRoute) {
+    if (!session) {
+      const url = request.nextUrl.clone();
+      url.pathname = '/auth/sign-in';
+      return NextResponse.redirect(url);
+    }
+  }
+
+  return NextResponse.next();
 }
 
-// The matcher should only include routes that still use this API-style authentication.
-// Since the employee search now uses a Server Action, it no longer needs to be here.
 export const config = {
-  matcher: ['/ai-assistant/:path*'],
-}
+  matcher: [
+    /*
+     * Match all request paths except for the ones starting with:
+     * - api (API routes)
+     * - _next/static (static files)
+     * - _next/image (image optimization files)
+     * - favicon.ico (favicon file)
+     */
+    '/((?!api|_next/static|_next/image|favicon.ico).*)',
+  ],
+};

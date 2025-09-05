@@ -15,14 +15,14 @@ export default function HomePage() {
       if (user) {
         router.replace('/dashboard');
       } else {
-        router.replace('/auth/signin');
+        router.replace('/auth/sign-in');
       }
     }
   }, [user, isLoading, router]);
 
   return (
-    <div className="flex h-screen w-full items-center justify-center">
-      <Loader2 className="h-12 w-12 animate-spin text-primary" />
+      <div className="flex h-screen w-screen items-center justify-center">
+          <Loader2 className="h-12 w-12 animate-spin text-primary" />
     </div>
   );
 }

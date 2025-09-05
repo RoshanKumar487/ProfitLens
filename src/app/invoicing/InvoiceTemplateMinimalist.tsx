@@ -31,6 +31,7 @@ interface InvoiceDisplay {
   issuedDate: Date;
   items?: InvoiceItem[];
   notes?: string;
+  isRcmApplicable?: boolean;
 }
 
 interface CompanyDetailsFirestore {
@@ -154,10 +155,17 @@ const InvoiceTemplateMinimalist = React.forwardRef<HTMLDivElement, InvoiceTempla
                           <span className="text-gray-800">- {currencySymbol}{invoiceToView.discountAmount.toFixed(2)}</span>
                       </div>
                     )}
-                    <div className="flex justify-between text-sm mt-1">
-                        <span className="text-gray-600 font-semibold">Tax ({invoiceToView.taxRate}%)</span>
-                        <span className="text-gray-800">{currencySymbol}{invoiceToView.taxAmount.toFixed(2)}</span>
-                    </div>
+                    {invoiceToView.isRcmApplicable ? (
+                      <div className="flex justify-between text-sm mt-1">
+                          <span className="text-gray-600">Tax</span>
+                          <span className="text-gray-800 font-semibold">RCM Applicable</span>
+                      </div>
+                    ) : (
+                      <div className="flex justify-between text-sm mt-1">
+                          <span className="text-gray-600 font-semibold">Tax ({invoiceToView.taxRate}%)</span>
+                          <span className="text-gray-800">{currencySymbol}{invoiceToView.taxAmount.toFixed(2)}</span>
+                      </div>
+                    )}
                      <div className="border-t my-2"></div>
                     <div className="flex justify-between text-base font-bold">
                         <span style={{ color: isBlackAndWhite ? 'black' : accentColor }}>Total</span>

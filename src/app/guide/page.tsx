@@ -11,11 +11,11 @@ import { HelpCircle, LayoutDashboard, Receipt, Banknote, Users, Sparkles, FileBa
 export default function GuidePage() {
   return (
     <div className="space-y-8 p-4 sm:p-6 lg:p-8">
-      <PageTitle title="User Guide" subtitle="Your complete guide to mastering ProfitLens." icon={HelpCircle} />
+      <PageTitle title="User Guide" subtitle="Your complete guide to mastering InvoPilot." icon={HelpCircle} />
 
       <Card>
         <CardHeader>
-          <CardTitle>Welcome to ProfitLens!</CardTitle>
+          <CardTitle>Welcome to InvoPilot!</CardTitle>
           <CardDescription>This guide provides detailed instructions on how to use each feature of the application to manage your business finances effectively.</CardDescription>
         </CardHeader>
         <CardContent>
@@ -39,7 +39,6 @@ export default function GuidePage() {
               <li><strong>Expense Breakdown Chart:</strong> This pie chart shows how your expenses are distributed across different categories, based on transactions from your linked bank accounts.</li>
               <li><strong>Recent Activity:</strong> A feed of the latest actions taken in the app, such as paid invoices or new expenses.</li>
             </ul>
-            <Image src="https://placehold.co/800x450.png" width={800} height={450} alt="Dashboard Screenshot" className="rounded-lg border" data-ai-hint="dashboard analytics" />
           </AccordionContent>
         </AccordionItem>
 
@@ -59,7 +58,6 @@ export default function GuidePage() {
               <li><strong>Actions:</strong> From the invoice list, you can View, Print, Download as PDF, Edit, or Email the invoice directly to your client.</li>
                <li><strong>Payment Details:</strong> Add your company's bank account details on the "Company Details" page, and they will automatically appear on your invoices for easy payment.</li>
             </ul>
-             <Image src="https://placehold.co/800x500.png" width={800} height={500} alt="Invoicing Page Screenshot" className="rounded-lg border" data-ai-hint="invoice form" />
           </AccordionContent>
         </AccordionItem>
 
@@ -77,7 +75,6 @@ export default function GuidePage() {
               <li><strong>Logging Transactions:</strong> Select an account, then click "Add Transaction". You can log deposits or withdrawals, assign a category, and add a description. The account balance updates automatically.</li>
               <li><strong>Analytics:</strong> All "withdrawal" transactions are categorized and visualized in the "Expense Breakdown" pie chart on your dashboard.</li>
             </ul>
-            <Image src="https://placehold.co/800x400.png" width={800} height={400} alt="Bank Accounts Page Screenshot" className="rounded-lg border" data-ai-hint="financial transactions" />
           </AccordionContent>
         </AccordionItem>
         
@@ -95,7 +92,6 @@ export default function GuidePage() {
               <li><strong>File Uploads:</strong> You can upload a profile picture and an associated file (like a resume or contract) for each employee. You can either click to upload or drag-and-drop files into the designated areas.</li>
               <li><strong>Webcam Capture:</strong> Use the "Webcam" button to capture a profile picture directly from your device's camera.</li>
             </ul>
-             <Image src="https://placehold.co/800x450.png" width={800} height={450} alt="Employees Page Screenshot" className="rounded-lg border" data-ai-hint="team management" />
           </AccordionContent>
         </AccordionItem>
         

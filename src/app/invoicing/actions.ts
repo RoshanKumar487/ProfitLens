@@ -1,24 +1,15 @@
 
 'use server';
 
-import { db } from '@/lib/firebaseConfig';
-import { doc, updateDoc, deleteDoc, Timestamp, serverTimestamp, collection, addDoc } from 'firebase/firestore';
-import nodemailer from 'nodemailer';
+import { connectToDatabase } from '@/lib/mongodb';
+import { ObjectId } from 'mongodb';
+import { revalidatePath } from 'next/cache';
+import { getSession } from '@/app/auth/actions';
+import type { InvoiceSettings } from '@/app/settings/actions';
+import { MOCK_COMPANY_PROFILE, MOCK_FULL_INVOICE, MOCK_INVOICES } from '@/lib/mock-data';
 
-interface SendInvoiceEmailPayload {
-  to: string;
-  subject: string;
-  htmlBody: string;
-  invoiceNumber: string;
-}
-
-interface EmailSendingResult {
-  success: boolean;
-  message: string;
-  error?: any;
-}
-
-interface InvoiceItem {
+// Interface for a single item within an invoice
+export interface InvoiceItem {
   id: string;
   description: string;
   hsnNo?: string;
@@ -26,7 +17,9 @@ interface InvoiceItem {
   unitPrice: number;
   customFields?: { [key: string]: string };
 }
-interface InvoiceData {
+
+// Interface for the complete invoice data structure used for creation and display
+export interface FullInvoice {
   clientName: string;
   clientEmail?: string;
   clientAddress?: string;
@@ -37,8 +30,9 @@ interface InvoiceData {
   discountAmount: number;
   taxRate: number;
   taxAmount: number;
+  isRcmApplicable: boolean;
   amount: number;
-  dueDate: Date;
+  dueDate?: Date;
   status: 'Paid' | 'Pending' | 'Overdue' | 'Draft';
   issuedDate: Date;
   items: InvoiceItem[];
@@ -46,112 +40,208 @@ interface InvoiceData {
   invoiceNumber: string;
 }
 
+// Interface for displaying a summary of an invoice in a list
+export interface InvoiceDisplay {
+  id: string;
+  invoiceNumber: string;
+  clientName: string;
+  amount: number;
+  dueDate: Date;
+  status: 'Paid' | 'Pending' | 'Overdue' | 'Draft';
+  issuedDate: Date;
+}
 
-export async function createInvoice(invoiceData: Omit<InvoiceData, 'id'>, companyId: string, userId: string, userName: string): Promise<{ success: boolean; message: string; id?: string }> {
-  if (!companyId || !userId) {
-    return { success: false, message: 'User or company information is missing.' };
+export interface FullInvoiceDisplay extends FullInvoice {
+  id: string;
+}
+
+
+// Interface for the company's profile details stored in Firestore
+export interface CompanyDetailsFirestore {
+  name: string;
+  address?: string;
+  city?: string;
+  state?: string;
+  country?: string;
+  gstin?: string;
+  pan?: string;
+  phone?: string;
+  email?: string;
+  website?: string;
+  accountNumber?: string;
+  ifscCode?: string;
+  bankName?: string;
+  branch?: string;
+  signatureUrl?: string;
+  stampUrl?: string;
+}
+
+
+async function getCompanyId(): Promise<ObjectId | null> {
+    const session = await getSession();
+    if (!session?.companyId) {
+        return new ObjectId("66a4f91e3e7649f49d21a221"); // Fallback for mock/dev
+    }
+    return new ObjectId(session.companyId);
+}
+
+/**
+ * Fetches all invoices for the current user's company.
+ * @returns A promise that resolves to an array of invoices.
+ */
+export async function getInvoices(): Promise<InvoiceDisplay[]> {
+  const companyId = await getCompanyId();
+  if (!companyId) return [];
+
+  try {
+    const { db } = await connectToDatabase();
+    const invoices = await db.collection('invoices')
+      .find({ companyId })
+      .sort({ issuedDate: -1 })
+      .toArray();
+
+    return invoices.map(doc => ({
+      id: doc._id.toHexString(),
+      invoiceNumber: doc.invoiceNumber,
+      clientName: doc.clientName,
+      amount: doc.amount,
+      dueDate: new Date(doc.dueDate),
+      status: doc.status,
+      issuedDate: new Date(doc.issuedDate),
+    }));
+  } catch (error) {
+    console.error('Failed to get invoices:', error);
+    return MOCK_INVOICES;
   }
-  if (!invoiceData.clientName || invoiceData.amount === undefined || !invoiceData.issuedDate || !invoiceData.dueDate) {
-    return { success: false, message: 'Client Name, Amount, Issued Date, and Due Date are required.' };
+}
+
+/**
+ * Fetches a single invoice by its ID.
+ * @param invoiceId The ID of the invoice to fetch.
+ * @returns A promise that resolves to the invoice object or null if not found.
+ */
+export async function getInvoiceById(invoiceId: string): Promise<FullInvoiceDisplay | null> {
+    const companyId = await getCompanyId();
+    if (!companyId || !ObjectId.isValid(invoiceId)) return null;
+
+    try {
+        const { db } = await connectToDatabase();
+        const doc = await db.collection('invoices').findOne({
+            _id: new ObjectId(invoiceId),
+            companyId: companyId,
+        });
+
+        if (!doc) {
+             // Fallback to mock for demo purposes if not found
+            return MOCK_FULL_INVOICE.id === invoiceId ? MOCK_FULL_INVOICE : null;
+        };
+
+        const { _id, companyId: docCompanyId, ...rest } = doc;
+        
+        const fullInvoiceData: FullInvoice = {
+            clientName: doc.clientName,
+            subtotal: doc.subtotal,
+            discountType: doc.discountType,
+            discountValue: doc.discountValue,
+            discountAmount: doc.discountAmount,
+            taxRate: doc.taxRate,
+            taxAmount: doc.taxAmount,
+            isRcmApplicable: doc.isRcmApplicable,
+            amount: doc.amount,
+            status: doc.status,
+            issuedDate: new Date(doc.issuedDate),
+            items: doc.items.map((item: any) => ({...item, id: item.id || new ObjectId().toHexString()})),
+            invoiceNumber: doc.invoiceNumber,
+            clientEmail: doc.clientEmail,
+            clientAddress: doc.clientAddress,
+            clientGstin: doc.clientGstin,
+            dueDate: doc.dueDate ? new Date(doc.dueDate) : undefined,
+            notes: doc.notes,
+        };
+
+        return {
+            id: _id.toHexString(),
+            ...fullInvoiceData,
+        };
+
+    } catch (error) {
+        console.error('Failed to get invoice by ID:', error);
+        // Fallback to mock for demo purposes if error
+        return MOCK_FULL_INVOICE.id === invoiceId ? MOCK_FULL_INVOICE : null;
+    }
+}
+
+
+/**
+ * Adds a new invoice to the database.
+ * @param invoiceData The data for the new invoice.
+ * @returns A promise that resolves to an object indicating success or failure.
+ */
+export async function addInvoice(invoiceData: FullInvoice) {
+  const companyId = await getCompanyId();
+  if (!companyId) {
+    return { success: false, message: 'User not associated with a company.' };
   }
 
   try {
-    const invoicePayload = {
+    const { db } = await connectToDatabase();
+    const result = await db.collection('invoices').insertOne({
       ...invoiceData,
-      companyId: companyId,
-      issuedDate: Timestamp.fromDate(new Date(invoiceData.issuedDate)),
-      dueDate: Timestamp.fromDate(new Date(invoiceData.dueDate)),
-      createdAt: serverTimestamp(),
-      updatedAt: serverTimestamp(),
-      createdBy: {
-        id: userId,
-        name: userName,
-      },
-    };
-    
-    const docRef = await addDoc(collection(db, 'invoices'), invoicePayload);
-    return { success: true, message: 'Invoice created successfully.', id: docRef.id };
-
+      companyId,
+      createdAt: new Date(),
+    });
+    revalidatePath('/invoicing');
+    return { success: true, message: 'Invoice created successfully.', invoiceId: result.insertedId.toHexString() };
   } catch (error: any) {
-    console.error("Error creating invoice:", error);
     return { success: false, message: `Failed to create invoice: ${error.message}` };
   }
 }
 
 
-export async function sendInvoiceEmailAction(payload: SendInvoiceEmailPayload): Promise<EmailSendingResult> {
-  const { to, subject, htmlBody, invoiceNumber } = payload;
-
-  if (!process.env.SMTP_HOST || !process.env.SMTP_PORT || !process.env.SMTP_USER || !process.env.SMTP_PASS || !process.env.SMTP_FROM_EMAIL) {
-    console.error('SMTP environment variables are not fully configured.');
-    return { success: false, message: 'Email server not configured. Please contact administrator.' };
-  }
-
-  const transporter = nodemailer.createTransport({
-    host: process.env.SMTP_HOST,
-    port: parseInt(process.env.SMTP_PORT, 10),
-    secure: process.env.SMTP_SECURE === 'true',
-    auth: {
-      user: process.env.SMTP_USER,
-      pass: process.env.SMTP_PASS,
-    },
-    tls: {
-        rejectUnauthorized: process.env.NODE_ENV === 'production', 
+/**
+ * Deletes an invoice from the database.
+ * @param invoiceId The ID of the invoice to delete.
+ * @returns A promise that resolves to an object indicating success or failure.
+ */
+export async function deleteInvoice(invoiceId: string) {
+    const companyId = await getCompanyId();
+    if (!companyId || !ObjectId.isValid(invoiceId)) {
+        return { success: false, message: 'Invalid invoice ID or company.' };
     }
-  });
 
-  const mailOptions = {
-    from: `"${process.env.SMTP_FROM_NAME || 'ProfitLens'}" <${process.env.SMTP_FROM_EMAIL}>`,
-    to: to,
-    subject: subject,
-    html: htmlBody,
-  };
-
-  try {
-    const info = await transporter.sendMail(mailOptions);
-    console.log(`Email sent for invoice ${invoiceNumber} to ${to}: ${info.messageId}`);
-    return { success: true, message: 'Email sent successfully!' };
-  } catch (error: any) {
-    console.error(`Error sending email for invoice ${invoiceNumber} to ${to}:`, error);
-    return { success: false, message: `Failed to send email: ${error.message || 'Unknown error'}`, error: error.toString() };
-  }
+    try {
+        const { db } = await connectToDatabase();
+        await db.collection('invoices').deleteOne({
+            _id: new ObjectId(invoiceId),
+            companyId,
+        });
+        revalidatePath('/invoicing');
+        return { success: true, message: 'Invoice deleted successfully.' };
+    } catch (error: any) {
+        return { success: false, message: `Failed to delete invoice: ${error.message}` };
+    }
 }
 
-
-export async function updateInvoice(id: string, data: Partial<InvoiceData>): Promise<{ success: boolean; message: string }> {
-  try {
-    const invoiceRef = doc(db, 'invoices', id);
-    const dataToSave: { [key: string]: any } = { ...data };
+/**
+ * Fetches the company profile details.
+ * @returns The company profile details or null if not found.
+ */
+export async function getCompanyProfile(): Promise<CompanyDetailsFirestore | null> {
+    const companyId = await getCompanyId();
+    if (!companyId) return null;
     
-    if (data.issuedDate && !(data.issuedDate instanceof Timestamp)) {
-        dataToSave.issuedDate = Timestamp.fromDate(new Date(data.issuedDate));
-    }
-    if (data.dueDate && !(data.dueDate instanceof Timestamp)) {
-        dataToSave.dueDate = Timestamp.fromDate(new Date(data.dueDate));
-    }
-    
-    if ('id' in dataToSave) {
-        delete dataToSave.id;
-    }
+    try {
+        const { db } = await connectToDatabase();
+        const company = await db.collection('companies').findOne({ _id: companyId });
 
-    await updateDoc(invoiceRef, {
-      ...dataToSave,
-      updatedAt: serverTimestamp(),
-    });
-    return { success: true, message: 'Invoice updated successfully.' };
-  } catch (error: any) {
-    console.error("Error updating invoice:", error);
-    return { success: false, message: `Failed to update invoice: ${error.message}` };
-  }
-}
+        if (company) {
+            const { _id, ...profileData } = company;
+            return profileData as CompanyDetailsFirestore;
+        }
+        return MOCK_COMPANY_PROFILE;
 
-export async function deleteInvoice(id: string): Promise<{ success: boolean; message: string }> {
-  try {
-    const invoiceRef = doc(db, 'invoices', id);
-    await deleteDoc(invoiceRef);
-    return { success: true, message: 'Invoice deleted successfully.' };
-  } catch (error: any) {
-    console.error("Error deleting invoice:", error);
-    return { success: false, message: `Failed to delete invoice: ${error.message}` };
-  }
+    } catch (error) {
+        console.error('Failed to get company profile:', error);
+        return MOCK_COMPANY_PROFILE;
+    }
 }

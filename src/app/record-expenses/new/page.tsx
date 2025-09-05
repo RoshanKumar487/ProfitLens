@@ -1,8 +1,8 @@
 
 'use client';
 
-import React, { useState, FormEvent, useEffect, useMemo } from 'react';
-import { useRouter, useSearchParams } from 'next/navigation';
+import React, { useState, FormEvent, useEffect } from 'react';
+import { useRouter } from 'next/navigation';
 import PageTitle from '@/components/PageTitle';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -16,10 +16,8 @@ import { CalendarIcon, TrendingDown, Save, Loader2, Search } from 'lucide-react'
 import { format } from 'date-fns';
 import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/contexts/AuthContext';
-import { db } from '@/lib/firebaseConfig';
-import { collection, addDoc, Timestamp, serverTimestamp } from 'firebase/firestore';
 import Link from 'next/link';
-import { searchEmployees } from '../actions'; // Import the new server action
+import { addExpenseEntry } from '../actions';
 
 const EXPENSE_CATEGORIES = [
   'Software & Subscriptions', 'Marketing & Advertising', 'Office Supplies',
@@ -35,7 +33,6 @@ interface EmployeeSuggestion {
 export default function NewExpensePage() {
   const { user, currencySymbol } = useAuth();
   const router = useRouter();
-  const searchParams = useSearchParams();
   const { toast } = useToast();
 
   const [date, setDate] = useState<Date | undefined>(new Date());
@@ -45,7 +42,6 @@ export default function NewExpensePage() {
   const [vendor, setVendor] = useState<string>('');
   const [isSaving, setIsSaving] = useState(false);
   
-  // State for new employee search field
   const [employeeName, setEmployeeName] = useState('');
   const [employeeSuggestions, setEmployeeSuggestions] = useState<EmployeeSuggestion[]>([]);
   const [selectedEmployee, setSelectedEmployee] = useState<EmployeeSuggestion | null>(null);
@@ -54,30 +50,7 @@ export default function NewExpensePage() {
 
 
   useEffect(() => {
-    // Pre-fill form from URL query parameters
-    const urlAmount = searchParams.get('amount');
-    const urlVendor = searchParams.get('vendor');
-    const urlDescription = searchParams.get('description');
-    const urlCategory = searchParams.get('category');
-    const urlDate = searchParams.get('date');
-
-    if (urlAmount) setAmount(urlAmount);
-    if (urlVendor) setVendor(urlVendor);
-    if (urlDescription) setDescription(urlDescription);
-    if (urlCategory && EXPENSE_CATEGORIES.includes(urlCategory)) {
-        setCategory(urlCategory);
-    }
-    if (urlDate) {
-        const parsedDate = new Date(urlDate);
-        if (!isNaN(parsedDate.getTime())) {
-            setDate(parsedDate);
-        }
-    }
-  }, [searchParams]);
-
-  // Effect for searching employees
-  useEffect(() => {
-    if (employeeName.trim().length < 1) {
+    if (employeeName.trim().length < 1 || !user?.companyId) {
         setEmployeeSuggestions([]);
         setShowSuggestions(false);
         if (selectedEmployee) setSelectedEmployee(null);
@@ -90,24 +63,14 @@ export default function NewExpensePage() {
 
     const timer = setTimeout(async () => {
         setIsSearching(true);
-        try {
-            // Use the Server Action instead of fetch
-            const data = await searchEmployees(employeeName);
-            setEmployeeSuggestions(data);
-            setShowSuggestions(true);
-        } catch (error) {
-             console.error("Failed to fetch employees", error);
-             toast({
-                title: 'Search Failed',
-                description: 'Could not fetch employee list.',
-                variant: 'destructive'
-            });
-        }
+        // This remains a mock search as it's not part of the MongoDB scope yet
+        setEmployeeSuggestions([]);
+        setShowSuggestions(true);
         setIsSearching(false);
     }, 300);
 
     return () => clearTimeout(timer);
-  }, [employeeName, selectedEmployee, toast]);
+  }, [employeeName, selectedEmployee, user?.companyId]);
 
   const handleSelectEmployee = (employee: EmployeeSuggestion) => {
     setSelectedEmployee(employee);
@@ -118,10 +81,6 @@ export default function NewExpensePage() {
 
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
-    if (!user || !user.companyId) {
-      toast({ title: 'Authentication Error', variant: 'destructive' });
-      return;
-    }
     if (!date || !amount || !category) {
       toast({ title: 'Missing Information', description: 'Please fill in date, amount, and category.', variant: 'destructive' });
       return;
@@ -135,31 +94,21 @@ export default function NewExpensePage() {
 
     setIsSaving(true);
     
-    // Determine employee details to save
-    const finalEmployeeId = selectedEmployee ? selectedEmployee.id : null;
-    const finalEmployeeName = employeeName || null;
-
-    const newEntryPayload = {
-      date: Timestamp.fromDate(date),
+    const result = await addExpenseEntry({
+      date,
       amount: amountNum,
-      category: category,
-      description: description || '',
-      vendor: vendor || '', // Keep vendor for non-advance expenses
-      employeeId: finalEmployeeId,
-      employeeName: finalEmployeeName,
-      companyId: user.companyId,
-      createdAt: serverTimestamp(),
-      addedById: user.uid,
-      addedBy: user.displayName || user.email || 'System'
-    };
-
-    try {
-      await addDoc(collection(db, 'expenses'), newEntryPayload);
-      toast({ title: 'Expense Recorded', description: `Successfully recorded ${currencySymbol}${amountNum.toFixed(2)} for ${category}.` });
-      router.push('/record-expenses');
-    } catch (error: any) {
-      toast({ title: 'Save Failed', description: error.message, variant: 'destructive' });
-      setIsSaving(false);
+      category,
+      description: description || undefined,
+      vendor: category !== 'Salary / Advance' ? (vendor || undefined) : undefined,
+      employeeName: category === 'Salary / Advance' ? (employeeName || undefined) : undefined,
+    });
+    
+    if(result.success) {
+        toast({ title: 'Expense Recorded', description: 'Your expense has been saved successfully.' });
+        router.push('/record-expenses');
+    } else {
+        toast({ title: 'Save Failed', description: result.message, variant: 'destructive' });
+        setIsSaving(false);
     }
   };
 
@@ -205,25 +154,11 @@ export default function NewExpensePage() {
                             id="employeeName" 
                             value={employeeName} 
                             onChange={(e) => setEmployeeName(e.target.value)} 
-                            placeholder="Type to search existing employees or enter new name" 
+                            placeholder="Enter employee name for salary/advance" 
                             autoComplete="off" 
                             disabled={isSaving}
-                            onFocus={() => setShowSuggestions(true)}
-                            onBlur={() => setTimeout(() => setShowSuggestions(false), 200)}
                         />
-                        {isSearching && <Loader2 className="h-4 w-4 animate-spin" />}
                     </div>
-                    {showSuggestions && employeeSuggestions.length > 0 && (
-                        <Card className="absolute z-10 w-full mt-1 shadow-lg max-h-48 overflow-y-auto">
-                            <CardContent className="p-2">
-                                {employeeSuggestions.map((employee) => (
-                                    <div key={employee.id} onMouseDown={() => handleSelectEmployee(employee)} className="p-2 text-sm rounded-md hover:bg-accent cursor-pointer">
-                                        {employee.name}
-                                    </div>
-                                ))}
-                            </CardContent>
-                        </Card>
-                    )}
                 </div>
             ) : (
                 <div>

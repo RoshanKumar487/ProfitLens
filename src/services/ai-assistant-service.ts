@@ -1,26 +1,9 @@
 
 'use server';
 
-import { db } from '@/lib/firebaseConfig';
-import {
-  collection,
-  addDoc,
-  getDocs,
-  doc,
-  updateDoc,
-  deleteDoc,
-  query,
-  where,
-  orderBy,
-  Timestamp,
-  serverTimestamp,
-  getDoc,
-  writeBatch,
-  limit,
-} from 'firebase/firestore';
-import { v4 as uuidv4 } from 'uuid';
 import { analyzeExpenseOpportunities } from '@/ai/flows/analyze-expense-opportunities';
-
+import { connectToDatabase } from '@/lib/mongodb';
+import { ObjectId } from 'mongodb';
 
 // Interface Definitions
 interface Employee {
@@ -28,23 +11,6 @@ interface Employee {
   position: string;
   salary: number;
   description?: string;
-}
-
-interface InvoiceItem {
-  id: string;
-  description: string;
-  quantity: number;
-  unitPrice: number;
-}
-
-interface Invoice {
-  clientName: string;
-  clientEmail?: string;
-  clientAddress?: string;
-  issuedDate: Date;
-  dueDate: Date;
-  items: InvoiceItem[];
-  status: 'Paid' | 'Pending' | 'Overdue' | 'Draft';
 }
 
 interface Expense {
@@ -55,134 +21,103 @@ interface Expense {
     vendor?: string;
 }
 
-
-// Shared function to get user info - assuming a server context where auth is available
-// For simplicity in this service, we'll pass companyId directly.
-// The calling action is responsible for security.
-
 // == EMPLOYEE SERVICES ==
 export async function listEmployees(companyId: string): Promise<any[]> {
-  const q = query(collection(db, 'employees'), where('companyId', '==', companyId), orderBy('createdAt', 'desc'));
-  const snapshot = await getDocs(q);
-  return snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+    const { db } = await connectToDatabase();
+    const employees = await db.collection('employees').find({ companyId: new ObjectId(companyId) }).toArray();
+    return JSON.parse(JSON.stringify(employees)); // Serialize to handle ObjectId
 }
 
 export async function addEmployee(companyId: string, employeeData: Employee): Promise<string> {
-    const docRef = await addDoc(collection(db, 'employees'), {
+    const { db } = await connectToDatabase();
+    const result = await db.collection('employees').insertOne({
         ...employeeData,
-        name_lowercase: employeeData.name.toLowerCase(),
-        companyId,
-        addedById: 'ai_assistant', // Or get current user if available
-        addedBy: 'AI Assistant',
-        createdAt: serverTimestamp(),
-        updatedAt: serverTimestamp(),
+        companyId: new ObjectId(companyId),
+        createdAt: new Date(),
     });
-    return docRef.id;
+    return result.insertedId.toHexString();
 }
 
 export async function findEmployeeByName(companyId: string, name: string): Promise<any | null> {
-    const q = query(collection(db, 'employees'), where('companyId', '==', companyId), where('name', '==', name), limit(1));
-    const snapshot = await getDocs(q);
-    if (snapshot.empty) return null;
-    const doc = snapshot.docs[0];
-    return { id: doc.id, ...doc.data() };
+    const { db } = await connectToDatabase();
+    const employee = await db.collection('employees').findOne({
+        companyId: new ObjectId(companyId),
+        name: name,
+    });
+    return JSON.parse(JSON.stringify(employee)); // Serialize to handle ObjectId
 }
-
 
 // == INVOICE SERVICES ==
 export async function listInvoices(companyId: string): Promise<any[]> {
-  const q = query(collection(db, 'invoices'), where('companyId', '==', companyId), orderBy('issuedDate', 'desc'));
-  const snapshot = await getDocs(q);
-  return snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-}
-
-export async function createInvoice(companyId: string, invoiceData: Invoice): Promise<string> {
-    const subtotal = invoiceData.items.reduce((sum, item) => sum + (item.quantity * item.unitPrice), 0);
-    // Assuming 0 tax/discount for AI-created invoices for simplicity, can be expanded.
-    const total = subtotal;
-
-    const newInvoiceNumber = `INV-${Date.now().toString().slice(-6)}`;
-
-    const docRef = await addDoc(collection(db, 'invoices'), {
-        ...invoiceData,
-        companyId,
-        invoiceNumber: newInvoiceNumber,
-        issuedDate: Timestamp.fromDate(invoiceData.issuedDate),
-        dueDate: Timestamp.fromDate(invoiceData.dueDate),
-        subtotal,
-        discountType: 'fixed',
-        discountValue: 0,
-        discountAmount: 0,
-        taxRate: 0,
-        taxAmount: 0,
-        amount: total,
-        createdAt: serverTimestamp(),
-    });
-    return docRef.id;
+  const { db } = await connectToDatabase();
+  const invoices = await db.collection('invoices').find({ companyId: new ObjectId(companyId) }).toArray();
+  return JSON.parse(JSON.stringify(invoices));
 }
 
 export async function updateInvoiceStatus(companyId: string, invoiceNumber: string, status: 'Paid' | 'Pending' | 'Overdue' | 'Draft'): Promise<boolean> {
-    const q = query(collection(db, 'invoices'), where('companyId', '==', companyId), where('invoiceNumber', '==', invoiceNumber), limit(1));
-    const snapshot = await getDocs(q);
-    if (snapshot.empty) return false;
-    
-    const invoiceRef = snapshot.docs[0].ref;
-    await updateDoc(invoiceRef, { status });
-    return true;
+    const { db } = await connectToDatabase();
+    const result = await db.collection('invoices').updateOne(
+        { companyId: new ObjectId(companyId), invoiceNumber: invoiceNumber },
+        { $set: { status: status } }
+    );
+    return result.modifiedCount > 0;
 }
-
 
 // == EXPENSE SERVICES ==
 export async function listExpenses(companyId: string): Promise<any[]> {
-    const q = query(collection(db, 'expenses'), where('companyId', '==', companyId), orderBy('date', 'desc'));
-    const snapshot = await getDocs(q);
-    return snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+    const { db } = await connectToDatabase();
+    const expenses = await db.collection('expenses').find({ companyId: new ObjectId(companyId) }).toArray();
+    return JSON.parse(JSON.stringify(expenses));
 }
 
 export async function addExpense(companyId: string, expenseData: Expense): Promise<string> {
-    const docRef = await addDoc(collection(db, 'expenses'), {
+    const { db } = await connectToDatabase();
+    const result = await db.collection('expenses').insertOne({
         ...expenseData,
-        companyId,
-        date: Timestamp.fromDate(expenseData.date),
-        addedById: 'ai_assistant',
-        addedBy: 'AI Assistant',
-        createdAt: serverTimestamp(),
-        updatedAt: serverTimestamp(),
+        companyId: new ObjectId(companyId),
+        createdAt: new Date(),
     });
-    return docRef.id;
+    return result.insertedId.toHexString();
 }
 
 export async function deleteLastExpense(companyId: string): Promise<boolean> {
-    const q = query(collection(db, 'expenses'), where('companyId', '==', companyId), orderBy('createdAt', 'desc'), limit(1));
-    const snapshot = await getDocs(q);
-    if (snapshot.empty) return false;
-
-    await deleteDoc(snapshot.docs[0].ref);
-    return true;
+    const { db } = await connectToDatabase();
+    const lastExpense = await db.collection('expenses').find({ companyId: new ObjectId(companyId) }).sort({ createdAt: -1 }).limit(1).toArray();
+    if (lastExpense.length === 0) {
+        return false;
+    }
+    const result = await db.collection('expenses').deleteOne({ _id: lastExpense[0]._id });
+    return result.deletedCount > 0;
 }
 
 // == REPORTING & ANALYSIS SERVICES ==
 export async function generateFinancialSummary(companyId: string): Promise<any> {
-  const expensesQuery = query(collection(db, 'expenses'), where('companyId', '==', companyId));
-  const revenueQuery = query(collection(db, 'revenueEntries'), where('companyId', '==', companyId));
+    const { db } = await connectToDatabase();
+    const revenueCursor = await db.collection('revenue').find({ companyId: new ObjectId(companyId) });
+    const expensesCursor = await db.collection('expenses').find({ companyId: new ObjectId(companyId) });
 
-  const [expensesSnapshot, revenueSnapshot] = await Promise.all([
-    getDocs(expensesQuery),
-    getDocs(revenueQuery),
-  ]);
+    const totalRevenue = (await revenueCursor.toArray()).reduce((sum, doc) => sum + doc.amount, 0);
+    const totalExpenses = (await expensesCursor.toArray()).reduce((sum, doc) => sum + doc.amount, 0);
+  
+  try {
+    const analysis = await analyzeExpenseOpportunities({
+        revenue: totalRevenue,
+        expenses: totalExpenses,
+    });
 
-  const totalExpenses = expensesSnapshot.docs.reduce((sum, doc) => sum + doc.data().amount, 0);
-  const totalRevenue = revenueSnapshot.docs.reduce((sum, doc) => sum + doc.data().amount, 0);
-
-  const analysis = await analyzeExpenseOpportunities({
-      revenue: totalRevenue,
-      expenses: totalExpenses,
-  });
-
-  return {
+    return {
+        totalRevenue,
+        totalExpenses,
+        netProfit: totalRevenue - totalExpenses,
+        analysis,
+    };
+  } catch (error) {
+    console.error("[Service Error] Generating financial summary:", error);
+    return {
       totalRevenue,
       totalExpenses,
       netProfit: totalRevenue - totalExpenses,
-      analysis,
-  };
+      analysis: { summary: "AI analysis could not be generated.", opportunities: [], recommendations: [] }
+    };
+  }
 }

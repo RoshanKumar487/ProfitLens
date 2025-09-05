@@ -1,8 +1,9 @@
 
 'use server';
 
-import { db } from '@/lib/firebaseConfig';
-import { doc, getDoc, updateDoc, setDoc } from 'firebase/firestore';
+import { connectToDatabase } from '@/lib/mongodb';
+import { ObjectId } from 'mongodb';
+import { getSession } from '@/app/auth/actions';
 
 export interface CustomItemColumn {
   id: string;
@@ -11,9 +12,9 @@ export interface CustomItemColumn {
 
 export interface InvoiceSettings {
   customItemColumns: CustomItemColumn[];
-  defaultPaymentTermsDays?: number;
-  defaultHsnCode?: string;
-  defaultNotes?: string;
+  defaultPaymentTermsDays: number;
+  defaultHsnCode: string;
+  defaultNotes: string;
 }
 
 export interface CustomPayrollField {
@@ -24,124 +25,111 @@ export interface CustomPayrollField {
 
 export interface PayrollSettings {
   customFields: CustomPayrollField[];
-  pfPercentage?: number;
-  esiPercentage?: number;
+  pfPercentage: number;
+  esiPercentage: number;
 }
 
 export interface CustomProductField {
-    id: string;
-    label: string;
+  id: string;
+  label: string;
 }
 
 export interface ProductSettings {
     customFields: CustomProductField[];
 }
 
-
-export async function getInvoiceSettings(companyId: string): Promise<InvoiceSettings> {
-  if (!companyId) {
-    throw new Error('Company ID is required to get invoice settings.');
-  }
-
-  const companyDocRef = doc(db, 'companyProfiles', companyId);
-  const docSnap = await getDoc(companyDocRef);
-
-  if (docSnap.exists()) {
-    const data = docSnap.data();
-    // Return existing settings or default if not present
-    return data.invoiceSettings || { customItemColumns: [], defaultPaymentTermsDays: 30, defaultHsnCode: '', defaultNotes: '' };
-  } else {
-    // Return default settings for a company profile that might not have been saved yet
-    return { customItemColumns: [], defaultPaymentTermsDays: 30, defaultHsnCode: '', defaultNotes: '' };
-  }
+async function getCompanyId(): Promise<ObjectId | null> {
+    const session = await getSession();
+    if (!session?.companyId) return null;
+    return new ObjectId(session.companyId);
 }
 
-export async function saveInvoiceSettings(
-  companyId: string,
-  settings: InvoiceSettings
-): Promise<{ success: boolean; message: string }> {
-  if (!companyId) {
-    return { success: false, message: 'Company ID is required to save settings.' };
-  }
-
-  try {
-    const companyDocRef = doc(db, 'companyProfiles', companyId);
-    await setDoc(companyDocRef, { invoiceSettings: settings }, { merge: true });
-    return { success: true, message: 'Invoice settings saved successfully.' };
-  } catch (error: any) {
-    console.error('Error saving invoice settings:', error);
-    return { success: false, message: `Failed to save settings: ${error.message}` };
-  }
+// --- INVOICE SETTINGS ---
+export async function getInvoiceSettings(): Promise<InvoiceSettings> {
+    const companyId = await getCompanyId();
+    if (!companyId) return { customItemColumns: [], defaultPaymentTermsDays: 30, defaultHsnCode: '', defaultNotes: '' };
+    try {
+        const { db } = await connectToDatabase();
+        const settings = await db.collection('settings').findOne({ companyId, type: 'invoice' });
+        return settings?.data ?? { customItemColumns: [], defaultPaymentTermsDays: 30, defaultHsnCode: '', defaultNotes: '' };
+    } catch (error) {
+        console.error("Failed to get invoice settings:", error);
+        return { customItemColumns: [], defaultPaymentTermsDays: 30, defaultHsnCode: '', defaultNotes: '' };
+    }
 }
 
-export async function getPayrollSettings(companyId: string): Promise<PayrollSettings> {
-  if (!companyId) {
-    throw new Error('Company ID is required to get payroll settings.');
-  }
-  const companyDocRef = doc(db, 'companyProfiles', companyId);
-  const docSnap = await getDoc(companyDocRef);
-
-  if (docSnap.exists()) {
-    const settings = docSnap.data().payrollSettings || { customFields: [] };
-    // Add default type for backward compatibility
-    settings.customFields = settings.customFields.map((field: any) => ({
-      ...field,
-      type: field.type || 'number', // Default to 'number' if type is missing
-    }));
-    return settings;
-  } else {
-    return { customFields: [], pfPercentage: 0, esiPercentage: 0 };
-  }
+export async function saveInvoiceSettings(settings: InvoiceSettings) {
+    const companyId = await getCompanyId();
+    if (!companyId) return { success: false, message: 'User not authenticated.' };
+    try {
+        const { db } = await connectToDatabase();
+        await db.collection('settings').updateOne(
+            { companyId, type: 'invoice' },
+            { $set: { data: settings, updatedAt: new Date() } },
+            { upsert: true }
+        );
+        return { success: true, message: 'Invoice settings saved successfully.' };
+    } catch (error: any) {
+        return { success: false, message: `Failed to save settings: ${error.message}` };
+    }
 }
 
-export async function savePayrollSettings(
-  companyId: string,
-  settings: PayrollSettings
-): Promise<{ success: boolean; message: string }> {
-  if (!companyId) {
-    return { success: false, message: 'Company ID is required to save settings.' };
-  }
-
-  try {
-    const companyDocRef = doc(db, 'companyProfiles', companyId);
-    await setDoc(companyDocRef, { payrollSettings: settings }, { merge: true });
-    return { success: true, message: 'Payroll settings saved successfully.' };
-  } catch (error: any) {
-    console.error('Error saving payroll settings:', error);
-    return { success: false, message: `Failed to save settings: ${error.message}` };
-  }
+// --- PAYROLL SETTINGS ---
+export async function getPayrollSettings(): Promise<PayrollSettings> {
+    const companyId = await getCompanyId();
+    if (!companyId) return { customFields: [], pfPercentage: 12, esiPercentage: 0.75 };
+    try {
+        const { db } = await connectToDatabase();
+        const settings = await db.collection('settings').findOne({ companyId, type: 'payroll' });
+        return settings?.data ?? { customFields: [], pfPercentage: 12, esiPercentage: 0.75 };
+    } catch (error) {
+        console.error("Failed to get payroll settings:", error);
+        return { customFields: [], pfPercentage: 12, esiPercentage: 0.75 };
+    }
 }
 
-export async function getProductSettings(companyId: string): Promise<ProductSettings> {
-  if (!companyId) {
-    throw new Error('Company ID is required to get product settings.');
-  }
-
-  const companyDocRef = doc(db, 'companyProfiles', companyId);
-  const docSnap = await getDoc(companyDocRef);
-
-  if (docSnap.exists()) {
-    const data = docSnap.data();
-    return data.productSettings || { customFields: [] };
-  } else {
-    return { customFields: [] };
-  }
+export async function savePayrollSettings(settings: PayrollSettings) {
+    const companyId = await getCompanyId();
+    if (!companyId) return { success: false, message: 'User not authenticated.' };
+    try {
+        const { db } = await connectToDatabase();
+        await db.collection('settings').updateOne(
+            { companyId, type: 'payroll' },
+            { $set: { data: settings, updatedAt: new Date() } },
+            { upsert: true }
+        );
+        return { success: true, message: 'Payroll settings saved successfully.' };
+    } catch (error: any) {
+        return { success: false, message: `Failed to save settings: ${error.message}` };
+    }
 }
 
-export async function saveProductSettings(
-  companyId: string,
-  settings: ProductSettings
-): Promise<{ success: boolean; message: string }> {
-  if (!companyId) {
-    return { success: false, message: 'Company ID is required to save settings.' };
-  }
+// --- PRODUCT SETTINGS ---
+export async function getProductSettings(): Promise<ProductSettings> {
+    const companyId = await getCompanyId();
+    if (!companyId) return { customFields: [] };
+    try {
+        const { db } = await connectToDatabase();
+        const settings = await db.collection('settings').findOne({ companyId, type: 'product' });
+        return settings?.data ?? { customFields: [] };
+    } catch (error) {
+        console.error("Failed to get product settings:", error);
+        return { customFields: [] };
+    }
+}
 
-  try {
-    const companyDocRef = doc(db, 'companyProfiles', companyId);
-    await setDoc(companyDocRef, { productSettings: settings }, { merge: true });
-    return { success: true, message: 'Product settings saved successfully.' };
-  } catch (error: any) {
-    console.error('Error saving product settings:', error);
-    return { success: false, message: `Failed to save settings: ${error.message}` };
-  }
+export async function saveProductSettings(settings: ProductSettings) {
+    const companyId = await getCompanyId();
+    if (!companyId) return { success: false, message: 'User not authenticated.' };
+    try {
+        const { db } = await connectToDatabase();
+        await db.collection('settings').updateOne(
+            { companyId, type: 'product' },
+            { $set: { data: settings, updatedAt: new Date() } },
+            { upsert: true }
+        );
+        return { success: true, message: 'Product settings saved successfully.' };
+    } catch (error: any) {
+        return { success: false, message: `Failed to save settings: ${error.message}` };
+    }
 }

@@ -1,6 +1,5 @@
-
 import { config } from 'dotenv';
-config();
+config({ path: '.env' });
 
 import '@/ai/flows/analyze-expense-opportunities.ts';
 import '@/ai/flows/analyze-expense-report.ts';

@@ -1,37 +1,38 @@
+
 'use server';
 /**
- * @fileOverview An AI agent for analyzing receipts.
+ * @fileOverview An AI agent for analyzing and extracting data from receipt images.
+ * This file defines a Genkit flow that takes an image of a receipt and returns structured data.
  *
- * - analyzeReceipt - A function that handles the receipt analysis process.
- * - AnalyzeReceiptInput - The input type for the analyzeReceipt function.
- * - AnalyzeReceiptOutput - The return type for the analyzeReceipt function.
+ * @exports analyzeReceipt - The primary function to call this flow.
  */
 
 import {ai} from '@/ai/genkit';
-import {z} from 'genkit';
+import {
+  AnalyzeReceiptInputSchema,
+  AnalyzeReceiptOutputSchema,
+  type AnalyzeReceiptInput,
+  type AnalyzeReceiptOutput
+} from './analyze-receipt-types';
 
-const AnalyzeReceiptInputSchema = z.object({
-  receiptImage: z
-    .string()
-    .describe(
-      "A photo of a receipt, as a data URI that must include a MIME type and use Base64 encoding. Expected format: 'data:<mimetype>;base64,<encoded_data>'."
-    ),
-});
-export type AnalyzeReceiptInput = z.infer<typeof AnalyzeReceiptInputSchema>;
 
-const AnalyzeReceiptOutputSchema = z.object({
-  vendor: z.string().optional().describe('The name of the vendor or store.'),
-  amount: z.number().optional().describe('The total amount of the transaction.'),
-  date: z.string().optional().describe('The date of the transaction in YYYY-MM-DD format.'),
-  description: z.string().optional().describe('A brief summary of the items purchased.'),
-  category: z.string().optional().describe("A suggested expense category based on the items or vendor from this list: 'Software & Subscriptions', 'Marketing & Advertising', 'Office Supplies', 'Utilities', 'Rent & Lease', 'Salaries & Wages', 'Travel', 'Meals & Entertainment', 'Professional Services', 'Other'")
-});
-export type AnalyzeReceiptOutput = z.infer<typeof AnalyzeReceiptOutputSchema>;
-
+/**
+ * Analyzes an image of a receipt to extract structured transaction data.
+ * This is the main entry point for the flow.
+ *
+ * @param {AnalyzeReceiptInput} input - The input data containing the receipt image.
+ * @returns {Promise<AnalyzeReceiptOutput>} A promise that resolves to the extracted receipt data.
+ */
 export async function analyzeReceipt(input: AnalyzeReceiptInput): Promise<AnalyzeReceiptOutput> {
   return analyzeReceiptFlow(input);
 }
 
+
+/**
+ * Defines the prompt for the Genkit AI model.
+ * It takes the receipt image and instructs the AI to extract transaction details
+ * according to the provided output schema.
+ */
 const prompt = ai.definePrompt({
   name: 'analyzeReceiptPrompt',
   input: {schema: AnalyzeReceiptInputSchema},
@@ -41,14 +42,19 @@ const prompt = ai.definePrompt({
   Extract the following information:
   1.  **Vendor**: The name of the store or service provider.
   2.  **Amount**: The final total amount of the transaction. This should be a number.
-  3.  **Date**: The date the transaction occurred. Format it as YYYY-MM-DD. If the year is not present, assume the current year.
+  3.  **Date**: The date the transaction occurred. Format it as YYYY-MM-DD. If the year is not present, assume the current year. If the date is ambiguous, make a reasonable guess.
   4.  **Description**: A brief, one-line summary of what was purchased. If items are listed, summarize them.
-  5.  **Category**: Suggest a relevant expense category from this list: 'Software & Subscriptions', 'Marketing & Advertising', 'Office Supplies', 'Utilities', 'Rent & Lease', 'Salaries & Wages', 'Travel', 'Meals & Entertainment', 'Professional Services', 'Other'.
+  5.  **Category**: Suggest a relevant expense category from this list: 'Software & Subscriptions', 'Marketing & Advertising', 'Office Supplies', 'Utilities', 'Rent & Lease', 'Salary / Advance', 'Travel', 'Meals & Entertainment', 'Professional Services', 'Other'.
 
   Receipt Image: {{media url=receiptImage}}
   `,
 });
 
+
+/**
+ * Defines the main Genkit flow for analyzing a receipt.
+ * This flow takes the input, calls the AI with the defined prompt, and returns the structured output.
+ */
 const analyzeReceiptFlow = ai.defineFlow(
   {
     name: 'analyzeReceiptFlow',
@@ -57,6 +63,8 @@ const analyzeReceiptFlow = ai.defineFlow(
   },
   async input => {
     const {output} = await prompt(input);
-    return output!;
+    
+    // Ensure output is not null, providing a fallback if needed.
+    return output ?? {};
   }
 );

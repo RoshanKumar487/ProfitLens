@@ -2,28 +2,30 @@
 'use server';
 /**
  * @fileOverview The main Genkit flow for the AI Assistant.
+ * This file defines the server-side logic for the conversational AI assistant,
+ * which can access and manipulate application data using a set of tools.
+ *
+ * @exports askAssistant - The primary function to call this flow.
  */
+
 import { ai } from '@/ai/genkit';
 import { z } from 'zod';
 import { allTools } from '../tools';
 import { format } from 'date-fns';
+import { AskAssistantInputSchema, type AskAssistantInput, type AskAssistantOutput } from './ask-assistant-types';
 
-const AssistantInputSchema = z.object({
-    history: z.array(z.any()).describe("The chat history between the user and the assistant."),
-    companyId: z.string().describe("The ID of the user's company."),
-    currencySymbol: z.string().describe("The currency symbol for the user's company."),
-});
 
-export const askAssistantFlow = ai.defineFlow(
-    {
-        name: 'askAssistantFlow',
-        inputSchema: AssistantInputSchema,
-        outputSchema: z.string(),
-    },
-    async (input) => {
-        const today = format(new Date(), 'PPPP');
+/**
+ * Processes a user's request through the AI assistant.
+ * This is the main entry point for the flow.
+ *
+ * @param {AskAssistantInput} input - The input data containing the chat history and context.
+ * @returns {Promise<AskAssistantOutput>} A promise that resolves to the assistant's string response.
+ */
+export async function askAssistant(input: AskAssistantInput): Promise<AskAssistantOutput> {
+  const today = format(new Date(), 'PPPP');
 
-        const systemPrompt = `
+  const systemPrompt = `
 You are an AI Support Agent for the ProfitLens application. Your role is to act as a comprehensive support system for the user. You have a deep understanding of the application's database and functionality.
 
 Your primary goal is to provide customer support by answering questions, suggesting relevant actions (like creating, reading, updating, or deleting data), and even making minor fixes when requested.
@@ -42,33 +44,46 @@ Key Instructions:
 - Present lists of data, like employees or invoices, in a clear markdown table.
 `;
 
-        // We need to inject the companyId into the tool inputs.
-        // The LLM doesn't know about companyId, it's a security measure.
-        // We can augment the last user message to include it in a structured way
-        // that the tool input schema can parse.
-        const lastMessage = input.history.pop();
-        if (!lastMessage || lastMessage.role !== 'user') {
-            return "I'm sorry, I don't have a user message to respond to.";
-        }
-        
-        const augmentedPrompt = `
+  // We need to inject the companyId into the tool inputs.
+  // The LLM doesn't know about companyId, it's a security measure.
+  // We can augment the last user message to include it in a structured way
+  // that the tool input schema can parse.
+  const lastMessage = input.history.pop();
+  if (!lastMessage || lastMessage.role !== 'user') {
+      return "I'm sorry, I don't have a user message to respond to.";
+  }
+  
+  const augmentedPrompt = `
 User question: "${lastMessage.content}"
 
 Based on the user's question, call the appropriate tool. Your context for all tool calls is companyId: "${input.companyId}".
 `;
 
-        const llmResponse = await ai.generate({
-            model: 'googleai/gemini-2.0-flash',
-            tools: allTools,
-            prompt: augmentedPrompt,
-            system: systemPrompt,
-            history: input.history,
-            config: {
-                // Attach the companyId to every tool request's input
-                toolRequest: (input) => ({ ...input, companyId: input.companyId }),
-            },
-        });
+  const llmResponse = await ai.generate({
+      model: 'googleai/gemini-2.0-flash',
+      tools: allTools,
+      prompt: augmentedPrompt,
+      system: systemPrompt,
+      history: input.history,
+      config: {
+          // Attach the companyId to every tool request's input
+          toolRequest: (input) => ({ ...input, companyId: input.companyId }),
+      },
+  });
 
-        return llmResponse.text;
-    }
+  return llmResponse.text;
+}
+
+
+/**
+ * Defines the main Genkit flow for the AI Assistant.
+ * This is a wrapper around the core `askAssistant` logic to make it a defined flow.
+ */
+export const askAssistantFlow = ai.defineFlow(
+    {
+        name: 'askAssistantFlow',
+        inputSchema: AskAssistantInputSchema,
+        outputSchema: z.string(),
+    },
+    askAssistant
 );

@@ -2,40 +2,38 @@
 'use server';
 /**
  * @fileOverview An AI agent for analyzing documents containing employee lists.
+ * This file defines the server-side logic for an AI-powered flow that extracts structured
+ * employee data from a document image.
  *
- * - analyzeEmployeeDocument - A function that handles the document analysis process.
- * - AnalyzeEmployeeDocumentInput - The input type for the analyzeEmployeeDocument function.
- * - AnalyzeEmployeeDocumentOutput - The return type for the analyzeEmployeeDocument function.
+ * @exports analyzeEmployeeDocument - The primary function to call this flow.
  */
 
 import {ai} from '@/ai/genkit';
-import {z} from 'genkit';
+import {
+  AnalyzeEmployeeDocumentInputSchema,
+  AnalyzeEmployeeDocumentOutputSchema,
+  type AnalyzeEmployeeDocumentInput,
+  type AnalyzeEmployeeDocumentOutput
+} from './analyze-employee-document-types';
 
-const AnalyzeEmployeeDocumentInputSchema = z.object({
-  documentImage: z
-    .string()
-    .describe(
-      "A photo of a document, as a data URI that must include a MIME type and use Base64 encoding. Expected format: 'data:<mimetype>;base64,<encoded_data>'."
-    ),
-});
-export type AnalyzeEmployeeDocumentInput = z.infer<typeof AnalyzeEmployeeDocumentInputSchema>;
 
-const EmployeeSchema = z.object({
-    name: z.string().describe("The full name of the employee."),
-    position: z.string().describe("The job title or position of the employee."),
-    salary: z.number().describe("The salary of the employee, as a number, with any currency symbols or commas removed."),
-    description: z.string().optional().describe("Any additional notes or description for the employee."),
-});
-
-const AnalyzeEmployeeDocumentOutputSchema = z.object({
-    employees: z.array(EmployeeSchema).describe("An array of employees extracted from the document.")
-});
-export type AnalyzeEmployeeDocumentOutput = z.infer<typeof AnalyzeEmployeeDocumentOutputSchema>;
-
+/**
+ * Analyzes an image of a document to extract a list of employees and their details.
+ * This is the main entry point for the flow.
+ *
+ * @param {AnalyzeEmployeeDocumentInput} input - The input data containing the document image.
+ * @returns {Promise<AnalyzeEmployeeDocumentOutput>} A promise that resolves to the structured employee data.
+ */
 export async function analyzeEmployeeDocument(input: AnalyzeEmployeeDocumentInput): Promise<AnalyzeEmployeeDocumentOutput> {
   return analyzeEmployeeDocumentFlow(input);
 }
 
+
+/**
+ * Defines the prompt for the Genkit AI model.
+ * It takes the document image and instructs the AI to extract employee data
+ * according to the provided output schema.
+ */
 const prompt = ai.definePrompt({
   name: 'analyzeEmployeeDocumentPrompt',
   input: {schema: AnalyzeEmployeeDocumentInputSchema},
@@ -54,6 +52,11 @@ const prompt = ai.definePrompt({
   `,
 });
 
+
+/**
+ * Defines the main Genkit flow for analyzing the employee document.
+ * This flow takes the input, calls the AI with the defined prompt, and returns the structured output.
+ */
 const analyzeEmployeeDocumentFlow = ai.defineFlow(
   {
     name: 'analyzeEmployeeDocumentFlow',
@@ -62,6 +65,8 @@ const analyzeEmployeeDocumentFlow = ai.defineFlow(
   },
   async input => {
     const {output} = await prompt(input);
-    return output!;
+    
+    // Ensure output is not null, providing a fallback to an empty array if needed.
+    return output ?? { employees: [] };
   }
 );

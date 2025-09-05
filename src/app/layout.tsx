@@ -1,15 +1,14 @@
-
 import type { Metadata } from 'next';
 import './globals.css';
 import { Toaster } from '@/components/ui/toaster';
 import BackgroundAnimation from '@/components/BackgroundAnimation';
 import AppShell from '@/components/layout/AppShell';
-import { AuthProvider } from '@/contexts/AuthContext'; // Import AuthProvider
 import { ThemeProvider } from 'next-themes';
+import { AuthProvider } from '@/contexts/AuthContext';
 
 export const metadata: Metadata = {
   title: 'InvoPilot',
-  description: 'Your Invoicing and Business Pilot',
+  description: 'Your Business Financial Autopilot',
 };
 
 export default function RootLayout({
@@ -26,13 +25,13 @@ export default function RootLayout({
       </head>
       <body className="font-body antialiased">
         <ThemeProvider attribute="class" defaultTheme="system" enableSystem>
-            <AuthProvider>
+          <AuthProvider>
             <BackgroundAnimation />
             <AppShell>
                 {children}
             </AppShell>
             <Toaster />
-            </AuthProvider>
+          </AuthProvider>
         </ThemeProvider>
       </body>
     </html>

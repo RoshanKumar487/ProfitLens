@@ -31,6 +31,7 @@ interface InvoiceDisplay {
   issuedDate: Date;
   items?: InvoiceItem[];
   notes?: string;
+  isRcmApplicable?: boolean;
 }
 
 interface CompanyDetailsFirestore {
@@ -169,10 +170,17 @@ const InvoiceTemplateModern = React.forwardRef<HTMLDivElement, InvoiceTemplatePr
                       <span>- {currencySymbol}{invoiceToView.discountAmount.toFixed(2)}</span>
                   </div>
                 )}
-                <div className="grid grid-cols-2 py-1">
-                    <span className="font-semibold">Tax ({invoiceToView.taxRate}%):</span>
-                    <span>{currencySymbol}{invoiceToView.taxAmount.toFixed(2)}</span>
-                </div>
+                {invoiceToView.isRcmApplicable ? (
+                  <div className="grid grid-cols-2 py-1">
+                      <span className="font-semibold">Tax:</span>
+                      <span className="font-semibold">RCM Applicable</span>
+                  </div>
+                ) : (
+                  <div className="grid grid-cols-2 py-1">
+                      <span className="font-semibold">Tax ({invoiceToView.taxRate}%):</span>
+                      <span>{currencySymbol}{invoiceToView.taxAmount.toFixed(2)}</span>
+                  </div>
+                )}
                 <div className={cn("grid grid-cols-2 py-2 mt-2", isBlackAndWhite ? "border-t-2 border-black" : "bg-slate-800 text-white rounded-lg")}>
                     <span className="font-bold text-xl pl-4">Grand Total:</span>
                     <span className="font-bold text-xl pr-4">{currencySymbol}{invoiceToView.amount.toFixed(2)}</span>

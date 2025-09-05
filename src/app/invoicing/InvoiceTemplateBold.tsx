@@ -31,6 +31,7 @@ interface InvoiceDisplay {
   issuedDate: Date;
   items?: InvoiceItem[];
   notes?: string;
+  isRcmApplicable?: boolean;
 }
 
 interface CompanyDetailsFirestore {
@@ -140,26 +141,39 @@ const InvoiceTemplateBold = React.forwardRef<HTMLDivElement, InvoiceTemplateProp
         
         {/* Footer */}
         <footer className="mt-auto pt-8">
-            <div className="p-8 grid grid-cols-2 gap-8 items-end">
+             <div className="p-8 grid grid-cols-[1fr_auto] gap-8 items-end">
                 <div className="text-sm text-gray-600">
                     <h4 className="font-bold text-base text-gray-800 mb-2">Thank you!</h4>
                     <p>{invoiceToView.notes || 'We appreciate your business. Please contact us if you have any questions.'}</p>
                 </div>
-                <div className="text-right">
+                <div className="w-64">
                     <div className="grid grid-cols-2 py-1">
                         <span className="font-semibold text-gray-500">Subtotal:</span>
-                        <span>{currencySymbol}{invoiceToView.subtotal.toFixed(2)}</span>
+                        <span className="text-right">{currencySymbol}{invoiceToView.subtotal.toFixed(2)}</span>
                     </div>
                      {invoiceToView.discountAmount > 0 && (
                       <div className="grid grid-cols-2 py-1 text-red-600">
                           <span className="font-semibold">Discount:</span>
-                          <span>- {currencySymbol}{invoiceToView.discountAmount.toFixed(2)}</span>
+                          <span className="text-right">- {currencySymbol}{invoiceToView.discountAmount.toFixed(2)}</span>
                       </div>
                     )}
-                    <div className="grid grid-cols-2 py-1">
-                        <span className="font-semibold text-gray-500">Tax ({invoiceToView.taxRate}%):</span>
-                        <span>{currencySymbol}{invoiceToView.taxAmount.toFixed(2)}</span>
-                    </div>
+                    {invoiceToView.isRcmApplicable ? (
+                      <div className="grid grid-cols-2 py-1">
+                          <span className="font-semibold text-gray-500">RCM:</span>
+                          <span className="text-right">Applicable</span>
+                      </div>
+                    ) : (
+                      <div className="grid grid-cols-2 py-1">
+                          <span className="font-semibold text-gray-500">Tax ({invoiceToView.taxRate}%):</span>
+                          <span className="text-right">{currencySymbol}{invoiceToView.taxAmount.toFixed(2)}</span>
+                      </div>
+                    )}
+                </div>
+            </div>
+             <div className="px-8 pb-8 flex justify-end">
+                <div className="w-64 mt-16 text-center">
+                    <div className="border-b-2 border-black w-full"></div>
+                    <p className="text-sm font-semibold mt-2">Authorised Signature</p>
                 </div>
             </div>
             <div 
@@ -178,10 +192,10 @@ const InvoiceTemplateBold = React.forwardRef<HTMLDivElement, InvoiceTemplateProp
                 </div>
             </div>
         </footer>
-        <div className="h-16 w-full mt-4"></div>
       </div>
     );
   }
 );
 InvoiceTemplateBold.displayName = 'InvoiceTemplateBold';
 export default InvoiceTemplateBold;
+

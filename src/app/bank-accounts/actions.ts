@@ -1,163 +1,128 @@
 
 'use server';
 
-import { db } from '@/lib/firebaseConfig';
-import {
-  collection,
-  addDoc,
-  doc,
-  updateDoc,
-  deleteDoc,
-  serverTimestamp,
-  writeBatch,
-  query,
-  where,
-  getDocs,
-  getDoc,
-  collectionGroup,
-} from 'firebase/firestore';
+import { connectToDatabase } from '@/lib/mongodb';
+import { ObjectId } from 'mongodb';
+import { revalidatePath } from 'next/cache';
+import { getSession } from '@/app/auth/actions';
 
-export interface BankAccountData {
-  id?: string;
-  accountHolderName: string;
-  bankName: string;
-  accountNumberLast4: string;
-  accountType: 'checking' | 'savings' | 'credit' | 'other';
-  balance: number;
-  companyId: string;
+export interface BankAccount {
+    bankName: string;
+    accountNumberLast4: string;
+    accountType: 'checking' | 'savings' | 'credit';
+    balance: number;
 }
 
-export interface TransactionData {
-  id?: string;
-  accountId: string;
-  companyId: string;
-  date: Date;
-  description: string;
-  category: string;
-  amount: number;
-  type: 'deposit' | 'withdrawal';
+export interface BankAccountDisplay extends BankAccount {
+    id: string;
 }
 
-// Bank Account Actions
-export async function addBankAccount(accountData: Omit<BankAccountData, 'id' | 'companyId'>, companyId: string): Promise<{ success: boolean; message: string; id?: string }> {
-  if (!companyId) return { success: false, message: 'User is not associated with a company.' };
-  try {
-    const docRef = await addDoc(collection(db, 'bankAccounts'), {
-      ...accountData,
-      companyId,
-      createdAt: serverTimestamp(),
-      updatedAt: serverTimestamp(),
-    });
-    return { success: true, message: 'Bank account added successfully.', id: docRef.id };
-  } catch (error: any) {
-    console.error("Error adding bank account:", error);
-    return { success: false, message: `Failed to add bank account: ${error.message}` };
-  }
+export interface Transaction {
+    accountId: string;
+    date: Date;
+    description: string;
+    category: string;
+    amount: number;
+    type: 'deposit' | 'withdrawal';
 }
 
-export async function updateBankAccount(id: string, updates: Partial<BankAccountData>): Promise<{ success: boolean; message: string }> {
-  try {
-    const accountRef = doc(db, 'bankAccounts', id);
-    await updateDoc(accountRef, { ...updates, updatedAt: serverTimestamp() });
-    return { success: true, message: 'Bank account updated successfully.' };
-  } catch (error: any) {
-    console.error("Error updating bank account:", error);
-    return { success: false, message: `Failed to update bank account: ${error.message}` };
-  }
+export interface TransactionDisplay extends Transaction {
+    id: string;
 }
 
-export async function deleteBankAccount(id: string): Promise<{ success: boolean; message: string }> {
-  try {
-    const batch = writeBatch(db);
-    
-    // Delete the account document
-    const accountRef = doc(db, 'bankAccounts', id);
-    batch.delete(accountRef);
-
-    // Delete all associated transactions using a collection group query for efficiency
-    const transactionsQuery = query(collectionGroup(db, 'transactions'), where('accountId', '==', id));
-    const transactionsSnapshot = await getDocs(transactionsQuery);
-    transactionsSnapshot.forEach(doc => {
-      batch.delete(doc.ref);
-    });
-
-    await batch.commit();
-
-    return { success: true, message: 'Bank account and all its transactions deleted successfully.' };
-  } catch (error: any) {
-    console.error("Error deleting bank account:", error);
-    return { success: false, message: `Failed to delete bank account: ${error.message}` };
-  }
+async function getCompanyId(): Promise<ObjectId | null> {
+    const session = await getSession();
+    if (!session?.companyId) return null;
+    return new ObjectId(session.companyId);
 }
 
-// Transaction Actions
-export async function addTransaction(transactionData: Omit<TransactionData, 'id' | 'companyId'>, companyId: string): Promise<{ success: boolean; message: string, id?: string }> {
-  try {
-    const { accountId, amount, type } = transactionData;
-    const batch = writeBatch(db);
-    const accountRef = doc(db, 'bankAccounts', accountId);
+export async function getBankAccounts(): Promise<BankAccountDisplay[]> {
+    const companyId = await getCompanyId();
+    if (!companyId) return [];
 
-    // 1. Get current balance
-    const accountSnap = await getDoc(accountRef);
-    if (!accountSnap.exists()) {
-      throw new Error("Bank account not found.");
+    try {
+        const { db } = await connectToDatabase();
+        const accounts = await db.collection('bank_accounts').find({ companyId }).toArray();
+        return accounts.map(doc => {
+            const { _id, companyId, ...rest } = doc;
+            return { id: _id.toHexString(), ...rest } as unknown as BankAccountDisplay;
+        });
+    } catch (error) {
+        console.error("Failed to get bank accounts:", error);
+        return [];
     }
-    const currentBalance = accountSnap.data().balance || 0;
-    
-    // 2. Calculate new balance
-    const newBalance = type === 'deposit' ? currentBalance + amount : currentBalance - amount;
-
-    // 3. Add transaction document to the subcollection
-    const transactionRef = doc(collection(db, 'bankAccounts', accountId, 'transactions'));
-    batch.set(transactionRef, { 
-      ...transactionData, 
-      companyId,
-      createdAt: serverTimestamp()
-    });
-
-    // 4. Update bank account balance
-    batch.update(accountRef, { balance: newBalance, updatedAt: serverTimestamp() });
-
-    await batch.commit();
-    return { success: true, message: 'Transaction added successfully.', id: transactionRef.id };
-
-  } catch (error: any) {
-    console.error("Error adding transaction:", error);
-    return { success: false, message: `Failed to add transaction: ${error.message}` };
-  }
 }
 
-export async function deleteTransaction(accountId: string, transactionId: string): Promise<{ success: boolean; message: string }> {
-  try {
-    const batch = writeBatch(db);
-    const accountRef = doc(db, 'bankAccounts', accountId);
-    const transactionRef = doc(db, 'bankAccounts', accountId, 'transactions', transactionId);
+export async function addBankAccount(account: BankAccount) {
+    const companyId = await getCompanyId();
+    if (!companyId) return { success: false, message: "User not authenticated." };
 
-    // 1. Get transaction and account data
-    const [accountSnap, transactionSnap] = await Promise.all([getDoc(accountRef), getDoc(transactionRef)]);
-    
-    if (!accountSnap.exists() || !transactionSnap.exists()) {
-      throw new Error("Account or transaction not found.");
+    try {
+        const { db } = await connectToDatabase();
+        await db.collection('bank_accounts').insertOne({ ...account, companyId });
+        revalidatePath('/bank-accounts');
+        return { success: true, message: "Bank account added successfully." };
+    } catch (error: any) {
+        return { success: false, message: `Failed to add account: ${error.message}` };
     }
-    const accountData = accountSnap.data();
-    const transactionData = transactionSnap.data() as TransactionData;
+}
 
-    // 2. Revert the balance
-    const currentBalance = accountData.balance;
-    const newBalance = transactionData.type === 'deposit' 
-      ? currentBalance - transactionData.amount 
-      : currentBalance + transactionData.amount;
+export async function getTransactionsForAccount(accountId: string): Promise<TransactionDisplay[]> {
+    const companyId = await getCompanyId();
+    if (!companyId || !ObjectId.isValid(accountId)) return [];
 
-    // 3. Delete transaction
-    batch.delete(transactionRef);
+    try {
+        const { db } = await connectToDatabase();
+        const transactions = await db.collection('transactions')
+            .find({ companyId, accountId: new ObjectId(accountId) })
+            .sort({ date: -1 })
+            .limit(100)
+            .toArray();
+            
+        return transactions.map(doc => {
+             const { _id, companyId, ...rest } = doc;
+             return { 
+                 id: _id.toHexString(),
+                 ...rest,
+                 accountId: doc.accountId.toHexString(),
+             } as unknown as TransactionDisplay;
+        });
+    } catch (error) {
+        console.error(`Failed to get transactions for account ${accountId}:`, error);
+        return [];
+    }
+}
 
-    // 4. Update balance
-    batch.update(accountRef, { balance: newBalance, updatedAt: serverTimestamp() });
-    
-    await batch.commit();
-    return { success: true, message: 'Transaction deleted successfully.' };
-  } catch (error: any) {
-    console.error("Error deleting transaction:", error);
-    return { success: false, message: `Failed to delete transaction: ${error.message}` };
-  }
+export async function addTransaction(transaction: Transaction) {
+    const companyId = await getCompanyId();
+    if (!companyId || !ObjectId.isValid(transaction.accountId)) return { success: false, message: "Invalid data provided." };
+
+    try {
+        const { db } = await connectToDatabase();
+        const { accountId, ...transData } = transaction;
+
+        const session = db.client.startSession();
+        let result;
+        await session.withTransaction(async () => {
+            result = await db.collection('transactions').insertOne({ 
+                ...transData,
+                accountId: new ObjectId(accountId),
+                companyId 
+            }, { session });
+
+            const updateAmount = transaction.type === 'deposit' ? transaction.amount : -transaction.amount;
+            await db.collection('bank_accounts').updateOne(
+                { _id: new ObjectId(accountId), companyId },
+                { $inc: { balance: updateAmount } },
+                { session }
+            );
+        });
+        await session.endSession();
+
+        revalidatePath('/bank-accounts');
+        revalidatePath('/dashboard'); // For pie chart
+        return { success: true, message: "Transaction recorded successfully." };
+    } catch (error: any) {
+        return { success: false, message: `Failed to add transaction: ${error.message}` };
+    }
 }

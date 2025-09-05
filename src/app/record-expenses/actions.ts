@@ -1,156 +1,84 @@
 
 'use server';
 
-import { db } from '@/lib/firebaseConfig';
-import { collection, doc, updateDoc, deleteDoc, Timestamp, serverTimestamp, writeBatch, query, where, getDocs, limit, orderBy } from 'firebase/firestore';
-import { getAuth } from 'firebase-admin/auth';
-import { app as adminApp } from '@/lib/firebaseAdminConfig';
-import { headers } from 'next/headers';
+import { connectToDatabase } from '@/lib/mongodb';
+import { ObjectId } from 'mongodb';
+import { revalidatePath } from 'next/cache';
+import { getSession } from '@/app/auth/actions';
 
-
-export interface ExpenseUpdateData {
-  date: Date;
-  amount: number;
-  category: string;
-  description: string;
-  vendor: string;
-  employeeId?: string;
-  employeeName?: string;
+export interface Expense {
+    date: Date;
+    amount: number;
+    category: string;
+    vendor?: string;
+    description?: string;
+    employeeName?: string;
 }
 
-export interface ExpenseImportData {
-  date: Date;
-  amount: number;
-  category: string;
-  description?: string;
-  vendor?: string;
-  employeeId?: string;
-  employeeName?: string;
+export interface ExpenseDisplay extends Expense {
+  id: string;
 }
 
-// Helper to get company ID from the user's session token
-async function getCompanyIdForCurrentUser(): Promise<string | null> {
-  const idToken = headers().get('x-firebase-id-token');
-  if (!idToken) return null;
-  
-  try {
-    const decodedToken = await getAuth(adminApp).verifyIdToken(idToken);
-    const userDocSnap = await getDoc(doc(db, 'users', decodedToken.uid));
-    return userDocSnap.exists() ? userDocSnap.data().companyId : null;
-  } catch (error) {
-    console.error("Error getting current user's company ID:", error);
-    return null;
-  }
+async function getCompanyId(): Promise<ObjectId | null> {
+    const session = await getSession();
+    if (!session?.companyId) {
+        // Fallback for mock environment
+        return new ObjectId("66a4f91e3e7649f49d21a221");
+    }
+    return new ObjectId(session.companyId);
 }
 
-export async function searchEmployees(searchTerm: string): Promise<{ id: string; name: string }[]> {
-  const companyId = await getCompanyIdForCurrentUser();
-  if (!companyId) {
-    console.error("Action Error: Could not verify company ID for employee search.");
-    return [];
-  }
+export async function addExpenseEntry(expenseData: Expense) {
+    const companyId = await getCompanyId();
+    if (!companyId) {
+        return { success: false, message: 'User not associated with a company.' };
+    }
 
-  const lowerCaseSearchTerm = searchTerm.toLowerCase();
-  try {
-    const employeesRef = collection(db, 'employees');
-    const q = query(
-      employeesRef,
-      where('companyId', '==', companyId),
-      where('name_lowercase', '>=', lowerCaseSearchTerm),
-      where('name_lowercase', '<=', lowerCaseSearchTerm + '\uf8ff'),
-      orderBy('name_lowercase'),
-      limit(10)
-    );
-
-    const querySnapshot = await getDocs(q);
-    const employees = querySnapshot.docs.map(doc => ({
-      id: doc.id,
-      name: doc.data().name,
-    }));
-
-    return employees;
-  } catch (error: any) {
-    console.error('Error searching employees in server action:', error);
-    return [];
-  }
-}
-
-
-export async function bulkAddExpenses(
-  expenses: ExpenseImportData[],
-  companyId: string,
-  addedById: string,
-  addedBy: string
-): Promise<{ success: boolean; message: string; count: number }> {
-  if (!companyId || !addedById) {
-    return { success: false, message: 'User or company information is missing.', count: 0 };
-  }
-  if (!expenses || expenses.length === 0) {
-    return { success: false, message: 'No expense data provided.', count: 0 };
-  }
-
-  const batch = writeBatch(db);
-  let processedCount = 0;
-
-  try {
-    expenses.forEach(expense => {
-      // Basic validation for each expense record
-      if (expense.date && expense.category && typeof expense.amount === 'number' && expense.amount > 0) {
-        const newExpenseRef = doc(collection(db, 'expenses'));
-        batch.set(newExpenseRef, {
-          ...expense,
-          date: Timestamp.fromDate(expense.date), // Convert JS Date to Firestore Timestamp
-          companyId,
-          addedById,
-          addedBy,
-          createdAt: serverTimestamp(),
-          updatedAt: serverTimestamp(),
+    try {
+        const { db } = await connectToDatabase();
+        await db.collection('expenses').insertOne({
+            ...expenseData,
+            companyId,
+            createdAt: new Date(),
         });
-        processedCount++;
-      }
-    });
-    
-    if (processedCount === 0) {
-        return { success: false, message: "No valid expense records found to import.", count: 0 };
+        revalidatePath('/record-expenses');
+        return { success: true, message: 'Expense recorded successfully.' };
+    } catch (error: any) {
+        console.error('Failed to add expense:', error);
+        return { success: false, message: `Failed to record expense: ${error.message}` };
     }
-
-    await batch.commit();
-    return { success: true, message: `Successfully imported ${processedCount} expenses.`, count: processedCount };
-  } catch (error: any) {
-    console.error("Error bulk adding expenses:", error);
-    return { success: false, message: `Failed to import expenses: ${error.message}`, count: 0 };
-  }
 }
 
-export async function updateExpenseEntry(id: string, updates: ExpenseUpdateData): Promise<{ success: boolean; message: string }> {
-  try {
-    const expenseRef = doc(db, 'expenses', id);
-    const payload = { 
-      ...updates,
-      date: Timestamp.fromDate(updates.date),
-      updatedAt: serverTimestamp() 
-    };
-
-    if (!payload.employeeId) {
-        (payload as any).employeeId = null;
-        (payload as any).employeeName = null;
+export async function getRecentExpenses(): Promise<ExpenseDisplay[]> {
+    const companyId = await getCompanyId();
+    if (!companyId) {
+        return [];
     }
 
-    await updateDoc(expenseRef, payload);
-    return { success: true, message: 'Expense updated successfully.' };
-  } catch (error: any) {
-    console.error("Error updating expense:", error);
-    return { success: false, message: `Failed to update expense: ${error.message}` };
-  }
-}
+    try {
+        const { db } = await connectToDatabase();
+        const expenses = await db.collection('expenses')
+            .find({ companyId })
+            .sort({ date: -1 })
+            .limit(50)
+            .toArray();
 
-export async function deleteExpenseEntry(id: string): Promise<{ success: boolean; message: string }> {
-  try {
-    await deleteDoc(doc(db, 'expenses', id));
-    return { success: true, message: 'Expense deleted successfully.' };
-  } catch (error: any)
-  {
-    console.error("Error deleting expense:", error);
-    return { success: false, message: `Failed to delete expense: ${error.message}` };
-  }
+        // Convert complex MongoDB types (like ObjectId) to simple, serializable types (like string).
+        return expenses.map(doc => {
+            const { _id, companyId, ...rest } = doc;
+            return {
+                id: _id.toHexString(),
+                // Only include the fields defined in the Expense interface, plus the id
+                date: new Date(doc.date),
+                amount: doc.amount,
+                category: doc.category,
+                vendor: doc.vendor,
+                description: doc.description,
+                employeeName: doc.employeeName,
+            };
+        }) as unknown as ExpenseDisplay[];
+    } catch (error) {
+        console.error('Failed to get expenses:', error);
+        return [];
+    }
 }

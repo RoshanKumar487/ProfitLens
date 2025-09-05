@@ -4,19 +4,11 @@
 import * as React from "react"
 import Link from "next/link"
 import { Pie, PieChart, ResponsiveContainer, Cell, Tooltip } from "recharts"
-import { useAuth } from "@/contexts/AuthContext"
-import { db } from "@/lib/firebaseConfig"
-import { collectionGroup, query, where, getDocs, onSnapshot } from "firebase/firestore"
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Skeleton } from "@/components/ui/skeleton"
 import { Alert, AlertTitle } from "@/components/ui/alert"
 import { Info, ArrowRight } from "lucide-react"
-
-interface Transaction {
-  category: string;
-  amount: number;
-}
 
 const COLORS = [
   "hsl(var(--chart-1))",
@@ -32,54 +24,27 @@ const COLORS = [
 ];
 
 export default function TransactionPieChart() {
-  const { user, currencySymbol } = useAuth();
+  const currencySymbol = '$'; // Mock currency symbol
   const [data, setData] = React.useState<any[]>([]);
   const [totalExpenses, setTotalExpenses] = React.useState(0);
   const [isLoading, setIsLoading] = React.useState(true);
 
   React.useEffect(() => {
-    if (!user || !user.companyId) {
-      setIsLoading(false);
-      return;
-    }
+    // Removed all Firebase data fetching logic to prevent errors
+    // after backend disconnection.
+    setIsLoading(false);
 
-    setIsLoading(true);
-    const q = query(
-      collectionGroup(db, 'transactions'),
-      where('companyId', '==', user.companyId),
-      where('type', '==', 'withdrawal')
-    );
-    
-    const unsubscribe = onSnapshot(q, (snapshot) => {
-        const transactions: Transaction[] = [];
-        snapshot.forEach(doc => {
-            transactions.push(doc.data() as Transaction);
-        });
-
-        const categoryTotals = transactions.reduce((acc, tx) => {
-            if (!acc[tx.category]) {
-                acc[tx.category] = 0;
-            }
-            acc[tx.category] += tx.amount;
-            return acc;
-        }, {} as { [key: string]: number });
-
-        const chartData = Object.entries(categoryTotals)
-            .map(([name, value]) => ({ name, value }))
-            .sort((a, b) => b.value - a.value);
-
-        setData(chartData);
-
-        const total = chartData.reduce((sum, item) => sum + item.value, 0);
-        setTotalExpenses(total);
-        setIsLoading(false);
-    }, (error) => {
-        console.error("Error fetching transaction data for chart:", error);
-        setIsLoading(false);
-    });
-
-    return () => unsubscribe();
-  }, [user]);
+    // Set mock data for the chart
+    const mockData = [
+        { name: 'Office Supplies', value: 450 },
+        { name: 'Software', value: 800 },
+        { name: 'Utilities', value: 600 },
+        { name: 'Marketing', value: 1200 },
+        { name: 'Travel', value: 300 },
+    ];
+    setData(mockData);
+    setTotalExpenses(mockData.reduce((sum, item) => sum + item.value, 0));
+  }, []);
 
   const CustomTooltip = ({ active, payload }: any) => {
     if (active && payload && payload.length) {
