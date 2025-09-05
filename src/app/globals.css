@@ -42,6 +42,19 @@ body {
 
     --radius: 0.75rem;
 
+    /* Chart Colors */
+    --chart-1: 220 80% 60%;
+    --chart-2: 160 70% 50%;
+    --chart-3: 40 80% 60%;
+    --chart-4: 0 80% 65%;
+    --chart-5: 320 75% 55%;
+    --chart-6: 280 70% 60%;
+    --chart-7: 200 85% 55%;
+    --chart-8: 60 80% 50%;
+    --chart-9: 100 70% 55%;
+    --chart-10: 10 75% 60%;
+    
+
     /* Glassmorphism Sidebar */
     --sidebar-background: 220 13% 97% / 0.5;
     --sidebar-foreground: 220 9% 30%;
@@ -100,6 +113,18 @@ body {
     --danger-card: 0 80% 10%;
 
     --radius: 0.75rem;
+
+    /* Chart Colors */
+    --chart-1: 220 70% 60%;
+    --chart-2: 160 60% 50%;
+    --chart-3: 40 70% 60%;
+    --chart-4: 0 70% 60%;
+    --chart-5: 320 65% 55%;
+    --chart-6: 280 60% 60%;
+    --chart-7: 200 75% 55%;
+    --chart-8: 60 70% 50%;
+    --chart-9: 100 60% 55%;
+    --chart-10: 10 65% 60%;
 
     /* Glassmorphism Sidebar */
     --sidebar-background: 220 13% 13% / 0.5;
