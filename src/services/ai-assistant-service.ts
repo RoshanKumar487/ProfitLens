@@ -2,25 +2,8 @@
 'use server';
 
 import { analyzeExpenseOpportunities } from '@/ai/flows/analyze-expense-opportunities';
-
-// MOCK DATABASE - Replace with your actual database client
-const db = {
-  collection: (name: string) => ({
-    where: (field: string, op: string, value: any) => ({
-      get: async () => ({ docs: [], empty: true }),
-      limit: (n: number) => ({
-        get: async () => ({ docs: [], empty: true }),
-      }),
-       orderBy: (field: string, dir: string) => ({
-        limit: (n: number) => ({
-          get: async () => ({ docs: [], empty: true }),
-        }),
-      }),
-    }),
-    add: async (data: any) => ({ id: 'new-mock-id' }),
-  }),
-};
-
+import { connectToDatabase } from '@/lib/mongodb';
+import { ObjectId } from 'mongodb';
 
 // Interface Definitions
 interface Employee {
@@ -38,97 +21,83 @@ interface Expense {
     vendor?: string;
 }
 
-// Helper function to get docs from a snapshot
-const getDocsFromSnapshot = (snapshot: { docs: any[] }) => {
-    return snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-};
-
 // == EMPLOYEE SERVICES ==
 export async function listEmployees(companyId: string): Promise<any[]> {
-    const snapshot = await db.collection('employees').where('companyId', '==', companyId).get();
-    return getDocsFromSnapshot(snapshot);
+    const { db } = await connectToDatabase();
+    const employees = await db.collection('employees').find({ companyId: new ObjectId(companyId) }).toArray();
+    return JSON.parse(JSON.stringify(employees)); // Serialize to handle ObjectId
 }
 
 export async function addEmployee(companyId: string, employeeData: Employee): Promise<string> {
-    const employeeRef = await db.collection('employees').add({
+    const { db } = await connectToDatabase();
+    const result = await db.collection('employees').insertOne({
         ...employeeData,
-        companyId,
+        companyId: new ObjectId(companyId),
         createdAt: new Date(),
     });
-    return employeeRef.id;
+    return result.insertedId.toHexString();
 }
 
 export async function findEmployeeByName(companyId: string, name: string): Promise<any | null> {
-    const snapshot = await db.collection('employees')
-        .where('companyId', '==', companyId)
-        .where('name', '==', name)
-        .limit(1)
-        .get();
-
-    if (snapshot.empty) {
-        return null;
-    }
-    const doc = snapshot.docs[0];
-    return { id: doc.id, ...doc.data() };
+    const { db } = await connectToDatabase();
+    const employee = await db.collection('employees').findOne({
+        companyId: new ObjectId(companyId),
+        name: name,
+    });
+    return JSON.parse(JSON.stringify(employee)); // Serialize to handle ObjectId
 }
 
 // == INVOICE SERVICES ==
 export async function listInvoices(companyId: string): Promise<any[]> {
-  const snapshot = await db.collection('invoices').where('companyId', '==', companyId).get();
-  return getDocsFromSnapshot(snapshot);
+  const { db } = await connectToDatabase();
+  const invoices = await db.collection('invoices').find({ companyId: new ObjectId(companyId) }).toArray();
+  return JSON.parse(JSON.stringify(invoices));
 }
 
 export async function updateInvoiceStatus(companyId: string, invoiceNumber: string, status: 'Paid' | 'Pending' | 'Overdue' | 'Draft'): Promise<boolean> {
-    const snapshot = await db.collection('invoices')
-        .where('companyId', '==', companyId)
-        .where('invoiceNumber', '==', invoiceNumber)
-        .limit(1)
-        .get();
-        
-    if (snapshot.empty) return false;
-    
-    // In a real app, you would call update on the doc ref.
-    // await snapshot.docs[0].ref.update({ status });
-    console.log(`Mock: Updated invoice ${invoiceNumber} to ${status}`);
-    return true;
+    const { db } = await connectToDatabase();
+    const result = await db.collection('invoices').updateOne(
+        { companyId: new ObjectId(companyId), invoiceNumber: invoiceNumber },
+        { $set: { status: status } }
+    );
+    return result.modifiedCount > 0;
 }
 
 // == EXPENSE SERVICES ==
 export async function listExpenses(companyId: string): Promise<any[]> {
-    const snapshot = await db.collection('expenses').where('companyId', '==', companyId).get();
-    return getDocsFromSnapshot(snapshot);
+    const { db } = await connectToDatabase();
+    const expenses = await db.collection('expenses').find({ companyId: new ObjectId(companyId) }).toArray();
+    return JSON.parse(JSON.stringify(expenses));
 }
 
 export async function addExpense(companyId: string, expenseData: Expense): Promise<string> {
-    const expenseRef = await db.collection('expenses').add({
+    const { db } = await connectToDatabase();
+    const result = await db.collection('expenses').insertOne({
         ...expenseData,
-        companyId,
+        companyId: new ObjectId(companyId),
         createdAt: new Date(),
     });
-    return expenseRef.id;
+    return result.insertedId.toHexString();
 }
 
 export async function deleteLastExpense(companyId: string): Promise<boolean> {
-    const snapshot = await db.collection('expenses')
-        .where('companyId', '==', companyId)
-        .orderBy('createdAt', 'desc')
-        .limit(1)
-        .get();
-
-    if (snapshot.empty) return false;
-    
-    // In a real app: await snapshot.docs[0].ref.delete();
-    console.log('Mock: Deleted last expense');
-    return true;
+    const { db } = await connectToDatabase();
+    const lastExpense = await db.collection('expenses').find({ companyId: new ObjectId(companyId) }).sort({ createdAt: -1 }).limit(1).toArray();
+    if (lastExpense.length === 0) {
+        return false;
+    }
+    const result = await db.collection('expenses').deleteOne({ _id: lastExpense[0]._id });
+    return result.deletedCount > 0;
 }
 
 // == REPORTING & ANALYSIS SERVICES ==
 export async function generateFinancialSummary(companyId: string): Promise<any> {
-    const revenueSnapshot = await db.collection('revenue').where('companyId', '==', companyId).get();
-    const expensesSnapshot = await db.collection('expenses').where('companyId', '==', companyId).get();
+    const { db } = await connectToDatabase();
+    const revenueCursor = await db.collection('revenue').find({ companyId: new ObjectId(companyId) });
+    const expensesCursor = await db.collection('expenses').find({ companyId: new ObjectId(companyId) });
 
-    const totalRevenue = revenueSnapshot.docs.reduce((sum, doc) => sum + doc.data().amount, 0);
-    const totalExpenses = expensesSnapshot.docs.reduce((sum, doc) => sum + doc.data().amount, 0);
+    const totalRevenue = (await revenueCursor.toArray()).reduce((sum, doc) => sum + doc.amount, 0);
+    const totalExpenses = (await expensesCursor.toArray()).reduce((sum, doc) => sum + doc.amount, 0);
   
   try {
     const analysis = await analyzeExpenseOpportunities({
