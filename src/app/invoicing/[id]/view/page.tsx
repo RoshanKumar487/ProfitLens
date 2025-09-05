@@ -4,7 +4,7 @@
 import React, { useState, useRef, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/button';
-import { Receipt, Mail, Printer, ArrowLeft, Loader2, Edit, Download, PenSquare } from 'lucide-react';
+import { Receipt, Mail, Printer, ArrowLeft, Loader2, Edit, Download, PenSquare, ZoomIn, ZoomOut } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/contexts/AuthContext';
 import InvoiceTemplateIndian from '../../InvoiceTemplateIndian';
@@ -22,6 +22,7 @@ import { Switch } from '@/components/ui/switch';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import SignaturePad from '@/components/SignaturePad';
 import { MOCK_FULL_INVOICE, MOCK_COMPANY_PROFILE, MOCK_INVOICE_SETTINGS, type FullInvoiceDisplay, type CompanyDetailsFirestore } from '@/lib/mock-data';
+import { Slider } from '@/components/ui/slider';
 
 
 export default function ViewInvoicePage() {
@@ -40,6 +41,7 @@ export default function ViewInvoicePage() {
     const [isBlackAndWhite, setIsBlackAndWhite] = useState(false);
     const [isSignatureDialogOpen, setIsSignatureDialogOpen] = useState(false);
     const printRef = useRef<HTMLDivElement>(null);
+    const [zoom, setZoom] = useState(1);
 
 
     const handleDisabledAction = () => {
@@ -86,8 +88,8 @@ export default function ViewInvoicePage() {
     }
 
     return (
-      <div className="w-full">
-        <header className="w-full bg-background/80 border-b shadow-sm sticky top-14 sm:top-16 z-10 p-2 print:hidden backdrop-blur-sm">
+      <div className="w-full flex flex-col h-full overflow-hidden">
+        <header className="w-full bg-background/80 border-b shadow-sm sticky top-14 sm:top-16 z-10 p-2 print:hidden backdrop-blur-sm shrink-0">
             <div className="max-w-7xl mx-auto flex justify-between items-center flex-wrap gap-2 px-4">
                 <div className="flex items-center gap-2">
                     <Receipt className="h-5 w-5 text-primary" />
@@ -117,6 +119,19 @@ export default function ViewInvoicePage() {
                         </DialogContent>
                     </Dialog>
                     <div className="flex items-center gap-2 border-l pl-2">
+                         <div className="hidden lg:flex items-center gap-2">
+                            <ZoomOut className="h-4 w-4" />
+                            <Slider
+                                value={[zoom]}
+                                onValueChange={(value) => setZoom(value[0])}
+                                min={0.2}
+                                max={2}
+                                step={0.1}
+                                className="w-24"
+                                disabled={isProcessing}
+                            />
+                            <ZoomIn className="h-4 w-4" />
+                        </div>
                         <div className="flex items-center gap-1.5">
                             <Switch id="use-letterhead" checked={useLetterhead} onCheckedChange={setUseLetterhead} disabled={isProcessing} />
                             <Label htmlFor="use-letterhead" className="text-xs cursor-pointer">Letterhead</Label>
@@ -152,9 +167,17 @@ export default function ViewInvoicePage() {
             </div>
         </header>
 
-        <main className="w-full bg-muted py-8">
-            <div className="bg-white shadow-lg mx-auto">
-                 {templateToRender()}
+        <main className="w-full bg-muted py-8 overflow-auto flex-grow">
+            <div 
+                className="transition-transform origin-top mx-auto"
+                style={{
+                    transform: `scale(${zoom})`,
+                    transformOrigin: 'top',
+                }}
+            >
+                 <div className="bg-white shadow-lg mx-auto">
+                     {templateToRender()}
+                </div>
             </div>
         </main>
       </div>
