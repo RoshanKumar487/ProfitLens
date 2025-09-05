@@ -43,8 +43,9 @@ export default function SignInPage() {
       const result = await response.json();
 
       if (response.ok) {
-        router.push('/dashboard');
         toast({ title: 'Success', description: 'Signed in successfully.' });
+        router.refresh();
+        router.push('/dashboard');
       } else {
         throw new Error(result.message || 'Failed to sign in.');
       }

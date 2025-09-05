@@ -45,8 +45,9 @@ export default function SignUpPage() {
       const result = await response.json();
 
       if (response.ok) {
-        router.push('/dashboard');
         toast({ title: 'Success', description: 'Your account has been created.' });
+        router.refresh();
+        router.push('/dashboard');
       } else {
         throw new Error(result.message || 'An unknown error occurred.');
       }
