@@ -37,6 +37,7 @@
     "@radix-ui/react-tooltip": "^1.1.8",
     "@radix-ui/react-visually-hidden": "^1.1.0",
     "ai": "^3.2.19",
+    "bcryptjs": "^2.4.3",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
     "date-fns": "^3.6.0",
@@ -44,8 +45,10 @@
     "firebase": "^10.12.3",
     "firebase-admin": "^12.2.2",
     "html2canvas": "^1.4.1",
+    "jose": "^5.6.3",
     "jspdf": "^2.5.1",
     "jspdf-autotable": "^3.8.2",
+    "jsonwebtoken": "^9.0.2",
     "lucide-react": "^0.475.0",
     "mongodb": "^6.7.0",
     "next": "15.3.3",
@@ -63,6 +66,8 @@
     "zod": "^3.24.2"
   },
   "devDependencies": {
+    "@types/bcryptjs": "^2.4.6",
+    "@types/jsonwebtoken": "^9.0.6",
     "@types/node": "^20",
     "@types/react": "^18",
     "@types/react-dom": "^18",

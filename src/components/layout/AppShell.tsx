@@ -27,11 +27,7 @@ import { Tooltip, TooltipProvider, TooltipContent, TooltipTrigger } from '@/comp
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { AssistantChat } from '@/components/AssistantChat';
 import { useAuth } from '@/contexts/AuthContext';
-
-const CollapseIcon = ({ className }: { className?: string }) => (
-    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={cn("group-data-[state=expanded]:hidden", className)}><rect width="18" height="18" x="3" y="3" rx="2"/><path d="M9 3v18"/><path d="m14 9 3-3 3 3"/></svg>
-);
-
+import { signOutAction } from '@/app/auth/actions';
 
 const AppShellLayout = ({ children }: { children: React.ReactNode }) => {
   const pathname = usePathname();
@@ -41,10 +37,7 @@ const AppShellLayout = ({ children }: { children: React.ReactNode }) => {
   const router = useRouter();
 
   const handleSignOut = async () => {
-    // Since auth is disabled, this is a mock sign out.
-    // In a real app, this would call signOutAction().
-    console.log("Mock sign out successful");
-    router.push('/auth/sign-in'); // Redirect to a nominal sign-in page
+    await signOutAction();
   };
   
   const getInitials = (name?: string | null) => {
@@ -271,15 +264,22 @@ const AppShellLayout = ({ children }: { children: React.ReactNode }) => {
 
 const AppShell = ({ children }: { children: React.ReactNode }) => {
   const pathname = usePathname();
+  const { user, isLoading } = useAuth();
 
-  // Don't render the shell for auth pages when auth is disabled,
-  // as they are not meant to be accessed directly.
-  if (pathname.startsWith('/auth')) {
+  if (isLoading) {
     return (
-         <div className="flex h-screen w-screen items-center justify-center">
-            <p>Redirecting...</p>
-        </div>
+      <div className="flex h-screen w-screen items-center justify-center">
+        <Loader2 className="h-12 w-12 animate-spin text-primary" />
+      </div>
     );
+  }
+
+  if (!user && !pathname.startsWith('/auth')) {
+    return null; // Or a redirect component if you prefer
+  }
+  
+  if (pathname.startsWith('/auth')) {
+    return <>{children}</>;
   }
   
   return (

@@ -13,13 +13,12 @@ import Link from 'next/link';
 import { Loader2 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { useRouter } from 'next/navigation';
-import { signUpWithEmail } from '../actions';
 
 const formSchema = z.object({
   displayName: z.string().min(2, 'Display name is required'),
   companyName: z.string().min(2, 'Company name is required'),
   email: z.string().email('Invalid email address'),
-  password: z.string().min(6, 'Password must be at least 6 characters long'),
+  password: z.string().min(8, 'Password must be at least 8 characters long'),
 });
 
 type FormValues = z.infer<typeof formSchema>;
@@ -37,12 +36,19 @@ export default function SignUpPage() {
   const onSubmit: SubmitHandler<FormValues> = async (data) => {
     setIsLoading(true);
     try {
-      const result = await signUpWithEmail(data);
-      if (result.success) {
-        router.push('/');
+      const response = await fetch('/api/auth/register', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(data),
+      });
+
+      const result = await response.json();
+
+      if (response.ok) {
+        router.push('/dashboard');
         toast({ title: 'Success', description: 'Your account has been created.' });
       } else {
-        throw new Error(result.error || 'An unknown error occurred.');
+        throw new Error(result.message || 'An unknown error occurred.');
       }
     } catch (error: any) {
       toast({

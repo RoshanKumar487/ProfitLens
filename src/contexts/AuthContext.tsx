@@ -2,12 +2,12 @@
 'use client';
 
 import React, { createContext, useContext, useState, useEffect } from 'react';
-import type { User as FirebaseUser } from 'firebase/auth';
 import { getCurrencySymbol } from '@/lib/countries';
-import { MOCK_USER } from '@/lib/mock-data';
+import { getSessionAction } from '@/app/auth/actions';
+import { Loader2 } from 'lucide-react';
 
 export interface UserProfile {
-  uid: string;
+  id: string;
   email: string | null;
   displayName: string | null;
   companyId: string | null;
@@ -20,33 +20,52 @@ export interface UserProfile {
 
 export interface AuthContextType {
   user: UserProfile | null;
-  firebaseUser: FirebaseUser | null;
   isLoading: boolean;
   currencySymbol: string;
 }
 
 const AuthContext = createContext<AuthContextType>({
   user: null,
-  firebaseUser: null,
   isLoading: true,
   currencySymbol: '$',
 });
 
 export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
-  const [user, setUser] = useState<UserProfile | null>(MOCK_USER);
-  const [isLoading, setIsLoading] = useState(false);
+  const [user, setUser] = useState<UserProfile | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
   const [currencySymbol, setCurrencySymbol] = useState<string>('$');
 
   useEffect(() => {
-    // Auth is disabled, so we just set the mock user and currency.
-    if (user) {
-        setCurrencySymbol(getCurrencySymbol(user.country));
-    }
-    setIsLoading(false);
-  }, [user]);
+    const fetchSession = async () => {
+      try {
+        const sessionUser = await getSessionAction();
+        if (sessionUser) {
+          setUser(sessionUser);
+          setCurrencySymbol(getCurrencySymbol(sessionUser.country));
+        } else {
+          setUser(null);
+        }
+      } catch (error) {
+        console.error("Failed to fetch session:", error);
+        setUser(null);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    fetchSession();
+  }, []);
+
+  if (isLoading) {
+    return (
+      <div className="flex h-screen w-screen items-center justify-center">
+        <Loader2 className="h-12 w-12 animate-spin text-primary" />
+      </div>
+    );
+  }
 
   return (
-    <AuthContext.Provider value={{ user, firebaseUser: null, isLoading, currencySymbol }}>
+    <AuthContext.Provider value={{ user, isLoading, currencySymbol }}>
       {children}
     </AuthContext.Provider>
   );

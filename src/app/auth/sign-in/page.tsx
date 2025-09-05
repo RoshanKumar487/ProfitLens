@@ -12,9 +12,6 @@ import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '
 import Link from 'next/link';
 import { Loader2 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
-import { signInWithEmailAndPassword } from 'firebase/auth';
-import { auth } from '@/lib/firebase';
-import { signInWithIdToken } from '../actions';
 import { useRouter } from 'next/navigation';
 
 const formSchema = z.object({
@@ -37,15 +34,19 @@ export default function SignInPage() {
   const onSubmit: SubmitHandler<FormValues> = async (data) => {
     setIsLoading(true);
     try {
-      const userCredential = await signInWithEmailAndPassword(auth, data.email, data.password);
-      const idToken = await userCredential.user.getIdToken();
-      const result = await signInWithIdToken(idToken);
+      const response = await fetch('/api/auth/login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(data),
+      });
 
-      if (result.success) {
-        router.push('/');
+      const result = await response.json();
+
+      if (response.ok) {
+        router.push('/dashboard');
         toast({ title: 'Success', description: 'Signed in successfully.' });
       } else {
-        throw new Error(result.error || 'Failed to create session.');
+        throw new Error(result.message || 'Failed to sign in.');
       }
     } catch (error: any) {
       toast({
