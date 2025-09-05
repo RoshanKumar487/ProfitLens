@@ -12,22 +12,30 @@ import { format } from 'date-fns';
 import { useAuth } from '@/contexts/AuthContext';
 import { Skeleton } from '@/components/ui/skeleton';
 import Link from 'next/link';
-import { MOCK_EXPENSES, type Expense } from '@/lib/mock-data';
+import { getRecentExpenses, type ExpenseDisplay } from './actions';
 
 export default function RecordExpensesPage() {
   const { user, currencySymbol, isLoading: authIsLoading } = useAuth();
   
-  const [recentEntries, setRecentEntries] = useState<Expense[]>([]);
+  const [recentEntries, setRecentEntries] = useState<ExpenseDisplay[]>([]);
   const [isLoadingEntries, setIsLoadingEntries] = useState(true);
 
   useEffect(() => {
-    setIsLoadingEntries(true);
-    // Mock fetching expenses
-    setTimeout(() => {
-        setRecentEntries(MOCK_EXPENSES);
-        setIsLoadingEntries(false);
-    }, 1000);
-  }, []);
+    async function loadExpenses() {
+        if (!user) return;
+        setIsLoadingEntries(true);
+        try {
+            const expenses = await getRecentExpenses();
+            setRecentEntries(expenses);
+        } catch (error) {
+            // Toast is handled in the component calling the action
+            console.error(error);
+        } finally {
+            setIsLoadingEntries(false);
+        }
+    }
+    loadExpenses();
+  }, [user]);
 
 
   if (authIsLoading) {

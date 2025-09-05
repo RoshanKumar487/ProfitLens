@@ -13,10 +13,11 @@ import { Calendar } from '@/components/ui/calendar';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { CalendarIcon, TrendingDown, Save, Loader2, Search } from 'lucide-react';
-import { format, parseISO } from 'date-fns';
+import { format } from 'date-fns';
 import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/contexts/AuthContext';
 import Link from 'next/link';
+import { addExpenseEntry } from '../actions';
 
 const EXPENSE_CATEGORIES = [
   'Software & Subscriptions', 'Marketing & Advertising', 'Office Supplies',
@@ -62,7 +63,7 @@ export default function NewExpensePage() {
 
     const timer = setTimeout(async () => {
         setIsSearching(true);
-        // This remains a mock search as it's not part of the SQLite scope
+        // This remains a mock search as it's not part of the MongoDB scope yet
         setEmployeeSuggestions([]);
         setShowSuggestions(true);
         setIsSearching(false);
@@ -93,11 +94,22 @@ export default function NewExpensePage() {
 
     setIsSaving(true);
     
-    // Mock save
-    setTimeout(() => {
-        toast({ title: 'Expense Recorded', description: 'Your expense has been saved locally.' });
+    const result = await addExpenseEntry({
+      date,
+      amount: amountNum,
+      category,
+      description: description || undefined,
+      vendor: category !== 'Salary / Advance' ? (vendor || undefined) : undefined,
+      employeeName: category === 'Salary / Advance' ? (employeeName || undefined) : undefined,
+    });
+    
+    if(result.success) {
+        toast({ title: 'Expense Recorded', description: 'Your expense has been saved successfully.' });
         router.push('/record-expenses');
-    }, 1000);
+    } else {
+        toast({ title: 'Save Failed', description: result.message, variant: 'destructive' });
+        setIsSaving(false);
+    }
   };
 
   return (
