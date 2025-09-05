@@ -192,7 +192,7 @@ export default function NewInvoicePage() {
                     </header>
 
                     {/* Client & Dates */}
-                    <section className="grid grid-cols-1 md:grid-cols-2 gap-8 mb-8">
+                    <section className="grid grid-cols-1 md:grid-cols-2 gap-8 mb-8 border rounded-lg p-6">
                         <div className="space-y-3">
                             <h3 className="font-semibold">Bill To:</h3>
                             <Input placeholder="Client Name" className="font-bold" value={currentInvoice.clientName || ''} onChange={(e) => setCurrentInvoice({...currentInvoice, clientName: e.target.value})} required />
@@ -200,14 +200,14 @@ export default function NewInvoicePage() {
                             <Input placeholder="Client GSTIN" value={currentInvoice.clientGstin || ''} onChange={(e) => setCurrentInvoice({...currentInvoice, clientGstin: e.target.value})}/>
                             <Textarea placeholder="Client Billing Address" value={currentInvoice.clientAddress || ''} onChange={(e) => setCurrentInvoice({...currentInvoice, clientAddress: e.target.value})} rows={3}/>
                         </div>
-                        <div className="space-y-3 text-right">
-                             <div className="space-y-1">
+                        <div className="space-y-3 md:text-right flex flex-col justify-between">
+                            <div className="space-y-1">
                                 <Label>Issued Date</Label>
-                                <Popover><PopoverTrigger asChild><Button variant="outline" className="w-full justify-start"><CalendarIconLucide className="mr-2 h-4 w-4" />{currentInvoice.issuedDate ? format(currentInvoice.issuedDate, 'PPP') : ''}</Button></PopoverTrigger><PopoverContent className="w-auto p-0"><Calendar mode="single" selected={currentInvoice.issuedDate} onSelect={(d) => setCurrentInvoice({...currentInvoice, issuedDate: d!})}/></PopoverContent></Popover>
+                                <Popover><PopoverTrigger asChild><Button variant="outline" className="w-full justify-start text-left"><CalendarIconLucide className="mr-2 h-4 w-4" />{currentInvoice.issuedDate ? format(currentInvoice.issuedDate, 'PPP') : ''}</Button></PopoverTrigger><PopoverContent className="w-auto p-0"><Calendar mode="single" selected={currentInvoice.issuedDate} onSelect={(d) => setCurrentInvoice({...currentInvoice, issuedDate: d!})}/></PopoverContent></Popover>
                             </div>
-                             <div className="space-y-1">
+                            <div className="space-y-1">
                                 <Label>Due Date</Label>
-                                <Popover><PopoverTrigger asChild><Button variant="outline" className="w-full justify-start"><CalendarIconLucide className="mr-2 h-4 w-4" />{currentInvoice.dueDate ? format(currentInvoice.dueDate, 'PPP') : ''}</Button></PopoverTrigger><PopoverContent className="w-auto p-0"><Calendar mode="single" selected={currentInvoice.dueDate} onSelect={(d) => setCurrentInvoice({...currentInvoice, dueDate: d!})}/></PopoverContent></Popover>
+                                <Popover><PopoverTrigger asChild><Button variant="outline" className="w-full justify-start text-left"><CalendarIconLucide className="mr-2 h-4 w-4" />{currentInvoice.dueDate ? format(currentInvoice.dueDate, 'PPP') : ''}</Button></PopoverTrigger><PopoverContent className="w-auto p-0"><Calendar mode="single" selected={currentInvoice.dueDate} onSelect={(d) => setCurrentInvoice({...currentInvoice, dueDate: d!})}/></PopoverContent></Popover>
                             </div>
                         </div>
                     </section>
