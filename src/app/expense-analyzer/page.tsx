@@ -8,13 +8,9 @@ import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Sparkles, CheckCircle, AlertTriangle, Loader2, Info } from 'lucide-react';
-import {
-  analyzeExpenseOpportunities,
-  type AnalyzeExpenseOpportunitiesOutput,
-} from '@/ai/flows/analyze-expense-opportunities';
-import {
-  analyzeExpenseReport,
-} from '@/ai/flows/analyze-expense-report';
+import { analyzeExpenseOpportunities } from '@/ai/flows/analyze-expense-opportunities';
+import type { AnalyzeExpenseOpportunitiesOutput } from '@/ai/flows/analyze-expense-opportunities-types';
+import { analyzeExpenseReport } from '@/ai/flows/analyze-expense-report';
 import { useToast } from '@/hooks/use-toast';
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { useAuth } from '@/contexts/AuthContext';

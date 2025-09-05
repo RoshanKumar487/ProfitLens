@@ -6,27 +6,13 @@
  * which can access and manipulate application data using a set of tools.
  *
  * @exports askAssistant - The primary function to call this flow.
- * @exports AskAssistantInput - The Zod schema for the input data.
- * @exports AskAssistantOutput - The Zod schema for the output data (a simple string).
  */
 
 import { ai } from '@/ai/genkit';
 import { z } from 'zod';
 import { allTools } from '../tools';
 import { format } from 'date-fns';
-
-/**
- * Zod schema for the input of the AI assistant flow.
- */
-export const AskAssistantInputSchema = z.object({
-    history: z.array(z.any()).describe("The chat history between the user and the assistant."),
-    companyId: z.string().describe("The ID of the user's company."),
-    currencySymbol: z.string().describe("The currency symbol for the user's company."),
-});
-export type AskAssistantInput = z.infer<typeof AskAssistantInputSchema>;
-
-// The output is a simple string for the chat response.
-export type AskAssistantOutput = string;
+import { AskAssistantInputSchema, type AskAssistantInput, type AskAssistantOutput } from './ask-assistant-types';
 
 
 /**
