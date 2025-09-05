@@ -1,3 +1,4 @@
+
 'use server';
 
 import { connectToDatabase } from '@/lib/mongodb';
@@ -62,15 +63,20 @@ export async function getRecentExpenses(): Promise<ExpenseDisplay[]> {
             .limit(50)
             .toArray();
 
-        // MongoDB driver returns BSON dates, which need to be converted for the client
+        // Convert complex MongoDB types (like ObjectId) to simple, serializable types (like string).
         return expenses.map(doc => {
-            const { _id, ...rest } = doc;
+            const { _id, companyId, ...rest } = doc;
             return {
                 id: _id.toHexString(),
-                ...rest,
-                date: new Date(doc.date).toISOString(),
-            } as unknown as ExpenseDisplay;
-        });
+                // Only include the fields defined in the Expense interface, plus the id
+                date: new Date(doc.date),
+                amount: doc.amount,
+                category: doc.category,
+                vendor: doc.vendor,
+                description: doc.description,
+                employeeName: doc.employeeName,
+            };
+        }) as unknown as ExpenseDisplay[];
     } catch (error) {
         console.error('Failed to get expenses:', error);
         return [];
