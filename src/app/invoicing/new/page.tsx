@@ -48,7 +48,7 @@ interface InvoiceDisplay {
   taxAmount: number;
   isRcmApplicable: boolean;
   amount: number;
-  dueDate: Date;
+  dueDate?: Date;
   status: 'Paid' | 'Pending' | 'Overdue' | 'Draft';
   issuedDate: Date;
   items: InvoiceItem[];
@@ -62,7 +62,7 @@ export default function NewInvoicePage() {
 
     const [currentInvoice, setCurrentInvoice] = useState<Partial<InvoiceDisplay>>({
             status: 'Draft',
-            items: [], // Start with an empty array
+            items: [], 
             invoiceNumber: `INV${(Date.now()).toString().slice(-6)}`,
             clientName: '',
             notes: MOCK_INVOICE_SETTINGS.defaultNotes,
@@ -162,6 +162,9 @@ export default function NewInvoicePage() {
         setCurrentInvoice(prev => prev ? ({ ...prev, items: (prev.items || []).filter(item => item.id !== itemId) }) : null)
     };
 
+    const customColumns = invoiceSettings?.customItemColumns || [];
+    const itemGridCols = `grid-cols-[minmax(0,4fr)_minmax(0,1.5fr)_minmax(0,1fr)_minmax(0,1.5fr)_minmax(0,1.5fr)_minmax(0,0.5fr)]`;
+
     return (
         <div className="space-y-6 p-4 sm:p-6 lg:p-8">
             <PageTitle title="Create New Invoice" subtitle="Fill in the details to generate a new invoice." icon={Receipt}>
@@ -192,7 +195,7 @@ export default function NewInvoicePage() {
                     </header>
 
                     {/* Client & Dates */}
-                    <section className="grid grid-cols-1 md:grid-cols-2 gap-8 mb-8 border rounded-lg p-6">
+                     <section className="grid grid-cols-1 md:grid-cols-2 gap-8 mb-8 border rounded-lg p-6">
                         <div className="space-y-3">
                             <h3 className="font-semibold">Bill To:</h3>
                             <Input placeholder="Client Name" className="font-bold" value={currentInvoice.clientName || ''} onChange={(e) => setCurrentInvoice({...currentInvoice, clientName: e.target.value})} required />
@@ -200,14 +203,14 @@ export default function NewInvoicePage() {
                             <Input placeholder="Client GSTIN" value={currentInvoice.clientGstin || ''} onChange={(e) => setCurrentInvoice({...currentInvoice, clientGstin: e.target.value})}/>
                             <Textarea placeholder="Client Billing Address" value={currentInvoice.clientAddress || ''} onChange={(e) => setCurrentInvoice({...currentInvoice, clientAddress: e.target.value})} rows={3}/>
                         </div>
-                        <div className="space-y-3 md:text-right flex flex-col justify-between">
+                        <div className="space-y-4">
                             <div className="space-y-1">
                                 <Label>Issued Date</Label>
                                 <Popover><PopoverTrigger asChild><Button variant="outline" className="w-full justify-start text-left"><CalendarIconLucide className="mr-2 h-4 w-4" />{currentInvoice.issuedDate ? format(currentInvoice.issuedDate, 'PPP') : ''}</Button></PopoverTrigger><PopoverContent className="w-auto p-0"><Calendar mode="single" selected={currentInvoice.issuedDate} onSelect={(d) => setCurrentInvoice({...currentInvoice, issuedDate: d!})}/></PopoverContent></Popover>
                             </div>
-                            <div className="space-y-1">
-                                <Label>Due Date</Label>
-                                <Popover><PopoverTrigger asChild><Button variant="outline" className="w-full justify-start text-left"><CalendarIconLucide className="mr-2 h-4 w-4" />{currentInvoice.dueDate ? format(currentInvoice.dueDate, 'PPP') : ''}</Button></PopoverTrigger><PopoverContent className="w-auto p-0"><Calendar mode="single" selected={currentInvoice.dueDate} onSelect={(d) => setCurrentInvoice({...currentInvoice, dueDate: d!})}/></PopoverContent></Popover>
+                             <div className="space-y-1">
+                                <Label>Due Date (Optional)</Label>
+                                <Popover><PopoverTrigger asChild><Button variant="outline" className="w-full justify-start text-left"><CalendarIconLucide className="mr-2 h-4 w-4" />{currentInvoice.dueDate ? format(currentInvoice.dueDate, 'PPP') : <span>Pick a date</span>}</Button></PopoverTrigger><PopoverContent className="w-auto p-0"><Calendar mode="single" selected={currentInvoice.dueDate} onSelect={(d) => setCurrentInvoice({...currentInvoice, dueDate: d})}/></PopoverContent></Popover>
                             </div>
                         </div>
                     </section>
@@ -216,36 +219,33 @@ export default function NewInvoicePage() {
                     <section className="mb-8">
                         <div className="w-full">
                             {/* Table Header */}
-                            <div className="grid grid-cols-12 gap-2 text-sm font-semibold text-muted-foreground px-2 py-1">
-                                <div className="col-span-5">Description</div>
-                                <div className="col-span-2 text-right">Quantity</div>
-                                <div className="col-span-2 text-right">Price</div>
-                                <div className="col-span-2 text-right">Total</div>
-                                <div className="col-span-1"></div>
+                            <div className={`grid ${itemGridCols} gap-2 text-sm font-semibold text-muted-foreground px-2 py-1`}>
+                                <div className="">Description</div>
+                                <div className="text-center">HSN No.</div>
+                                {customColumns.map(col => <div key={col.id} className="text-right">{col.label}</div>)}
+                                <div className="text-right">Quantity</div>
+                                <div className="text-right">Price</div>
+                                <div className="text-right">Total</div>
+                                <div className=""></div>
                             </div>
                              {/* Table Body */}
                             <div className="space-y-2">
                             {(currentInvoice.items || []).map((item, index) => (
-                                <div key={item.id} className="grid grid-cols-12 gap-2 items-start p-2 rounded-md hover:bg-muted/50">
-                                    <div className="col-span-5">
-                                        <Input placeholder="Item description" value={item.description} onChange={e => handleItemChange(item.id, 'description', e.target.value)} />
-                                        <div className="flex gap-2 mt-1">
-                                            <Input placeholder="HSN" className="text-xs h-7" value={item.hsnNo || ''} onChange={e => handleItemChange(item.id, 'hsnNo', e.target.value)} />
-                                            {invoiceSettings?.customItemColumns.map(col => (
-                                                <Input key={col.id} placeholder={col.label} className="text-xs h-7" value={item.customFields?.[col.id] || ''} onChange={e => handleCustomFieldChange(item.id, col.id, e.target.value)} />
-                                            ))}
-                                        </div>
-                                    </div>
-                                    <div className="col-span-2">
-                                        <Input type="number" placeholder="1" className="text-right" value={item.quantity} onChange={e => handleItemChange(item.id, 'quantity', e.target.value)} />
-                                    </div>
-                                    <div className="col-span-2">
-                                        <Input type="number" placeholder="0.00" className="text-right" value={item.unitPrice} onChange={e => handleItemChange(item.id, 'unitPrice', e.target.value)} />
-                                    </div>
-                                    <div className="col-span-2 text-right font-medium pr-2 pt-2">
+                                <div key={item.id} className={`grid ${itemGridCols} gap-2 items-start p-2 rounded-md hover:bg-muted/50`}>
+                                    <Input placeholder="Item description" value={item.description} onChange={e => handleItemChange(item.id, 'description', e.target.value)} />
+                                    <Input placeholder="HSN" className="text-center" value={item.hsnNo || ''} onChange={e => handleItemChange(item.id, 'hsnNo', e.target.value)} />
+                                    
+                                    {customColumns.map(col => (
+                                        <Input key={col.id} placeholder={col.label} className="text-right" value={item.customFields?.[col.id] || ''} onChange={e => handleCustomFieldChange(item.id, col.id, e.target.value)} />
+                                    ))}
+
+                                    <Input type="number" placeholder="1" className="text-right" value={item.quantity} onChange={e => handleItemChange(item.id, 'quantity', e.target.value)} />
+                                    <Input type="number" placeholder="0.00" className="text-right" value={item.unitPrice} onChange={e => handleItemChange(item.id, 'unitPrice', e.target.value)} />
+                                    
+                                    <div className="text-right font-medium pr-2 pt-2">
                                         {currencySymbol}{(item.quantity * item.unitPrice).toFixed(2)}
                                     </div>
-                                    <div className="col-span-1 flex justify-center items-center pt-1">
+                                    <div className="flex justify-center items-center pt-1">
                                         <Button type="button" variant="ghost" size="icon" className="text-destructive h-8 w-8" onClick={() => handleRemoveItem(item.id)}><Trash2 className="h-4 w-4" /></Button>
                                     </div>
                                 </div>
