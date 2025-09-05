@@ -1,8 +1,9 @@
 
 'use server';
 
-// Mock database interactions since the backend is disconnected.
-// In a real application, this would interact with Firestore.
+import { connectToDatabase } from '@/lib/mongodb';
+import { ObjectId } from 'mongodb';
+import { getSession } from '@/app/auth/actions';
 
 export interface CustomItemColumn {
   id: string;
@@ -37,46 +38,98 @@ export interface ProductSettings {
     customFields: CustomProductField[];
 }
 
-
-// Mock functions that would interact with a database
-export async function getInvoiceSettings(companyId: string): Promise<InvoiceSettings> {
-  console.log(`Mock getInvoiceSettings for company: ${companyId}`);
-  // Return default mock settings
-  return {
-    customItemColumns: [{ id: 'col1', label: 'Serial No.' }],
-    defaultPaymentTermsDays: 30,
-    defaultHsnCode: '998314',
-    defaultNotes: 'Thank you for your business. Please make payment by the due date.'
-  };
+async function getCompanyId(): Promise<ObjectId | null> {
+    const session = await getSession();
+    if (!session?.companyId) return null;
+    return new ObjectId(session.companyId);
 }
 
-export async function saveInvoiceSettings(companyId: string, settings: InvoiceSettings) {
-  console.log(`Mock saveInvoiceSettings for company: ${companyId}`, settings);
-  return { success: true, message: 'Invoice settings saved successfully (mock).' };
+// --- INVOICE SETTINGS ---
+export async function getInvoiceSettings(): Promise<InvoiceSettings> {
+    const companyId = await getCompanyId();
+    if (!companyId) return { customItemColumns: [], defaultPaymentTermsDays: 30, defaultHsnCode: '', defaultNotes: '' };
+    try {
+        const { db } = await connectToDatabase();
+        const settings = await db.collection('settings').findOne({ companyId, type: 'invoice' });
+        return settings?.data ?? { customItemColumns: [], defaultPaymentTermsDays: 30, defaultHsnCode: '', defaultNotes: '' };
+    } catch (error) {
+        console.error("Failed to get invoice settings:", error);
+        return { customItemColumns: [], defaultPaymentTermsDays: 30, defaultHsnCode: '', defaultNotes: '' };
+    }
 }
 
-export async function getPayrollSettings(companyId: string): Promise<PayrollSettings> {
-    console.log(`Mock getPayrollSettings for company: ${companyId}`);
-    return {
-        customFields: [{id: 'field1', label: 'Bonus', type: 'number'}],
-        pfPercentage: 12,
-        esiPercentage: 0.75,
-    };
+export async function saveInvoiceSettings(settings: InvoiceSettings) {
+    const companyId = await getCompanyId();
+    if (!companyId) return { success: false, message: 'User not authenticated.' };
+    try {
+        const { db } = await connectToDatabase();
+        await db.collection('settings').updateOne(
+            { companyId, type: 'invoice' },
+            { $set: { data: settings, updatedAt: new Date() } },
+            { upsert: true }
+        );
+        return { success: true, message: 'Invoice settings saved successfully.' };
+    } catch (error: any) {
+        return { success: false, message: `Failed to save settings: ${error.message}` };
+    }
 }
 
-export async function savePayrollSettings(companyId: string, settings: PayrollSettings) {
-    console.log(`Mock savePayrollSettings for company: ${companyId}`, settings);
-    return { success: true, message: 'Payroll settings saved successfully (mock).' };
+// --- PAYROLL SETTINGS ---
+export async function getPayrollSettings(): Promise<PayrollSettings> {
+    const companyId = await getCompanyId();
+    if (!companyId) return { customFields: [], pfPercentage: 12, esiPercentage: 0.75 };
+    try {
+        const { db } = await connectToDatabase();
+        const settings = await db.collection('settings').findOne({ companyId, type: 'payroll' });
+        return settings?.data ?? { customFields: [], pfPercentage: 12, esiPercentage: 0.75 };
+    } catch (error) {
+        console.error("Failed to get payroll settings:", error);
+        return { customFields: [], pfPercentage: 12, esiPercentage: 0.75 };
+    }
 }
 
-export async function getProductSettings(companyId: string): Promise<ProductSettings> {
-    console.log(`Mock getProductSettings for company: ${companyId}`);
-    return {
-        customFields: [{id: 'prodField1', label: 'Color'}],
-    };
+export async function savePayrollSettings(settings: PayrollSettings) {
+    const companyId = await getCompanyId();
+    if (!companyId) return { success: false, message: 'User not authenticated.' };
+    try {
+        const { db } = await connectToDatabase();
+        await db.collection('settings').updateOne(
+            { companyId, type: 'payroll' },
+            { $set: { data: settings, updatedAt: new Date() } },
+            { upsert: true }
+        );
+        return { success: true, message: 'Payroll settings saved successfully.' };
+    } catch (error: any) {
+        return { success: false, message: `Failed to save settings: ${error.message}` };
+    }
 }
 
-export async function saveProductSettings(companyId: string, settings: ProductSettings) {
-    console.log(`Mock saveProductSettings for company: ${companyId}`, settings);
-    return { success: true, message: 'Product settings saved successfully (mock).' };
+// --- PRODUCT SETTINGS ---
+export async function getProductSettings(): Promise<ProductSettings> {
+    const companyId = await getCompanyId();
+    if (!companyId) return { customFields: [] };
+    try {
+        const { db } = await connectToDatabase();
+        const settings = await db.collection('settings').findOne({ companyId, type: 'product' });
+        return settings?.data ?? { customFields: [] };
+    } catch (error) {
+        console.error("Failed to get product settings:", error);
+        return { customFields: [] };
+    }
+}
+
+export async function saveProductSettings(settings: ProductSettings) {
+    const companyId = await getCompanyId();
+    if (!companyId) return { success: false, message: 'User not authenticated.' };
+    try {
+        const { db } = await connectToDatabase();
+        await db.collection('settings').updateOne(
+            { companyId, type: 'product' },
+            { $set: { data: settings, updatedAt: new Date() } },
+            { upsert: true }
+        );
+        return { success: true, message: 'Product settings saved successfully.' };
+    } catch (error: any) {
+        return { success: false, message: `Failed to save settings: ${error.message}` };
+    }
 }

@@ -12,7 +12,8 @@ import { Input } from '@/components/ui/input';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { HandCoins, Loader2, Save, Calendar as CalendarIcon, Settings, Printer, PlusCircle, Trash2, Search, Download, MoreHorizontal, Mail, Send } from 'lucide-react';
 import { format, startOfMonth, getDaysInMonth } from 'date-fns';
-import { getPayrollDataForPeriod, savePayrollData, deletePayrollRecord, sendPayslipEmail } from './actions';
+import { getPayrollDataForPeriod, savePayrollData, deletePayrollRecord } from './actions';
+import { getCompanyProfile } from '@/app/invoicing/actions';
 import { getPayrollSettings, type PayrollSettings } from '@/app/settings/actions';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
@@ -26,13 +27,13 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogD
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger, DropdownMenuSeparator } from '@/components/ui/dropdown-menu';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import PayslipTemplate from './PayslipTemplate';
-import { doc, getDoc } from 'firebase/firestore';
 import { urlToDataUri } from '@/lib/utils';
 import jsPDF from 'jspdf';
 import html2canvas from 'html2canvas';
 import { Label } from '@/components/ui/label';
 import { cn } from '@/lib/utils';
 import { type EmployeeWithPayroll } from './actions';
+import { type CompanyDetailsFirestore } from '@/app/invoicing/actions';
 
 const getInitials = (name: string = "") => {
   const names = name.split(' ');
@@ -62,7 +63,7 @@ export default function PayrollPage() {
   const payslipPrintRef = useRef<HTMLDivElement>(null);
   const [isPayslipDialogOpen, setIsPayslipDialogOpen] = useState(false);
   const [employeeForAction, setEmployeeForAction] = useState<EmployeeWithPayroll | null>(null);
-  const [companyDetails, setCompanyDetails] = useState<any | null>(null);
+  const [companyDetails, setCompanyDetails] = useState<CompanyDetailsFirestore | null>(null);
   const [payslipImageDataUris, setPayslipImageDataUris] = useState<{ signature?: string; stamp?: string }>({});
   const [isPrinting, setIsPrinting] = useState(false);
   
@@ -71,17 +72,21 @@ export default function PayrollPage() {
   const [isSendingEmail, setIsSendingEmail] = useState(false);
 
   const fetchPayrollData = useCallback(async () => {
-    if (!user?.companyId) return;
+    if (!user) return;
     setIsLoading(true);
     try {
         const period = format(payPeriod, 'yyyy-MM');
         const [pData, pSettings, cDetails] = await Promise.all([
-            getPayrollDataForPeriod(user.companyId, period),
-            getPayrollSettings(user.companyId),
-            // Mock company details fetch
-            Promise.resolve({ name: user.companyName, address: '123 Main St' })
+            getPayrollDataForPeriod(period),
+            getPayrollSettings(),
+            getCompanyProfile()
         ]);
-        setPayrollData(pData);
+        
+        // Set working days for new entries
+        const daysInMonth = getDaysInMonth(payPeriod);
+        const processedData = pData.map(d => ({...d, workingDays: d.workingDays > 0 ? d.workingDays : daysInMonth}))
+
+        setPayrollData(processedData);
         setPayrollSettings(pSettings);
         setCompanyDetails(cDetails);
     } catch (error) {
@@ -89,14 +94,14 @@ export default function PayrollPage() {
     } finally {
         setIsLoading(false);
     }
-  }, [user?.companyId, payPeriod, toast, user?.companyName]);
+  }, [user, payPeriod, toast]);
 
 
   useEffect(() => {
-    if (!authLoading && user?.companyId) {
+    if (!authLoading && user) {
         fetchPayrollData();
     }
-  }, [authLoading, user?.companyId, fetchPayrollData]);
+  }, [authLoading, user, fetchPayrollData]);
 
   const filteredAndCalculatedData = useMemo(() => {
     if (!payrollSettings) return [];
@@ -213,9 +218,9 @@ export default function PayrollPage() {
   };
 
   const handleSaveAll = async () => {
-    if (!user?.companyId) return;
+    if (!user) return;
     setIsSaving(true);
-    const result = await savePayrollData(user.companyId, format(payPeriod, 'yyyy-MM'), payrollData);
+    const result = await savePayrollData(format(payPeriod, 'yyyy-MM'), payrollData);
     if (result.success) {
         toast({ title: 'Success', description: 'Payroll data saved successfully.' });
         fetchPayrollData();
@@ -230,7 +235,7 @@ export default function PayrollPage() {
   };
   
   const handleConfirmDelete = async () => {
-    if (!employeeToDelete || !user?.companyId) return;
+    if (!employeeToDelete || !user) return;
     if (employeeToDelete.isNew || !employeeToDelete.payrollId) {
       setPayrollData(prev => prev.filter(emp => emp.id !== employeeToDelete.id));
       setEmployeeToDelete(null);
@@ -238,7 +243,7 @@ export default function PayrollPage() {
       return;
     }
     setIsDeleting(true);
-    const result = await deletePayrollRecord(user.companyId, employeeToDelete.payrollId);
+    const result = await deletePayrollRecord(employeeToDelete.payrollId);
      if (result.success) {
         toast({ title: 'Success', description: 'Payroll record deleted.' });
         fetchPayrollData();
@@ -277,31 +282,39 @@ export default function PayrollPage() {
   
   const handleOpenPayslipDialog = async (employee: EmployeeWithPayroll) => {
     setEmployeeForAction(employee);
+    if (companyDetails?.signatureUrl || companyDetails?.stampUrl) {
+      const [sig, stamp] = await Promise.all([
+          companyDetails.signatureUrl ? urlToDataUri(companyDetails.signatureUrl) : Promise.resolve(undefined),
+          companyDetails.stampUrl ? urlToDataUri(companyDetails.stampUrl) : Promise.resolve(undefined),
+      ]);
+      setPayslipImageDataUris({ signature: sig, stamp });
+    }
     setIsPayslipDialogOpen(true);
   };
 
-  const handleOpenEmailDialog = async (employee: EmployeeWithPayroll) => {
-    setEmployeeForAction(employee);
-    setRecipientEmail('');
-    setIsEmailDialogOpen(true);
+  const processPayslip = async (action: 'download' | 'print') => {
+    if (!payslipPrintRef.current || !employeeForAction) return;
+    setIsPrinting(true);
+    toast({title: 'Processing...', description: `Generating payslip PDF.`});
+    try {
+        const canvas = await html2canvas(payslipPrintRef.current, { scale: 3, useCORS: true, backgroundColor: '#ffffff' });
+        const imgData = canvas.toDataURL('image/png');
+        const pdf = new jsPDF({ orientation: 'p', unit: 'mm', format: 'a4' });
+        pdf.addImage(imgData, 'PNG', 0, 0, pdf.internal.pageSize.getWidth(), pdf.internal.pageSize.getHeight());
+        
+        if (action === 'download') {
+            pdf.save(`Payslip-${employeeForAction.name}-${format(payPeriod, 'MM-yyyy')}.pdf`);
+        } else {
+            pdf.autoPrint();
+            window.open(pdf.output('bloburl'), '_blank');
+        }
+    } catch(err) {
+        toast({title: 'Error', description: 'Failed to generate PDF.', variant: 'destructive'});
+    } finally {
+        setIsPrinting(false);
+    }
   };
   
-  const handleDownloadSheetPdf = async () => {
-    toast({ title: 'Action Disabled', description: 'Cannot download data without a backend connection.', variant: 'destructive' });
-  };
-
-  const handlePrintPayslip = async () => {
-    toast({ title: 'Action Disabled', description: 'Cannot print data without a backend connection.', variant: 'destructive' });
-  };
-
-  const handleDownloadPayslipPdf = async () => {
-    toast({ title: 'Action Disabled', description: 'Cannot download data without a backend connection.', variant: 'destructive' });
-  };
-
-  const handleSendEmail = async () => {
-    toast({ title: 'Action Disabled', description: 'Cannot send email without a backend connection.', variant: 'destructive' });
-  };
-
 
   if (authLoading || isLoading) {
       return <div className="flex justify-center items-center h-64"><Loader2 className="h-12 w-12 animate-spin text-primary" /></div>;
@@ -365,14 +378,6 @@ export default function PayrollPage() {
                       <p>Manage Payroll Settings</p>
                     </TooltipContent>
                   </Tooltip>
-                  <Tooltip>
-                    <TooltipTrigger asChild>
-                        <Button variant="outline" size="icon" onClick={handleDownloadSheetPdf} disabled={isPrinting}>
-                            {isPrinting ? <Loader2 className="h-4 w-4 animate-spin"/> : <Download className="h-4 w-4" />}
-                        </Button>
-                    </TooltipTrigger>
-                    <TooltipContent><p>Download Payroll Sheet as PDF</p></TooltipContent>
-                  </Tooltip>
                 </TooltipProvider>
                 <Button onClick={handleSaveAll} disabled={isSaving || isLoading}>
                     {isSaving ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Save className="mr-2 h-4 w-4" />}
@@ -406,10 +411,6 @@ export default function PayrollPage() {
         </CardHeader>
         <CardContent>
             <div ref={payrollTableRef} className="overflow-auto relative" style={{maxHeight: 'calc(100vh - 420px)'}}>
-                 <div className="hidden print:block text-center mb-4">
-                    <h1 className="text-xl font-bold">{user?.companyName}</h1>
-                    <h2 className="text-lg">Payroll for {format(payPeriod, 'MMMM yyyy')}</h2>
-                </div>
                 <Table>
                 <TableHeader className="sticky top-0 bg-card z-10 print:bg-white">
                     <TableRow>
@@ -463,7 +464,7 @@ export default function PayrollPage() {
                         <TableCell className="font-semibold">{currencySymbol}{emp.totalDeductions?.toFixed(2) || '0.00'}</TableCell>
                         <TableCell className="font-bold text-lg">{currencySymbol}{emp.netPayment?.toFixed(2) || '0.00'}</TableCell>
                         <TableCell><Button variant={emp.status === 'Paid' ? 'default' : 'secondary'} size="sm" onClick={() => handleStatusChange(emp.id, emp.status === 'Paid' ? 'Pending' : 'Paid')} className="w-20">{emp.status}</Button></TableCell>
-                        <TableCell className="print:hidden sticky right-0 bg-card group-hover:bg-muted"><DropdownMenu><DropdownMenuTrigger asChild><Button variant="ghost" size="icon" className="h-8 w-8"><MoreHorizontal className="h-4 w-4" /></Button></DropdownMenuTrigger><DropdownMenuContent align="end"><DropdownMenuItem onClick={() => handleOpenPayslipDialog(emp)}><Printer className="mr-2 h-4 w-4" /> Print Payslip</DropdownMenuItem><DropdownMenuItem onClick={() => handleOpenEmailDialog(emp)}><Mail className="mr-2 h-4 w-4" /> Email Payslip</DropdownMenuItem><DropdownMenuSeparator /><DropdownMenuItem onClick={() => promptDelete(emp)} className="text-destructive focus:text-destructive focus:bg-destructive/10"><Trash2 className="mr-2 h-4 w-4" /> Delete Record</DropdownMenuItem></DropdownMenuContent></DropdownMenu></TableCell>
+                        <TableCell className="print:hidden sticky right-0 bg-card group-hover:bg-muted"><DropdownMenu><DropdownMenuTrigger asChild><Button variant="ghost" size="icon" className="h-8 w-8"><MoreHorizontal className="h-4 w-4" /></Button></DropdownMenuTrigger><DropdownMenuContent align="end"><DropdownMenuItem onClick={() => handleOpenPayslipDialog(emp)}><Printer className="mr-2 h-4 w-4" /> Print Payslip</DropdownMenuItem><DropdownMenuSeparator /><DropdownMenuItem onClick={() => promptDelete(emp)} className="text-destructive focus:text-destructive focus:bg-destructive/10"><Trash2 className="mr-2 h-4 w-4" /> Delete Record</DropdownMenuItem></DropdownMenuContent></DropdownMenu></TableCell>
                         </TableRow>
                     ))
                     ) : (
@@ -507,48 +508,14 @@ export default function PayrollPage() {
             <DialogHeader className="p-4 sm:p-6 pb-2 border-b bg-background no-print"><DialogTitle className="font-headline text-xl truncate">Payslip: {employeeForAction?.name}</DialogTitle></DialogHeader>
             <ScrollArea className="flex-grow bg-muted p-4 sm:p-8">
               <div ref={payslipPrintRef}>
-                {employeeForAction && companyDetails ? (<PayslipTemplate employee={employeeForAction} payPeriod={format(payPeriod, 'yyyy-MM')} companyDetails={companyDetails} payrollSettings={payrollSettings} currencySymbol={currencySymbol} signatureDataUri={payslipImageDataUris.signature} stampDataUri={payslipImageDataUris.stamp}/>) : <Skeleton className="w-[210mm] h-[297mm] mx-auto bg-white" />}
+                {employeeForAction && companyDetails && payrollSettings ? (<PayslipTemplate employee={employeeForAction} payPeriod={format(payPeriod, 'yyyy-MM')} companyDetails={companyDetails} payrollSettings={payrollSettings} currencySymbol={currencySymbol} signatureDataUri={payslipImageDataUris.signature} stampDataUri={payslipImageDataUris.stamp}/>) : <Skeleton className="w-[210mm] h-[297mm] mx-auto bg-white" />}
               </div>
             </ScrollArea>
             <DialogFooter className="p-4 sm:p-6 border-t bg-background no-print justify-end flex-wrap gap-2">
-              <Button type="button" variant="secondary" onClick={handleDownloadPayslipPdf} disabled={isPrinting}>{isPrinting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Download className="mr-2 h-4 w-4" />} Download PDF</Button>
-              <Button type="button" variant="default" onClick={handlePrintPayslip} disabled={isPrinting}>{isPrinting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Printer className="mr-2 h-4 w-4" />} Print Payslip</Button>
+              <Button type="button" variant="secondary" onClick={() => processPayslip('download')} disabled={isPrinting}>{isPrinting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Download className="mr-2 h-4 w-4" />} Download PDF</Button>
+              <Button type="button" variant="default" onClick={() => processPayslip('print')} disabled={isPrinting}>{isPrinting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Printer className="mr-2 h-4 w-4" />} Print Payslip</Button>
             </DialogFooter>
           </DialogContent>
-        </Dialog>
-        <Dialog open={isEmailDialogOpen} onOpenChange={setIsEmailDialogOpen}>
-            <DialogContent>
-                <DialogHeader>
-                <DialogTitle>Email Payslip to {employeeForAction?.name}</DialogTitle>
-                <DialogDescription>A PDF of the payslip will be generated and sent to the recipient's email address.</DialogDescription>
-                </DialogHeader>
-                <div className="space-y-2">
-                <Label htmlFor="recipient-email">Recipient Email</Label>
-                <Input id="recipient-email" type="email" placeholder="employee@example.com" value={recipientEmail} onChange={(e) => setRecipientEmail(e.target.value)} disabled={isSendingEmail}/>
-                </div>
-                <DialogFooter>
-                <Button variant="outline" onClick={() => setIsEmailDialogOpen(false)} disabled={isSendingEmail}>Cancel</Button>
-                <Button onClick={handleSendEmail} disabled={isSendingEmail || !recipientEmail}>
-                    {isSendingEmail ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Send className="mr-2 h-4 w-4" />}
-                    Send Email
-                </Button>
-                </DialogFooter>
-                 <div className="absolute -left-[9999px] top-0 opacity-0 pointer-events-none">
-                    <div ref={payslipPrintRef}>
-                      {employeeForAction && companyDetails && (
-                          <PayslipTemplate
-                              employee={employeeForAction}
-                              payPeriod={format(payPeriod, 'yyyy-MM')}
-                              companyDetails={companyDetails}
-                              payrollSettings={payrollSettings}
-                              currencySymbol={currencySymbol}
-                              signatureDataUri={payslipImageDataUris.signature}
-                              stampDataUri={payslipImageDataUris.stamp}
-                          />
-                      )}
-                    </div>
-                </div>
-            </DialogContent>
         </Dialog>
     </div>
   );

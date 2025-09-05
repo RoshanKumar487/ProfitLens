@@ -12,7 +12,7 @@ import { format } from 'date-fns';
 import { useAuth } from '@/contexts/AuthContext';
 import { Skeleton } from '@/components/ui/skeleton';
 import Link from 'next/link';
-import { MOCK_REVENUE, type RevenueEntryDisplay } from '@/lib/mock-data';
+import { getRecentRevenue, type RevenueEntryDisplay } from './actions';
 
 export default function RecordRevenuePage() {
   const { user, isLoading: authIsLoading, currencySymbol } = useAuth();
@@ -21,13 +21,20 @@ export default function RecordRevenuePage() {
   const [isLoadingEntries, setIsLoadingEntries] = useState(true);
 
   useEffect(() => {
-    // Mock fetching revenue
-    setIsLoadingEntries(true);
-    setTimeout(() => {
-        setRecentEntries(MOCK_REVENUE);
-        setIsLoadingEntries(false);
-    }, 1000);
-  }, []);
+    async function loadRevenue() {
+        if (!user) return;
+        setIsLoadingEntries(true);
+        try {
+            const revenue = await getRecentRevenue();
+            setRecentEntries(revenue);
+        } catch (error) {
+            console.error(error);
+        } finally {
+            setIsLoadingEntries(false);
+        }
+    }
+    loadRevenue();
+  }, [user]);
 
   if (authIsLoading) {
     return (

@@ -41,16 +41,16 @@ export default function SettingsPage() {
   const [isSaving, setIsSaving] = useState(false);
 
   const fetchSettings = useCallback(async () => {
-    if (!user || !user.companyId) {
+    if (!user) {
         setIsLoading(false);
         return;
     }
     setIsLoading(true);
     try {
         const [fetchedInvoiceSettings, fetchedPayrollSettings, fetchedProductSettings] = await Promise.all([
-            getInvoiceSettings(user.companyId),
-            getPayrollSettings(user.companyId),
-            getProductSettings(user.companyId),
+            getInvoiceSettings(),
+            getPayrollSettings(),
+            getProductSettings(),
         ]);
         setInvoiceSettings(fetchedInvoiceSettings);
         setPayrollSettings(fetchedPayrollSettings);
@@ -85,9 +85,9 @@ export default function SettingsPage() {
   };
 
   const handleSaveInvoiceSettings = async () => {
-    if (!user || !user.companyId) return;
+    if (!user) return;
     setIsSaving(true);
-    const result = await saveInvoiceSettings(user.companyId, invoiceSettings);
+    const result = await saveInvoiceSettings(invoiceSettings);
     toast({ title: result.success ? 'Success' : 'Error', description: result.message, variant: result.success ? 'default' : 'destructive' });
     setIsSaving(false);
   };
@@ -121,9 +121,9 @@ export default function SettingsPage() {
   };
 
   const handleSavePayrollSettings = async () => {
-    if (!user || !user.companyId) return;
+    if (!user) return;
     setIsSaving(true);
-    const result = await savePayrollSettings(user.companyId, payrollSettings);
+    const result = await savePayrollSettings(payrollSettings);
     toast({ title: result.success ? 'Success' : 'Error', description: result.message, variant: result.success ? 'default' : 'destructive' });
     setIsSaving(false);
   };
@@ -145,9 +145,9 @@ export default function SettingsPage() {
   };
 
   const handleSaveProductSettings = async () => {
-    if (!user || !user.companyId) return;
+    if (!user) return;
     setIsSaving(true);
-    const result = await saveProductSettings(user.companyId, productSettings);
+    const result = await saveProductSettings(productSettings);
     toast({ title: result.success ? 'Success' : 'Error', description: result.message, variant: result.success ? 'default' : 'destructive' });
     setIsSaving(false);
   };

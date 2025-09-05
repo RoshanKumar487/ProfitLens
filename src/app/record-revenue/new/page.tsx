@@ -16,6 +16,7 @@ import { format } from 'date-fns';
 import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/contexts/AuthContext';
 import Link from 'next/link';
+import { addRevenueEntry } from '../actions';
 
 export default function NewRevenuePage() {
   const { user, currencySymbol } = useAuth();
@@ -47,11 +48,20 @@ export default function NewRevenuePage() {
 
     setIsSaving(true);
     
-    // Mock saving
-    setTimeout(() => {
-      toast({ title: 'Revenue Recorded', description: 'Your revenue has been saved locally.' });
-      router.push('/record-revenue');
-    }, 1000);
+    const result = await addRevenueEntry({
+        date,
+        amount: amountNum,
+        source,
+        description: description || undefined,
+    });
+    
+    if (result.success) {
+        toast({ title: 'Revenue Recorded', description: result.message });
+        router.push('/record-revenue');
+    } else {
+        toast({ title: 'Save Failed', description: result.message, variant: 'destructive' });
+        setIsSaving(false);
+    }
   };
 
   return (

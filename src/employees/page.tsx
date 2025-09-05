@@ -21,22 +21,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger, DropdownMenuSeparator } from '@/components/ui/dropdown-menu';
 import Link from 'next/link';
 import { useToast } from '@/hooks/use-toast';
-import { deleteEmployee } from './actions';
-
-export interface EmployeeDisplay {
-  id: string;
-  name: string;
-  position: string;
-  salary: number;
-  description?: string;
-  profilePictureUrl?: string;
-}
-
-const MOCK_EMPLOYEES: EmployeeDisplay[] = [
-    { id: '1', name: 'Alice Johnson', position: 'Software Engineer', salary: 95000, description: 'Frontend specialist' },
-    { id: '2', name: 'Bob Williams', position: 'Project Manager', salary: 110000, description: 'Leads the core product team' },
-    { id: '3', name: 'Charlie Brown', position: 'UX/UI Designer', salary: 85000, description: 'Focuses on mobile application design' },
-];
+import { getEmployees, deleteEmployee, type EmployeeDisplay } from './actions';
 
 
 const getInitials = (name: string = "") => {
@@ -55,19 +40,36 @@ export default function EmployeesPage() {
   const [employees, setEmployees] = useState<EmployeeDisplay[]>([]);
   const [isLoadingEmployees, setIsLoadingEmployees] = useState(true);
 
-  useEffect(() => {
+  const fetchEmployees = useCallback(async () => {
+    if (!user) return;
     setIsLoadingEmployees(true);
-    // Simulate fetching data
-    setTimeout(() => {
-        setEmployees(MOCK_EMPLOYEES);
+    try {
+        const fetchedEmployees = await getEmployees();
+        setEmployees(fetchedEmployees);
+    } catch(error: any) {
+        toast({ title: 'Error', description: 'Could not fetch employees.', variant: 'destructive' });
+    } finally {
         setIsLoadingEmployees(false);
-    }, 1000);
-  }, []);
+    }
+  }, [user, toast]);
+
+  useEffect(() => {
+    if(!authIsLoading) {
+      fetchEmployees();
+    }
+  }, [authIsLoading, fetchEmployees]);
 
   const handleDelete = async (employeeId: string, employeeName: string) => {
     const originalEmployees = [...employees];
     setEmployees(prev => prev.filter(emp => emp.id !== employeeId));
-    toast({ title: 'Employee Deleted', description: `${employeeName} has been removed (mock).` });
+    
+    const result = await deleteEmployee(employeeId);
+    if (!result.success) {
+      toast({ title: 'Error', description: result.message, variant: 'destructive' });
+      setEmployees(originalEmployees); // Revert on failure
+    } else {
+      toast({ title: 'Employee Deleted', description: `${employeeName} has been removed.` });
+    }
   }
 
   if (authIsLoading) {

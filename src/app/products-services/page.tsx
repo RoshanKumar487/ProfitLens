@@ -37,45 +37,27 @@ export default function ProductsServicesPage() {
     const [productSettings, setProductSettings] = useState<ProductSettings | null>(null);
     
     const fetchProducts = useCallback(async () => {
-        if (!user?.companyId) return;
+        if (!user) return;
         setIsLoading(true);
         try {
-            const fetchedProducts = await getAllProducts(user.companyId);
+            const [fetchedProducts, fetchedSettings] = await Promise.all([
+                getAllProducts(),
+                getProductSettingsForCompany()
+            ]);
             setProducts(fetchedProducts);
+            setProductSettings(fetchedSettings);
         } catch (error) {
             toast({ title: "Error", description: "Failed to load products.", variant: "destructive" });
         } finally {
             setIsLoading(false);
         }
-    }, [user?.companyId, toast]);
+    }, [user, toast]);
 
     useEffect(() => {
-        const fetchInitialData = async () => {
-            if (!user?.companyId) {
-                setIsLoading(false);
-                return;
-            }
-            setIsLoading(true);
-            try {
-                const [fetchedProducts, fetchedSettings] = await Promise.all([
-                    getAllProducts(user.companyId),
-                    getProductSettingsForCompany(user.companyId)
-                ]);
-                setProducts(fetchedProducts);
-                setProductSettings(fetchedSettings);
-            } catch (error) {
-                 toast({ title: "Error", description: "Failed to load initial data.", variant: "destructive" });
-            } finally {
-                setIsLoading(false);
-            }
-        };
-
-        if (user?.companyId) {
-           fetchInitialData();
-        } else if (!authIsLoading) {
-            setIsLoading(false);
-        }
-    }, [user?.companyId, authIsLoading, toast]);
+       if (!authIsLoading) {
+           fetchProducts();
+       }
+    }, [authIsLoading, fetchProducts]);
     
     const filteredAndSortedProducts = useMemo(() => {
         let sortableItems = [...products];
@@ -168,9 +150,9 @@ export default function ProductsServicesPage() {
     };
     
     const handleSaveAllProducts = async () => {
-      if (!user?.companyId) return;
+      if (!user) return;
       setIsSaving(true);
-      const result = await saveAllProducts(user.companyId, products);
+      const result = await saveAllProducts(products);
       if (result.success) {
         toast({ title: "Success", description: result.message });
         await fetchProducts();
@@ -189,9 +171,9 @@ export default function ProductsServicesPage() {
     };
 
     const confirmDelete = async () => {
-        if (!itemToDelete || !user?.companyId) return;
+        if (!itemToDelete || !user) return;
         setIsSaving(true);
-        const result = await deleteProduct(user.companyId, itemToDelete.id);
+        const result = await deleteProduct(itemToDelete.id);
         if (result.success) {
             toast({ title: "Success", description: result.message });
             setProducts(prev => prev.filter(p => p.id !== itemToDelete.id));

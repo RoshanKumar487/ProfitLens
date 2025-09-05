@@ -3,21 +3,21 @@
 
 import React, { useState, useEffect, useCallback } from 'react';
 import { useRouter, useParams } from 'next/navigation';
-import { useForm, Controller } from 'react-hook-form';
+import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
-import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from '@/components/ui/card';
+import { Card, CardContent, CardHeader, CardTitle, CardFooter } from '@/components/ui/card';
 import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/contexts/AuthContext';
-import { Loader2, Save, User, Camera, UploadCloud, Trash2, ArrowLeft, CalendarIcon } from 'lucide-react';
+import { Loader2, Save, User, ArrowLeft, CalendarIcon } from 'lucide-react';
 import Link from 'next/link';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Popover, PopoverTrigger, PopoverContent } from '@/components/ui/popover';
 import { Calendar } from '@/components/ui/calendar';
-import { format, parseISO } from 'date-fns';
+import { format } from 'date-fns';
 import Image from 'next/image';
 import { updateEmployee, getEmployeeById, uploadFile } from '../../actions';
 import { EmployeeSchema, type EmployeeInput } from '@/lib/schemas';
@@ -55,16 +55,20 @@ export default function EmployeeFormPage() {
         if (!isEditMode) return;
         setIsLoading(true);
         try {
-            // Mock fetching
-            const employee = {
-                name: 'Alice Johnson', position: 'Software Engineer', salary: 95000, 
-                joiningDate: new Date(), dateOfBirth: new Date('1990-05-15')
-            };
-            form.reset({
-                ...employee,
-                joiningDate: employee.joiningDate ? new Date(employee.joiningDate) : undefined,
-                dateOfBirth: employee.dateOfBirth ? new Date(employee.dateOfBirth) : undefined,
-            });
+            const employee = await getEmployeeById(employeeId);
+            if (employee) {
+                form.reset({
+                    ...employee,
+                    joiningDate: employee.joiningDate ? new Date(employee.joiningDate) : undefined,
+                    dateOfBirth: employee.dateOfBirth ? new Date(employee.dateOfBirth) : undefined,
+                });
+                if (employee.profilePictureUrl) setProfilePicturePreview(employee.profilePictureUrl);
+                if (employee.signatureUrl) setSignaturePreview(employee.signatureUrl);
+                if (employee.leftThumbImpressionUrl) setThumbImpressionPreview(employee.leftThumbImpressionUrl);
+            } else {
+                toast({ title: "Error", description: "Employee not found.", variant: "destructive" });
+                router.push('/employees');
+            }
         } catch (error) {
             toast({ title: "Error", description: "Failed to load employee data.", variant: "destructive" });
         } finally {
@@ -111,12 +115,35 @@ export default function EmployeeFormPage() {
 
 
     const onSubmit = async (data: EmployeeInput) => {
+        if (!user) return;
         setIsSaving(true);
         try {
-            // Mock saving
-            await new Promise(resolve => setTimeout(resolve, 1000));
-            toast({ title: 'Success', description: `Employee ${isEditMode ? 'updated' : 'added'}.` });
-            router.push('/employees');
+            let profilePictureUrl = form.getValues('profilePictureUrl');
+            if (profilePictureFile) {
+                profilePictureUrl = await uploadFile(profilePictureFile, `employees/${user.companyId}/${employeeId || 'new'}/profile.jpg`);
+            }
+            
+            let signatureUrl = form.getValues('signatureUrl');
+            if (signatureFile) {
+                signatureUrl = await uploadFile(signatureFile, `employees/${user.companyId}/${employeeId || 'new'}/signature.png`);
+            }
+            
+            let leftThumbImpressionUrl = form.getValues('leftThumbImpressionUrl');
+            if (thumbImpressionFile) {
+                leftThumbImpressionUrl = await uploadFile(thumbImpressionFile, `employees/${user.companyId}/${employeeId || 'new'}/thumb.png`);
+            }
+
+            const result = await updateEmployee(
+                isEditMode ? employeeId : null,
+                { ...data, profilePictureUrl, signatureUrl, leftThumbImpressionUrl }
+            );
+
+            if (result.success) {
+                toast({ title: 'Success', description: `Employee ${isEditMode ? 'updated' : 'added'}.` });
+                router.push('/employees');
+            } else {
+                toast({ title: 'Save Failed', description: result.message, variant: 'destructive' });
+            }
         } catch (error: any) {
             toast({ title: 'Save Failed', description: error.message || 'An unknown error occurred.', variant: 'destructive' });
         } finally {
