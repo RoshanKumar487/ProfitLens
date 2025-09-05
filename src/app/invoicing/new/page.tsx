@@ -72,7 +72,7 @@ export default function NewInvoicePage() {
             issuedDate: new Date(),
             dueDate: new Date(new Date().setDate(new Date().getDate() + (MOCK_INVOICE_SETTINGS.defaultPaymentTermsDays || 30))),
             status: 'Draft',
-            items: [{ id: crypto.randomUUID(), description: '', hsnNo: MOCK_INVOICE_SETTINGS.defaultHsnCode || '', quantity: 1, unitPrice: 0, customFields: {} }],
+            items: [], // Start with an empty array
             invoiceNumber: `INV${(Date.now()).toString().slice(-6)}`,
             clientName: '',
             notes: MOCK_INVOICE_SETTINGS.defaultNotes,
@@ -84,6 +84,17 @@ export default function NewInvoicePage() {
     const [isSaving, setIsSaving] = useState(false);
     const [invoiceSettings] = useState<InvoiceSettings | null>(MOCK_INVOICE_SETTINGS);
     
+    // Fix for hydration error: initialize the first item on the client side.
+    useEffect(() => {
+        if (currentInvoice.items?.length === 0) {
+            setCurrentInvoice(prev => ({
+                ...prev,
+                items: [{ id: uuidv4(), description: '', hsnNo: MOCK_INVOICE_SETTINGS.defaultHsnCode || '', quantity: 1, unitPrice: 0, customFields: {} }]
+            }));
+        }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, []);
+
     useEffect(() => {
         if (!currentInvoice) return;
         const subtotal = (currentInvoice.items || []).reduce((sum, item) => sum + (Number(item.quantity || 0) * Number(item.unitPrice || 0)), 0);
@@ -117,7 +128,7 @@ export default function NewInvoicePage() {
     
     const handleAddItem = () => {
         const newItem: InvoiceItem = { 
-            id: crypto.randomUUID(), 
+            id: uuidv4(), 
             description: '', 
             hsnNo: invoiceSettings?.defaultHsnCode || '', 
             quantity: 1, 
