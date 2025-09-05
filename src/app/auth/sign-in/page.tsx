@@ -23,7 +23,6 @@ type FormValues = z.infer<typeof formSchema>;
 
 export default function SignInPage() {
   const { toast } = useToast();
-  const router = useRouter();
   const [isLoading, setIsLoading] = useState(false);
 
   const form = useForm<FormValues>({
@@ -44,7 +43,7 @@ export default function SignInPage() {
 
       if (response.ok) {
         toast({ title: 'Success', description: 'Signed in successfully. Redirecting...' });
-        window.location.href = '/dashboard';
+        window.location.href = '/dashboard'; // Force a full page reload to ensure session is picked up
       } else {
         throw new Error(result.message || 'Failed to sign in.');
       }
