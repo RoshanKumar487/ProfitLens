@@ -6,6 +6,7 @@ import { ObjectId } from 'mongodb';
 import { revalidatePath } from 'next/cache';
 import { getSession } from '@/app/auth/actions';
 import type { InvoiceSettings } from '@/app/settings/actions';
+import { MOCK_COMPANY_PROFILE, MOCK_FULL_INVOICE, MOCK_INVOICES } from '@/lib/mock-data';
 
 // Interface for a single item within an invoice
 export interface InvoiceItem {
@@ -133,12 +134,34 @@ export async function getInvoiceById(invoiceId: string): Promise<FullInvoiceDisp
         if (!doc) return null;
 
         const { _id, companyId: docCompanyId, ...rest } = doc;
+        
+        // Ensure all properties of FullInvoice are present
+        const fullInvoiceData: FullInvoice = {
+            clientName: doc.clientName,
+            subtotal: doc.subtotal,
+            discountType: doc.discountType,
+            discountValue: doc.discountValue,
+            discountAmount: doc.discountAmount,
+            taxRate: doc.taxRate,
+            taxAmount: doc.taxAmount,
+            isRcmApplicable: doc.isRcmApplicable,
+            amount: doc.amount,
+            status: doc.status,
+            issuedDate: new Date(doc.issuedDate),
+            items: doc.items.map((item: any) => ({...item, id: item.id || new ObjectId().toHexString()})), // ensure items have ids
+            invoiceNumber: doc.invoiceNumber,
+            // optional fields
+            clientEmail: doc.clientEmail,
+            clientAddress: doc.clientAddress,
+            clientGstin: doc.clientGstin,
+            dueDate: doc.dueDate ? new Date(doc.dueDate) : undefined,
+            notes: doc.notes,
+        };
+
         return {
             id: _id.toHexString(),
-            ...rest,
-            issuedDate: new Date(doc.issuedDate),
-            dueDate: doc.dueDate ? new Date(doc.dueDate) : undefined,
-        } as FullInvoiceDisplay;
+            ...fullInvoiceData,
+        };
 
     } catch (error) {
         console.error('Failed to get invoice by ID:', error);
