@@ -1,8 +1,8 @@
 
 'use client';
 
-import React, { useState, useMemo, useEffect } from 'react';
-import { useRouter } from 'next/navigation';
+import React, { useState, useEffect } from 'react';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Receipt, PlusCircle, Save, Loader2, Calendar as CalendarIconLucide, Trash2, Settings, ArrowLeft } from 'lucide-react';
@@ -16,72 +16,87 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { useAuth } from '@/contexts/AuthContext';
 import { Separator } from '@/components/ui/separator';
 import Link from 'next/link';
-import { type InvoiceSettings } from '@/app/settings/actions';
+import { getInvoiceSettings, type InvoiceSettings } from '@/app/settings/actions';
 import { v4 as uuidv4 } from 'uuid';
 import { Checkbox } from '@/components/ui/checkbox';
-import { MOCK_INVOICE_SETTINGS, MOCK_USER } from '@/lib/mock-data';
 import PageTitle from '@/components/PageTitle';
-
-interface InvoiceItem {
-  id: string;
-  description: string;
-  hsnNo?: string;
-  quantity: number;
-  unitPrice: number;
-  customFields?: { [key: string]: string };
-}
+import { addInvoice, getInvoiceById, getCompanyProfile, type FullInvoice, type InvoiceItem, type CompanyDetailsFirestore } from '../actions';
+import { Skeleton } from '@/components/ui/skeleton';
 
 type DiscountType = 'fixed' | 'percentage';
 
-interface InvoiceDisplay {
-  id: string;
-  invoiceNumber: string;
-  clientName: string;
-  clientEmail?: string;
-  clientAddress?: string;
-  clientGstin?: string;
-  subtotal: number;
-  discountType: DiscountType;
-  discountValue: number;
-  discountAmount: number;
-  taxRate: number;
-  taxAmount: number;
-  isRcmApplicable: boolean;
-  amount: number;
-  dueDate?: Date;
-  status: 'Paid' | 'Pending' | 'Overdue' | 'Draft';
-  issuedDate: Date;
-  items: InvoiceItem[];
-  notes?: string;
-}
-
 export default function NewInvoicePage() {
-    const { currencySymbol } = useAuth();
+    const { user, currencySymbol, isLoading: authLoading } = useAuth();
     const { toast } = useToast();
     const router = useRouter();
+    const searchParams = useSearchParams();
 
-    const [currentInvoice, setCurrentInvoice] = useState<Partial<InvoiceDisplay>>({});
+    const [currentInvoice, setCurrentInvoice] = useState<Partial<FullInvoice> | null>(null);
     const [isSaving, setIsSaving] = useState(false);
-    const [invoiceSettings, setInvoiceSettings] = useState<InvoiceSettings | null>(MOCK_INVOICE_SETTINGS);
+    const [isLoading, setIsLoading] = useState(true);
+    const [invoiceSettings, setInvoiceSettings] = useState<InvoiceSettings | null>(null);
+    const [companyProfile, setCompanyProfile] = useState<CompanyDetailsFirestore | null>(null);
     
     useEffect(() => {
-        // Use a useEffect to set initial state that relies on external data or randomness
-        // to avoid hydration errors.
-        setCurrentInvoice({
-            id: uuidv4(),
-            status: 'Draft',
-            items: [{ id: uuidv4(), description: '', hsnNo: MOCK_INVOICE_SETTINGS.defaultHsnCode || '', quantity: 1, unitPrice: 0, customFields: {} }], 
-            invoiceNumber: `INV${(Date.now()).toString().slice(-6)}`,
-            clientName: '',
-            notes: MOCK_INVOICE_SETTINGS.defaultNotes,
-            discountType: 'fixed',
-            discountValue: 0,
-            taxRate: 0,
-            isRcmApplicable: false,
-            issuedDate: new Date(),
-            dueDate: new Date(new Date().setDate(new Date().getDate() + (MOCK_INVOICE_SETTINGS?.defaultPaymentTermsDays || 30))),
-        });
-    }, []);
+        const initializeInvoice = async () => {
+            if (!user?.companyId) {
+                if (!authLoading) setIsLoading(false);
+                return;
+            };
+            
+            setIsLoading(true);
+            try {
+                const [settings, company] = await Promise.all([
+                    getInvoiceSettings(user.companyId),
+                    getCompanyProfile()
+                ]);
+                setInvoiceSettings(settings);
+                setCompanyProfile(company);
+
+                const duplicateFromId = searchParams.get('from');
+                let initialData: Partial<FullInvoice>;
+
+                if (duplicateFromId) {
+                    const originalInvoice = await getInvoiceById(duplicateFromId);
+                    if (originalInvoice) {
+                        initialData = {
+                            ...originalInvoice,
+                            invoiceNumber: `INV${(Date.now()).toString().slice(-6)}`,
+                            issuedDate: new Date(),
+                            dueDate: new Date(new Date().setDate(new Date().getDate() + (settings?.defaultPaymentTermsDays || 30))),
+                            status: 'Draft',
+                        };
+                    } else {
+                        toast({title: "Error", description: "Could not find invoice to duplicate.", variant: "destructive"});
+                        initialData = {};
+                    }
+                } else {
+                    initialData = {
+                        items: [{ id: uuidv4(), description: '', hsnNo: settings.defaultHsnCode || '', quantity: 1, unitPrice: 0, customFields: {} }],
+                        invoiceNumber: `INV${(Date.now()).toString().slice(-6)}`,
+                        notes: settings.defaultNotes,
+                        discountType: 'fixed',
+                        discountValue: 0,
+                        taxRate: 0,
+                        isRcmApplicable: false,
+                        issuedDate: new Date(),
+                        status: 'Draft',
+                        dueDate: new Date(new Date().setDate(new Date().getDate() + (settings.defaultPaymentTermsDays || 30))),
+                    };
+                }
+                 setCurrentInvoice(initialData);
+
+            } catch (error) {
+                 toast({title: "Error", description: "Failed to initialize invoice data.", variant: "destructive"});
+            } finally {
+                setIsLoading(false);
+            }
+        };
+
+        if (!authLoading) {
+            initializeInvoice();
+        }
+    }, [user?.companyId, searchParams, toast, authLoading]);
 
     useEffect(() => {
         if (!currentInvoice) return;
@@ -111,7 +126,20 @@ export default function NewInvoicePage() {
 
     const handleFormSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
-        toast({ title: "Action Disabled", description: "Cannot create new invoices in this demo.", variant: "destructive" });
+        if (!currentInvoice || !currentInvoice.clientName || !currentInvoice.invoiceNumber) {
+            toast({title: "Missing Information", description: "Client Name and Invoice Number are required.", variant: "destructive"});
+            return;
+        }
+        setIsSaving(true);
+        const result = await addInvoice(currentInvoice as FullInvoice);
+        
+        if (result.success && result.invoiceId) {
+            toast({ title: "Success", description: result.message });
+            router.push(`/invoicing/${result.invoiceId}/view`);
+        } else {
+            toast({ title: "Error", description: result.message, variant: "destructive" });
+            setIsSaving(false);
+        }
     };
     
     const handleAddItem = () => {
@@ -123,7 +151,7 @@ export default function NewInvoicePage() {
             unitPrice: 0, 
             customFields: {} 
         };
-        setCurrentInvoice(prev => ({ ...prev, items: [...(prev.items || []), newItem] }));
+        setCurrentInvoice(prev => prev ? ({ ...prev, items: [...(prev.items || []), newItem] }) : null);
     };
 
     const handleItemChange = (itemId: string, field: keyof Omit<InvoiceItem, 'id' | 'customFields'>, value: string | number) => {
@@ -155,12 +183,29 @@ export default function NewInvoicePage() {
     };
 
     const handleRemoveItem = (itemId: string) => {
-        if ((currentInvoice.items || []).length <= 1) {
+        if ((currentInvoice?.items || []).length <= 1) {
             toast({ title: 'Cannot remove', description: 'You must have at least one item in the invoice.', variant: 'destructive' });
             return;
         }
         setCurrentInvoice(prev => prev ? ({ ...prev, items: (prev.items || []).filter(item => item.id !== itemId) }) : null)
     };
+
+    if (isLoading || authLoading) {
+        return (
+            <div className="space-y-6 p-4 sm:p-6 lg:p-8">
+                <PageTitle title="Create New Invoice" />
+                <div className="max-w-4xl mx-auto p-8 border rounded-lg"><Skeleton className="h-96 w-full" /></div>
+            </div>
+        )
+    }
+    
+    if (!user) {
+        return (
+             <div className="space-y-6 p-4 sm:p-6 lg:p-8">
+                <PageTitle title="Access Denied" subtitle="Please sign in to create an invoice." />
+            </div>
+        )
+    }
 
     const customColumns = invoiceSettings?.customItemColumns || [];
     const itemGridCols = `grid-cols-[minmax(0,4fr)_minmax(0,1.5fr)_minmax(0,1fr)_minmax(0,1.5fr)_minmax(0,1.5fr)_minmax(0,0.5fr)]`;
@@ -185,12 +230,12 @@ export default function NewInvoicePage() {
                     {/* Header */}
                     <header className="flex justify-between items-start mb-8">
                         <div>
-                            <h1 className="text-2xl font-bold text-primary">{MOCK_USER.companyName}</h1>
+                            <h1 className="text-2xl font-bold text-primary">{companyProfile?.name}</h1>
                             <p className="text-muted-foreground text-sm">Invoice</p>
                         </div>
                         <div className="text-right">
                             <Label htmlFor="invoiceNumber" className="text-muted-foreground">Invoice #</Label>
-                            <Input id="invoiceNumber" className="text-right font-bold text-lg h-9 w-40 mt-1" value={currentInvoice.invoiceNumber || ''} onChange={(e) => setCurrentInvoice({...currentInvoice, invoiceNumber: e.target.value})} required/>
+                            <Input id="invoiceNumber" className="text-right font-bold text-lg h-9 w-40 mt-1" value={currentInvoice?.invoiceNumber || ''} onChange={(e) => setCurrentInvoice({...currentInvoice, invoiceNumber: e.target.value})} required/>
                         </div>
                     </header>
 
@@ -198,49 +243,50 @@ export default function NewInvoicePage() {
                      <section className="grid grid-cols-1 md:grid-cols-2 gap-8 mb-8 border rounded-lg p-6">
                         <div className="space-y-3">
                             <h3 className="font-semibold">Bill To:</h3>
-                            <Input placeholder="Client Name" className="font-bold" value={currentInvoice.clientName || ''} onChange={(e) => setCurrentInvoice({...currentInvoice, clientName: e.target.value})} required />
-                            <Input placeholder="Client Email" type="email" value={currentInvoice.clientEmail || ''} onChange={(e) => setCurrentInvoice({...currentInvoice, clientEmail: e.target.value})}/>
-                            <Input placeholder="Client GSTIN" value={currentInvoice.clientGstin || ''} onChange={(e) => setCurrentInvoice({...currentInvoice, clientGstin: e.target.value})}/>
-                            <Textarea placeholder="Client Billing Address" value={currentInvoice.clientAddress || ''} onChange={(e) => setCurrentInvoice({...currentInvoice, clientAddress: e.target.value})} rows={3}/>
+                            <Input placeholder="Client Name" className="font-bold" value={currentInvoice?.clientName || ''} onChange={(e) => setCurrentInvoice({...currentInvoice, clientName: e.target.value})} required />
+                            <Input placeholder="Client Email" type="email" value={currentInvoice?.clientEmail || ''} onChange={(e) => setCurrentInvoice({...currentInvoice, clientEmail: e.target.value})}/>
+                            <Input placeholder="Client GSTIN" value={currentInvoice?.clientGstin || ''} onChange={(e) => setCurrentInvoice({...currentInvoice, clientGstin: e.target.value})}/>
+                            <Textarea placeholder="Client Billing Address" value={currentInvoice?.clientAddress || ''} onChange={(e) => setCurrentInvoice({...currentInvoice, clientAddress: e.target.value})} rows={3}/>
                         </div>
                         <div className="space-y-4">
                             <div className="space-y-1">
                                 <Label>Issued Date</Label>
-                                <Popover><PopoverTrigger asChild><Button variant="outline" className="w-full justify-start text-left"><CalendarIconLucide className="mr-2 h-4 w-4" />{currentInvoice.issuedDate ? format(currentInvoice.issuedDate, 'PPP') : ''}</Button></PopoverTrigger><PopoverContent className="w-auto p-0"><Calendar mode="single" selected={currentInvoice.issuedDate} onSelect={(d) => setCurrentInvoice({...currentInvoice, issuedDate: d!})}/></PopoverContent></Popover>
+                                <Popover><PopoverTrigger asChild><Button variant="outline" className="w-full justify-start text-left"><CalendarIconLucide className="mr-2 h-4 w-4" />{currentInvoice?.issuedDate ? format(currentInvoice.issuedDate, 'PPP') : ''}</Button></PopoverTrigger><PopoverContent className="w-auto p-0"><Calendar mode="single" selected={currentInvoice?.issuedDate} onSelect={(d) => setCurrentInvoice({...currentInvoice, issuedDate: d!})}/></PopoverContent></Popover>
                             </div>
                              <div className="space-y-1">
                                 <Label>Due Date (Optional)</Label>
-                                <Popover><PopoverTrigger asChild><Button variant="outline" className="w-full justify-start text-left"><CalendarIconLucide className="mr-2 h-4 w-4" />{currentInvoice.dueDate ? format(currentInvoice.dueDate, 'PPP') : <span>Pick a date</span>}</Button></PopoverTrigger><PopoverContent className="w-auto p-0"><Calendar mode="single" selected={currentInvoice.dueDate} onSelect={(d) => setCurrentInvoice({...currentInvoice, dueDate: d})}/></PopoverContent></Popover>
+                                <Popover><PopoverTrigger asChild><Button variant="outline" className="w-full justify-start text-left"><CalendarIconLucide className="mr-2 h-4 w-4" />{currentInvoice?.dueDate ? format(currentInvoice.dueDate, 'PPP') : <span>Pick a date</span>}</Button></PopoverTrigger><PopoverContent className="w-auto p-0"><Calendar mode="single" selected={currentInvoice?.dueDate} onSelect={(d) => setCurrentInvoice({...currentInvoice, dueDate: d})}/></PopoverContent></Popover>
                             </div>
                         </div>
                     </section>
 
                     {/* Items Table */}
-                    <section className="mb-8">
-                        <div className="w-full">
-                            {/* Table Header */}
-                            <div className="grid grid-cols-[minmax(0,4fr)_minmax(0,1.5fr)_minmax(0,1fr)_minmax(0,1.5fr)_minmax(0,1.5fr)_minmax(0,0.5fr)] gap-2 text-sm font-semibold text-muted-foreground px-2 py-1">
+                     <section className="mb-8">
+                        <div className="w-full overflow-x-auto">
+                           <div className="grid gap-2 text-sm font-semibold text-muted-foreground px-2 py-1" style={{gridTemplateColumns: `minmax(250px, 2fr) minmax(120px, 1fr) ${customColumns.map(() => 'minmax(120px, 1fr)').join(' ')} minmax(100px, 0.75fr) minmax(120px, 1fr) minmax(120px, 1fr) 50px`}}>
                                 <Label>Description</Label>
                                 <Label className="text-center">HSN No.</Label>
+                                {customColumns.map(col => <Label key={col.id} className="text-center">{col.label}</Label>)}
                                 <Label className="text-right">Quantity</Label>
                                 <Label className="text-right">Price</Label>
                                 <Label className="text-right">Total</Label>
-                                <div className=""></div>
+                                <div></div>
                             </div>
-                             {/* Table Body */}
                             <div className="space-y-2">
-                            {(currentInvoice.items || []).map((item, index) => (
-                                <div key={item.id} className="grid grid-cols-[minmax(0,4fr)_minmax(0,1.5fr)_minmax(0,1fr)_minmax(0,1.5fr)_minmax(0,1.5fr)_minmax(0,0.5fr)] gap-2 items-start p-2 rounded-md hover:bg-muted/50">
-                                    <Input placeholder="Item description" value={item.description} onChange={e => handleItemChange(item.id, 'description', e.target.value)} />
+                            {(currentInvoice?.items || []).map((item) => (
+                                <div key={item.id} className="grid gap-2 items-start p-2 rounded-md hover:bg-muted/50" style={{gridTemplateColumns: `minmax(250px, 2fr) minmax(120px, 1fr) ${customColumns.map(() => 'minmax(120px, 1fr)').join(' ')} minmax(100px, 0.75fr) minmax(120px, 1fr) minmax(120px, 1fr) 50px`}}>
+                                    <Textarea placeholder="Item description" value={item.description} onChange={e => handleItemChange(item.id, 'description', e.target.value)} className="min-h-[40px] h-10" />
                                     <Input placeholder="HSN" className="text-center" value={item.hsnNo || ''} onChange={e => handleItemChange(item.id, 'hsnNo', e.target.value)} />
-                                    
+                                     {customColumns.map(col => (
+                                        <Input key={col.id} placeholder={col.label} className="text-center" value={item.customFields?.[col.id] || ''} onChange={e => handleCustomFieldChange(item.id, col.id, e.target.value)} />
+                                    ))}
                                     <Input type="number" placeholder="1" className="text-right" value={item.quantity} onChange={e => handleItemChange(item.id, 'quantity', e.target.value)} />
                                     <Input type="number" placeholder="0.00" className="text-right" value={item.unitPrice} onChange={e => handleItemChange(item.id, 'unitPrice', e.target.value)} />
                                     
                                     <div className="text-right font-medium pr-2 pt-2">
                                         {currencySymbol}{((item.quantity || 0) * (item.unitPrice || 0)).toFixed(2)}
                                     </div>
-                                    <div className="flex justify-center items-center pt-1">
+                                    <div className="flex justify-center items-center pt-1 sticky right-0">
                                         <Button type="button" variant="ghost" size="icon" className="text-destructive h-8 w-8" onClick={() => handleRemoveItem(item.id)}><Trash2 className="h-4 w-4" /></Button>
                                     </div>
                                 </div>
@@ -254,34 +300,34 @@ export default function NewInvoicePage() {
                     <footer className="grid grid-cols-1 md:grid-cols-2 gap-8 pt-8 border-t">
                         <div className="space-y-2">
                             <Label>Notes / Terms</Label>
-                            <Textarea placeholder="Thank you for your business." value={currentInvoice.notes || ''} onChange={(e) => setCurrentInvoice({...currentInvoice, notes: e.target.value})} />
+                            <Textarea placeholder="Thank you for your business." value={currentInvoice?.notes || ''} onChange={(e) => setCurrentInvoice({...currentInvoice, notes: e.target.value})} />
                         </div>
                         <div className="space-y-3">
-                             <div className="flex justify-between items-center"><span className="text-muted-foreground">Subtotal</span><span className="font-medium">{currencySymbol}{(currentInvoice.subtotal || 0).toFixed(2)}</span></div>
+                             <div className="flex justify-between items-center"><span className="text-muted-foreground">Subtotal</span><span className="font-medium">{currencySymbol}{(currentInvoice?.subtotal || 0).toFixed(2)}</span></div>
                              <div className="flex justify-between items-center">
                                  <div className="flex items-center gap-2">
-                                     <Select value={currentInvoice.discountType || 'fixed'} onValueChange={(v: DiscountType) => setCurrentInvoice({...currentInvoice, discountType: v})}>
+                                     <Select value={currentInvoice?.discountType || 'fixed'} onValueChange={(v: DiscountType) => setCurrentInvoice({...currentInvoice, discountType: v})}>
                                         <SelectTrigger className="w-28 h-8"><SelectValue/></SelectTrigger>
                                         <SelectContent>
                                             <SelectItem value="fixed">Fixed ({currencySymbol})</SelectItem>
                                             <SelectItem value="percentage">%</SelectItem>
                                         </SelectContent>
                                      </Select>
-                                      <Input type="number" className="w-24 h-8" value={currentInvoice.discountValue || 0} onChange={(e) => setCurrentInvoice({...currentInvoice, discountValue: parseFloat(e.target.value) || 0})} />
+                                      <Input type="number" className="w-24 h-8" value={currentInvoice?.discountValue || 0} onChange={(e) => setCurrentInvoice({...currentInvoice, discountValue: parseFloat(e.target.value) || 0})} />
                                  </div>
-                                 <span className="font-medium text-destructive">- {currencySymbol}{(currentInvoice.discountAmount || 0).toFixed(2)}</span>
+                                 <span className="font-medium text-destructive">- {currencySymbol}{(currentInvoice?.discountAmount || 0).toFixed(2)}</span>
                              </div>
                              <div className="flex justify-between items-center">
                                   <div className="flex items-center gap-2">
                                     <Label>Tax Rate</Label>
-                                    <Input type="number" className="w-20 h-8" value={currentInvoice.taxRate || 0} onChange={(e) => setCurrentInvoice({...currentInvoice, taxRate: parseFloat(e.target.value) || 0})} disabled={currentInvoice.isRcmApplicable} />
+                                    <Input type="number" className="w-20 h-8" value={currentInvoice?.taxRate || 0} onChange={(e) => setCurrentInvoice({...currentInvoice, taxRate: parseFloat(e.target.value) || 0})} disabled={currentInvoice?.isRcmApplicable} />
                                     <span className="text-muted-foreground text-sm">%</span>
-                                    <div className="flex items-center space-x-2 pl-4"><Checkbox id="rcm" checked={currentInvoice.isRcmApplicable} onCheckedChange={(checked) => setCurrentInvoice({...currentInvoice, isRcmApplicable: !!checked})} /><Label htmlFor="rcm" className="text-sm font-medium">RCM</Label></div>
+                                    <div className="flex items-center space-x-2 pl-4"><Checkbox id="rcm" checked={currentInvoice?.isRcmApplicable} onCheckedChange={(checked) => setCurrentInvoice({...currentInvoice, isRcmApplicable: !!checked})} /><Label htmlFor="rcm" className="text-sm font-medium">RCM</Label></div>
                                   </div>
-                                 <span className="font-medium">{currentInvoice.isRcmApplicable ? "N/A" : `+ ${currencySymbol}${(currentInvoice.taxAmount || 0).toFixed(2)}`}</span>
+                                 <span className="font-medium">{currentInvoice?.isRcmApplicable ? "N/A" : `+ ${currencySymbol}${(currentInvoice?.taxAmount || 0).toFixed(2)}`}</span>
                              </div>
                              <Separator className="my-2" />
-                             <div className="flex justify-between items-center text-xl font-bold text-primary"><span >Grand Total</span><span>{currencySymbol}{(currentInvoice.amount || 0).toFixed(2)}</span></div>
+                             <div className="flex justify-between items-center text-xl font-bold text-primary"><span >Grand Total</span><span>{currencySymbol}{(currentInvoice?.amount || 0).toFixed(2)}</span></div>
                         </div>
                     </footer>
                 </div>
@@ -289,4 +335,3 @@ export default function NewInvoicePage() {
         </div>
     );
 }
-

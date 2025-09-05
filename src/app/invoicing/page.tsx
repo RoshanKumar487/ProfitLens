@@ -1,7 +1,7 @@
 
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import PageTitle from '@/components/PageTitle';
 import { Button } from '@/components/ui/button';
 import {
@@ -15,25 +15,53 @@ import {
 } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
-import { Receipt, MoreHorizontal, PlusCircle } from 'lucide-react';
+import { Receipt, MoreHorizontal, PlusCircle, Loader2 } from 'lucide-react';
 import { format } from 'date-fns';
 import { useAuth } from '@/contexts/AuthContext';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
 import Link from 'next/link';
 import { useToast } from '@/hooks/use-toast';
-import { MOCK_INVOICES, type InvoiceDisplay } from '@/lib/mock-data';
+import { getInvoices, deleteInvoice, type InvoiceDisplay } from './actions';
 
 
 export default function InvoicingPage() {
   const { user, isLoading: authIsLoading, currencySymbol } = useAuth();
   const { toast } = useToast();
-  const [invoices, setInvoices] = useState<InvoiceDisplay[]>(MOCK_INVOICES);
-  const [isLoading, setIsLoading] = useState(false);
+  const [invoices, setInvoices] = useState<InvoiceDisplay[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
 
-  const handleDelete = (invoiceId: string) => {
+  useEffect(() => {
+    async function loadInvoices() {
+        if (!user) {
+            setIsLoading(false);
+            return;
+        }
+        setIsLoading(true);
+        try {
+            const fetchedInvoices = await getInvoices();
+            setInvoices(fetchedInvoices);
+        } catch (error) {
+            toast({ title: 'Error', description: 'Could not fetch invoices.', variant: 'destructive' });
+        } finally {
+            setIsLoading(false);
+        }
+    }
+    loadInvoices();
+  }, [user, toast]);
+
+
+  const handleDelete = async (invoiceId: string) => {
+    const originalInvoices = [...invoices];
     setInvoices(prev => prev.filter(inv => inv.id !== invoiceId));
-    toast({ title: 'Invoice Deleted', description: 'The invoice has been removed from the list.'});
+    
+    const result = await deleteInvoice(invoiceId);
+    if (!result.success) {
+        toast({ title: 'Error', description: result.message, variant: 'destructive' });
+        setInvoices(originalInvoices); // Revert on failure
+    } else {
+        toast({ title: 'Invoice Deleted', description: 'The invoice has been removed.'});
+    }
   };
 
   const getStatusBadgeVariant = (status: InvoiceDisplay['status']) => {
@@ -54,7 +82,7 @@ export default function InvoicingPage() {
   if (authIsLoading) {
     return (
       <div className="flex items-center justify-center h-[calc(100vh-200px)] p-4 sm:p-6 lg:p-8">
-        <Skeleton className="h-12 w-12" />
+        <Loader2 className="h-12 w-12 animate-spin text-primary" />
       </div>
     );
   }

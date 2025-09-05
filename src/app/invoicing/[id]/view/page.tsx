@@ -1,8 +1,8 @@
 
 'use client';
 
-import React, { useState, useRef, useCallback } from 'react';
-import { useRouter } from 'next/navigation';
+import React, { useState, useRef, useCallback, useEffect } from 'react';
+import { useRouter, useParams } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import { Receipt, Mail, Printer, ArrowLeft, Loader2, Edit, Download, PenSquare, ZoomIn, ZoomOut } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
@@ -17,22 +17,24 @@ import { Skeleton } from '@/components/ui/skeleton';
 import Link from 'next/link';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { type InvoiceSettings } from '@/app/settings/actions';
+import { getInvoiceSettings, type InvoiceSettings } from '@/app/settings/actions';
 import { Switch } from '@/components/ui/switch';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import SignaturePad from '@/components/SignaturePad';
-import { MOCK_FULL_INVOICE, MOCK_COMPANY_PROFILE, MOCK_INVOICE_SETTINGS, type FullInvoiceDisplay, type CompanyDetailsFirestore } from '@/lib/mock-data';
 import { Slider } from '@/components/ui/slider';
-
+import { getInvoiceById, getCompanyProfile, type FullInvoiceDisplay, type CompanyDetailsFirestore } from '../../actions';
 
 export default function ViewInvoicePage() {
-    const { currencySymbol } = useAuth();
+    const { user, currencySymbol, isLoading: authIsLoading } = useAuth();
     const { toast } = useToast();
     const router = useRouter();
+    const params = useParams();
+    const invoiceId = params.id as string;
 
-    const [invoice] = useState<FullInvoiceDisplay | null>(MOCK_FULL_INVOICE);
-    const [companyProfile] = useState<CompanyDetailsFirestore | null>(MOCK_COMPANY_PROFILE);
-    const [invoiceSettings] = useState<InvoiceSettings | null>(MOCK_INVOICE_SETTINGS);
+    const [invoice, setInvoice] = useState<FullInvoiceDisplay | null>(null);
+    const [companyProfile, setCompanyProfile] = useState<CompanyDetailsFirestore | null>(null);
+    const [invoiceSettings, setInvoiceSettings] = useState<InvoiceSettings | null>(null);
+    const [isLoading, setIsLoading] = useState(true);
     
     const [localSignatureUri, setLocalSignatureUri] = useState<string | undefined>(undefined);
     const [isProcessing, setIsProcessing] = useState(false);
@@ -44,6 +46,44 @@ export default function ViewInvoicePage() {
     const [zoom, setZoom] = useState(1);
 
 
+    const fetchInvoiceData = useCallback(async () => {
+        if (!user?.companyId || !invoiceId) {
+            setIsLoading(false);
+            return;
+        };
+
+        setIsLoading(true);
+        try {
+            const [invoiceData, companyData, settingsData] = await Promise.all([
+                getInvoiceById(invoiceId),
+                getCompanyProfile(),
+                getInvoiceSettings(user.companyId),
+            ]);
+
+            if (!invoiceData) {
+                toast({ title: "Error", description: "Invoice not found.", variant: "destructive" });
+                router.push('/invoicing');
+                return;
+            }
+
+            setInvoice(invoiceData);
+            setCompanyProfile(companyData);
+            setInvoiceSettings(settingsData);
+
+        } catch (error) {
+            toast({ title: "Error", description: "Failed to load invoice data.", variant: "destructive" });
+        } finally {
+            setIsLoading(false);
+        }
+    }, [invoiceId, user?.companyId, router, toast]);
+
+    useEffect(() => {
+        if (!authIsLoading) {
+            fetchInvoiceData();
+        }
+    }, [authIsLoading, fetchInvoiceData]);
+
+
     const handleDisabledAction = () => {
         toast({ title: 'Action Disabled', description: 'This action is disabled in the demo.', variant: 'destructive' });
     }
@@ -53,14 +93,31 @@ export default function ViewInvoicePage() {
         setIsSignatureDialogOpen(false);
     };
 
+    if (isLoading || authIsLoading) {
+        return (
+            <div className="w-full flex flex-col h-[calc(100vh-4rem)] overflow-hidden">
+                 <header className="w-full bg-background/80 border-b shadow-sm z-10 p-2 print:hidden backdrop-blur-sm shrink-0">
+                    <div className="max-w-7xl mx-auto flex items-center gap-4 px-4 h-12">
+                         <Skeleton className="h-8 w-8" />
+                         <Skeleton className="h-6 w-32" />
+                    </div>
+                </header>
+                 <main className="w-full bg-muted py-8 overflow-auto flex-grow">
+                     <div className="w-[210mm] min-h-[297mm] mx-auto p-4 border shadow-lg bg-white">
+                        <Skeleton className="h-24 w-full mb-4" />
+                        <Skeleton className="h-[800px] w-full mt-4" />
+                    </div>
+                </main>
+            </div>
+        )
+    }
+
     if (!invoice || !companyProfile) {
         return (
-            <div className="flex flex-col items-center justify-center p-8 bg-muted min-h-screen">
-                 <div className="w-[210mm] min-h-[297mm] mx-auto p-4 border shadow-lg bg-white">
-                    <Skeleton className="h-24 w-full mb-4" />
-                    <Skeleton className="h-[800px] w-full mt-4" />
-                </div>
-            </div>
+             <div className="p-8 text-center">
+                <p>Could not load invoice data. It might have been deleted.</p>
+                <Button asChild variant="link"><Link href="/invoicing">Return to Invoices</Link></Button>
+             </div>
         )
     }
     
@@ -101,8 +158,8 @@ export default function ViewInvoicePage() {
                             <ArrowLeft className="mr-2 h-4 w-4" /> All Invoices
                         </Link>
                     </Button>
-                    <Button variant="secondary" size="sm" onClick={handleDisabledAction}>
-                        <Edit className="mr-2 h-4 w-4" /> Edit
+                    <Button variant="secondary" size="sm" asChild>
+                         <Link href={`/invoicing/new?from=${invoice.id}`}><Edit className="mr-2 h-4 w-4" /> Duplicate & Edit</Link>
                     </Button>
                     <Dialog open={isSignatureDialogOpen} onOpenChange={setIsSignatureDialogOpen}>
                         <DialogTrigger asChild>
@@ -147,7 +204,7 @@ export default function ViewInvoicePage() {
                             <SelectContent>
                                 <SelectItem value="business">Business</SelectItem>
                                 <SelectItem value="modern">Modern</SelectItem>
-                                <SelectItem value="simple">Simple</SelectItem>
+                                <SelectItem value="simple">Indian</SelectItem>
                                 <SelectItem value="minimalist">Minimalist</SelectItem>
                                 <SelectItem value="bold">Bold</SelectItem>
                                 <SelectItem value="corporate">Corporate</SelectItem>
