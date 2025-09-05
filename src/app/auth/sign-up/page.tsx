@@ -47,6 +47,7 @@ export default function SignUpPage() {
 
       if (response.ok) {
         toast({ title: 'Success', description: 'Your account has been created. Redirecting...' });
+        // Hard redirect to the dashboard to ensure the new session is loaded correctly.
         window.location.href = '/dashboard';
       } else {
         throw new Error(result.message || 'An unknown error occurred.');

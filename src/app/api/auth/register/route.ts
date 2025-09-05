@@ -1,3 +1,4 @@
+
 import { NextResponse } from 'next/server';
 import { connectToDatabase } from '@/lib/mongodb';
 import bcrypt from 'bcryptjs';
@@ -23,6 +24,7 @@ export async function POST(request: Request) {
     
     const publicCompanyId = `pub-${uuidv4()}`;
 
+    // Create the company first
     const companyResult = await db.collection('companies').insertOne({
         name: companyName,
         country: country,
@@ -31,15 +33,17 @@ export async function POST(request: Request) {
     });
     const companyId = companyResult.insertedId;
 
+    // Create the user and assign them as admin
     const userResult = await db.collection('users').insertOne({
       email,
       password: hashedPassword,
       displayName,
       companyId,
-      role: 'admin', // First user is always admin
+      role: 'admin', // First user is automatically the admin, granting immediate access
       createdAt: new Date(),
     });
     
+    // Set the user as the owner of the company
     await db.collection('companies').updateOne(
         { _id: companyId },
         { $set: { ownerId: userResult.insertedId } }
@@ -56,6 +60,7 @@ export async function POST(request: Request) {
       publicCompanyId,
     };
 
+    // Create a session for the new user, logging them in immediately
     await createSession(userPayload);
 
     return NextResponse.json({ success: true, user: userPayload }, { status: 201 });
