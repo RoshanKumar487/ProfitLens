@@ -12,7 +12,6 @@ import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '
 import Link from 'next/link';
 import { Loader2 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
-import { useRouter } from 'next/navigation';
 
 const formSchema = z.object({
   displayName: z.string().min(2, 'Display name is required'),
@@ -45,7 +44,7 @@ export default function SignUpPage() {
 
       if (response.ok) {
         toast({ title: 'Success', description: 'Your account has been created. Redirecting...' });
-        window.location.href = '/dashboard'; // Force a full page reload to ensure session is picked up
+        window.location.href = '/dashboard';
       } else {
         throw new Error(result.message || 'An unknown error occurred.');
       }
