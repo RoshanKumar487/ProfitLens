@@ -45,8 +45,8 @@ export default function SignUpPage() {
       const result = await response.json();
 
       if (response.ok) {
-        toast({ title: 'Success', description: 'Your account has been created.' });
-        router.refresh();
+        toast({ title: 'Success', description: 'Your account has been created. Redirecting...' });
+        window.location.href = '/dashboard';
       } else {
         throw new Error(result.message || 'An unknown error occurred.');
       }
@@ -56,7 +56,6 @@ export default function SignUpPage() {
         description: error.message,
         variant: 'destructive',
       });
-    } finally {
       setIsLoading(false);
     }
   };
@@ -79,7 +78,7 @@ export default function SignUpPage() {
                     <FormItem>
                       <FormLabel>Your Name</FormLabel>
                       <FormControl>
-                        <Input placeholder="John Doe" {...field} />
+                        <Input placeholder="John Doe" {...field} disabled={isLoading}/>
                       </FormControl>
                       <FormMessage />
                     </FormItem>
@@ -92,7 +91,7 @@ export default function SignUpPage() {
                     <FormItem>
                       <FormLabel>Company Name</FormLabel>
                       <FormControl>
-                        <Input placeholder="Acme Inc." {...field} />
+                        <Input placeholder="Acme Inc." {...field} disabled={isLoading}/>
                       </FormControl>
                       <FormMessage />
                     </FormItem>
@@ -106,7 +105,7 @@ export default function SignUpPage() {
                   <FormItem>
                     <FormLabel>Email</FormLabel>
                     <FormControl>
-                      <Input placeholder="user@example.com" {...field} />
+                      <Input placeholder="user@example.com" {...field} disabled={isLoading}/>
                     </FormControl>
                     <FormMessage />
                   </FormItem>
@@ -119,7 +118,7 @@ export default function SignUpPage() {
                   <FormItem>
                     <FormLabel>Password</FormLabel>
                     <FormControl>
-                      <Input type="password" placeholder="••••••••" {...field} />
+                      <Input type="password" placeholder="••••••••" {...field} disabled={isLoading}/>
                     </FormControl>
                     <FormMessage />
                   </FormItem>

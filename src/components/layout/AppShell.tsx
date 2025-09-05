@@ -265,6 +265,7 @@ const AppShellLayout = ({ children }: { children: React.ReactNode }) => {
 const AppShell = ({ children }: { children: React.ReactNode }) => {
   const pathname = usePathname();
   const { user, isLoading } = useAuth();
+  const router = useRouter();
 
   if (isLoading) {
     return (
@@ -274,8 +275,16 @@ const AppShell = ({ children }: { children: React.ReactNode }) => {
     );
   }
 
+  // If user is not authenticated and not on an auth page, redirect.
+  // This can happen briefly on initial load.
   if (!user && !pathname.startsWith('/auth')) {
-    return null; // Or a redirect component if you prefer
+    // router.replace('/auth/sign-in') is problematic here due to render loops.
+    // A simple loading state or null return is safer during hydration.
+    return (
+      <div className="flex h-screen w-screen items-center justify-center">
+        <Loader2 className="h-12 w-12 animate-spin text-primary" />
+      </div>
+    );
   }
   
   if (pathname.startsWith('/auth')) {

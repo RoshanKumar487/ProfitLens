@@ -43,8 +43,8 @@ export default function SignInPage() {
       const result = await response.json();
 
       if (response.ok) {
-        toast({ title: 'Success', description: 'Signed in successfully.' });
-        router.refresh();
+        toast({ title: 'Success', description: 'Signed in successfully. Redirecting...' });
+        window.location.href = '/dashboard';
       } else {
         throw new Error(result.message || 'Failed to sign in.');
       }
@@ -54,8 +54,7 @@ export default function SignInPage() {
         description: error.message,
         variant: 'destructive',
       });
-    } finally {
-      setIsLoading(false);
+       setIsLoading(false);
     }
   };
 
@@ -76,7 +75,7 @@ export default function SignInPage() {
                   <FormItem>
                     <FormLabel>Email</FormLabel>
                     <FormControl>
-                      <Input placeholder="user@example.com" {...field} />
+                      <Input placeholder="user@example.com" {...field} disabled={isLoading} />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
@@ -89,7 +88,7 @@ export default function SignInPage() {
                   <FormItem>
                     <FormLabel>Password</FormLabel>
                     <FormControl>
-                      <Input type="password" placeholder="••••••••" {...field} />
+                      <Input type="password" placeholder="••••••••" {...field} disabled={isLoading}/>
                     </FormControl>
                     <FormMessage />
                   </FormItem>
