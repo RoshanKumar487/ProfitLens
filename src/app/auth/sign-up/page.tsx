@@ -12,12 +12,15 @@ import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '
 import Link from 'next/link';
 import { Loader2 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { COUNTRIES } from '@/lib/countries';
 
 const formSchema = z.object({
   displayName: z.string().min(2, 'Display name is required'),
   companyName: z.string().min(2, 'Company name is required'),
   email: z.string().email('Invalid email address'),
   password: z.string().min(8, 'Password must be at least 8 characters long'),
+  country: z.string().min(2, 'Country is required'),
 });
 
 type FormValues = z.infer<typeof formSchema>;
@@ -28,7 +31,7 @@ export default function SignUpPage() {
 
   const form = useForm<FormValues>({
     resolver: zodResolver(formSchema),
-    defaultValues: { displayName: '', companyName: '', email: '', password: '' },
+    defaultValues: { displayName: '', companyName: '', email: '', password: '', country: '' },
   });
 
   const onSubmit: SubmitHandler<FormValues> = async (data) => {
@@ -122,6 +125,28 @@ export default function SignUpPage() {
                   </FormItem>
                 )}
               />
+               <FormField
+                  control={form.control}
+                  name="country"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Country & Currency</FormLabel>
+                      <Select onValueChange={field.onChange} defaultValue={field.value} disabled={isLoading}>
+                         <FormControl>
+                            <SelectTrigger><SelectValue placeholder="Select a country" /></SelectTrigger>
+                         </FormControl>
+                         <SelectContent>
+                           {COUNTRIES.map(c => (
+                             <SelectItem key={c.code} value={c.code}>
+                               {c.name} ({c.currency})
+                             </SelectItem>
+                           ))}
+                         </SelectContent>
+                      </Select>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
               <Button type="submit" className="w-full" disabled={isLoading}>
                 {isLoading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
                 Create Account

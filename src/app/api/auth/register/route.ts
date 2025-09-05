@@ -2,12 +2,13 @@ import { NextResponse } from 'next/server';
 import { connectToDatabase } from '@/lib/mongodb';
 import bcrypt from 'bcryptjs';
 import { createSession } from '@/lib/auth';
+import { v4 as uuidv4 } from 'uuid';
 
 export async function POST(request: Request) {
   try {
-    const { email, password, displayName, companyName } = await request.json();
+    const { email, password, displayName, companyName, country } = await request.json();
 
-    if (!email || !password || !displayName || !companyName) {
+    if (!email || !password || !displayName || !companyName || !country) {
       return NextResponse.json({ message: 'All fields are required' }, { status: 400 });
     }
 
@@ -19,9 +20,13 @@ export async function POST(request: Request) {
     }
 
     const hashedPassword = await bcrypt.hash(password, 10);
+    
+    const publicCompanyId = `pub-${uuidv4()}`;
 
     const companyResult = await db.collection('companies').insertOne({
         name: companyName,
+        country: country,
+        publicId: publicCompanyId,
         createdAt: new Date(),
     });
     const companyId = companyResult.insertedId;
@@ -47,6 +52,8 @@ export async function POST(request: Request) {
       companyId: companyId.toHexString(),
       companyName,
       role: 'admin',
+      country,
+      publicCompanyId,
     };
 
     await createSession(userPayload);

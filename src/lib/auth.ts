@@ -2,7 +2,10 @@ import { SignJWT, jwtVerify } from 'jose';
 import { cookies } from 'next/headers';
 import { NextRequest, NextResponse } from 'next/server';
 
-const secretKey = process.env.JWT_SECRET_KEY || 'default-secret-key-that-should-be-in-env';
+const secretKey = process.env.JWT_SECRET_KEY;
+if (!secretKey) {
+    throw new Error('JWT_SECRET_KEY is not set in the environment variables.');
+}
 const key = new TextEncoder().encode(secretKey);
 
 export async function encrypt(payload: any) {
@@ -20,8 +23,6 @@ export async function decrypt(input: string): Promise<any> {
     });
     return payload;
   } catch (error) {
-    // Log the specific error for debugging purposes
-    console.error('JWT Verification Error:', error);
     // In case of any error (token expired, invalid signature, etc.), return null
     return null;
   }
@@ -31,7 +32,7 @@ export async function createSession(user: any) {
   const expires = new Date(Date.now() + 60 * 60 * 1000); // 1 hour from now
   const session = await encrypt({ user, expires });
 
-  cookies().set('session', session, { expires, httpOnly: true });
+  cookies().set('session', session, { expires, httpOnly: true, secure: process.env.NODE_ENV === 'production', path: '/' });
 }
 
 export async function verifySession() {
@@ -47,6 +48,7 @@ export async function verifySession() {
     
     // Check if the session is expired
     if (new Date(session.expires) < new Date()) {
+        await deleteSession();
         return null;
     }
 
@@ -54,5 +56,5 @@ export async function verifySession() {
 }
 
 export async function deleteSession() {
-  cookies().set('session', '', { expires: new Date(0) });
+  cookies().set('session', '', { expires: new Date(0), path: '/' });
 }

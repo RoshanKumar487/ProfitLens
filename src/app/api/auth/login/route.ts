@@ -34,6 +34,8 @@ export async function POST(request: Request) {
         companyName: company?.name,
         role: user.role,
         isSuperAdmin: user.isSuperAdmin || false,
+        country: company?.country || 'US',
+        publicCompanyId: company?.publicId,
     };
 
     await createSession(userPayload);

@@ -2,7 +2,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { verifySession } from '@/lib/auth';
 
-const PROTECTED_ROUTES = ['/dashboard', '/invoicing', '/employees', '/settings', '/reports', '/record-expenses', '/record-revenue', '/payroll', '/products-services', '/company-details', '/admin', '/ai-assistant'];
+const PROTECTED_ROUTES = ['/dashboard', '/invoicing', '/employees', '/settings', '/reports', '/record-expenses', '/record-revenue', '/payroll', '/products-services', '/company-details', '/admin', '/ai-assistant', '/bank-accounts'];
 const AUTH_ROUTES = ['/auth/sign-in', '/auth/sign-up'];
 
 export async function middleware(request: NextRequest) {
@@ -10,7 +10,7 @@ export async function middleware(request: NextRequest) {
   const session = await verifySession();
 
   const isAuthPage = AUTH_ROUTES.some(route => pathname.startsWith(route));
-  const isProtectedRoute = PROTECTED_ROUTES.some(route => pathname.startsWith(route));
+  const isProtectedRoute = PROTECTED_ROUTES.some(route => pathname.startsWith(route)) || pathname === '/';
   
   if (isAuthPage) {
     if (session) {
@@ -21,7 +21,9 @@ export async function middleware(request: NextRequest) {
 
   if (isProtectedRoute) {
     if (!session) {
-      return NextResponse.redirect(new URL('/auth/sign-in', request.url));
+      const url = request.nextUrl.clone();
+      url.pathname = '/auth/sign-in';
+      return NextResponse.redirect(url);
     }
   }
 
