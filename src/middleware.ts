@@ -2,52 +2,30 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { verifySession } from '@/lib/auth';
 
-const PROTECTED_ROUTES = ['/dashboard', '/invoicing', '/employees', '/settings', '/reports'];
+const PROTECTED_ROUTES = ['/dashboard', '/invoicing', '/employees', '/settings', '/reports', '/record-expenses', '/record-revenue', '/payroll', '/products-services', '/company-details', '/admin', '/ai-assistant'];
 const AUTH_ROUTES = ['/auth/sign-in', '/auth/sign-up'];
 
 export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
+  const session = await verifySession();
 
-  try {
-    const session = await verifySession();
-    
-    // If user is authenticated
+  const isAuthPage = AUTH_ROUTES.some(route => pathname.startsWith(route));
+  const isProtectedRoute = PROTECTED_ROUTES.some(route => pathname.startsWith(route));
+  
+  if (isAuthPage) {
     if (session) {
-      // and trying to access auth pages, redirect to dashboard
-      if (AUTH_ROUTES.some(route => pathname.startsWith(route))) {
-        return NextResponse.redirect(new URL('/dashboard', request.url));
-      }
-      // Pass headers to ensure the next request has the session info
-      return NextResponse.next({
-        request: {
-          headers: request.headers,
-        }
-      });
+      return NextResponse.redirect(new URL('/dashboard', request.url));
     }
+    return NextResponse.next();
+  }
 
-    // If user is not authenticated
-    // and trying to access a protected route, redirect to sign-in
-    if (PROTECTED_ROUTES.some(route => pathname.startsWith(route))) {
+  if (isProtectedRoute) {
+    if (!session) {
       return NextResponse.redirect(new URL('/auth/sign-in', request.url));
     }
-    
-    return NextResponse.next({
-        request: {
-          headers: request.headers,
-        }
-      });
-  } catch (err) {
-    console.error('Middleware error:', err);
-    // If verification fails, redirect to sign-in for protected routes
-    if (PROTECTED_ROUTES.some(route => pathname.startsWith(route))) {
-        return NextResponse.redirect(new URL('/auth/sign-in', request.url));
-    }
-    return NextResponse.next({
-        request: {
-          headers: request.headers,
-        }
-      });
   }
+
+  return NextResponse.next();
 }
 
 export const config = {
