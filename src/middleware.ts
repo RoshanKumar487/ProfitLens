@@ -1,3 +1,4 @@
+
 import { NextRequest, NextResponse } from 'next/server';
 import { verifySession } from '@/lib/auth';
 
@@ -16,7 +17,12 @@ export async function middleware(request: NextRequest) {
       if (AUTH_ROUTES.some(route => pathname.startsWith(route))) {
         return NextResponse.redirect(new URL('/dashboard', request.url));
       }
-      return NextResponse.next();
+      // Pass headers to ensure the next request has the session info
+      return NextResponse.next({
+        request: {
+          headers: request.headers,
+        }
+      });
     }
 
     // If user is not authenticated
@@ -25,14 +31,22 @@ export async function middleware(request: NextRequest) {
       return NextResponse.redirect(new URL('/auth/sign-in', request.url));
     }
     
-    return NextResponse.next();
+    return NextResponse.next({
+        request: {
+          headers: request.headers,
+        }
+      });
   } catch (err) {
     console.error('Middleware error:', err);
     // If verification fails, redirect to sign-in for protected routes
     if (PROTECTED_ROUTES.some(route => pathname.startsWith(route))) {
         return NextResponse.redirect(new URL('/auth/sign-in', request.url));
     }
-    return NextResponse.next();
+    return NextResponse.next({
+        request: {
+          headers: request.headers,
+        }
+      });
   }
 }
 
